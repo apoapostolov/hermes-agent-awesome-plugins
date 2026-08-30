@@ -1,0 +1,5 @@
+name: drag-to-pin-session
+version: 1.0.0
+description: "Drag a session into the Pinned section to pin it, drag it out to unpin."
+author: Apostol Apostolov
+license: MIT

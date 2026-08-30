@@ -19,7 +19,7 @@ import sys
 
 LIVE_ROOT = pathlib.Path("C:/Users/theap/AppData/Local/hermes/plugins")
 MONO_ROOT = pathlib.Path("C:/git-public/hermes-agent-awesome-plugins")
-PLUGINS = ("provider-status", "hermes-break", "better-colors")
+PLUGINS = ("provider-status", "hermes-break", "better-colors", "drag-to-pin-session")
 IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo", "config.json", "library.env", ".env", "*.key", ".DS_Store")
 
 def run(cmd, cwd=None):
@@ -56,12 +56,12 @@ def copy_plugins():
             shutil.rmtree(p, ignore_errors=True)
         for p in dst.rglob("*.pyc"):
             p.unlink(missing_ok=True)
-        # Pack install looks for desktop/plugin.js. Live better-colors keeps
+        # Pack install looks for desktop/plugin.js. Live plugins keep
         # plugin.js at the package root so the desktop-plugins auto-on door
-        # is the only loader.
+        # is the only loader — relocate for the pack layout only.
         root_js = dst / "plugin.js"
         desk_js = dst / "desktop" / "plugin.js"
-        if name == "better-colors" and root_js.exists() and not desk_js.exists():
+        if root_js.exists() and not desk_js.exists():
             (dst / "desktop").mkdir(exist_ok=True)
             root_js.replace(desk_js)
             print("  moved plugin.js -> desktop/plugin.js")

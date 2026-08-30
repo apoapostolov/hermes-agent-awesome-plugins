@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0] - 2026-08-30
+
+Adds `drag-to-pin-session` to the pack.
+
+### Added
+
+- **drag-to-pin-session:** the Pinned section of the Sessions sidebar becomes a drag container. Drag a session row in to pin it, drag a pinned row out into Sessions to unpin it. Desktop-only, hot-reloads, no rebuild.
+
+### Changed
+
+- Pack description and README now cover four plugins.
+- `hermes-awesome-plugins-sync` mirrors `drag-to-pin-session`, and relocates a root `plugin.js` to `desktop/plugin.js` for any plugin rather than only `better-colors`.
+
 ## [1.0.0] - 2026-08-30
 
 First pack. Three Hermes Agent plugins, pinned to exact SHAs.
