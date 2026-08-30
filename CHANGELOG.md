@@ -2,12 +2,13 @@
 
 ## [1.0.0] - 2026-08-30
 
-First pack. Two Hermes Agent plugins, pinned to exact SHAs.
+First pack. Three Hermes Agent plugins, pinned to exact SHAs.
 
 ### Added
 
 - **provider-status:** quota chips across providers, Grok/Codex OAuth, key-pool rotation, and per-key reset-day rotation.
 - **hermes-break:** `/break` and `/again` kill a hung spawn without aborting the turn. `/again` reissues that call once.
+- **better-colors:** session list appearance. Color and bold titles, extra Appearance colors, idle-bullet glyphs.
 
 ### Upgrade notes
 
