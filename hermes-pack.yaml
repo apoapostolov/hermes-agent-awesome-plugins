@@ -1,5 +1,5 @@
 name: hermes-agent-awesome-plugins
-description: Hand-picked Hermes plugins that actually matter. Pack pins provider-status + hermes-break to reproducible SHAs.
+description: Hand-picked Hermes plugins that actually matter. Pack pins provider-status, hermes-break, and better-colors to reproducible SHAs.
 version: 1.0.0
 author: Apostol Apostolov
 plugins:
@@ -8,6 +8,9 @@ plugins:
     ref: 43fa4920e338a230ec10bba2a89f7edfcdeb3eca
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/hermes-break
+    ref: 43fa4920e338a230ec10bba2a89f7edfcdeb3eca
+  - repo: apoapostolov/hermes-agent-awesome-plugins
+    subdir: plugins/better-colors
     ref: 43fa4920e338a230ec10bba2a89f7edfcdeb3eca
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync

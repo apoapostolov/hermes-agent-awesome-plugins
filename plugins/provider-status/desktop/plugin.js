@@ -11,7 +11,7 @@ import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
 import * as React from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-const _PS_BUILD = 'v11-primary-gear'
+const _PS_BUILD = 'v12-delete-race'
 const STALE_MS = 0 // always refetch on mount — cheap endpoint
 const MANUAL_REFRESH_MS = 60_000 // min spacing between click-triggered refetches
 
@@ -304,6 +304,16 @@ const SHORT_NAME = {
   opencode: 'Go',
   openrouter: 'OR',
   codex: 'Codex',
+  openai: 'OA',
+  anthropic: 'AN',
+  groq: 'GQ',
+  cerebras: 'CB',
+  moonshot: 'MS',
+  minimax: 'MX',
+  gemini: 'GM',
+  huggingface: 'HF',
+  mistral: 'MI',
+  qwen: 'QW',
 }
 
 function chipName(id, full, compact) {
@@ -585,6 +595,16 @@ const FALLBACK_META = {
   codex: { name: 'Codex (OpenAI)', icon: 'code', env: [], has_env: false },
   opencode: { name: 'OpenCode Go', icon: 'terminal', env: ['OPENCODE_GO_API_KEY'], has_env: false },
   openrouter: { name: 'OpenRouter', icon: 'globe', env: ['OPENROUTER_API_KEY'], has_env: false },
+  openai: { name: 'OpenAI', icon: 'cloud', env: ['OPENAI_API_KEY'], has_env: false },
+  anthropic: { name: 'Anthropic', icon: 'comment-discussion', env: ['ANTHROPIC_API_KEY'], has_env: false },
+  groq: { name: 'Groq', icon: 'zap', env: ['GROQ_API_KEY'], has_env: false },
+  cerebras: { name: 'Cerebras', icon: 'chip', env: ['CEREBRAS_API_KEY'], has_env: false },
+  moonshot: { name: 'Moonshot Kimi', icon: 'moon', env: ['MOONSHOT_API_KEY'], has_env: false },
+  minimax: { name: 'MiniMax', icon: 'symbol-numeric', env: ['MINIMAX_API_KEY'], has_env: false },
+  gemini: { name: 'Google Gemini', icon: 'sparkle', env: ['GEMINI_API_KEY'], has_env: false },
+  huggingface: { name: 'Hugging Face', icon: 'smiley', env: ['HUGGINGFACE_API_KEY'], has_env: false },
+  mistral: { name: 'Mistral', icon: 'wind', env: ['MISTRAL_API_KEY'], has_env: false },
+  qwen: { name: 'Qwen', icon: 'archive', env: ['DASHSCOPE_API_KEY'], has_env: false },
 }
 
 function _isMetaMap(v) {
@@ -669,7 +689,7 @@ function SignalDot({ tone, reason, age }) {
   })
 }
 
-function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, variant, dragging, dropOver, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, variant, dragging, dropOver, onDragStart, onDragOver, onDrop, onDragEnd, onRemove }) {
   const [enabled, setEnabled] = useState(!!pc.enabled)
   const [keys, setKeys] = useState(pc.pool?.length ? [...pc.pool] : [''])
   const [flow, setFlow] = useState(null)
@@ -852,8 +872,10 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, variant, dra
         jsx(SignalDot, { tone: (probe?.keys || []).find(k => k.index === 0)?.tone, reason: (probe?.keys || []).find(k => k.index === 0)?.reason, age: probeAge }),
         // + button (env providers only) — square icon button with add glyph
         !isOAuth && pmeta.env?.length ? jsx(Button, { variant: 'outline', size: 'icon-xs', className: 'shrink-0 items-center justify-center', onClick: addKey, title: 'add another key', children: jsx(Codicon, { name: 'add', size: '0.75rem' }) }) : null,
-        // checkbox — rightmost
+        // checkbox
         jsx(Checkbox, { checked: enabled, onCheckedChange: v => { setEnabled(v); persist(v) }, className: 'shrink-0', size: 'sm' }),
+        // delete provider — rightmost. Removes the row + key entirely.
+        jsx(Button, { variant: 'ghost', size: 'icon-xs', className: 'shrink-0 text-(--ui-text-quaternary) hover:text-destructive', onClick: () => onRemove && onRemove(pid), title: 'delete provider', children: jsx(Codicon, { name: 'trash', size: '0.75rem' }) }),
       ]}),
       // ── extra key rows ──
       keys.slice(1).map((k, i) => jsxs('div', { className: 'flex items-center gap-2', children: [
@@ -876,16 +898,77 @@ function SetupBody({ variant } = {}) {
   const [order, setOrder] = useState(null) // null = not yet derived
   const [dragPid, setDragPid] = useState(null)
   const [overPid, setOverPid] = useState(null)
-  const pidsRaw = [...savedOrder.filter(p => meta[p]), ...Object.keys(meta).filter(p => !savedOrder.includes(p))]
+  // Rows follow saved `order` only. The catalog is the dropdown, never auto-appended.
+  const pidsRaw = savedOrder.filter(p => meta[p])
   const pids = order ?? pidsRaw
 
-  useEffect(() => { setOrder(null) }, [cfg]) // backend is source of truth on refetch
+  // Rapid add/delete: keep the intended order in a ref, serialize POSTs, and
+  // ignore a cfg refetch that still contains a pid we just removed.
+  const orderRef = useRef(pids)
+  orderRef.current = pids
+  const pendingRemove = useRef(new Set())
+  const saveChain = useRef(Promise.resolve())
+  const savingN = useRef(0)
+
+  const persistNow = async (extra = {}) => {
+    const latest = [...orderRef.current]
+    const gone = [...pendingRemove.current]
+    const rest = { ...extra }
+    for (const [k, v] of Object.entries(provCfg)) {
+      if (gone.includes(k) || !latest.includes(k)) continue
+      if (!rest[k]) rest[k] = v
+    }
+    for (const k of Object.keys(rest)) {
+      if (!latest.includes(k)) delete rest[k]
+    }
+    await postJson('config', { providers: rest, remove: gone, order: latest, poll_minutes: cfg.poll_minutes || undefined })
+    postJson('refresh')
+    await refetchCfg()
+    if (savingN.current <= 1) {
+      for (const p of gone) {
+        if (!orderRef.current.includes(p)) pendingRemove.current.delete(p)
+      }
+    }
+  }
+  const enqueueCfg = (fn) => {
+    savingN.current += 1
+    saveChain.current = saveChain.current.then(fn).catch(() => {}).finally(() => { savingN.current -= 1 })
+    return saveChain.current
+  }
+
+  const [toAdd, setToAdd] = useState('')
+  const addable = Object.keys(meta).filter(p => !(pids).includes(p))
+
+  const addProvider = () => {
+    if (!toAdd || !meta[toAdd]) return
+    const id = toAdd
+    pendingRemove.current.delete(id)
+    const next = [...orderRef.current, id]
+    orderRef.current = next
+    setOrder(next)
+    setToAdd('')
+    enqueueCfg(() => persistNow({ [id]: { ...(provCfg[id] || {}), enabled: false, pool: (provCfg[id] && provCfg[id].pool) || [] } }))
+  }
+
+  const removeProvider = (pid) => {
+    pendingRemove.current.add(pid)
+    const next = orderRef.current.filter(p => p !== pid)
+    orderRef.current = next
+    setOrder(next)
+    enqueueCfg(() => persistNow())
+  }
+
+  useEffect(() => {
+    if (savingN.current) return
+    const server = (cfg.order || []).filter(p => meta[p])
+    if ([...pendingRemove.current].some(p => server.includes(p))) return
+    setOrder(null)
+  }, [cfg])
 
   const persistOrder = (nextPids) => {
+    orderRef.current = nextPids
     setOrder(nextPids)
-    postJson('config', { providers: provCfg, order: nextPids, poll_minutes: cfg.poll_minutes || undefined })
-    postJson('refresh')
-    refetchCfg()
+    enqueueCfg(() => persistNow())
   }
   // Live HTML5 sortable: as the pointer crosses a row midpoint, splice now
   // (no persist). Persist once on drop / dragend.
@@ -980,10 +1063,28 @@ function SetupBody({ variant } = {}) {
       onDragOver: hoverReorder,
       onDrop: finishDrag,
       onDragEnd: finishDrag,
+      onRemove: removeProvider,
     }))
+  const addRow = addable.length
+    ? jsxs('div', { className: 'flex items-center gap-2', children: [
+        jsx('select', {
+          value: toAdd,
+          onChange: e => setToAdd(e.target.value),
+          className: 'h-7 flex-1 min-w-0 rounded border bg-transparent px-2 text-[0.75rem]',
+          style: { borderColor: 'var(--ui-border)', color: 'var(--ui-text-secondary)' },
+          children: [
+            jsx('option', { value: '', children: 'Add a provider…' }),
+            addable.map(p => jsx('option', { key: p, value: p, children: meta[p].name || p })),
+          ],
+        }),
+        jsx(Button, { variant: 'outline', size: 'icon-xs', className: 'shrink-0 h-7 w-7 items-center justify-center', disabled: !toAdd, onClick: addProvider, title: 'add provider', children: jsx(Codicon, { name: 'add', size: '0.8rem' }) }),
+      ] })
+    : null
+
   return jsxs('div', { className: 'flex flex-col gap-3', style: { fontSize: '0.8125rem' },
     children: [
       banner,
+      addRow,
       variant === 'hermes'
         ? jsx('div', { ref: flipRef, className: 'overflow-hidden rounded-lg border border-(--stroke-nous) divide-y divide-(--ui-stroke-secondary)', children: rows })
         : jsx('div', { ref: flipRef, className: 'flex flex-col gap-2', children: rows }),

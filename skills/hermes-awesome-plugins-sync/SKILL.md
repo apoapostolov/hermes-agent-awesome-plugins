@@ -1,7 +1,7 @@
 ---
 name: hermes-awesome-plugins-sync
 category: hermes
-description: "Use when provider-status or hermes-break changes — sync live plugins into the hermes-agent-awesome-plugins monorepo, sanitize secrets, refresh wiring, and repin hermes-pack.yaml."
+description: "Use when provider-status, hermes-break, or better-colors changes — sync live plugins into the hermes-agent-awesome-plugins monorepo."
 version: 1.0.0
 tags:
 - hermes
@@ -13,11 +13,11 @@ related_skills:
 
 # Hermes Awesome Plugins Sync
 
-Keep `C:/git-public/hermes-agent-awesome-plugins` (GitHub `apoapostolov/hermes-agent-awesome-plugins`) in sync with the live installs at `C:/Users/theap/AppData/Local/hermes/plugins/{provider-status,hermes-break}`. When either plugin is touched, the monorepo must be updated in the same session — no drift.
+Keep `C:/git-public/hermes-agent-awesome-plugins` (GitHub `apoapostolov/hermes-agent-awesome-plugins`) in sync with the live installs at `C:/Users/theap/AppData/Local/hermes/plugins/{provider-status,hermes-break,better-colors}`. When any of those plugins is touched, the monorepo must be updated in the same session — no drift.
 
 ## Trigger
 
-- Any edit to `provider-status` (`plugin.yaml`, `__init__.py`, `dashboard/*`, `desktop/plugin.js`) or `hermes-break` (`__init__.py`, `desktop/plugin.js`, `plugin.yaml`).
+- Any edit to `provider-status`, `hermes-break`, or `better-colors`.
 - Version bump, bug fix, UI tweak, new provider — all of them.
 - Explicit "sync the awesome plugins" / "push to awesome-plugins".
 
@@ -53,6 +53,7 @@ It copies:
 
 - `C:/Users/theap/AppData/Local/hermes/plugins/provider-status` → `C:/git-public/hermes-agent-awesome-plugins/plugins/provider-status` (ignores `config.json`, `library.env`, `__pycache__`)
 - `C:/Users/theap/AppData/Local/hermes/plugins/hermes-break` → `C:/git-public/hermes-agent-awesome-plugins/plugins/hermes-break`
+- `C:/Users/theap/AppData/Local/hermes/plugins/better-colors` → `C:/git-public/hermes-agent-awesome-plugins/plugins/better-colors` (root `plugin.js` is moved to `desktop/plugin.js` for the pack layout)
 
 It preserves `.example` files and `README.md` in the monorepo if they are newer than live stubs.
 
@@ -61,7 +62,7 @@ Manual fallback (if script missing):
 ```bash
 python -c "
 import shutil, pathlib
-for name in ('provider-status','hermes-break'):
+for name in ('provider-status','hermes-break','better-colors'):
   src=pathlib.Path(f'C:/Users/theap/AppData/Local/hermes/plugins/{name}')
   dst=pathlib.Path(f'C:/git-public/hermes-agent-awesome-plugins/plugins/{name}')
   if dst.exists(): shutil.rmtree(dst)
@@ -94,7 +95,7 @@ hermes plugins pack show C:/git-public/hermes-agent-awesome-plugins/hermes-pack.
 hermes plugins pack show https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
 ```
 
-Both must parse and list 2 plugins with exact SHAs.
+Both must parse and list 3 plugins with exact SHAs.
 
 ## Also mirrored in-repo
 

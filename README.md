@@ -34,6 +34,7 @@ hermes plugins install github:apoapostolov/hermes-agent-awesome-plugins --ref <s
 |---|---|---|
 | [**provider-status**](plugins/provider-status/README.md) | Unified multi-provider quota/status bar — chips (`↑ used` / `↓ remaining`), setup dialog, OAuth (Grok/Codex), key-pool + reset-day auto-rotation. | native + desktop + dashboard |
 | [**hermes-break**](plugins/hermes-break/README.md) | `/break` / `/again` — kill a hung tool spawn without aborting the turn. Composer strip with elapsed grades + auto-break. | native + desktop |
+| [**better-colors**](plugins/better-colors/README.md) | Session names take the Appearance color (mode-aware lightness), optional per-session bold, full Codicon idle-bullet with search. | desktop |
 
 More plugins will be curated here over time. The pack always pins exact commits, never floating tags.
 
@@ -46,7 +47,7 @@ More plugins will be curated here over time. The pack always pins exact commits,
 
 ## Local dev / sync
 
-This repo mirrors the live installs at `C:/Users/theap/AppData/Local/hermes/plugins/{provider-status,hermes-break}`.
+This repo mirrors the live installs at `C:/Users/theap/AppData/Local/hermes/plugins/{provider-status,hermes-break,better-colors}`.
 
 - Make changes in the live plugin dir, verify with `hermes plugins doctor <name>`.
 - Then run the sync skill to mirror + bump + pin the pack:

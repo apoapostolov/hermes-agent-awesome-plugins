@@ -293,7 +293,9 @@ def _ingest_library(cfg: dict) -> dict:
             stems = tuple(spec["match"])
             values = [v for k, v in lib.items() if _is_key_name(k, stems)]
             # keep first-seen order from current pool then library extras
-            pconf = providers.setdefault(pid, {})
+            pconf = providers.get(pid)
+            if pconf is None:
+                continue  # deleted rows stay gone; do not resurrect from library.env
             old = list(pconf.get("pool") or [])
             merged: list[str] = []
             for v in old + values:
@@ -1348,12 +1350,181 @@ def fetch_opencode(cfg: dict) -> dict:
     return {"ok": False, "error": f"HTTP {last_status}" if last_status else "unreachable"}
 
 
+def fetch_openai(cfg: dict) -> dict:
+    """OpenAI legacy credit-grants balance (grants/usage based, not usage-based
+    subscriptions). Showed only when a remaining balance exists."""
+    key = resolve_key(["OPENAI_API_KEY"], cfg.get("pool"), cfg.get("pool_index", 0))
+    if not key:
+        return {"ok": False, "error": "no key", "label": "OPENAI_API_KEY"}
+    try:
+        d = api_get("https://api.openai.com/dashboard/billing/credit_grants",
+                    {"Authorization": f"Bearer {key}", "Accept": "application/json",
+                     "Referer": "https://platform.openai.com/", "Origin": "https://platform.openai.com"})
+    except HTTPError as e:
+        return {"ok": False, "error": f"HTTP {e.code}", **({"needs_auth": True} if e.code in (401, 403) else {})}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:60]}
+    avail = d.get("total_available")
+    if avail is None:
+        granted = d.get("total_granted"); used = d.get("total_used")
+        if granted is not None and used is not None:
+            avail = float(granted) - float(used)
+    if avail is None:
+        return {"ok": False, "error": "no wallet"}
+    return {"ok": True, "balance": round(max(0.0, float(avail)), 2),
+            "pct": None, "detail": f"${max(0.0, float(avail)):.2f}"}
+
+
+def fetch_anthropic(cfg: dict) -> dict:
+    """Anthropic exposes no wallet balance; surface the per-minute request
+    rate-limit as a bounded wall from the /v1/models probe headers."""
+    key = resolve_key(["ANTHROPIC_API_KEY"], cfg.get("pool"), cfg.get("pool_index", 0))
+    if not key:
+        return {"ok": False, "error": "no key", "label": "ANTHROPIC_API_KEY"}
+    try:
+        req = __import__("urllib.request", fromlist=["Request"]).Request(
+            "https://api.anthropic.com/v1/models",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "Accept": "application/json"})
+        with __import__("urllib.request", fromlist=["urlopen"]).urlopen(req, timeout=10) as resp:
+            h = resp.headers
+    except HTTPError as e:
+        return {"ok": False, "error": f"HTTP {e.code}", **({"needs_auth": True} if e.code in (401, 403) else {})}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:60]}
+    lim = h.get("anthropic-ratelimit-requests-limit")
+    rem = h.get("anthropic-ratelimit-requests-remaining")
+    if lim is None or rem is None:
+        return {"ok": False, "error": "no rate-limit headers"}
+    used = float(lim) - float(rem)
+    return {"ok": True, "percent": round(used / float(lim) * 100, 1),
+            "detail": f"RPM {int(used)}/{int(float(lim))}"}
+
+
+def _header_limit_fetch(url: str, label: str, keyname: str, cfg: dict) -> dict:
+    """Groq / Cerebras: rate-limit headers on the /models probe."""
+    key = resolve_key([keyname], cfg.get("pool"), cfg.get("pool_index", 0))
+    if not key:
+        return {"ok": False, "error": "no key", "label": keyname}
+    try:
+        req = __import__("urllib.request", fromlist=["Request"]).Request(
+            url, headers={"Authorization": f"Bearer {key}", "Accept": "application/json"})
+        with __import__("urllib.request", fromlist=["urlopen"]).urlopen(req, timeout=10) as resp:
+            h = resp.headers
+    except HTTPError as e:
+        return {"ok": False, "error": f"HTTP {e.code}", **({"needs_auth": True} if e.code in (401, 403) else {})}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:60]}
+    lim = h.get("x-ratelimit-limit-requests")
+    rem = h.get("x-ratelimit-remaining-requests")
+    if lim is None or rem is None:
+        return {"ok": False, "error": "no rate-limit headers"}
+    used = float(lim) - float(rem)
+    return {"ok": True, "percent": round(used / float(lim) * 100, 1),
+            "detail": f"{label} {int(used)}/{int(float(lim))}"}
+
+
+def fetch_groq(cfg: dict) -> dict:
+    return _header_limit_fetch("https://api.groq.com/openai/v1/models", "RPM", "GROQ_API_KEY", cfg)
+
+
+def fetch_cerebras(cfg: dict) -> dict:
+    return _header_limit_fetch("https://api.cerebras.ai/v1/models", "RPM", "CEREBRAS_API_KEY", cfg)
+
+
+def fetch_moonshot(cfg: dict) -> dict:
+    key = resolve_key(["MOONSHOT_API_KEY"], cfg.get("pool"), cfg.get("pool_index", 0))
+    if not key:
+        return {"ok": False, "error": "no key", "label": "MOONSHOT_API_KEY"}
+    last = None
+    for base in ("https://api.moonshot.ai", "https://api.moonshot.cn"):
+        try:
+            d = api_get(f"{base}/v1/users/me/balance",
+                        {"Authorization": f"Bearer {key}", "Accept": "application/json"})
+            break
+        except HTTPError as e:
+            last = f"HTTP {e.code}"
+            if e.code not in (400, 401, 403):
+                break
+        except Exception as e:
+            last = str(e)[:40]
+            break
+    else:
+        return {"ok": False, "error": last or "unreachable"}
+    body = d.get("data") if isinstance(d, dict) else {}
+    if not isinstance(body, dict):
+        body = d if isinstance(d, dict) else {}
+    amt = body.get("available_balance", body.get("balance", body.get("total_balance")))
+    if amt is None:
+        return {"ok": False, "error": "empty"}
+    return {"ok": True, "balance": round(float(amt), 2),
+            "pct": None, "detail": f"{float(amt):.2f}"}
+
+
+def fetch_minimax(cfg: dict) -> dict:
+    key = resolve_key(["MINIMAX_API_KEY"], cfg.get("pool"), cfg.get("pool_index", 0))
+    if not key:
+        return {"ok": False, "error": "no key", "label": "MINIMAX_API_KEY"}
+    last = None
+    data = None
+    for url in ("https://www.minimax.io/v1/token_plan/remains",
+                "https://api.minimax.io/v1/token_plan/remains"):
+        try:
+            data = api_get(url, {"Authorization": f"Bearer {key}", "Accept": "application/json"})
+            break
+        except HTTPError as e:
+            last = f"HTTP {e.code}"
+        except Exception as e:
+            last = str(e)[:40]
+    if data is None:
+        return {"ok": False, "error": last or "unreachable"}
+    raw = data.get("data") if isinstance(data, dict) else None
+    rows = raw.get("model_remains") if isinstance(raw, dict) and isinstance(raw.get("model_remains"), list) else [raw]
+    best = None
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        total = row.get("current_interval_total_count") or row.get("currentIntervalTotalCount")
+        left = row.get("current_interval_usage_count") or row.get("currentIntervalUsageCount")
+        if total is None or left is None:
+            continue
+        used = float(total) - float(left)
+        if total:
+            best = round(used / float(total) * 100, 1)
+            break
+    if best is None:
+        return {"ok": False, "error": "empty"}
+    return {"ok": True, "percent": best, "detail": f"used {best}%"}
+
+
+# Cloud providers with no public quota/wallet/rate-limit endpoint: still addable
+# and key-configurable, but the chip reports no usage boundary.
+def _no_quota(label: str):
+    def _f(cfg: dict) -> dict:
+        key = resolve_key([label], cfg.get("pool"), cfg.get("pool_index", 0))
+        if not key:
+            return {"ok": False, "error": "no key", "label": label}
+        return {"ok": False, "error": "no public quota endpoint"}
+    return _f
+
+
+fetch_gemini = _no_quota("GEMINI_API_KEY")
+fetch_huggingface = _no_quota("HUGGINGFACE_API_KEY")
+fetch_mistral = _no_quota("MISTRAL_API_KEY")
+fetch_qwen = _no_quota("DASHSCOPE_API_KEY")
+
+
 # ── Dispatch ───────────────────────────────────────────────────────
+
 
 FETCHERS = {
     "deepseek": fetch_deepseek, "glm": fetch_glm, "tavily": fetch_tavily,
     "grok": fetch_grok, "codex": fetch_codex, "opencode": fetch_opencode,
     "openrouter": fetch_openrouter,
+    "openai": fetch_openai, "anthropic": fetch_anthropic,
+    "groq": fetch_groq, "cerebras": fetch_cerebras,
+    "moonshot": fetch_moonshot, "minimax": fetch_minimax,
+    "gemini": fetch_gemini, "huggingface": fetch_huggingface,
+    "mistral": fetch_mistral, "qwen": fetch_qwen,
 }
 
 PROVIDER_META = {
@@ -1364,6 +1535,16 @@ PROVIDER_META = {
     "codex": {"name": "Codex (OpenAI)", "short": "Codex", "icon": "code", "env": []},
     "opencode": {"name": "OpenCode Go", "short": "Go", "icon": "terminal", "env": ["OPENCODE_GO_API_KEY"]},
     "openrouter": {"name": "OpenRouter", "short": "OR", "icon": "globe", "env": ["OPENROUTER_API_KEY"]},
+    "openai": {"name": "OpenAI", "short": "OA", "icon": "cloud", "env": ["OPENAI_API_KEY"]},
+    "anthropic": {"name": "Anthropic", "short": "AN", "icon": "comment-discussion", "env": ["ANTHROPIC_API_KEY"]},
+    "groq": {"name": "Groq", "short": "GQ", "icon": "zap", "env": ["GROQ_API_KEY"]},
+    "cerebras": {"name": "Cerebras", "short": "CB", "icon": "chip", "env": ["CEREBRAS_API_KEY"]},
+    "moonshot": {"name": "Moonshot Kimi", "short": "MS", "icon": "moon", "env": ["MOONSHOT_API_KEY"]},
+    "minimax": {"name": "MiniMax", "short": "MX", "icon": "symbol-numeric", "env": ["MINIMAX_API_KEY"]},
+    "gemini": {"name": "Google Gemini", "short": "GM", "icon": "sparkle", "env": ["GEMINI_API_KEY"]},
+    "huggingface": {"name": "Hugging Face", "short": "HF", "icon": "smiley", "env": ["HUGGINGFACE_API_KEY"]},
+    "mistral": {"name": "Mistral", "short": "MI", "icon": "wind", "env": ["MISTRAL_API_KEY"]},
+    "qwen": {"name": "Qwen", "short": "QW", "icon": "archive", "env": ["DASHSCOPE_API_KEY"]},
 }
 
 
@@ -1384,6 +1565,7 @@ class ConfigUpdate(BaseModel):
     providers: dict[str, ProviderConfig] = {}
     order: list[str] = []
     poll_minutes: int | None = None
+    remove: list[str] = []   # provider ids to delete entirely (rows + order)
 
 @router.get("/status")
 def get_status():
@@ -1391,8 +1573,7 @@ def get_status():
     pcfg = cfg.get("providers", {})
     # Order results by the saved `order` list so the statusbar matches dialog order.
     saved_order = [p for p in (cfg.get("order") or []) if p in FETCHERS]
-    tail = [p for p in FETCHERS if p not in saved_order]
-    ordered_ids = saved_order + tail
+    ordered_ids = saved_order
     results = {}
     cfg_dirty = False
 
@@ -1553,7 +1734,10 @@ def update_config(body: ConfigUpdate):
     def _m(cfg: dict) -> None:
         providers = cfg.setdefault("providers", {})
         secret_keep = ("access_token", "refresh_token", "email", "client_id", "issuer")
+        skip = set(body.remove or [])
         for pid, pv in (body.providers or {}).items():
+            if pid in skip:
+                continue
             incoming = (pv if isinstance(pv, ProviderConfig) else ProviderConfig(**pv)).model_dump()
             prev = dict(providers.get(pid) or {})
             merged = {**prev, **incoming}
@@ -1613,8 +1797,14 @@ def update_config(body: ConfigUpdate):
                 merged["reset_days_fired"] = prev["reset_days_fired"]
             providers[pid] = merged
         cfg["providers"] = providers
-        if body.order:
-            cfg["order"] = body.order
+        if body.remove:
+            rm = [p for p in body.remove if p in providers]
+            for p in rm:
+                providers.pop(p, None)
+            if rm:
+                cfg["order"] = [p for p in (cfg.get("order") or []) if p not in rm]
+        if body.order is not None:
+            cfg["order"] = [p for p in body.order if p in FETCHERS]
         if body.poll_minutes is not None:
             cfg["poll_minutes"] = max(1, int(body.poll_minutes))
     mutate_config(_m)
