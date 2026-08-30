@@ -5,15 +5,15 @@ author: Apostol Apostolov
 plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/provider-status
-    ref: 23ed9f6f8802c1d0a247f62840466d88253b93b6
+    ref: ccab6133da54abd96eaad7086fed24f5d4661cde
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/hermes-break
-    ref: 23ed9f6f8802c1d0a247f62840466d88253b93b6
+    ref: ccab6133da54abd96eaad7086fed24f5d4661cde
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/better-colors
-    ref: 23ed9f6f8802c1d0a247f62840466d88253b93b6
+    ref: ccab6133da54abd96eaad7086fed24f5d4661cde
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/drag-to-pin-session
-    ref: 23ed9f6f8802c1d0a247f62840466d88253b93b6
+    ref: ccab6133da54abd96eaad7086fed24f5d4661cde
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync
