@@ -769,7 +769,7 @@ function start() {
 export default {
   id: ID,
   name: 'Better Colors',
-  description: 'Mode-aware session colors, optional bold, and bullet glyphs in Appearance.',
+  description: 'Session list appearance: color and bold titles, extra Appearance colors, idle-bullet glyphs.',
   defaultEnabled: true,
   register(ctx) {
     store = ctx.storage

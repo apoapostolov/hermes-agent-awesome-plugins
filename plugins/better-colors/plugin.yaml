@@ -1,5 +1,5 @@
 name: better-colors
-version: 1.1.0
-description: "Mode-aware session colors, optional bold, and bullet glyphs in Appearance."
+version: 1.1.1
+description: "Session list appearance: color and bold titles, extra Appearance colors, idle-bullet glyphs."
 author: Apostol Apostolov
 license: MIT

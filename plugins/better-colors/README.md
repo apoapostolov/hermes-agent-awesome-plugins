@@ -1,6 +1,6 @@
 # better-colors
 
-Desktop plugin that paints session names with the Appearance color, with optional bold and a Codicon idle-bullet.
+Desktop plugin for **session list appearance**: titles take the Appearance color, optional per-session bold, extra colors in the picker, and a Codicon idle-bullet.
 
 - Session title uses the Appearance color. Lightness flips for light vs dark so one hue stays readable in both modes.
 - **Bold Session** is per chat, stored with that session's color.
