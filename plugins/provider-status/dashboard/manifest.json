@@ -1,0 +1,12 @@
+{
+  "name": "provider-status",
+  "label": "Provider Status",
+  "description": "Unified multi-provider usage status bars with setup dialog",
+  "version": "0.1.0",
+  "api": "plugin_api.py",
+  "tab": {
+    "path": "/provider-status",
+    "position": "end",
+    "hidden": true
+  }
+}

@@ -1,0 +1,11 @@
+name: hermes-break
+version: 1.2.0
+description: "Skip a hung tool call without aborting the turn. /break kills the newest in-flight spawn. /again reissues at most twice per call."
+author: Apostol Apostolov
+license: MIT
+hooks:
+  - pre_tool_call
+  - post_tool_call
+  - transform_tool_result
+  - on_session_start
+  - on_session_end
