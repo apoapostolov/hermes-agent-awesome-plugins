@@ -5,9 +5,9 @@ author: Apostol Apostolov
 plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/provider-status
-    ref: cd30f4dc82ed9b5e0c34469167d4c227d0d5a85e
+    ref: 43fa4920e338a230ec10bba2a89f7edfcdeb3eca
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/hermes-break
-    ref: cd30f4dc82ed9b5e0c34469167d4c227d0d5a85e
+    ref: 43fa4920e338a230ec10bba2a89f7edfcdeb3eca
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync
