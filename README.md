@@ -1,69 +1,60 @@
-# hermes-agent-awesome-plugins
+# Hermes Agent Awesome Plugins
 
-> **Show this repo to Hermes and it installs everything.**
+A Hermes Agent plugin pack. Two plugins, pinned to exact SHAs in `hermes-pack.yaml`. Install the pack, not a GitHub Release.
 
-Hand-picked, battle-tested Hermes plugins that earn their keep. One pack, one prompt.
+## What's New in 1.0.0
 
-## Just tell Hermes
+First pack. `provider-status` shows quota chips across providers, with Grok/Codex OAuth plus key-pool and reset-day rotation. `hermes-break` adds `/break` and `/again` so you can kill a hung spawn without aborting the turn.
 
-Paste this into any Hermes session that can see this repo (local checkout `C:/git-public/hermes-agent-awesome-plugins` or the GitHub URL):
+See [CHANGELOG.md](CHANGELOG.md) for the notes.
 
-```
-Install the awesome plugins from this repo — read hermes-pack.yaml and README.md
-then run the install for me. Source: https://github.com/apoapostolov/hermes-agent-awesome-plugins
-```
+## Plugins
 
-Hermes will:
+| Plugin | What it does |
+| --- | --- |
+| [provider-status](plugins/provider-status/README.md) | Quota chips across providers (`↑ used` / `↓ remaining`). Grok and Codex OAuth. Key-pool rotation when remaining is low. Reset-day rotation per key. |
+| [hermes-break](plugins/hermes-break/README.md) | `/break` and `/again` kill a hung spawn tree and leave the turn running. `/again` reissues the call once. |
 
-1. Read `hermes-pack.yaml` (pinned SHAs → reproducible)
-2. Run `hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml`
-3. Walk you through capability consents + any `requires_env` prompts
-4. Verify with `hermes plugins list` and `hermes plugins pack show <url>`
+## Install
 
-No Hermes? Do it manually:
+Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) `>= 0.3`.
 
 ```bash
 hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
-# or per-plugin
-hermes plugins install github:apoapostolov/hermes-agent-awesome-plugins --ref <sha>  # subdir via pack only
 ```
 
-## What's inside
+Each plugin still gets its own capability consent. Packs do not bulk-grant. Secrets are `requires_env` at install, not in the pack.
 
-| Plugin | What it does | Kind |
-|---|---|---|
-| [**provider-status**](plugins/provider-status/README.md) | Unified multi-provider quota/status bar — chips (`↑ used` / `↓ remaining`), setup dialog, OAuth (Grok/Codex), key-pool + reset-day auto-rotation. | native + desktop + dashboard |
-| [**hermes-break**](plugins/hermes-break/README.md) | `/break` / `/again` — kill a hung tool spawn without aborting the turn. Composer strip with elapsed grades + auto-break. | native + desktop |
-| [**better-colors**](plugins/better-colors/README.md) | Session names take the Appearance color (mode-aware lightness), optional per-session bold, full Codicon idle-bullet with search. | desktop |
+Verify:
 
-More plugins will be curated here over time. The pack always pins exact commits, never floating tags.
-
-## How it works
-
-- Each plugin lives in `plugins/<name>/` with its own `plugin.yaml`, Python backend, and `desktop/plugin.js`.
-- `hermes-pack.yaml` pins `repo + subdir + ref` for every plugin — that file is the source of truth.
-- `hermes plugins pack install <url>` fans out to ordinary pinned installs (`--ref <sha>`), then every plugin's declared capabilities go through the **same per-plugin consent** as a standalone install — packs never bulk-grant.
-- Secrets never ride in the pack. Plugins declare `requires_env` and prompt for them at install.
-
-## Local dev / sync
-
-This repo mirrors the live installs at `C:/Users/theap/AppData/Local/hermes/plugins/{provider-status,hermes-break,better-colors}`.
-
-- Make changes in the live plugin dir, verify with `hermes plugins doctor <name>`.
-- Then run the sync skill to mirror + bump + pin the pack:
-
-```
-# Tell Hermes:
-Sync the awesome-plugins monorepo — copy live plugins into C:/git-public/hermes-agent-awesome-plugins, sanitize secrets, refresh README wiring, commit + push, then update hermes-pack.yaml refs to the new commit SHA.
+```bash
+hermes plugins list
+hermes plugins pack show https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
 ```
 
-Skill: [`skills/hermes-awesome-plugins-sync`](skills/hermes-awesome-plugins-sync/SKILL.md) — always keep the monorepo in sync when you touch these plugins.
+From a Hermes session that can see this repo, you can also ask it to read `hermes-pack.yaml` and run that pack install.
+
+## How It Works
+
+`hermes-pack.yaml` is the source of truth: `repo` + `subdir` + 40-char `ref` per plugin. `hermes plugins pack install` fans out to ordinary pinned installs.
+
+Each plugin lives under `plugins/<name>/` with its own `plugin.yaml`, Python backend, and desktop entry.
 
 ## Requirements
 
 - Hermes Agent `>= 0.3` (plugins + packs)
-- Windows / macOS / Linux — both plugins are cross-platform; `hermes-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX.
+- Windows / macOS / Linux. `hermes-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX.
+
+## Documentation
+
+- [provider-status](plugins/provider-status/README.md)
+- [hermes-break](plugins/hermes-break/README.md)
+- [hermes-awesome-plugins-sync](skills/hermes-awesome-plugins-sync/SKILL.md) — maintainer skill to mirror live plugin dirs into this repo and repin `hermes-pack.yaml`
+
+## Support
+
+Support, feedback, and feature ideas: [@ApoMakesMods](https://x.com/ApoMakesMods) on X.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE) © Apostol Apostolov
