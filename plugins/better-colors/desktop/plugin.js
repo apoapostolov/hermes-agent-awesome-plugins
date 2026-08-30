@@ -321,6 +321,18 @@ function ensureStyle() {
     ${ROW}[data-bc-bold="1"] ${TITLE},
     ${ROW}[data-bc-bold="1"] ${TITLE} .hover-marquee-inner {
       font-weight: 700 !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      animation: none !important;
+      transform: none !important;
+    }
+    ${ROW}[data-bc-bold="1"] ${TITLE} .hover-marquee-inner {
+      display: block !important;
+      max-width: 100% !important;
+    }
+    ${ROW}[data-bc-bold="1"] ${TITLE}[data-marquee='true'] {
+      text-overflow: ellipsis !important;
     }
     [${EXTRA_ATTR}="host"] {
       display: grid;
@@ -541,8 +553,14 @@ function paintGlyph(row, color) {
 function paintSessionTitles() {
   document.querySelectorAll(ROW).forEach(row => {
     const sid = rowSessionId(row)
-    if (sessionBold(sid)) row.dataset.bcBold = '1'
-    else delete row.dataset.bcBold
+    if (sessionBold(sid)) {
+      row.dataset.bcBold = '1'
+      row.querySelectorAll(TITLE).forEach(el => {
+        delete el.dataset.marquee
+        el.style.removeProperty('--marquee-d')
+        el.style.removeProperty('--marquee-t')
+      })
+    } else delete row.dataset.bcBold
     const idle = row.querySelector(IDLE_DOT)
     if (idle) {
       const fill = idle.style.backgroundColor
