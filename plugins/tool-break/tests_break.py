@@ -1,4 +1,4 @@
-"""Local checks for hermes-break rewrite helpers."""
+"""Local checks for tool-break rewrite helpers."""
 from __future__ import annotations
 
 import importlib.util

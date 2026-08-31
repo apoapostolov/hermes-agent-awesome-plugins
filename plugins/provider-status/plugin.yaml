@@ -1,4 +1,13 @@
 name: provider-status
 version: 0.1.0
-description: "Unified multi-provider usage status bars with setup dialog"
+description: "Unified multi-provider quota usage tracking in the status bar, with support for OAuth, color-based warnings, and multiple accounts per provider with Hermes key rotation on exhaust."
 author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/provider-status
+tags:
+  - desktop
+  - quota
+  - oauth
+  - statusbar

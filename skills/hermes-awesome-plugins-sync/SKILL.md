@@ -1,7 +1,7 @@
 ---
 name: hermes-awesome-plugins-sync
 category: hermes
-description: "Use when provider-status, hermes-break, or better-colors changes — sync live plugins into the hermes-agent-awesome-plugins monorepo."
+description: "Use when provider-status, tool-break, or better-colors changes — sync live plugins into the hermes-agent-awesome-plugins monorepo."
 version: 1.0.0
 tags:
 - hermes
@@ -13,11 +13,11 @@ related_skills:
 
 # Hermes Awesome Plugins Sync
 
-Keep `C:/git-public/hermes-agent-awesome-plugins` (GitHub `apoapostolov/hermes-agent-awesome-plugins`) in sync with the live installs at `C:/Users/theap/AppData/Local/hermes/plugins/{provider-status,hermes-break,better-colors}`. When any of those plugins is touched, the monorepo must be updated in the same session — no drift.
+Keep `C:/git-public/hermes-agent-awesome-plugins` (GitHub `apoapostolov/hermes-agent-awesome-plugins`) in sync with the live installs at `C:/Users/theap/AppData/Local/hermes/plugins/{provider-status,tool-break,better-colors}`. When any of those plugins is touched, the monorepo must be updated in the same session — no drift.
 
 ## Trigger
 
-- Any edit to `provider-status`, `hermes-break`, or `better-colors`.
+- Any edit to `provider-status`, `tool-break`, or `better-colors`.
 - Version bump, bug fix, UI tweak, new provider — all of them.
 - Explicit "sync the awesome plugins" / "push to awesome-plugins".
 
@@ -34,7 +34,7 @@ Keep `C:/git-public/hermes-agent-awesome-plugins` (GitHub `apoapostolov/hermes-a
 
 ```bash
 hermes plugins doctor provider-status
-hermes plugins doctor hermes-break
+hermes plugins doctor tool-break
 ```
 
 Fix any failures before syncing.
@@ -52,7 +52,7 @@ python "C:/git-public/hermes-agent-awesome-plugins/skills/hermes-awesome-plugins
 It copies:
 
 - `C:/Users/theap/AppData/Local/hermes/plugins/provider-status` → `C:/git-public/hermes-agent-awesome-plugins/plugins/provider-status` (ignores `config.json`, `library.env`, `__pycache__`)
-- `C:/Users/theap/AppData/Local/hermes/plugins/hermes-break` → `C:/git-public/hermes-agent-awesome-plugins/plugins/hermes-break`
+- `C:/Users/theap/AppData/Local/hermes/plugins/tool-break` → `C:/git-public/hermes-agent-awesome-plugins/plugins/tool-break`
 - `C:/Users/theap/AppData/Local/hermes/plugins/better-colors` → `C:/git-public/hermes-agent-awesome-plugins/plugins/better-colors` (root `plugin.js` is moved to `desktop/plugin.js` for the pack layout)
 
 It preserves `.example` files and `README.md` in the monorepo if they are newer than live stubs.
@@ -62,7 +62,7 @@ Manual fallback (if script missing):
 ```bash
 python -c "
 import shutil, pathlib
-for name in ('provider-status','hermes-break','better-colors'):
+for name in ('provider-status','tool-break','better-colors'):
   src=pathlib.Path(f'C:/Users/theap/AppData/Local/hermes/plugins/{name}')
   dst=pathlib.Path(f'C:/git-public/hermes-agent-awesome-plugins/plugins/{name}')
   if dst.exists(): shutil.rmtree(dst)
@@ -79,7 +79,7 @@ If new config keys were added, update `plugins/provider-status/config.json.examp
 ```bash
 git -C C:/git-public/hermes-agent-awesome-plugins status
 git -C C:/git-public/hermes-agent-awesome-plugins add -A
-git -C C:/git-public/hermes-agent-awesome-plugins commit -m "sync: provider-status vX.Y.Z + hermes-break vA.B.C — <one-line why>"
+git -C C:/git-public/hermes-agent-awesome-plugins commit -m "sync: provider-status vX.Y.Z + tool-break vA.B.C — <one-line why>"
 git -C C:/git-public/hermes-agent-awesome-plugins push
 # capture new SHA then patch hermes-pack.yaml refs
 SHA=$(git -C C:/git-public/hermes-agent-awesome-plugins rev-parse HEAD)

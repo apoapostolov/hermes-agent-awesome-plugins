@@ -1,5 +1,12 @@
 name: better-colors
 version: 1.1.1
-description: "Session list appearance: color and bold titles, extra Appearance colors, idle-bullet glyphs."
+description: "Improve your session list with full name color, bolding, and a Codicon icon when a session is idle."
 author: Apostol Apostolov
 license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/better-colors
+tags:
+  - desktop
+  - appearance
+  - sessions

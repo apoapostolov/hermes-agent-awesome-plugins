@@ -1,5 +1,5 @@
 /**
- * hermes-break desktop half. Layout A: name + time pill left,
+ * tool-break desktop half. Layout A: name + time pill left,
  * Break / Message / Again / gear right. Message injects "/break "
  * into the composer. Gear sets elapsed color grades, auto-break
  * checkboxes, and tools that never show the strip.
@@ -20,9 +20,9 @@ import {
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useEffect, useRef, useState } from 'react'
 
-const ID = 'hermes-break'
-const GRADE_KEY = 'hermes-break.grades'
-const HIDE_KEY = 'hermes-break.hide'
+const ID = 'tool-break'
+const GRADE_KEY = 'tool-break.grades'
+const HIDE_KEY = 'tool-break.hide'
 const DEFAULT_GRADES = {
   amber: 30,
   amberBold: 60,
@@ -739,7 +739,7 @@ export default {
       id: 'break-key',
       area: KEYBINDS_AREA,
       data: {
-        id: 'hermes-break.break',
+        id: 'tool-break.break',
         label: 'Skip stalled tool call',
         category: 'session',
         defaults: ['mod+shift+b'],
@@ -752,7 +752,7 @@ export default {
       id: 'break-palette',
       area: PALETTE_AREA,
       data: {
-        id: 'hermes-break.break',
+        id: 'tool-break.break',
         label: 'Break stalled tool',
         keywords: ['break', 'stuck', 'hung', 'skip', 'tool'],
         run: () => {
@@ -764,7 +764,7 @@ export default {
       id: 'again-palette',
       area: PALETTE_AREA,
       data: {
-        id: 'hermes-break.again',
+        id: 'tool-break.again',
         label: 'Break and reissue stalled tool',
         keywords: ['again', 'retry', 'reissue', 'stuck'],
         run: () => {

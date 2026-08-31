@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.0] - 2026-09-01
+
+`hermes-break` is now `tool-break`. The pack requires Hermes Agent 0.21.0.
+
+### Changed
+
+- **tool-break:** renamed from `hermes-break`. Commands stay `/break`, `/break {message}`, and `/again`.
+- Plugin descriptions match the community-index copy.
+- Manifests declare `manifest_version: 2`, `api_version: 1`, homepage, and tags.
+- Install docs require Hermes Agent `>= 0.21.0` (shareable plugin packs).
+
+### Upgrade notes
+
+- Reinstall from the pack, or disable `hermes-break` and enable `tool-break`.
+- Desktop strip settings live under `localStorage` keys `tool-break.grades` and `tool-break.hide` (old `hermes-break.*` keys are not read).
+
 ## [1.1.0] - 2026-08-30
 
 Adds `drag-to-pin-session` to the pack.

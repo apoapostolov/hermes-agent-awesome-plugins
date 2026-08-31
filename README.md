@@ -2,9 +2,11 @@
 
 A Hermes Agent plugin pack. Four plugins, pinned to exact SHAs in `hermes-pack.yaml`. Install the pack, not a GitHub Release.
 
-## What's New in 1.1.0
+Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
-`drag-to-pin-session` makes the **Pinned** section of the Sessions sidebar a drag container. Drag a session in to pin it, drag a pinned row out to unpin it. No rebuild, no restart.
+## What's New in 1.2.0
+
+`hermes-break` is now **`tool-break`**. Same `/break` and `/again` commands. Pack install needs Hermes 0.21.0.
 
 See [CHANGELOG.md](CHANGELOG.md) for the notes.
 
@@ -12,14 +14,14 @@ See [CHANGELOG.md](CHANGELOG.md) for the notes.
 
 | Plugin | What it does |
 | --- | --- |
-| [provider-status](plugins/provider-status/README.md) | Quota chips across providers (`↑ used` / `↓ remaining`). Grok and Codex OAuth. Key-pool rotation when remaining is low. Reset-day rotation per key. |
-| [hermes-break](plugins/hermes-break/README.md) | `/break` and `/again` kill a hung spawn tree and leave the turn running. `/again` reissues the call once. |
-| [better-colors](plugins/better-colors/README.md) | Session list appearance: color and bold titles, extra Appearance colors, idle-bullet glyphs. |
-| [drag-to-pin-session](plugins/drag-to-pin-session/README.md) | Drag sessions into the Pinned section to pin, drag them out to unpin. Desktop-only, hot-reloads. |
+| [provider-status](plugins/provider-status/README.md) | Unified multi-provider quota usage tracking in the status bar, with support for OAuth, color-based warnings, and multiple accounts per provider with Hermes key rotation on exhaust. |
+| [tool-break](plugins/tool-break/README.md) | Never let a stalled tool call force you to cancel a long task. Abort an in-flight call with `/break`, instruct with `/break {message}`, or force it to repeat with `/again`. |
+| [better-colors](plugins/better-colors/README.md) | Improve your session list with full name color, bolding, and a Codicon icon when a session is idle. |
+| [drag-to-pin-session](plugins/drag-to-pin-session/README.md) | Reorganize your pinned sessions with drag-and-drop. Drag a session into the Pinned section to pin it, or drag it out to unpin. |
 
 ## Install
 
-Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) `>= 0.3`.
+Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) `>= 0.21.0`.
 
 ```bash
 hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
@@ -44,13 +46,13 @@ Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop
 
 ## Requirements
 
-- Hermes Agent `>= 0.3` (plugins + packs)
-- Windows / macOS / Linux. `hermes-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX. `better-colors` and `drag-to-pin-session` are desktop-only (session list overlays).
+- Hermes Agent `>= 0.21.0` (plugin packs)
+- Windows / macOS / Linux. `tool-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX. `better-colors` and `drag-to-pin-session` are desktop-only (session list overlays).
 
 ## Documentation
 
 - [provider-status](plugins/provider-status/README.md)
-- [hermes-break](plugins/hermes-break/README.md)
+- [tool-break](plugins/tool-break/README.md)
 - [better-colors](plugins/better-colors/README.md)
 - [drag-to-pin-session](plugins/drag-to-pin-session/README.md)
 - [hermes-awesome-plugins-sync](skills/hermes-awesome-plugins-sync/SKILL.md) — maintainer skill to mirror live plugin dirs into this repo and repin `hermes-pack.yaml`

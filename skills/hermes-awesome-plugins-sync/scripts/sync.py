@@ -19,7 +19,7 @@ import sys
 
 LIVE_ROOT = pathlib.Path("C:/Users/theap/AppData/Local/hermes/plugins")
 MONO_ROOT = pathlib.Path("C:/git-public/hermes-agent-awesome-plugins")
-PLUGINS = ("provider-status", "hermes-break", "better-colors", "drag-to-pin-session")
+PLUGINS = ("provider-status", "tool-break", "better-colors", "drag-to-pin-session")
 IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo", "config.json", "library.env", ".env", "*.key", ".DS_Store")
 
 def run(cmd, cwd=None):
