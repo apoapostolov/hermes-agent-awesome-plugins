@@ -40,6 +40,7 @@ function start() {
   const contentObserver = new MutationObserver(records => {
     const touched = new Set()
     records.forEach(record => {
+      if (!record.addedNodes.length) return
       const node = record.target.nodeType === Node.TEXT_NODE
         ? record.target.parentElement
         : record.target
@@ -76,7 +77,7 @@ function start() {
     if (state) return state
     state = { hidden: isInHiddenPane(el), followUntil: 0, timers: [] }
     viewports.set(el, state)
-    contentObserver.observe(el, { childList: true, subtree: true, characterData: true })
+    contentObserver.observe(el, { childList: true, subtree: true })
     resizeObserver.observe(el)
     return state
   }
@@ -90,7 +91,7 @@ function start() {
       state.hidden = hidden
       el.setAttribute(MARK, hidden ? 'hidden' : 'visible')
 
-      if (!hidden && (becameVisible || firstVisibleMount || state.followUntil > Date.now())) {
+      if (!hidden && (becameVisible || firstVisibleMount)) {
         scheduleSnap(el, state)
       }
     })
