@@ -1,6 +1,6 @@
 name: scroll-on-switch
-version: 1.1.0
-description: "Snap the transcript to the bottom when a session becomes active, including newly mounted sessions and late-rendered messages."
+version: 1.2.0
+description: "Snap the transcript to the bottom when a session becomes active or receives new and late-rendered messages."
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2

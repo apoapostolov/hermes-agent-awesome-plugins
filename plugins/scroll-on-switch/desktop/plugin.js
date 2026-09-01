@@ -37,6 +37,23 @@ function isInHiddenPane(el) {
  */
 function start() {
   const viewports = new WeakMap()
+  const contentObserver = new MutationObserver(records => {
+    const touched = new Set()
+    records.forEach(record => {
+      const node = record.target.nodeType === Node.TEXT_NODE
+        ? record.target.parentElement
+        : record.target
+      const viewport = node?.closest?.(VIEWPORT)
+      if (viewport) touched.add(viewport)
+    })
+    touched.forEach(el => {
+      const state = viewports.get(el)
+      if (state && !isInHiddenPane(el)) {
+        state.hidden = false
+        scheduleSnap(el, state)
+      }
+    })
+  })
   const resizeObserver = new ResizeObserver(entries => {
     entries.forEach(({ target }) => {
       const state = viewports.get(target)
@@ -59,6 +76,7 @@ function start() {
     if (state) return state
     state = { hidden: isInHiddenPane(el), followUntil: 0, timers: [] }
     viewports.set(el, state)
+    contentObserver.observe(el, { childList: true, subtree: true, characterData: true })
     resizeObserver.observe(el)
     return state
   }
@@ -100,6 +118,7 @@ function start() {
 
   return () => {
     observer.disconnect()
+    contentObserver.disconnect()
     resizeObserver.disconnect()
     document.querySelectorAll(`[${MARK}]`).forEach(el => el.removeAttribute(MARK))
     document.querySelectorAll(VIEWPORT).forEach(el => {
