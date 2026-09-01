@@ -16,12 +16,12 @@ See [CHANGELOG.md](CHANGELOG.md) for the notes.
 
 | Plugin | What it does |
 | --- | --- |
-| [provider-status](plugins/provider-status/README.md) | Unified multi-provider quota usage tracking in the status bar, with support for OAuth, color-based warnings, and multiple accounts per provider with Hermes key rotation on exhaust. |
-| [tool-break](plugins/tool-break/README.md) | Never let a stalled tool call force you to cancel a long task. Abort an in-flight call with `/break`, instruct with `/break {message}`, or force it to repeat with `/again`. |
-| [better-colors](plugins/better-colors/README.md) | Improve your session list with full name color, bolding, and a Codicon icon when a session is idle. |
-| [drag-to-pin-session](plugins/drag-to-pin-session/README.md) | Reorganize your pinned sessions with drag-and-drop. Drag a session into the Pinned section to pin it, or drag it out to unpin. |
-| [opaque-composer](plugins/opaque-composer/README.md) | Keep the desktop composer solid while scrolling so conversation text stays readable. |
-| [scroll-on-switch](plugins/scroll-on-switch/README.md) | Keep active session transcripts at the bottom after switching sessions or receiving a new message. |
+| [provider‑status](plugins/provider-status/README.md) | Unified multi-provider quota usage tracking in the status bar, with support for OAuth, color-based warnings, and multiple accounts per provider with Hermes key rotation on exhaust. |
+| [tool‑break](plugins/tool-break/README.md) | Never let a stalled tool call force you to cancel a long task. Abort an in-flight call with `/break`, instruct with `/break {message}`, or force it to repeat with `/again`. |
+| [better‑colors](plugins/better-colors/README.md) | Improve your session list with full name color, bolding, and a Codicon icon when a session is idle. |
+| [drag‑to‑pin‑session](plugins/drag-to-pin-session/README.md) | Reorganize your pinned sessions with drag-and-drop. Drag a session into the Pinned section to pin it, or drag it out to unpin it. |
+| [opaque‑composer](plugins/opaque-composer/README.md) | Keep the desktop composer solid while scrolling so conversation text stays readable. |
+| [scroll‑on‑switch](plugins/scroll-on-switch/README.md) | Keep active session transcripts at the bottom after switching sessions or receiving a new message. |
 
 ## Install
 
