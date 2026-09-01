@@ -86,19 +86,11 @@ class BusyShortcutsTests(unittest.TestCase):
         cli.process_command("/q next turn")
         self.assertEqual(cli.calls, ["/q next turn"])
 
-    def test_bare_q_sets_queue_mode(self):
+    def test_q_is_untouched_built_in_queue_command(self):
         self.plugin._patch_cli()
         cli = FakeCLI()
         cli.process_command("/q")
-        self.assertEqual(cli.calls, ["/busy queue"])
-
-    def test_queue_hook_handles_bare_q_only(self):
-        self.plugin._active_cli = FakeCLI()
-        result = self.plugin._on_queue_command(raw_command="q", args="")
-        self.assertEqual(result, {"decision": "handled", "message": ""})
-        self.assertEqual(self.plugin._active_cli.calls, ["/busy queue"])
-        self.assertIsNone(self.plugin._on_queue_command(raw_command="q", args="next turn"))
-
+        self.assertEqual(cli.calls, ["/q"])
 
 if __name__ == "__main__":
     unittest.main()

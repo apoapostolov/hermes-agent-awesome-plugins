@@ -3,7 +3,7 @@
 Adds compact commands for changing how Hermes handles input while it is busy:
 
 - `/i` sets **interrupt** mode.
-- `/q` sets **queue** mode, while `/q <prompt>` remains Hermes' built-in queue shortcut.
+- `/q <prompt>` uses Hermes' built-in queue shortcut.
 - `/s` sets **steer** mode.
 - `/s <prompt>` sends the prompt through `/steer` immediately.
 
