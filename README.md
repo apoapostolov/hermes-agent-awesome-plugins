@@ -1,6 +1,6 @@
 # Hermes Agent Awesome Plugins
 
-A Hermes Agent plugin pack. Six plugins, pinned to exact SHAs in `hermes-pack.yaml`. Install the pack, not a GitHub Release.
+A Hermes Agent plugin pack. Seven plugins, pinned to exact SHAs in `hermes-pack.yaml`. Install the pack, not a GitHub Release.
 
 Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
@@ -22,6 +22,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the notes.
 | [drag‑to‑pin‑session](plugins/drag-to-pin-session/README.md) | Reorganize your pinned sessions with drag-and-drop. Drag a session into the Pinned section to pin it, or drag it out to unpin it. |
 | [opaque‑composer](plugins/opaque-composer/README.md) | Keep the desktop composer solid while scrolling so conversation text stays readable. |
 | [scroll‑on‑switch](plugins/scroll-on-switch/README.md) | Keep the active session transcript at the bottom when switching sessions. |
+| [busy‑shortcuts](plugins/busy-shortcuts/README.md) | Add `/i` for interrupt mode and `/s` for steer mode while retaining Hermes' built-in `/q` queue shortcut. |
 
 ## Install
 
@@ -61,6 +62,7 @@ Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop
 - [drag-to-pin-session](plugins/drag-to-pin-session/README.md)
 - [opaque-composer](plugins/opaque-composer/README.md)
 - [scroll-on-switch](plugins/scroll-on-switch/README.md)
+- [busy-shortcuts](plugins/busy-shortcuts/README.md)
 - [hermes-awesome-plugins-sync](skills/hermes-awesome-plugins-sync/SKILL.md) — maintainer skill to mirror live plugin dirs into this repo and repin `hermes-pack.yaml`
 
 ## Support

@@ -1,0 +1,12 @@
+name: busy-shortcuts
+version: 1.0.0
+description: "Short slash commands for Hermes busy-input modes: /i interrupt, /q queue, and /s steer."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/busy-shortcuts
+tags:
+  - desktop
+  - commands
+  - shortcuts
