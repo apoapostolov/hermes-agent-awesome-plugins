@@ -23,6 +23,6 @@ plugins:
     ref: ec5ed01b3af6c55d4f572be6b761ed2742461c13
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/busy-shortcuts
-    ref: c0c466d200d739e2d4e30aada2d43606c0359c3f
+    ref: 3a5a693758e971c16c19203d1e2631de942fd058
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync
