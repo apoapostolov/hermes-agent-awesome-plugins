@@ -82,6 +82,12 @@ class BusyShortcutsTests(unittest.TestCase):
         cli.process_command("/q next turn")
         self.assertEqual(cli.calls, ["/q next turn"])
 
+    def test_bare_q_sets_queue_mode(self):
+        self.plugin._patch_cli()
+        cli = FakeCLI()
+        cli.process_command("/q")
+        self.assertEqual(cli.calls, ["/busy queue"])
+
 
 if __name__ == "__main__":
     unittest.main()

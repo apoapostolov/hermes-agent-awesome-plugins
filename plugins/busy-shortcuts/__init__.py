@@ -5,6 +5,8 @@ behavior for ``/q <prompt>``. Bare ``/q`` remains the built-in queue command.
 The added shortcuts are:
 
 - ``/i`` -> ``/busy interrupt``
+- bare ``/q`` -> ``/busy queue``; ``/q <prompt>`` keeps the built-in queue
+  behavior
 - ``/s <prompt>`` -> ``/steer <prompt>``
 
 The CLI patch makes the aliases execute against the live CLI instance instead
@@ -92,9 +94,11 @@ def _patch_cli() -> None:
             else:
                 _set_mode("steer")
             return True
+        if base == "q" and not args:
+            _active_cli = self
+            _set_mode("queue")
+            return True
 
-        # /q is already a built-in alias for /queue. Keep it untouched so
-        # /q <prompt> remains useful and compatible with Hermes core.
         _active_cli = self
         return original(self, command)
 

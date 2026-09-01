@@ -22,7 +22,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the notes.
 | [drag‑to‑pin‑session](plugins/drag-to-pin-session/README.md) | Reorganize your pinned sessions with drag-and-drop. Drag a session into the Pinned section to pin it, or drag it out to unpin it. |
 | [opaque‑composer](plugins/opaque-composer/README.md) | Keep the desktop composer solid while scrolling so conversation text stays readable. |
 | [scroll‑on‑switch](plugins/scroll-on-switch/README.md) | Keep the active session transcript at the bottom when switching sessions. |
-| [busy‑shortcuts](plugins/busy-shortcuts/README.md) | Add `/i` for interrupt mode and `/s` for steer mode while retaining Hermes' built-in `/q` queue shortcut. |
+| [busy‑shortcuts](plugins/busy-shortcuts/README.md) | Add `/i` for interrupt mode, `/q` for queue mode, and `/s` for steer mode. Prompt arguments retain Hermes' built-in queue and steer behavior. |
 
 ## Install
 
