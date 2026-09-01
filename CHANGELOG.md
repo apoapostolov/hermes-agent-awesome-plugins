@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.0] - 2026-09-01
+
+### Fixed
+
+- **scroll-on-switch:** only scrolls when switching to a session. New messages and AI streaming no longer interrupt manual scrolling.
+
 ## [1.4.0] - 2026-09-01
 
 ### Added

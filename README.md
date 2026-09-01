@@ -4,11 +4,11 @@ A Hermes Agent plugin pack. Six plugins, pinned to exact SHAs in `hermes-pack.ya
 
 Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
-## What's New in 1.4.0
+## What's New in 1.5.0
 
 **Opaque Composer** keeps the desktop composer solid while you scroll, so earlier message text stays readable.
 
-**Scroll on Switch** keeps active session transcripts at the newest message after a session switch or new message, while still allowing manual scrolling once the message settles.
+**Scroll on Switch** lands at the newest message when you switch sessions, including newly mounted sessions, and never reacts to new messages or AI streaming.
 
 See [CHANGELOG.md](CHANGELOG.md) for the notes.
 
@@ -21,7 +21,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the notes.
 | [better‑colors](plugins/better-colors/README.md) | Improve your session list with full name color, bolding, and a Codicon icon when a session is idle. |
 | [drag‑to‑pin‑session](plugins/drag-to-pin-session/README.md) | Reorganize your pinned sessions with drag-and-drop. Drag a session into the Pinned section to pin it, or drag it out to unpin it. |
 | [opaque‑composer](plugins/opaque-composer/README.md) | Keep the desktop composer solid while scrolling so conversation text stays readable. |
-| [scroll‑on‑switch](plugins/scroll-on-switch/README.md) | Keep active session transcripts at the bottom after switching sessions or receiving a new message. |
+| [scroll‑on‑switch](plugins/scroll-on-switch/README.md) | Keep the active session transcript at the bottom when switching sessions. |
 
 ## Install
 
