@@ -629,7 +629,8 @@ function BreakBar() {
     let poll = 0
     const tick = async () => {
       try {
-        const raw = await runSlash('/break-status', true)
+        const sid = sessionId()
+        const raw = sid ? await runSlash(`/break-status --session-id ${sid}`, true) : ''
         if (!stop) {
           setStatus(parseStatus(raw))
         }

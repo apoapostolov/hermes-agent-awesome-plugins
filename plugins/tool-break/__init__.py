@@ -437,11 +437,12 @@ def _newest_visible() -> Optional[dict[str, Any]]:
     return _newest_killable() or _newest_spawn()
 
 
-def _visible_items() -> list[dict[str, Any]]:
+def _visible_items(session_id: Optional[str] = None) -> list[dict[str, Any]]:
     items = [
         item
         for item in _inflight.values()
-        if _killable(item) or item.get("name") in SPAWN_TOOLS
+        if (session_id is None or item.get("session_id") == session_id)
+        and (_killable(item) or item.get("name") in SPAWN_TOOLS)
     ]
     items.sort(key=lambda item: float(item.get("started_at") or 0), reverse=True)
     return items
@@ -634,9 +635,9 @@ def _tool_status(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _status_payload() -> dict[str, Any]:
+def _status_payload(session_id: Optional[str] = None) -> dict[str, Any]:
     with _lock:
-        tools = [_tool_status(item) for item in _visible_items()]
+        tools = [_tool_status(item) for item in _visible_items(session_id)]
         if not tools:
             return {"inflight": False, "killable": False, "tools": []}
         target = tools[0]
@@ -655,8 +656,14 @@ def _status_payload() -> dict[str, Any]:
         }
 
 
-def _handle_status(_raw_args: str) -> str:
-    return json.dumps(_status_payload(), separators=(",", ":"))
+def _handle_status(raw_args: str) -> str:
+    # Desktop passes the focused session because plugin state is shared by the
+    # gateway process across all sessions.
+    session_id = None
+    text = (raw_args or "").strip()
+    if text.startswith("--session-id "):
+        session_id = text[len("--session-id "):].strip() or None
+    return json.dumps(_status_payload(session_id), separators=(",", ":"))
 
 
 def _install_cli_busy_dispatch() -> None:

@@ -140,6 +140,21 @@ def test_again_cap():
     mod._on_post_tool_call(tool_call_id="st-1")
 
 
+def test_status_is_scoped_to_session():
+    with mod._lock:
+        mod._inflight.clear()
+        mod._broken.clear()
+        mod._again_by_fp.clear()
+    mod._on_pre_tool_call(tool_name="terminal", tool_call_id="session-a", session_id="session-a", args={"command": "sleep 1"})
+    mod._on_pre_tool_call(tool_name="process", tool_call_id="session-b", session_id="session-b", args={"command": "sleep 2"})
+    shown_a = json.loads(mod._handle_status("--session-id session-a"))
+    shown_b = json.loads(mod._handle_status("--session-id session-b"))
+    assert [row["id"] for row in shown_a["tools"]] == ["session-a"]
+    assert [row["id"] for row in shown_b["tools"]] == ["session-b"]
+    mod._on_post_tool_call(tool_call_id="session-a")
+    mod._on_post_tool_call(tool_call_id="session-b")
+
+
 def test_parse_args():
     assert mod._parse_args("") == (None, None)
     assert mod._parse_args("try page=1") == (None, "try page=1")
@@ -162,6 +177,7 @@ if __name__ == "__main__":
     test_parse_args()
     test_descendants_of_self()
     test_status_payload()
+    test_status_is_scoped_to_session()
     test_newest_is_default()
     test_again_cap()
     print("ok")
