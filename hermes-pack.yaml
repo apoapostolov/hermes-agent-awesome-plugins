@@ -8,7 +8,7 @@ plugins:
     ref: 9f8559024a4975fc9cfd21b6486f036c9cc48e8d
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/tool-break
-    ref: 9fbc6617b43d845a3e0b635adaa1ac1e6756ad78
+    ref: e495d6a718754d423244c066a93b48224087c6f1
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/better-colors
     ref: 9f8559024a4975fc9cfd21b6486f036c9cc48e8d
