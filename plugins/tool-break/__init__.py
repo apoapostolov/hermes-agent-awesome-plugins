@@ -33,7 +33,7 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-PID_POLL_MS = 0.2
+PID_POLL_MS = 1.0
 PID_POLL_FOR_S = 2.5
 SPAWN_TOOLS = frozenset({"terminal", "process"})
 SALVAGE_MAX = 8192
@@ -272,6 +272,7 @@ def _newest() -> Optional[dict[str, Any]]:
 
 
 def _attach_pids(item: dict[str, Any]) -> None:
+    """Claim processes spawned after this tool call started (caller holds lock)."""
     claimed = _claimed_pids()
     seen: set[int] = item["seen"]
     pids: list[int] = item["pids"]
@@ -280,6 +281,40 @@ def _attach_pids(item: dict[str, Any]) -> None:
             continue
         pids.append(pid)
         seen.add(pid)
+
+
+def _watch_tick(item: dict[str, Any]) -> None:
+    """One pid snapshot, then rearm while inside the watch window.
+
+    The watch window is the first PID_POLL_FOR_S seconds of a call, which is
+    when the tool's own spawns happen. After that the timer stops entirely;
+    late spawns are still caught at /break time via _kill_list_for(). The old
+    design re-snapshotted the whole system every 200ms for the entire tool
+    duration, which slowed tool start and ate CPU under the plugin lock.
+    """
+    with _lock:
+        live = _inflight.get(item["id"])
+        if live is None:
+            item["poll"] = None
+            return
+        _attach_pids(live)
+        rearm = (time.monotonic() - live["started_at"]) < PID_POLL_FOR_S
+        if rearm:
+            timer = threading.Timer(PID_POLL_MS, _watch_tick, args=(item,))
+            timer.daemon = True
+            item["poll"] = timer
+        else:
+            item["poll"] = None
+    if rearm:
+        timer.start()
+
+
+def _watch_pids(item: dict[str, Any]) -> None:
+    timer = threading.Timer(PID_POLL_MS, _watch_tick, args=(item,))
+    timer.daemon = True
+    with _lock:
+        item["poll"] = timer
+    timer.start()
 
 
 def _pid_alive(pid: int) -> bool:
@@ -308,25 +343,6 @@ def _pid_alive(pid: int) -> bool:
         return True
     except OSError:
         return False
-
-
-def _watch_pids(item: dict[str, Any]) -> None:
-    def _tick() -> None:
-        with _lock:
-            live = _inflight.get(item["id"])
-            if live is None:
-                item["poll"] = None
-                return
-            _attach_pids(live)
-        timer = threading.Timer(PID_POLL_MS, _tick)
-        timer.daemon = True
-        item["poll"] = timer
-        timer.start()
-
-    timer = threading.Timer(PID_POLL_MS, _tick)
-    timer.daemon = True
-    item["poll"] = timer
-    timer.start()
 
 
 def _drop(tool_call_id: str) -> None:

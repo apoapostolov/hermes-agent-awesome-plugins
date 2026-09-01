@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.3] - 2026-09-01
+
+### Fixed
+
+- **tool-break:** version `1.2.1` → `1.2.2`. The backend pid watcher snapshotted the whole system process table every 200ms for the entire life of every tool call (~12ms of locked work per snapshot on Windows), which stalled tool start and made typing lag. The watcher now runs only for the first 2.5 seconds of a call, then stops; late spawns are still caught at `/break` time. Combined with the 1.2.1 desktop backoff, an idle session now does near-zero plugin work.
+
 ## [1.2.2] - 2026-09-01
 
 ### Changed
