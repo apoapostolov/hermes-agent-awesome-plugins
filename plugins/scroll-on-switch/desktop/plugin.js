@@ -37,48 +37,21 @@ function isInHiddenPane(el) {
  */
 function start() {
   const viewports = new WeakMap()
-  const contentObserver = new MutationObserver(records => {
-    const touched = new Set()
-    records.forEach(record => {
-      if (!record.addedNodes.length) return
-      const node = record.target.nodeType === Node.TEXT_NODE
-        ? record.target.parentElement
-        : record.target
-      const viewport = node?.closest?.(VIEWPORT)
-      if (viewport) touched.add(viewport)
-    })
-    touched.forEach(el => {
-      const state = viewports.get(el)
-      if (state && !isInHiddenPane(el)) {
-        state.hidden = false
-        scheduleSnap(el, state)
-      }
-    })
-  })
-  const resizeObserver = new ResizeObserver(entries => {
-    entries.forEach(({ target }) => {
-      const state = viewports.get(target)
-      if (state && !state.hidden && state.followUntil > Date.now()) {
-        scheduleSnap(target, state)
-      }
-    })
-  })
+  const states = new Set()
 
   const scheduleSnap = (el, state) => {
     state.timers.forEach(clearTimeout)
     state.timers = [0, 50, 150, 400, 900].map(delay => setTimeout(() => {
       if (!state.hidden && document.contains(el)) snapToBottom(el)
     }, delay))
-    state.followUntil = Date.now() + 1500
   }
 
   const observeViewport = el => {
     let state = viewports.get(el)
     if (state) return state
-    state = { hidden: isInHiddenPane(el), followUntil: 0, timers: [] }
+    state = { hidden: isInHiddenPane(el), timers: [] }
     viewports.set(el, state)
-    contentObserver.observe(el, { childList: true, subtree: true })
-    resizeObserver.observe(el)
+    states.add(state)
     return state
   }
 
@@ -119,20 +92,15 @@ function start() {
 
   return () => {
     observer.disconnect()
-    contentObserver.disconnect()
-    resizeObserver.disconnect()
+    states.forEach(state => state.timers.forEach(clearTimeout))
     document.querySelectorAll(`[${MARK}]`).forEach(el => el.removeAttribute(MARK))
-    document.querySelectorAll(VIEWPORT).forEach(el => {
-      const state = viewports.get(el)
-      if (state) state.timers.forEach(clearTimeout)
-    })
   }
 }
 
 export default {
   id: ID,
   name: 'Scroll on Switch',
-  description: 'Always land at the bottom of the transcript when a session becomes active, including newly mounted sessions.',
+  description: 'Always land at the bottom of the transcript when switching to a session, including newly mounted sessions.',
   defaultEnabled: true,
   register(ctx) {
     ctx.onDispose(start())

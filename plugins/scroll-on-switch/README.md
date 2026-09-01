@@ -1,13 +1,12 @@
 # Scroll on Switch
 
-Keep the active Hermes Desktop transcript at the newest message when a session becomes active or receives a new message.
+Keep the active Hermes Desktop transcript at the newest message when switching sessions.
 
 ## What it does
 
 - Scrolls newly mounted sessions to the bottom.
 - Scrolls keep-alive sessions to the bottom when they become visible.
-- Follows inserted user and assistant message nodes, including the final response after a request finishes.
-- Stops forcing the viewport after the update settles, so manual scrolling still works.
+- Does not react to new messages or AI streaming, so manual scrolling is never interrupted while a session is working.
 
 Desktop-only. The plugin hot-reloads in Hermes Desktop.
 
