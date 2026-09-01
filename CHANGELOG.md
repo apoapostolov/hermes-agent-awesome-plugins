@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.0] - 2026-09-01
+
+### Fixed
+
+- **scroll-on-switch:** restore explicit activation tracking after removing transcript observers. Hidden-to-visible and newly mounted session switches now scroll correctly without reacting to new messages.
+
 ## [1.5.0] - 2026-09-01
 
 ### Fixed

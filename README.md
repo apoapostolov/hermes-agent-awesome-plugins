@@ -4,7 +4,7 @@ A Hermes Agent plugin pack. Seven plugins, pinned to exact SHAs in `hermes-pack.
 
 Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
-## What's New in 1.5.0
+## What's New in 1.7.0
 
 **Opaque Composer** keeps the desktop composer solid while you scroll, so earlier message text stays readable.
 
