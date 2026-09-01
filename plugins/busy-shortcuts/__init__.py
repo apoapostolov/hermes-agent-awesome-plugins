@@ -62,6 +62,20 @@ def _handle_steer(raw_args: str) -> str:
     return "Use /steer <prompt> to inject a message, or /busy steer to set Enter mode"
 
 
+def _on_queue_command(**kwargs: Any) -> dict[str, str] | None:
+    """Use bare built-in /q as the queue-mode shortcut.
+
+    Hermes resolves /q to the built-in ``queue`` command before plugin command
+    handlers run. The command hook is the supported interception point for
+    that collision. Queue prompts still pass through unchanged.
+    """
+    raw_command = str(kwargs.get("raw_command") or "").strip().lower().lstrip("/")
+    args = str(kwargs.get("args") or kwargs.get("raw_args") or "").strip()
+    if raw_command == "q" and not args:
+        return {"decision": "handled", "message": _set_mode("queue")}
+    return None
+
+
 def _patch_cli() -> None:
     global _cli_patched
     if _cli_patched:
@@ -107,6 +121,7 @@ def _patch_cli() -> None:
 
 
 def register(ctx: Any) -> None:
+    ctx.register_hook("command:queue", _on_queue_command)
     ctx.register_command(
         "i",
         handler=_handle_interrupt,

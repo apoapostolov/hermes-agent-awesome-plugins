@@ -31,9 +31,13 @@ class FakeCLI:
 class FakeContext:
     def __init__(self):
         self.commands = {}
+        self.hooks = {}
 
     def register_command(self, name, handler, **kwargs):
         self.commands[name] = (handler, kwargs)
+
+    def register_hook(self, name, callback):
+        self.hooks[name] = callback
 
 
 class BusyShortcutsTests(unittest.TestCase):
@@ -87,6 +91,13 @@ class BusyShortcutsTests(unittest.TestCase):
         cli = FakeCLI()
         cli.process_command("/q")
         self.assertEqual(cli.calls, ["/busy queue"])
+
+    def test_queue_hook_handles_bare_q_only(self):
+        self.plugin._active_cli = FakeCLI()
+        result = self.plugin._on_queue_command(raw_command="q", args="")
+        self.assertEqual(result, {"decision": "handled", "message": ""})
+        self.assertEqual(self.plugin._active_cli.calls, ["/busy queue"])
+        self.assertIsNone(self.plugin._on_queue_command(raw_command="q", args="next turn"))
 
 
 if __name__ == "__main__":
