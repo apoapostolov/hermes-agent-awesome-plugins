@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.0] - 2026-09-01
+
+### Added
+
+- **scroll-on-switch:** keeps active session transcripts at the newest message after switching sessions or receiving a new message. It handles newly mounted sessions and late-rendered message nodes without preventing manual scrolling after the update settles. Desktop-only.
+
 ## [1.3.0] - 2026-09-01
 
 ### Added
