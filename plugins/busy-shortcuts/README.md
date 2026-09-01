@@ -11,4 +11,6 @@ The mode controls what a normal message does while Hermes is working. The
 selected mode is persisted in `display.busy_input_mode` when Hermes exposes its
 configuration writer.
 
-This plugin has no desktop UI and does not change Hermes core files.
+This plugin has a Python command half and a minimal desktop entry so it
+appears in Hermes' desktop plugin toggle surface. It does not duplicate the
+shortcut implementation in JavaScript and does not change Hermes core files.
