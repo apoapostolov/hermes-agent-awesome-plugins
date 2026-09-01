@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.2] - 2026-09-01
+
+### Changed
+
+- **tool-break:** version `1.2.0` → `1.2.1`. Desktop bar no longer polls `/break-status` every second and re-renders 4x/second while idle: the poll backs off to 5s when nothing is in flight, and the elapsed-time clock runs only while tools are visible. Behavior while a tool is in flight is unchanged.
+
 ## [1.2.1] - 2026-09-01
 
 ### Changed

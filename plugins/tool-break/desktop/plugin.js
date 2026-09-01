@@ -640,20 +640,34 @@ function BreakBar() {
       }
     }
     void tick()
+    // Poll fast while a tool is in flight so the bar reacts instantly;
+    // idle backoff keeps the slash.exec round trip off the hot path.
+    const busy = status.inflight || status.tools.length > 0
     poll = window.setInterval(() => {
       void tick()
-    }, 1000)
+    }, busy ? 1000 : 5000)
+    return () => {
+      stop = true
+      window.clearInterval(poll)
+    }
+  }, [status.inflight, status.tools.length])
+
+  const tools = visibleTools(status, hide)
+
+  // Elapsed-time clock only while there are visible tools to animate;
+  // an idle bar no longer re-renders 4x/second for nothing.
+  useEffect(() => {
+    if (!tools.length) {
+      return
+    }
+    setNow(Date.now())
     const clock = window.setInterval(() => {
       setNow(Date.now())
     }, 250)
     return () => {
-      stop = true
-      window.clearInterval(poll)
       window.clearInterval(clock)
     }
-  }, [])
-
-  const tools = visibleTools(status, hide)
+  }, [tools.length])
 
   useEffect(() => {
     const live = new Set(tools.map(tool => tool.id).filter(Boolean))
