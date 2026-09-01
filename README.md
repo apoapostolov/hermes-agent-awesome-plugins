@@ -1,12 +1,12 @@
 # Hermes Agent Awesome Plugins
 
-A Hermes Agent plugin pack. Four plugins, pinned to exact SHAs in `hermes-pack.yaml`. Install the pack, not a GitHub Release.
+A Hermes Agent plugin pack. Five plugins, pinned to exact SHAs in `hermes-pack.yaml`. Install the pack, not a GitHub Release.
 
 Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
-## What's New in 1.2.0
+## What's New in 1.3.0
 
-`hermes-break` is now **`tool-break`**. Same `/break` and `/again` commands. Pack install needs Hermes 0.21.0.
+**Opaque Composer** keeps the desktop composer solid while you scroll, so earlier message text stays readable.
 
 See [CHANGELOG.md](CHANGELOG.md) for the notes.
 
@@ -18,6 +18,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the notes.
 | [tool-break](plugins/tool-break/README.md) | Never let a stalled tool call force you to cancel a long task. Abort an in-flight call with `/break`, instruct with `/break {message}`, or force it to repeat with `/again`. |
 | [better-colors](plugins/better-colors/README.md) | Improve your session list with full name color, bolding, and a Codicon icon when a session is idle. |
 | [drag-to-pin-session](plugins/drag-to-pin-session/README.md) | Reorganize your pinned sessions with drag-and-drop. Drag a session into the Pinned section to pin it, or drag it out to unpin. |
+| [opaque-composer](plugins/opaque-composer/README.md) | Keep the desktop composer solid while scrolling so conversation text stays readable. |
 
 ## Install
 
@@ -42,12 +43,12 @@ From a Hermes session that can see this repo, you can also ask it to read `herme
 
 `hermes-pack.yaml` is the source of truth: `repo` + `subdir` + 40-char `ref` per plugin. `hermes plugins pack install` fans out to ordinary pinned installs.
 
-Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop entry. `better-colors` and `drag-to-pin-session` are desktop-only (session list overlays).
+Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop entry. `better-colors`, `drag-to-pin-session`, and `opaque-composer` are desktop-only.
 
 ## Requirements
 
 - Hermes Agent `>= 0.21.0` (plugin packs)
-- Windows / macOS / Linux. `tool-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX. `better-colors` and `drag-to-pin-session` are desktop-only (session list overlays).
+- Windows / macOS / Linux. `tool-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX. `better-colors`, `drag-to-pin-session`, and `opaque-composer` are desktop-only.
 
 ## Documentation
 
@@ -55,6 +56,7 @@ Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop
 - [tool-break](plugins/tool-break/README.md)
 - [better-colors](plugins/better-colors/README.md)
 - [drag-to-pin-session](plugins/drag-to-pin-session/README.md)
+- [opaque-composer](plugins/opaque-composer/README.md)
 - [hermes-awesome-plugins-sync](skills/hermes-awesome-plugins-sync/SKILL.md) — maintainer skill to mirror live plugin dirs into this repo and repin `hermes-pack.yaml`
 
 ## Support

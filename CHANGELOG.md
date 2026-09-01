@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.0] - 2026-09-01
+
+### Added
+
+- **opaque-composer:** keeps the desktop composer solid while scrolling so conversation text stays readable. Desktop-only and upgrade-safe through a small reversible stylesheet plugin.
+
 ## [1.2.3] - 2026-09-01
 
 ### Fixed
