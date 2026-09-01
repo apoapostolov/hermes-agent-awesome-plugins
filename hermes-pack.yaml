@@ -15,5 +15,8 @@ plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/drag-to-pin-session
     ref: 9f8559024a4975fc9cfd21b6486f036c9cc48e8d
+  - repo: apoapostolov/hermes-agent-awesome-plugins
+    subdir: plugins/opaque-composer
+    ref: e382ef35349a32a6e17d89cce61e1778002c2b8a
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync
