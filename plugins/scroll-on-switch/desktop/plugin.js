@@ -49,7 +49,7 @@ function start() {
   const observeViewport = el => {
     let state = viewports.get(el)
     if (state) return state
-    state = { hidden: isInHiddenPane(el), timers: [] }
+    state = { hidden: isInHiddenPane(el), seen: false, timers: [] }
     viewports.set(el, state)
     states.add(state)
     return state
@@ -59,8 +59,9 @@ function start() {
     document.querySelectorAll(VIEWPORT).forEach(el => {
       const state = observeViewport(el)
       const hidden = isInHiddenPane(el)
-      const becameVisible = state.hidden && !hidden
-      const firstVisibleMount = state.followUntil === 0 && !hidden
+      const becameVisible = state.seen && state.hidden && !hidden
+      const firstVisibleMount = !state.seen && !hidden
+      state.seen = true
       state.hidden = hidden
       el.setAttribute(MARK, hidden ? 'hidden' : 'visible')
 
