@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1] - 2026-09-01
+
+### Changed
+
+- **provider-status:** version `0.1.0` → `1.0.0`.
+
 ## [1.2.0] - 2026-09-01
 
 `hermes-break` is now `tool-break`. The pack requires Hermes Agent 0.21.0.

@@ -1,5 +1,5 @@
 name: provider-status
-version: 0.1.0
+version: 1.0.0
 description: "Unified multi-provider quota usage tracking in the status bar, with support for OAuth, color-based warnings, and multiple accounts per provider with Hermes key rotation on exhaust."
 author: Apostol Apostolov
 license: MIT
