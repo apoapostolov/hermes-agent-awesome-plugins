@@ -435,7 +435,7 @@ function GearMenu() {
           'inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem]',
           'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground'
         ),
-        onClick: () => { if (!refreshing) setOpen(true) },
+        onClick: () => setOpen(true),
         children: jsx(Codicon, {
           name: refreshing ? 'refresh' : 'settings-gear', size: '0.7rem',
           className: refreshing ? 'animate-spin' : undefined,
