@@ -752,7 +752,9 @@ function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
       if (result) setHoverResult(result)
     }
   }
-  const label = jsx('span', { children: text })
+  // Plain string label: the chip hugs each wrapped line. A span child would be
+  // forced inline-flex (atomic box) and the chip would paint one rectangle
+  // behind it — trailing empty space on short wrapped lines.
   return jsx(Tooltip, {
     label,
     children: jsx('span', {
