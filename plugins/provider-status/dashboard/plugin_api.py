@@ -1571,7 +1571,10 @@ class ConfigUpdate(BaseModel):
     remove: list[str] = []   # provider ids to delete entirely (rows + order)
 
 @router.get("/status")
-def get_status():
+def get_status(only: set | None = None):
+    """`only` limits live refetching to those pids (statusbar chip click).
+    Other pids are served from cache or last-good, never refetched, so a
+    single-chip refresh cannot be gated by unrelated slow providers."""
     cfg = _ingest_library(load_config())
     pcfg = cfg.get("providers", {})
     # Order results by the saved `order` list so the statusbar matches dialog order.
@@ -1607,6 +1610,13 @@ def get_status():
             cached = dict(cached)
             cached.setdefault("quotas", _probe_quota_lines(cached))
             return pid, cached, reset_dirty
+        if only is not None and pid not in only:
+            # Not requested: never refetch. Serve last-good even if stale.
+            if pid in _last_good:
+                out = dict(_last_good[pid]); out["stale"] = True
+                return pid, out, reset_dirty
+            return pid, {"enabled": True, "id": pid, "ok": False,
+                         "error": "not refreshed yet"}, reset_dirty
         try:
             status = fetcher(pconf)
             if status.get("ok", False):
@@ -1836,7 +1846,7 @@ def force_refresh(body: RefreshBody | None = None):
                 _cache.pop(p, None)
         else:
             _cache.clear()
-    result = get_status()
+    result = get_status(only=set(pids) if pids else None)
     if pids:
         result = {p: result[p] for p in result if p in pids}
     return result
