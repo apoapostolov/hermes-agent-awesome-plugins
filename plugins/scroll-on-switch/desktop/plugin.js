@@ -41,32 +41,42 @@ function start() {
 
   const scheduleSnap = (el, state) => {
     state.timers.forEach(clearTimeout)
-    // Long transcripts keep mounting nodes after the switch; a fixed retry
-    // ladder (<=900ms) gave up before React finished and the reader landed
-    // mid-list. Instead: snap now, then re-snap whenever the transcript grows,
-    // until its height is stable for ~300ms (or 5s total).
+    // Content keeps changing after the switch: long transcripts mount nodes
+    // late, and panels (tasks/todos) mount or expand even later. Snap now,
+    // then re-snap on every size change via ResizeObserver; the watcher
+    // retires 8s after the last change so it never runs forever.
     const snapNow = () => {
       if (state.hidden || !document.contains(el)) return false
       snapToBottom(el)
       return true
     }
     snapNow()
-    let lastH = -1
-    let stableSince = 0
-    const startedAt = Date.now()
-    const tick = () => {
-      if (state.hidden || !document.contains(el) || Date.now() - startedAt > 5000) return
-      const h = el.scrollHeight
-      if (h !== lastH) {
-        lastH = h
-        stableSince = Date.now()
-        snapNow()
-      }
-      if (Date.now() - stableSince < 300) {
-        state.timers.push(setTimeout(tick, 80))
-      }
+    // Re-snap while the transcript (or a panel inside it — task panels mount
+    // and expand LATE, well past any fixed ladder) changes size. ResizeObserver
+    // sees every growth burst no matter how late or slow; the watcher retires
+    // after ~8s of no growth so it never runs forever.
+    let ro = null
+    let retire = null
+    const stop = () => {
+      if (ro) ro.disconnect()
+      if (retire) clearTimeout(retire)
+      ro = retire = null
     }
-    state.timers.push(setTimeout(tick, 120))
+    ro = new ResizeObserver(() => {
+      if (state.hidden || !document.contains(el)) { stop(); return }
+      snapNow()
+      clearTimeout(retire)
+      retire = setTimeout(stop, 8000)
+    })
+    // arm: observe the scroller's content wrapper + first child (panel root)
+    const armObserver = () => {
+      const target = el.firstElementChild || el
+      try { ro.observe(target); if (target.firstElementChild) ro.observe(target.firstElementChild) } catch {}
+      clearTimeout(retire)
+      retire = setTimeout(stop, 8000)
+    }
+    armObserver()
+    state.stopWatcher = stop
   }
 
   const observeViewport = el => {
@@ -116,7 +126,7 @@ function start() {
 
   return () => {
     observer.disconnect()
-    states.forEach(state => state.timers.forEach(clearTimeout))
+    states.forEach(state => { state.timers.forEach(clearTimeout); if (state.stopWatcher) state.stopWatcher() })
     document.querySelectorAll(`[${MARK}]`).forEach(el => el.removeAttribute(MARK))
   }
 }
