@@ -788,8 +788,9 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
     return jsx('select', {
       value: val,
       title: 'Day of month this subscription renews on.\nSwitches to this key after the day passes.',
+      'data-ps-select': '',
       className: 'h-6 shrink-0 rounded border bg-transparent px-0.5 text-[0.65rem] tabular-nums text-center ' + (extraCls || ''),
-      style: { borderColor: 'var(--ui-border)', color: 'var(--ui-text-quaternary)', width: '2.6rem' },
+      style: { width: '2.6rem' },
       onChange: e => {
         const n = [...resetDays]
         while (n.length <= i) n.push(0)
@@ -1264,6 +1265,34 @@ export default {
 
   register(ctx) {
     _rest = ctx.rest // plugin-scoped REST door to /api/plugins/provider-status (auth handled)
+
+  // Theme fixes: native <select> popups ignore inherited colors and render
+  // light-on-light in dark mode; the SDK checkbox checked fill (bg-primary) is
+  // near-white in dark mode and reads harsh. Both are scoped to this plugin.
+  const STYLE_ID = 'provider-status-theme-fix'
+  const style = document.createElement('style')
+  style.id = STYLE_ID
+  style.textContent = `
+    select[data-ps-select] {
+      color-scheme: dark light;
+      background: var(--ui-bg-elevated, var(--background, transparent));
+      color: var(--ui-text-secondary, var(--foreground));
+      border-color: var(--ui-border);
+    }
+    select[data-ps-select] option {
+      background: var(--ui-bg-elevated, var(--background, inherit));
+      color: var(--ui-text-secondary, var(--foreground));
+    }
+    [data-slot="checkbox"][data-state="checked"],
+    [data-slot="checkbox"][data-state="indeterminate"] {
+      background: color-mix(in srgb, var(--ui-accent, var(--foreground)) 55%, transparent) !important;
+      border-color: color-mix(in srgb, var(--ui-accent, var(--foreground)) 70%, transparent) !important;
+      color: var(--ui-text-primary, var(--foreground)) !important;
+    }
+  `
+  document.head.appendChild(style)
+  ctx.onDispose(() => document.getElementById(STYLE_ID)?.remove())
+
 
     // Statusbar group — compact chips for all enabled providers.
     // ErrorBoundary keeps a render failure contained to this slot; the gear
