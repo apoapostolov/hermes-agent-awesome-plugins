@@ -742,12 +742,13 @@ function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
       if (result) setHoverResult(result)
     }
   }
-  // The app's Tip paints its chip per line-box of inline content. A
-  // whitespace-pre-line span is ONE line-box, so only the first line gets the
-  // black background and later lines render naked. Emit one <br> per line so
-  // box-decoration-break clones the chip onto every row.
-  const label = jsxs('span', {
-    children: full.split('\n').map((line, i) => jsxs('span', { children: [line, i < full.split('\n').length - 1 ? jsx('br', {}) : null] })),
+  // The app's Tip forces its direct child to inline-flex ([&>*]:!inline-flex).
+  // Inside a flex container <br> is ignored and children flow in a ROW, which
+  // concatenated every line onto one line. Make the wrapper a COLUMN flex so
+  // the lines stack vertically; the chip then covers the whole block.
+  const label = jsx('span', {
+    style: { flexDirection: 'column', alignItems: 'flex-start' },
+    children: full.split('\n').map((line, i) => jsx('span', { children: line })),
   })
   return jsx(Tooltip, {
     label,
