@@ -728,12 +728,13 @@ function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
   const effectiveQuotas = hoverResult?.quotas?.length ? hoverResult.quotas : quotas
   const fallback = hoverResult?.reason || reason || (effectiveTone === 'ok' ? 'Healthy' : effectiveTone === 'warn' ? 'Quota / retry' : effectiveTone === 'error' ? 'Not working' : 'Checking')
   // Quota rows show on ok AND warn (warn = quota pressure, so rows matter most);
-  // error keeps the plain reason line. The ● glyph separates the health state
-  // from the quota rows below it.
+  // error keeps the plain reason line. Each quota row carries a fine dot so the
+  // rows read as separate items under the status line.
   const quotaRows = _quotaText(effectiveQuotas)
-  const text = effectiveTone === 'ok' ? ['● Healthy', quotaRows].filter(Boolean).join('\n')
-    : effectiveTone === 'warn' && quotaRows ? ['● ' + fallback, quotaRows].join('\n')
-    : '● ' + fallback
+  const dotted = rows => rows.split('\n').map(r => '· ' + r).join('\n')
+  const text = effectiveTone === 'ok' ? ['Healthy', dotted(quotaRows)].filter(Boolean).join('\n')
+    : effectiveTone === 'warn' && quotaRows ? [fallback, dotted(quotaRows)].join('\n')
+    : fallback
   const full = text + (effectiveTone !== 'ok' && age != null ? ` (checked ${age < 60 ? Math.round(age) + 's' : age < 3600 ? Math.round(age / 60) + 'm' : Math.round(age / 3600) + 'h'} ago)` : '')
   const check = async () => {
     if (onCheck) {
