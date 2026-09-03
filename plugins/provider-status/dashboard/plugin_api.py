@@ -1811,6 +1811,16 @@ def update_config(body: ConfigUpdate):
                 merged.pop("reset_days", None)
             if "reset_days_fired" in prev and "reset_days_fired" not in merged:
                 merged["reset_days_fired"] = prev["reset_days_fired"]
+            # Manual active-key switch (dialog radio): push the chosen key into
+            # the Hermes env so the TUI/runtime picks it up immediately.
+            if pid in ROTATABLE and "pool_index" in incoming:
+                prev_idx = int(prev.get("pool_index") or 0)
+                new_idx = int(merged.get("pool_index") or 0)
+                pool = [k for k in (merged.get("pool") or []) if k]
+                if new_idx != prev_idx and 0 <= new_idx < len(pool):
+                    _apply_hermes_key(pid, pool[new_idx])
+                    log.info("provider-status %s: manual key switch -> #%d, env updated",
+                             pid, new_idx + 1)
             providers[pid] = merged
         cfg["providers"] = providers
         if body.remove:

@@ -806,7 +806,52 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
   }
   const setKeyAt = (i, v) => { const n = [...keys]; n[i] = v; setKeys(n) }
   const addKey = () => { setKeys([...keys, '']) }
-  const delKey = (i) => { const n = keys.filter((_, j) => j !== i); setKeys(n.length ? n : ['']); persist(undefined, n.length ? n : ['']) }
+  const delKey = (i) => {
+    const n = keys.filter((_, j) => j !== i)
+    setKeys(n.length ? n : [''])
+    // keep the radio honest: deleting the active key falls back to #1; deleting
+    // one before it shifts the active index up by one
+    let nextIdx = activeIdx
+    if (i === activeIdx) nextIdx = 0
+    else if (i < activeIdx) nextIdx = activeIdx - 1
+    setActiveIdx(nextIdx)
+    persist(undefined, n.length ? n : [''], { pool_index: nextIdx })
+  }
+
+  const [activeIdx, setActiveIdx] = useState(() => {
+    const n = Math.max(1, (pc.pool || []).filter(Boolean).length)
+    const idx = Number(pc.pool_index) || 0
+    return idx < n ? idx : 0
+  })
+  useEffect(() => {
+    const n = Math.max(1, (pc.pool || []).filter(Boolean).length)
+    const idx = Number(pc.pool_index) || 0
+    setActiveIdx(idx < n ? idx : 0)
+  }, [Number(pc.pool_index) || 0, (pc.pool || []).length])
+
+  // Active-key radio: one per key row. Selecting a row persists pool_index;
+  // the backend applies the key to the Hermes env and the dialog refreshes
+  // that provider so the statusbar shows the new account immediately.
+  const keyActiveRadio = (i) => {
+    if (isOAuth) return null
+    const n = Math.max(1, keys.map(s => s.trim()).filter(Boolean).length)
+    if (n < 2) return null
+    const active = i === activeIdx
+    return jsx('button', {
+      type: 'button',
+      title: active ? 'Active key' : 'Use this key',
+      onClick: () => {
+        if (active) return
+        setActiveIdx(i)
+        persist(undefined, undefined, { pool_index: i })
+        postJson('refresh', { providers: [pid] })
+      },
+      className: 'shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full border transition-colors ' +
+        (active ? 'border-(--ui-accent)' : 'border-(--ui-stroke-secondary) hover:border-(--ui-text-tertiary)'),
+      style: { background: active ? 'var(--ui-accent)' : 'transparent' },
+      children: active ? jsx('span', { className: 'w-1.5 h-1.5 rounded-full', style: { background: 'var(--background, #fff)' } }) : null,
+    })
+  }
 
   const startLogin = async () => {
     setBusy(true)
@@ -928,6 +973,8 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
         jsx('span', { className: 'font-medium text-sm shrink-0', children: pmeta.name }),
         // oauth login / code + connect
         loginSlot,
+        // active-key radio (multi-key providers): marks which key is in use
+        !isOAuth && pmeta.env?.length ? keyActiveRadio(0) : null,
         // key field #1 — spans the space between name/login and the right controls
         !isOAuth && pmeta.env?.length
           ? jsx(Input, { type: 'password', value: keys[0] || '', onChange: e => setKeyAt(0, e.target.value), onBlur: () => persist(), placeholder: ph, size: 'sm', className: 'flex-1 h-6 font-mono text-[0.7rem] min-w-0' })
@@ -947,6 +994,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
       ]}),
       // ── extra key rows ──
       keys.slice(1).map((k, i) => jsxs('div', { className: 'flex items-center gap-2', children: [
+        keyActiveRadio(i + 1),
         jsx('span', { className: 'text-[0.65rem] tabular-nums shrink-0 w-5 text-right', style: { color: 'var(--ui-text-quaternary)' }, children: '#' + (i + 2) }),
         jsx(Input, { type: 'password', value: k, onChange: e => setKeyAt(i + 1, e.target.value), onBlur: () => persist(), placeholder: `Key #${i + 2}`, size: 'sm', className: 'flex-1 h-6 font-mono text-[0.7rem]' }),
         resetDaySelect(i + 1),
