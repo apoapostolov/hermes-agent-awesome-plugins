@@ -728,38 +728,25 @@ function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
   const effectiveQuotas = hoverResult?.quotas?.length ? hoverResult.quotas : quotas
   const fallback = hoverResult?.reason || reason || (effectiveTone === 'ok' ? 'Healthy' : effectiveTone === 'warn' ? 'Quota / retry' : effectiveTone === 'error' ? 'Not working' : 'Checking')
   // Quota rows show on ok AND warn (warn = quota pressure, so rows matter most);
-  // error keeps the plain reason line. Each quota row carries a fine dot so the
-  // rows read as separate items under the status line.
+  // error keeps the plain reason. Everything renders on ONE line with a fine
+  // dot (spaced both sides) between segments — single line-box, so the app's
+  // tooltip chip background covers the whole label.
   const quotaRows = _quotaText(effectiveQuotas)
-  const dotted = rows => rows.split('\n').map(r => '· ' + r).join('\n')
-  const text = effectiveTone === 'ok' ? ['Healthy', dotted(quotaRows)].filter(Boolean).join('\n')
-    : effectiveTone === 'warn' && quotaRows ? [fallback, dotted(quotaRows)].join('\n')
-    : fallback
-  const full = text + (effectiveTone !== 'ok' && age != null ? ` (checked ${age < 60 ? Math.round(age) + 's' : age < 3600 ? Math.round(age / 60) + 'm' : Math.round(age / 3600) + 'h'} ago)` : '')
+  const segments = [
+    effectiveTone === 'ok' ? 'Healthy' : fallback,
+    ...(quotaRows ? quotaRows.split('\n') : []),
+  ]
+  let text = segments.join('  ·  ')
+  if (effectiveTone !== 'ok' && age != null) {
+    text += ` (checked ${age < 60 ? Math.round(age) + 's' : age < 3600 ? Math.round(age / 60) + 'm' : Math.round(age / 3600) + 'h'} ago)`
+  }
   const check = async () => {
     if (onCheck) {
       const result = await onCheck(pid)
       if (result) setHoverResult(result)
     }
   }
-  // The app's Tip forces its direct child to inline-flex ([&>*]:!inline-flex),
-  // and the chip's own background only paints the parent inline element's
-  // line-boxes: a flex-column child is ONE inline-level block, so the chip bg
-  // covers line 1 only. Style each line span with the chip's exact tokens
-  // (same --foreground/--background pair) so every row carries its own chip;
-  // overlapping same-color areas are invisible.
-  const lineStyle = {
-    display: 'block',
-    background: 'var(--foreground)',
-    color: 'var(--background)',
-    padding: '2px 6px',
-    font: 'bold 11px/normal Arial, sans-serif',
-    whiteSpace: 'pre',
-  }
-  const label = jsx('span', {
-    style: { flexDirection: 'column', alignItems: 'flex-start' },
-    children: full.split('\n').map((line, i) => jsx('span', { style: lineStyle, children: line })),
-  })
+  const label = jsx('span', { children: text })
   return jsx(Tooltip, {
     label,
     children: jsx('span', {
