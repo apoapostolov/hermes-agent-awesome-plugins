@@ -673,7 +673,7 @@ function StatusBadge({ st }) {
 // SDK Button/Input/Tooltip for a polished look matching Hermes dialogs.
 
 function _quotaText(quotas) {
-  return (quotas || []).map(q => `${q.label}: ${q.percent}%`).join('\n')
+  return (quotas || []).map(q => (q.display != null ? `${q.label}: ${q.display}` : `${q.label}: ${q.percent}%`)).join('\n')
 }
 
 function _quotaData(status) {
@@ -726,13 +726,14 @@ function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
   const [hoverResult, setHoverResult] = useState(null)
   const effectiveTone = hoverResult?.tone || tone
   const effectiveQuotas = hoverResult?.quotas?.length ? hoverResult.quotas : quotas
-  const fallback = hoverResult?.reason || reason || (effectiveTone === 'ok' ? 'healthy' : effectiveTone === 'warn' ? 'quota / retry' : effectiveTone === 'error' ? 'not working' : 'checking')
+  const fallback = hoverResult?.reason || reason || (effectiveTone === 'ok' ? 'Healthy' : effectiveTone === 'warn' ? 'Quota / retry' : effectiveTone === 'error' ? 'Not working' : 'Checking')
   // Quota rows show on ok AND warn (warn = quota pressure, so rows matter most);
-  // error keeps the plain reason line.
+  // error keeps the plain reason line. The ● glyph separates the health state
+  // from the quota rows below it.
   const quotaRows = _quotaText(effectiveQuotas)
-  const text = effectiveTone === 'ok' ? ['Healthy', quotaRows].filter(Boolean).join('\n')
-    : effectiveTone === 'warn' && quotaRows ? [fallback, quotaRows].join('\n')
-    : fallback
+  const text = effectiveTone === 'ok' ? ['● Healthy', quotaRows].filter(Boolean).join('\n')
+    : effectiveTone === 'warn' && quotaRows ? ['● ' + fallback, quotaRows].join('\n')
+    : '● ' + fallback
   const full = text + (effectiveTone !== 'ok' && age != null ? ` (checked ${age < 60 ? Math.round(age) + 's' : age < 3600 ? Math.round(age / 60) + 'm' : Math.round(age / 3600) + 'h'} ago)` : '')
   const check = async () => {
     if (onCheck) {

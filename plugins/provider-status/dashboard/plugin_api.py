@@ -385,8 +385,8 @@ def classify_tone(pid: str, status: dict) -> dict:
     rem = _display_remaining(pid, status) if isinstance(status, dict) else None
     if status and status.get("ok"):
         if _exhausted(pid, status):
-            return {"tone": "warn", "reason": "quota exhausted", "remaining": rem}
-        return {"tone": "ok", "reason": "healthy", "remaining": rem}
+            return {"tone": "warn", "reason": "Exhausted", "remaining": rem}
+        return {"tone": "ok", "reason": "Healthy", "remaining": rem}
     err = str((status or {}).get("error") or "unknown")
     low = err.lower()
     code = _http_code(status or {})
@@ -814,7 +814,9 @@ def fetch_tavily(cfg: dict) -> dict:
 
         used = int(plan_usage or key_usage)
         limit = int(plan_limit or key_limit)
+        # Quota line reads Monthly: the plan pool is a monthly allowance.
         return {"ok": True, "percent": round(pct, 1),
+                "windows": [{"label": "mo", "pct": round(pct, 1), "direction": "exhaust"}],
                 "detail": f"{used}/{limit}" + (" +paygo" if in_paygo else "")}
     except HTTPError as e:
         if e.code == 429:
@@ -1870,6 +1872,12 @@ def _probe_quota_lines(status: dict) -> list[dict]:
     """Expose provider quota windows as remaining percentages for the dialog."""
     if not isinstance(status, dict):
         return []
+    # Credit-based providers: the quota IS the dollar balance in the pool.
+    if status.get("balance") is not None and status.get("ok"):
+        try:
+            return [{"label": "Credits", "display": f"${float(status['balance']):.2f}"}]
+        except (TypeError, ValueError):
+            pass
     labels = {"5h": "5-Hours", "wk": "Weekly", "weekly": "Weekly", "mo": "Monthly", "monthly": "Monthly"}
     out = []
     windows = status.get("windows")
