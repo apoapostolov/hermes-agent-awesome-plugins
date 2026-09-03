@@ -1087,8 +1087,24 @@ function SetupBody({ variant } = {}) {
         if (!result || age == null || age > maxAge) result = null
       }
       if (!result) {
-        result = await _rest('/probe', { method: 'POST', body: { provider: pid } })
-        age = null
+        // Fire-and-forget queue: the backend probes on a worker thread and
+        // marks the pid pending in /probe-cache. Poll until it lands (or give
+        // up) instead of holding the request open — a slow provider can then
+        // never stall a hover or the dialog.
+        await _rest('/probe', { method: 'POST', body: { provider: pid } })
+        const deadline = Date.now() + 20000
+        while (Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, force ? 500 : 1200))
+          const cache = await _rest('/probe-cache')
+          const entry = cache?.[pid]
+          if (entry?.result && !entry?.pending) {
+            result = entry.result
+            age = entry.age_s
+            break
+          }
+          if (!entry?.pending && entry?.result == null && Date.now() > deadline - 19000) break
+        }
+        if (!result) return null
       }
       if (result?.keys) {
         // Read statuses through a ref: this callback's deps are [pollMinutes],
@@ -1107,18 +1123,22 @@ function SetupBody({ variant } = {}) {
     return null
   }, [pollMinutes])
 
-  // Dialog open = probe everything (all providers, all keys per provider —
-  // the backend /probe walks the whole key pool of a provider in one call),
-  // so quotas are visible without hovering and without adding anything to
-  // the status line. Fire-and-forget: results land in `probes` state.
+  // Dialog open = probe everything (all providers, all keys per provider — the
+  // backend walks the key pool of a provider in one queued probe, keys in
+  // parallel). Queued AFTER the dialog has rendered (small delay) so the
+  // entrance animation never competes with probe work; results stream into
+  // `probes` state as the cache fills. Deliberately not awaited anywhere.
   const openedRef = useRef(false)
   useEffect(() => {
     if (openedRef.current || metaWaiting || !metaLive) return
     if (!pids.length) return
     openedRef.current = true
-    for (const pid of pids) {
-      checkProbe(pid, true)
-    }
+    const t = setTimeout(() => {
+      for (const pid of pids) {
+        checkProbe(pid, true)
+      }
+    }, 400)
+    return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metaWaiting, metaLive, pids.join(',')])
   if (metaWaiting) return jsx('div', { className: 'p-2 text-xs', children: 'Loading…' })

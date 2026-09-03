@@ -1937,13 +1937,15 @@ def _probe_quota_lines(status: dict) -> list[dict]:
 
 
 def _probe_one_provider(pid: str, cfg: dict) -> dict:
-    """Probe every pool key of one provider sequentially (no host stampede)."""
+    """Probe every pool key of one provider. Keys fetch in parallel (each key
+    hits the same host, but providers with large pools used to serialize into
+    multi-second sweeps); results keep pool order."""
     pconf = dict((cfg.get("providers") or {}).get(pid) or {})
     fetcher = FETCHERS[pid]
     pool = [k for k in (pconf.get("pool") or []) if k]
     indexes = list(range(len(pool))) if pool else [0]
-    out = []
-    for idx in indexes:
+
+    def _one(idx: int) -> dict:
         trial = dict(pconf)
         trial["pool_index"] = idx
         try:
@@ -1951,17 +1953,24 @@ def _probe_one_provider(pid: str, cfg: dict) -> dict:
         except Exception as e:
             st = {"ok": False, "error": str(e)[:80]}
         classified = classify_tone(pid, st)
-        out.append({
+        return {
             "index": idx,
             "tone": classified["tone"],
             "reason": classified["reason"],
             "remaining": classified.get("remaining"),
             "quotas": _probe_quota_lines(st),
-        })
+        }
+
+    if len(indexes) == 1:
+        out = [_one(indexes[0])]
+    else:
+        with ThreadPoolExecutor(max_workers=len(indexes)) as pool_exec:
+            out = list(pool_exec.map(_one, indexes))
     return {"provider": pid, "keys": out}
 
 
 _probe_cache: dict = {}          # pid -> {"result": ..., "swept_at": epoch}
+_probe_pending: set[str] = set() # pids with an in-flight forced probe
 _probe_lock = threading.Lock()
 
 
@@ -2009,15 +2018,31 @@ def _start_probe_sweeper() -> None:
 
 @router.post("/probe")
 def probe_keys(body: ProbeBody):
-    """Live per-key traffic light. Always hits the provider (dialog silent
-    refresh). Sequential within one provider so we do not stampede the host."""
+    """Queue a live per-key traffic light probe and return immediately. The
+    fetch runs on a worker thread and lands in the probe cache; clients read
+    /probe-cache (pending pids are marked) instead of holding this request
+    open, so a slow provider can never stall a caller."""
     pid = str(body.provider or "").strip()
     if pid not in FETCHERS:
         return {"provider": pid, "keys": [], "error": "unknown provider"}
-    cfg = _ingest_library(load_config())
-    result = _probe_one_provider(pid, cfg)
-    _store_probe(pid, result)
-    return result
+    with _probe_lock:
+        if pid in _probe_pending:
+            return {"provider": pid, "queued": True, "keys": []}
+        _probe_pending.add(pid)
+
+    def _run() -> None:
+        try:
+            cfg = _ingest_library(load_config())
+            result = _probe_one_provider(pid, cfg)
+            _store_probe(pid, result)
+        except Exception:
+            log.exception("provider-status probe failed: %s", pid)
+        finally:
+            with _probe_lock:
+                _probe_pending.discard(pid)
+
+    threading.Thread(target=_run, name=f"ps-probe-{pid}", daemon=True).start()
+    return {"provider": pid, "queued": True, "keys": []}
 
 
 @router.get("/probe-cache")
@@ -2025,8 +2050,12 @@ def probe_cache_ep():
     """Current cache state for all providers (dialog seeding + debug)."""
     with _probe_lock:
         now = time.time()
-        return {pid: {"result": e["result"], "age_s": round(now - e["swept_at"], 1)}
-                for pid, e in _probe_cache.items()}
+        out = {pid: {"result": e["result"], "age_s": round(now - e["swept_at"], 1)}
+               for pid, e in _probe_cache.items()}
+        for pid in _probe_pending:
+            out.setdefault(pid, {"result": None, "age_s": None, "pending": True})
+            out[pid]["pending"] = True
+        return out
 
 
 def _save_oauth(provider: str, result: dict, client_id: str, issuer: str) -> None:
