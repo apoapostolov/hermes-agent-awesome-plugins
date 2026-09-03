@@ -489,6 +489,23 @@ function ensureStyle() {
   `
 }
 
+// Live-apply a color choice to the session entry the submenu is open on:
+// set the row's dot inline so the observer paints title + glyph immediately,
+// without waiting for the config save to re-render the row.
+function liveApplyColor(hex, stockBtn) {
+  if (!hex) return
+  const openRow = document.querySelector(`${ROW} [data-state="open"]`)?.closest('.row-hover')
+  const sid = openRow?.dataset.bcSid || (stockBtn ? sessionIdFrom(stockBtn) : null)
+  const row = openRow || (sid ? [...document.querySelectorAll(ROW)].find(r => r.dataset.bcSid === sid) : null)
+  if (!row) return
+  if (sid) row.dataset.bcSid = sid
+  row._bcCached = hex
+  const idle = row.querySelector(IDLE_DOT)
+  if (idle) idle.style.backgroundColor = hex
+  paintTitle(row, hex)
+  paintGlyph(row, hex)
+}
+
 function clearTitle(row) {
   delete row.dataset.bcColor
   row.style.removeProperty('--bc-color')
@@ -628,6 +645,7 @@ function injectCustomButton(host, stockBtn) {
     const live = colorSwatchProps(stockBtn)
     const onChange = live?.onChange || props.onChange
     onChange(hex)
+    liveApplyColor(hex, stockBtn)
   }
   picker.addEventListener('input', () => apply(picker.value))
   picker.addEventListener('change', () => apply(picker.value))
@@ -759,6 +777,16 @@ function enhancePickers() {
     )
     if (stock.length < 8) return
     tintStock(stock)
+    stock.forEach(btn => {
+      if (btn.dataset.bcLive) return
+      btn.dataset.bcLive = '1'
+      // React handles the config change; this mirrors the color onto the
+      // session entry instantly (capture so it fires regardless of order).
+      btn.addEventListener('click', () => {
+        const hex = btn.dataset.bcOrig || btn.style.backgroundColor
+        if (hex) liveApplyColor(hex, btn)
+      }, true)
+    })
     const host = grid.parentElement
     if (!host) return
     host.setAttribute(EXTRA_ATTR, 'host')
