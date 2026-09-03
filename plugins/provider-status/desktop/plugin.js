@@ -735,7 +735,7 @@ function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
   const segments = [
     effectiveTone === 'ok' ? 'Healthy' : fallback,
     ...(quotaRows ? quotaRows.split('\n') : []),
-  ]
+  ].map(s => s.trim()).filter(Boolean) // empty quota entries would leave a dangling trailing dot
   let text = segments.join('  ·  ')
   if (effectiveTone !== 'ok' && age != null) {
     text += ` (checked ${age < 60 ? Math.round(age) + 's' : age < 3600 ? Math.round(age / 60) + 'm' : Math.round(age / 3600) + 'h'} ago)`
