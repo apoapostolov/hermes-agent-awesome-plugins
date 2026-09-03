@@ -249,15 +249,24 @@ function rgbToHsl(r, g, b) {
   return { h: h * 60, s: s * 100, l: l * 100 }
 }
 
+// Memoized: appends + getComputedStyle per distinct color+mode, not per row per frame.
+const adaptCache = new Map()
 function adaptColor(color) {
+  const key = `${isDark() ? 'd' : 'l'}|${color}`
+  if (adaptCache.has(key)) return adaptCache.get(key)
   const rgb = parseRgb(color)
-  if (!rgb) return color
-  const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b)
-  if (s < 4) {
-    return isDark() ? 'hsl(0 0% 82%)' : 'hsl(0 0% 28%)'
+  let out = color
+  if (rgb) {
+    const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b)
+    if (s < 4) {
+      out = isDark() ? 'hsl(0 0% 82%)' : 'hsl(0 0% 28%)'
+    } else {
+      const nextL = isDark() ? Math.max(62, Math.min(78, l + 12)) : Math.min(42, Math.max(28, l - 14))
+      out = `hsl(${Math.round(h)} ${Math.round(s)}% ${Math.round(nextL)}%)`
+    }
   }
-  const nextL = isDark() ? Math.max(62, Math.min(78, l + 12)) : Math.min(42, Math.max(28, l - 14))
-  return `hsl(${Math.round(h)} ${Math.round(s)}% ${Math.round(nextL)}%)`
+  adaptCache.set(key, out)
+  return out
 }
 
 function fiberOf(el) {
@@ -490,8 +499,13 @@ function paintTitle(row, color) {
     clearTitle(row)
     return
   }
-  row.dataset.bcColor = '1'
-  row.style.setProperty('--bc-color', adaptColor(color))
+  // Idempotent writes only: style/dataset writes re-trigger the body observer,
+  // so unconditional writes here would create a paint-per-frame feedback loop.
+  if (row.dataset.bcColor !== '1') row.dataset.bcColor = '1'
+  const adapted = adaptColor(color)
+  if (row.style.getPropertyValue('--bc-color') !== adapted) {
+    row.style.setProperty('--bc-color', adapted)
+  }
 }
 
 function clearGlyphNode(el) {
@@ -535,9 +549,14 @@ function paintGlyph(row, color) {
   if (fill && fill !== 'transparent' && fill !== 'rgba(0, 0, 0, 0)') {
     row._bcCached = fill
   }
-  idle.style.setProperty('background', 'none', 'important')
-  idle.style.setProperty('background-color', 'transparent', 'important')
-  idle.dataset.bcGlyphHidden = '1'
+  // Guard every write: style writes on observed attributes re-fire the observer.
+  if (idle.style.getPropertyValue('background') !== 'none') {
+    idle.style.setProperty('background', 'none', 'important')
+  }
+  if (idle.style.getPropertyValue('background-color') !== 'transparent') {
+    idle.style.setProperty('background-color', 'transparent', 'important')
+  }
+  if (idle.dataset.bcGlyphHidden !== '1') idle.dataset.bcGlyphHidden = '1'
   if (existing && existing.classList.contains(`codicon-${glyph}`)) {
     if (existing.style.color !== tint) existing.style.color = tint
     return
@@ -554,7 +573,7 @@ function paintSessionTitles() {
   document.querySelectorAll(ROW).forEach(row => {
     const sid = rowSessionId(row)
     if (sessionBold(sid)) {
-      row.dataset.bcBold = '1'
+      if (row.dataset.bcBold !== '1') row.dataset.bcBold = '1'
       row.querySelectorAll(TITLE).forEach(el => {
         delete el.dataset.marquee
         el.style.removeProperty('--marquee-d')
