@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -765,9 +766,9 @@ def fetch_glm(cfg: dict) -> dict:
         windows = []
         if session_pct or session_pct == 0:
             windows.append({"label": "5h", "pct": session_pct, "direction": "increase"})
-        if weekly_pct:
+        if weekly_pct is not None:
             windows.append({"label": "wk", "pct": weekly_pct, "direction": "exhaust"})
-        if monthly_pct:
+        if monthly_pct is not None:
             windows.append({"label": "mo", "pct": monthly_pct, "direction": "exhaust"})
         return {"ok": True, "percent": session_pct,
                 "exhaust_percent": exhaust,
@@ -1601,6 +1602,8 @@ def get_status():
             (pid in ROTATABLE and pool_n > 1 and _exhausted(pid, cached))
             or (oauth_pool and acct_n > 1 and _exhausted(pid, cached))
         ):
+            cached = dict(cached)
+            cached.setdefault("quotas", _probe_quota_lines(cached))
             return pid, cached, reset_dirty
         try:
             status = fetcher(pconf)
@@ -1622,6 +1625,7 @@ def get_status():
                 rem = _display_remaining(pid, status)
                 if rem is not None:
                     status["remaining"] = rem
+                status["quotas"] = _probe_quota_lines(status)
                 status["pool_index"] = int(pconf.get("pool_index") or 0)
                 status["pool_size"] = pool_n
                 status["fetched_at"] = time.time()
@@ -1862,6 +1866,68 @@ def _probe_sweep_all() -> dict:
     return out
 
 
+def _probe_quota_lines(status: dict) -> list[dict]:
+    """Expose provider quota windows as remaining percentages for the dialog."""
+    if not isinstance(status, dict):
+        return []
+    labels = {"5h": "5-Hours", "wk": "Weekly", "weekly": "Weekly", "mo": "Monthly", "monthly": "Monthly"}
+    out = []
+    windows = status.get("windows")
+    if isinstance(windows, list):
+        for window in windows:
+            if not isinstance(window, dict):
+                continue
+            key = str(window.get("label") or "").strip().lower()
+            raw = window.get("pct")
+            try:
+                remaining = max(0.0, min(100.0, 100.0 - float(raw)))
+            except (TypeError, ValueError):
+                continue
+            label = labels.get(key)
+            if label:
+                out.append({"label": label, "percent": round(remaining, 1)})
+    if out:
+        return out
+    # Grok/Codex/OpenCode fetchers return compact detail arrows instead of
+    # windows: ↑N% is 5h remaining; each ↓N% is weekly then monthly.
+    compact = re.findall(r"([↑↓])\s*(\d+(?:\.\d+)?)%", str(status.get("detail") or ""))
+    if compact:
+        down = 0
+        for arrow, num in compact:
+            try:
+                percent = max(0.0, min(100.0, float(num)))
+            except ValueError:
+                continue
+            if arrow == "↑":
+                out.append({"label": "5-Hours", "percent": round(percent, 1)})
+            else:
+                out.append({"label": "Weekly" if down == 0 else "Monthly", "percent": round(percent, 1)})
+                down += 1
+        if out:
+            return out
+    # Last resort: headline numeric fields (period used% or exhaust_percent).
+    period = str(status.get("period") or "").lower()
+    used = status.get("percent")
+    exhaust = status.get("exhaust_percent")
+    if used is not None and period not in ("weekly", "monthly"):
+        try:
+            out.append({"label": "5-Hours", "percent": round(max(0.0, min(100.0, 100.0 - float(used))), 1)})
+        except (TypeError, ValueError):
+            pass
+    if exhaust is not None:
+        try:
+            out.append({"label": "Weekly", "percent": round(max(0.0, min(100.0, 100.0 - float(exhaust))), 1)})
+        except (TypeError, ValueError):
+            pass
+    if not out and used is not None and period in ("weekly", "monthly"):
+        try:
+            out.append({"label": "Weekly" if period == "weekly" else "Monthly",
+                        "percent": round(max(0.0, min(100.0, 100.0 - float(used))), 1)})
+        except (TypeError, ValueError):
+            pass
+    return out
+
+
 def _probe_one_provider(pid: str, cfg: dict) -> dict:
     """Probe every pool key of one provider sequentially (no host stampede)."""
     pconf = dict((cfg.get("providers") or {}).get(pid) or {})
@@ -1882,6 +1948,7 @@ def _probe_one_provider(pid: str, cfg: dict) -> dict:
             "tone": classified["tone"],
             "reason": classified["reason"],
             "remaining": classified.get("remaining"),
+            "quotas": _probe_quota_lines(st),
         })
     return {"provider": pid, "keys": out}
 

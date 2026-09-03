@@ -672,24 +672,92 @@ function StatusBadge({ st }) {
 // Header: [gripper] [Name] [Login/OAuth] [Key field flex-1] [Badge] [☐] [+]
 // SDK Button/Input/Tooltip for a polished look matching Hermes dialogs.
 
-function SignalDot({ tone, reason, age }) {
+function _quotaText(quotas) {
+  return (quotas || []).map(q => `${q.label}: ${q.percent}%`).join('\n')
+}
+
+function _quotaData(status) {
+  if (Array.isArray(status?.quotas) && status.quotas.length) return status.quotas
+  const labels = { '5h': '5-Hours', wk: 'Weekly', weekly: 'Weekly', mo: 'Monthly', monthly: 'Monthly' }
+  const out = (status?.windows || []).flatMap(w => {
+    const label = labels[String(w?.label || '').toLowerCase()]
+    const pct = Number(w?.pct)
+    return label && Number.isFinite(pct)
+      ? [{ label, percent: Math.max(0, Math.min(100, Math.round((100 - pct) * 10) / 10)) }]
+      : []
+  })
+  if (out.length) return out
+
+  // Cached account providers use compact detail strings instead of windows:
+  // ↑95% is 5h remaining; following ↓ values are weekly then monthly.
+  const detail = String(status?.detail || '')
+  const compact = [...detail.matchAll(/([↑↓])\s*(\d+(?:\.\d+)?)%/g)]
+  if (compact.length) {
+    let downIndex = 0
+    return compact.map((m) => {
+      const arrow = m[1]
+      const percent = Number(m[2])
+      const label = arrow === '↑' ? '5-Hours' : downIndex++ === 0 ? 'Weekly' : 'Monthly'
+      return { label, percent }
+    })
+  }
+
+  // Some cached status responses retain only the numeric headline fields.
+  const used = Number(status?.percent)
+  const exhaust = Number(status?.exhaust_percent)
+  const period = String(status?.period || '').toLowerCase()
+  const numeric = []
+  if (Number.isFinite(used) && period !== 'weekly' && period !== 'monthly') numeric.push({ label: '5-Hours', percent: Math.max(0, Math.min(100, Math.round((100 - used) * 10) / 10)) })
+  if (Number.isFinite(exhaust)) numeric.push({ label: 'Weekly', percent: Math.max(0, Math.min(100, Math.round((100 - exhaust) * 10) / 10)) })
+  if (numeric.length) return numeric
+
+  // Grok returns one billing period and percent used.
+  if (Number.isFinite(used) && (period === 'weekly' || period === 'monthly')) {
+    return [{ label: period === 'weekly' ? 'Weekly' : 'Monthly', percent: Math.max(0, Math.min(100, Math.round((100 - used) * 10) / 10)) }]
+  }
+  return []
+}
+
+function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
   const color = tone === 'ok' ? '#22c55e'
     : tone === 'warn' ? '#f59e0b'
     : tone === 'error' ? '#ef4444'
     : '#6b7280'
-  const label = reason || (tone === 'ok' ? 'healthy' : tone === 'warn' ? 'quota / retry' : tone === 'error' ? 'not working' : 'checking')
-  const full = label + (age != null ? ` (checked ${age < 60 ? Math.round(age) + 's' : age < 3600 ? Math.round(age / 60) + 'm' : Math.round(age / 3600) + 'h'} ago)` : '')
+  const [hoverResult, setHoverResult] = useState(null)
+  const effectiveTone = hoverResult?.tone || tone
+  const effectiveQuotas = hoverResult?.quotas?.length ? hoverResult.quotas : quotas
+  const fallback = hoverResult?.reason || reason || (effectiveTone === 'ok' ? 'healthy' : effectiveTone === 'warn' ? 'quota / retry' : effectiveTone === 'error' ? 'not working' : 'checking')
+  // Quota rows show on ok AND warn (warn = quota pressure, so rows matter most);
+  // error keeps the plain reason line.
+  const quotaRows = _quotaText(effectiveQuotas)
+  const text = effectiveTone === 'ok' ? ['Healthy', quotaRows].filter(Boolean).join('\n')
+    : effectiveTone === 'warn' && quotaRows ? [fallback, quotaRows].join('\n')
+    : fallback
+  const full = text + (effectiveTone !== 'ok' && age != null ? ` (checked ${age < 60 ? Math.round(age) + 's' : age < 3600 ? Math.round(age / 60) + 'm' : Math.round(age / 3600) + 'h'} ago)` : '')
+  const check = async () => {
+    if (onCheck) {
+      const result = await onCheck(pid)
+      if (result) setHoverResult(result)
+    }
+  }
+  // The app's Tip paints its chip per line-box of inline content. A
+  // whitespace-pre-line span is ONE line-box, so only the first line gets the
+  // black background and later lines render naked. Emit one <br> per line so
+  // box-decoration-break clones the chip onto every row.
+  const label = jsxs('span', {
+    children: full.split('\n').map((line, i) => jsxs('span', { children: [line, i < full.split('\n').length - 1 ? jsx('br', {}) : null] })),
+  })
   return jsx(Tooltip, {
-    label: full,
+    label,
     children: jsx('span', {
-      title: full,
+      onMouseEnter: check,
       className: 'inline-block shrink-0 rounded-full',
       style: { width: 8, height: 8, background: color, boxShadow: `0 0 0 1px color-mix(in srgb, ${color} 40%, transparent)` },
     }),
   })
 }
 
-function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, variant, dragging, dropOver, onDragStart, onDragOver, onDrop, onDragEnd, onRemove }) {
+function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, variant, dragging, dropOver, onDragStart, onDragOver, onDrop, onDragEnd, onRemove }) {
   const [enabled, setEnabled] = useState(!!pc.enabled)
   const [keys, setKeys] = useState(pc.pool?.length ? [...pc.pool] : [''])
   const [flow, setFlow] = useState(null)
@@ -869,7 +937,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, variant, dra
         // spacer pushes status+controls to the right edge (OAuth rows w/o key field)
         isOAuth || !pmeta.env?.length ? jsx('span', { className: 'flex-1' }) : null,
         // status dot — right-aligned (tooltip notes when the value is a cached sweep)
-        jsx(SignalDot, { tone: (probe?.keys || []).find(k => k.index === 0)?.tone, reason: (probe?.keys || []).find(k => k.index === 0)?.reason, age: probeAge }),
+        jsx(SignalDot, { pid, tone: (probe?.keys || []).find(k => k.index === 0)?.tone, reason: (probe?.keys || []).find(k => k.index === 0)?.reason, quotas: ((probe?.keys || []).find(k => k.index === 0)?.quotas?.length ? (probe?.keys || []).find(k => k.index === 0)?.quotas : _quotaData(st)), age: probeAge, onCheck }),
         // + button (env providers only) — square icon button with add glyph
         !isOAuth && pmeta.env?.length ? jsx(Button, { variant: 'outline', size: 'icon-xs', className: 'shrink-0 items-center justify-center', onClick: addKey, title: 'add another key', children: jsx(Codicon, { name: 'add', size: '0.75rem' }) }) : null,
         // checkbox
@@ -882,7 +950,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, variant, dra
         jsx('span', { className: 'text-[0.65rem] tabular-nums shrink-0 w-5 text-right', style: { color: 'var(--ui-text-quaternary)' }, children: '#' + (i + 2) }),
         jsx(Input, { type: 'password', value: k, onChange: e => setKeyAt(i + 1, e.target.value), onBlur: () => persist(), placeholder: `Key #${i + 2}`, size: 'sm', className: 'flex-1 h-6 font-mono text-[0.7rem]' }),
         resetDaySelect(i + 1),
-        jsx(SignalDot, { tone: (probe?.keys || []).find(row => row.index === i + 1)?.tone, reason: (probe?.keys || []).find(row => row.index === i + 1)?.reason, age: probeAge }),
+        jsx(SignalDot, { pid, tone: (probe?.keys || []).find(row => row.index === i + 1)?.tone, reason: (probe?.keys || []).find(row => row.index === i + 1)?.reason, quotas: (probe?.keys || []).find(row => row.index === i + 1)?.quotas, age: probeAge, onCheck }),
         jsx(Button, { variant: 'ghost', size: 'icon-xs', className: 'text-destructive', onClick: () => delKey(i + 1), title: 'remove', children: jsx(Codicon, { name: 'close', size: '0.7rem' }) }),
       ]}, i + 1)),
     ],
@@ -1001,40 +1069,58 @@ function SetupBody({ variant } = {}) {
   const flipRef = useFlipList((order ?? pidsRaw).join(','))
 
   const [probes, setProbes] = useState({})
-  const [probeAges, setProbeAges] = useState({})   // pid -> cache age seconds (null = live)
-  const pidKey = pids.join(',')
-  // seed from the background sweeper cache so dots are never gray on open
-  useEffect(() => {
-    if (metaWaiting || !pidKey || !_rest) return
-    let cancel = false
-    _rest('/probe-cache').then(r => {
-      if (cancel || !r) return
-      const seeded = {}, ages = {}
-      for (const [pid, e] of Object.entries(r)) {
-        if (e?.result?.keys?.length) { seeded[pid] = e.result; ages[pid] = e.age_s }
+  const [probeAges, setProbeAges] = useState({})   // pid -> cache age seconds
+  const pollMinutes = Math.max(1, Number(cfg.poll_minutes) || 5)
+  const statusesRef = useRef(statuses)
+  statusesRef.current = statuses
+  const checkProbe = React.useCallback(async (pid, force = false) => {
+    if (!_rest || !pid) return null
+    try {
+      let result = null
+      let age = null
+      if (!force) {
+        const cache = await _rest('/probe-cache')
+        const entry = cache?.[pid]
+        const maxAge = pollMinutes * 60 * 6
+        result = entry?.result
+        age = entry?.age_s
+        if (!result || age == null || age > maxAge) result = null
       }
-      if (Object.keys(seeded).length) { setProbes(prev => ({ ...seeded, ...prev })); setProbeAges(ages) }
-    }).catch(() => {})
-    return () => { cancel = true }
-  }, [pidKey, metaWaiting])
-  // then silently live-refresh each provider on top of the seeds
-  useEffect(() => {
-    if (metaWaiting || !pidKey || !_rest) return
-    let cancel = false
-    const ids = pidKey.split(',').filter(Boolean)
-    ids.forEach(async (pid) => {
-      try {
-        const r = await _rest('/probe', { method: 'POST', body: { provider: pid } })
-        if (!cancel && r?.keys) {
-          setProbes((prev) => ({ ...prev, [pid]: r }))
-          setProbeAges((prev) => ({ ...prev, [pid]: null }))  // live now
-        }
-      } catch {}
-    })
-    return () => { cancel = true }
-  }, [pidKey, metaWaiting])
+      if (!result) {
+        result = await _rest('/probe', { method: 'POST', body: { provider: pid } })
+        age = null
+      }
+      if (result?.keys) {
+        // Read statuses through a ref: this callback's deps are [pollMinutes],
+        // so a direct closure would freeze the value from the first render
+        // (usually undefined) and the quota fallback would always be empty.
+        const fallbackQuotas = _quotaData(statusesRef.current?.[pid])
+        const primary = result.keys.find(k => k.index === 0) || null
+        const withQuotas = primary && !primary.quotas?.length && fallbackQuotas.length
+          ? { ...primary, quotas: fallbackQuotas }
+          : primary
+        setProbes(prev => ({ ...prev, [pid]: result }))
+        setProbeAges(prev => ({ ...prev, [pid]: age }))
+        return withQuotas
+      }
+    } catch {}
+    return null
+  }, [pollMinutes])
 
-  // NOTE: no conditional returns above this line — hook order must be stable
+  // Dialog open = probe everything (all providers, all keys per provider —
+  // the backend /probe walks the whole key pool of a provider in one call),
+  // so quotas are visible without hovering and without adding anything to
+  // the status line. Fire-and-forget: results land in `probes` state.
+  const openedRef = useRef(false)
+  useEffect(() => {
+    if (openedRef.current || metaWaiting || !metaLive) return
+    if (!pids.length) return
+    openedRef.current = true
+    for (const pid of pids) {
+      checkProbe(pid, true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metaWaiting, metaLive, pids.join(',')])
   if (metaWaiting) return jsx('div', { className: 'p-2 text-xs', children: 'Loading…' })
 
   const banner = (!metaLive) ? jsxs('div', {
@@ -1055,7 +1141,7 @@ function SetupBody({ variant } = {}) {
 
   const rows = pids.map((pid) =>
     jsx(ProviderRow, {
-      key: pid, pid, pmeta: meta[pid], pc: provCfg[pid] || {}, st: statuses?.[pid], probe: probes[pid], probeAge: probeAges[pid], onSave: saveProvider,
+      key: pid, pid, pmeta: meta[pid], pc: provCfg[pid] || {}, st: statuses?.[pid], probe: probes[pid], probeAge: probeAges[pid], onCheck: checkProbe, onSave: saveProvider,
       variant,
       dragging: dragPid === pid,
       dropOver: overPid === pid,
