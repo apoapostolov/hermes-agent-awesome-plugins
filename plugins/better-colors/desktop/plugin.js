@@ -506,6 +506,22 @@ function liveApplyColor(hex, stockBtn) {
   paintGlyph(row, hex)
 }
 
+function liveClearColor(stockBtn) {
+  const openRow = document.querySelector(`${ROW} [data-state="open"]`)?.closest('.row-hover')
+  const sid = openRow?.dataset.bcSid || (stockBtn ? sessionIdFrom(stockBtn) : null)
+  const row = openRow || (sid ? [...document.querySelectorAll(ROW)].find(r => r.dataset.bcSid === sid) : null)
+  if (!row) return
+  if (sid) row.dataset.bcSid = sid
+  delete row._bcCached
+  const idle = row.querySelector(IDLE_DOT)
+  if (idle) {
+    idle.style.removeProperty('background-color')
+    idle.style.removeProperty('background')
+  }
+  clearTitle(row)
+  paintGlyph(row, null)
+}
+
 function clearTitle(row) {
   delete row.dataset.bcColor
   row.style.removeProperty('--bc-color')
@@ -790,6 +806,16 @@ function enhancePickers() {
     const host = grid.parentElement
     if (!host) return
     host.setAttribute(EXTRA_ATTR, 'host')
+    // The app's "no color" control is a full-width button AFTER the grid
+    // (onClick passes null). Wire it so clearing also live-clears the session
+    // entry — same treatment the swatches get.
+    const clearBtn = [...host.querySelectorAll('button')].find(b =>
+      !b.hasAttribute(EXTRA_ATTR) && !b.classList.contains('size-5') && b.closest('div') === host
+        && /mt-2/.test(b.className) && !b.dataset.bcLive)
+    if (clearBtn) {
+      clearBtn.dataset.bcLive = '1'
+      clearBtn.addEventListener('click', () => liveClearColor(stock[0]), true)
+    }
     injectCustomButton(host, stock[0])
     if (host.querySelector(`[${EXTRA_ATTR}="panel"]`)) return
     injectPanel(host, stock[0])
