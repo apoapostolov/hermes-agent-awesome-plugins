@@ -276,7 +276,9 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
             valueText ? jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: tag }) : null,
           ]),
       status?.stale ? jsx(Codicon, { name: 'warning', size: '0.6rem', style: { color: 'var(--ui-accent-secondary)' } }) : null,
-      (status?.slot > 1) ? jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: '#' + status.slot }) : null,
+      // Multi-key providers always show the active slot (#1 included) so the
+      // bar reads which key is in use; single-key providers stay clean.
+      (Number(status?.poolSize) > 1 && status?.slot) ? jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: '#' + status.slot }) : null,
     ],
   })
 }
@@ -357,7 +359,8 @@ function StatusBarGroup() {
     className: 'inline-flex h-full items-center',
     children: entries.map(([id, s]) => {
       const idx = s.pool_index ?? cfgQ.data?.providers?.[id]?.pool_index ?? 0
-      return jsx(ProviderChip, { key: id, id, name: chipName(id, s.name || id, entries.length > 2), status: { ...s, slot: Number(idx) + 1 }, onRefresh: () => onChipRefresh(id), active: id === activePid })
+      const poolSize = (cfgQ.data?.providers?.[id]?.pool || []).filter(Boolean).length
+      return jsx(ProviderChip, { key: id, id, name: chipName(id, s.name || id, entries.length > 2), status: { ...s, slot: Number(idx) + 1, poolSize }, onRefresh: () => onChipRefresh(id), active: id === activePid })
     }),
   })
 }
