@@ -45,6 +45,15 @@ function start() {
     // late, and panels (tasks/todos) mount or expand even later. Snap now,
     // then re-snap on every size change via ResizeObserver; the watcher
     // retires 8s after the last change so it never runs forever.
+    //
+    // The app re-enables scroll anchoring whenever it considers the reader
+    // "not following" (data-following=false). A panel whose height oscillates
+    // then re-anchors the scroll to a mid-list node on every size change,
+    // actively dragging the reader away from the bottom. While the snap
+    // session is live, force overflow-anchor:none so nothing fights the snap;
+    // restore the app's value when the watcher retires.
+    const prevAnchor = el.style.overflowAnchor
+    el.style.overflowAnchor = 'none'
     const snapNow = () => {
       if (state.hidden || !document.contains(el)) return false
       snapToBottom(el)
@@ -61,6 +70,7 @@ function start() {
       if (ro) ro.disconnect()
       if (retire) clearTimeout(retire)
       ro = retire = null
+      el.style.overflowAnchor = prevAnchor
     }
     ro = new ResizeObserver(() => {
       if (state.hidden || !document.contains(el)) { stop(); return }
