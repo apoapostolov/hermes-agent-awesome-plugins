@@ -1274,11 +1274,17 @@ export default {
   style.id = STYLE_ID
   style.textContent = `
     select[data-ps-select] {
-      color-scheme: dark light;
       background: var(--ui-bg-elevated, var(--background, transparent));
       color: var(--ui-text-secondary, var(--foreground));
       border-color: var(--ui-border);
     }
+    /* Native popup colors follow the UA color-scheme, which tracks the OS —
+       not the app theme. Pin it to the app's resolved mode so a dark app on a
+       light OS gets a dark popup. */
+    html[data-hermes-mode="dark"] select[data-ps-select],
+    html.dark select[data-ps-select] { color-scheme: dark; }
+    html[data-hermes-mode="light"] select[data-ps-select],
+    html:not(.dark) select[data-ps-select] { color-scheme: light; }
     select[data-ps-select] option {
       background: var(--ui-bg-elevated, var(--background, inherit));
       color: var(--ui-text-secondary, var(--foreground));
