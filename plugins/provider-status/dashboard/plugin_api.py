@@ -1754,7 +1754,14 @@ def update_config(body: ConfigUpdate):
         for pid, pv in (body.providers or {}).items():
             if pid in skip:
                 continue
-            incoming = (pv if isinstance(pv, ProviderConfig) else ProviderConfig(**pv)).model_dump()
+            model = pv if isinstance(pv, ProviderConfig) else ProviderConfig(**pv)
+            # Merge ONLY fields the caller actually sent: model_dump() would
+            # include pydantic defaults (enabled=False, pool=[], pool_index=0)
+            # and a partial save would silently disable the provider and wipe
+            # its key pool. This bit a real config once already.
+            incoming = model.model_dump(exclude_unset=True)
+            if not incoming:
+                continue
             prev = dict(providers.get(pid) or {})
             merged = {**prev, **incoming}
             for field in secret_keep:
