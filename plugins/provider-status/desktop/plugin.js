@@ -780,27 +780,71 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
 
   // Renewal-day dropdown: None + 1..31. Compact as the widest value ("None"/"31"),
   // never wraps. Selecting a day marks that key's subscription renewal date.
+    // Renewal-day dropdown: fully custom instead of a native <select> — the
+  // OS-drawn popup ignores page theming and rendered light-on-white in dark
+  // mode. A themed button + popover list takes all colors from ui vars.
+  const [dayMenuFor, setDayMenuFor] = useState(null) // index of open menu
+  useEffect(() => {
+    if (dayMenuFor === null) return
+    const close = () => setDayMenuFor(null)
+    document.addEventListener('mousedown', close, true)
+    return () => document.removeEventListener('mousedown', close, true)
+  }, [dayMenuFor])
+
   const resetDaySelect = (i, extraCls) => {
     if (!isResetDay) return null
     const val = resetDays[i] || 0
-    const opts = [jsx('option', { key: 'n', value: 0, children: 'None' })]
-    for (let d = 1; d <= 31; d++) opts.push(jsx('option', { key: d, value: d, children: String(d) }))
-    return jsx('select', {
-      value: val,
-      title: 'Day of month this subscription renews on.\nSwitches to this key after the day passes.',
-      'data-ps-select': '',
-      className: 'h-6 shrink-0 rounded border bg-transparent px-0.5 text-[0.65rem] tabular-nums text-center ' + (extraCls || ''),
-      style: { width: '2.6rem' },
-      onChange: e => {
-        const n = [...resetDays]
-        while (n.length <= i) n.push(0)
-        n[i] = parseInt(e.target.value, 10) || 0
-        setResetDays(n)
-        // normalize: 0 = None (stored as null/omitted)
-        const days = n.map(d => d || null)
-        persist(undefined, undefined, { reset_days: days })
-      },
-      children: opts,
+    const open = dayMenuFor === i
+    const pick = d => {
+      const n = [...resetDays]
+      while (n.length <= i) n.push(0)
+      n[i] = d
+      setResetDays(n)
+      setDayMenuFor(null)
+      // normalize: 0 = None (stored as null/omitted)
+      const days = n.map(x => x || null)
+      persist(undefined, undefined, { reset_days: days })
+    }
+    return jsx('div', {
+      className: 'relative shrink-0 ' + (extraCls || ''),
+      children: [
+        jsx('button', {
+          type: 'button',
+          title: 'Day of month this subscription renews on.\nSwitches to this key after the day passes.',
+          onClick: e => { e.stopPropagation(); setDayMenuFor(open ? null : i) },
+          className: 'h-6 w-2.6rem rounded border px-0.5 text-[0.65rem] tabular-nums text-center ' + (open ? 'border-(--ui-accent) ' : ''),
+          style: {
+            width: '2.6rem',
+            background: 'var(--ui-bg-elevated, var(--background))',
+            borderColor: open ? 'var(--ui-accent)' : 'var(--ui-border)',
+            color: val ? 'var(--ui-text-secondary, var(--foreground))' : 'var(--ui-text-quaternary, var(--foreground))',
+          },
+          children: val ? String(val) : 'None',
+        }),
+        open ? jsx('div', {
+          className: 'absolute right-0 top-7 z-50 rounded-md border py-1 shadow-lg',
+          style: {
+            background: 'var(--ui-bg-elevated, var(--background))',
+            borderColor: 'var(--ui-border)',
+            maxHeight: '16rem',
+            overflowY: 'auto',
+            minWidth: '4rem',
+          },
+          children: [jsx('button', {
+            key: 'n', type: 'button',
+            onClick: () => pick(0),
+            className: 'block w-full px-2 py-0.5 text-left text-[0.65rem] hover:bg-(--ui-control-hover-background)',
+            style: { color: !val ? 'var(--ui-accent)' : 'var(--ui-text-secondary, var(--foreground))' },
+            children: 'None',
+          })].concat(Array.from({ length: 31 }, (_, k) => k + 1).map(d => jsx('button', {
+            key: d, type: 'button',
+            onClick: () => pick(d),
+            className: 'block w-full px-2 py-0.5 text-left text-[0.65rem] tabular-nums hover:bg-(--ui-control-hover-background)',
+            style: { color: val === d ? 'var(--ui-accent)' : 'var(--ui-text-secondary, var(--foreground))' },
+            children: String(d),
+          }))),
+        }) : null,
+      ],
     })
   }
 
@@ -1273,18 +1317,6 @@ export default {
   const style = document.createElement('style')
   style.id = STYLE_ID
   style.textContent = `
-    select[data-ps-select] {
-      background: var(--ui-bg-elevated, var(--background, transparent));
-      color: var(--ui-text-secondary, var(--foreground));
-      border-color: var(--ui-border);
-    }
-    /* Native popup colors follow the UA color-scheme, which tracks the OS —
-       not the app theme. Pin it to the app's resolved mode so a dark app on a
-       light OS gets a dark popup. */
-    html[data-hermes-mode="dark"] select[data-ps-select],
-    html.dark select[data-ps-select] { color-scheme: dark; }
-    html[data-hermes-mode="light"] select[data-ps-select],
-    html:not(.dark) select[data-ps-select] { color-scheme: light; }
     select[data-ps-select] option {
       background: var(--ui-bg-elevated, var(--background, inherit));
       color: var(--ui-text-secondary, var(--foreground));
