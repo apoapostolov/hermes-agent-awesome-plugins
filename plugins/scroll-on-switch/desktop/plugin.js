@@ -41,9 +41,32 @@ function start() {
 
   const scheduleSnap = (el, state) => {
     state.timers.forEach(clearTimeout)
-    state.timers = [0, 50, 150, 400, 900].map(delay => setTimeout(() => {
-      if (!state.hidden && document.contains(el)) snapToBottom(el)
-    }, delay))
+    // Long transcripts keep mounting nodes after the switch; a fixed retry
+    // ladder (<=900ms) gave up before React finished and the reader landed
+    // mid-list. Instead: snap now, then re-snap whenever the transcript grows,
+    // until its height is stable for ~300ms (or 5s total).
+    const snapNow = () => {
+      if (state.hidden || !document.contains(el)) return false
+      snapToBottom(el)
+      return true
+    }
+    snapNow()
+    let lastH = -1
+    let stableSince = 0
+    const startedAt = Date.now()
+    const tick = () => {
+      if (state.hidden || !document.contains(el) || Date.now() - startedAt > 5000) return
+      const h = el.scrollHeight
+      if (h !== lastH) {
+        lastH = h
+        stableSince = Date.now()
+        snapNow()
+      }
+      if (Date.now() - stableSince < 300) {
+        state.timers.push(setTimeout(tick, 80))
+      }
+    }
+    state.timers.push(setTimeout(tick, 120))
   }
 
   const observeViewport = el => {
