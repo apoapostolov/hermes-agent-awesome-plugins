@@ -739,7 +739,10 @@ function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
     effectiveTone === 'ok' ? 'Healthy' : fallback,
     ...(quotaRows ? quotaRows.split('\n') : []),
   ].map(s => s.trim()).filter(Boolean) // empty quota entries would leave a dangling trailing dot
-  let text = segments.join('  ·  ')
+  // Join with a breakable space before the dot and NBSP after: the label
+  // wraps inside the 256px chip, and a plain-space join let lines break right
+  // after the dot — a 'trailing' dot with empty space at the end of a line.
+  let text = segments.join(' \u00b7\u00a0')
   if (effectiveTone !== 'ok' && age != null) {
     text += ` (checked ${age < 60 ? Math.round(age) + 's' : age < 3600 ? Math.round(age / 60) + 'm' : Math.round(age / 3600) + 'h'} ago)`
   }
