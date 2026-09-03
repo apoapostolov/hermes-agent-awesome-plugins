@@ -786,7 +786,14 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
   const [dayMenuFor, setDayMenuFor] = useState(null) // index of open menu
   useEffect(() => {
     if (dayMenuFor === null) return
-    const close = () => setDayMenuFor(null)
+    const close = e => {
+      // Ignore presses inside any dropdown UI (button, menu, its scrollbar) —
+      // otherwise the capture-phase mousedown closes the menu before the click
+      // lands and the scrollbar becomes unusable.
+      const t = e.target
+      if (t && t.closest && t.closest('[data-day-menu],[data-day-button]')) return
+      setDayMenuFor(null)
+    }
     document.addEventListener('mousedown', close, true)
     return () => document.removeEventListener('mousedown', close, true)
   }, [dayMenuFor])
@@ -810,6 +817,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
       children: [
         jsx('button', {
           type: 'button',
+          'data-day-button': '',
           title: 'Day of month this subscription renews on.\nSwitches to this key after the day passes.',
           onClick: e => { e.stopPropagation(); setDayMenuFor(open ? null : i) },
           className: 'h-6 w-2.6rem rounded border px-0.5 text-[0.65rem] tabular-nums text-center ' + (open ? 'border-(--ui-accent) ' : ''),
@@ -822,6 +830,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
           children: val ? String(val) : 'None',
         }),
         open ? jsx('div', {
+          'data-day-menu': '',
           className: 'absolute right-0 top-7 z-50 rounded-md border py-1 shadow-lg',
           style: {
             background: 'var(--ui-bg-elevated, var(--background))',
@@ -1272,18 +1281,55 @@ function SetupBody({ variant } = {}) {
       onDragEnd: finishDrag,
       onRemove: removeProvider,
     }))
+  // Add-provider picker: custom themed dropdown (native select popup ignores
+  // page theming — white popup in dark mode).
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  useEffect(() => {
+    if (!addMenuOpen) return
+    const close = e => {
+      const t = e.target
+      if (t && t.closest && t.closest('[data-add-picker]')) return
+      setAddMenuOpen(false)
+    }
+    document.addEventListener('mousedown', close, true)
+    return () => document.removeEventListener('mousedown', close, true)
+  }, [addMenuOpen])
+
   const addRow = addable.length
     ? jsxs('div', { className: 'flex items-center gap-2', children: [
-        jsx('select', {
-          value: toAdd,
-          onChange: e => setToAdd(e.target.value),
-          className: 'h-7 flex-1 min-w-0 rounded border bg-transparent px-2 text-[0.75rem]',
-          style: { borderColor: 'var(--ui-border)', color: 'var(--ui-text-secondary)' },
-          children: [
-            jsx('option', { value: '', children: 'Add a provider…' }),
-            addable.map(p => jsx('option', { key: p, value: p, children: meta[p].name || p })),
-          ],
-        }),
+        jsxs('div', { 'data-add-picker': '', className: 'relative flex-1 min-w-0', children: [
+          jsx('button', {
+            type: 'button',
+            onClick: () => setAddMenuOpen(v => !v),
+            className: 'h-7 w-full flex items-center justify-between rounded border px-2 text-[0.75rem]',
+            style: {
+              background: 'var(--ui-bg-elevated, var(--background))',
+              borderColor: addMenuOpen ? 'var(--ui-accent)' : 'var(--ui-border)',
+              color: toAdd ? 'var(--ui-text-secondary, var(--foreground))' : 'var(--ui-text-quaternary, var(--foreground))',
+            },
+            children: [
+              jsx('span', { children: toAdd ? (meta[toAdd]?.name || toAdd) : 'Add a provider…' }),
+              jsx('span', { style: { color: 'var(--ui-text-quaternary, var(--foreground))' }, children: '▾' }),
+            ],
+          }),
+          addMenuOpen ? jsx('div', {
+            className: 'absolute left-0 top-8 z-50 rounded-md border py-1 shadow-lg',
+            style: {
+              background: 'var(--ui-bg-elevated, var(--background))',
+              borderColor: 'var(--ui-border)',
+              maxHeight: '16rem',
+              overflowY: 'auto',
+              width: '100%',
+            },
+            children: addable.map(p => jsx('button', {
+              key: p, type: 'button',
+              onClick: () => { setToAdd(p); setAddMenuOpen(false) },
+              className: 'block w-full px-2 py-1 text-left text-[0.75rem] hover:bg-(--ui-control-hover-background)',
+              style: { color: toAdd === p ? 'var(--ui-accent)' : 'var(--ui-text-secondary, var(--foreground))' },
+              children: meta[p].name || p,
+            })),
+          }) : null,
+        ] }),
         jsx(Button, { variant: 'outline', size: 'icon-xs', className: 'shrink-0 h-7 w-7 items-center justify-center', disabled: !toAdd, onClick: addProvider, title: 'add provider', children: jsx(Codicon, { name: 'add', size: '0.8rem' }) }),
       ] })
     : null
