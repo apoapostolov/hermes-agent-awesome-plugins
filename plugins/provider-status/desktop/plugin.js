@@ -756,7 +756,7 @@ function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
   // forced inline-flex (atomic box) and the chip would paint one rectangle
   // behind it — trailing empty space on short wrapped lines.
   return jsx(Tooltip, {
-    label,
+    label: text,
     children: jsx('span', {
       onMouseEnter: check,
       className: 'inline-block shrink-0 rounded-full',
