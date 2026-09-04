@@ -1,26 +1,38 @@
 /**
  * UI Polish for Hermes.
  *
- * Session-list channel group headers: moves the platform/channel icon from
- * the left edge (before the name) to the right side of the same header
- * line, after the session count. Pure flex-order CSS, no DOM changes —
- * the app keeps managing its own nodes.
+ * Session-list channel group headers (Discord, Telegram, ...): the platform
+ * icon renders first, before the collapse glyph and the group name. This
+ * plugin MOVES the icon node to the far right of the same header line,
+ * after the session count, so the row reads:
+ *
+ *   [glyph] Name ............ 12  [icon]
+ *
+ * DOM-move approach: a MutationObserver re-applies the move whenever React
+ * re-renders a header, so it survives updates. Scoped strictly to the
+ * sessions list.
  */
 
 const ID = 'ui-polish-for-hermes'
-const STYLE_ID = 'ui-polish-for-hermes-style'
 
-const CSS = `
-  /* Header buttons render [chevron, icon, label, spacer, count, (warn)];
-     flex order moves the icon to the far right without touching the DOM. */
-  [data-sessions-mode] button > :nth-child(2) {
-    order: 9;
-  }
-  /* Keep the disconnect warning next to the count, not after the icon. */
-  [data-sessions-mode] button > :nth-child(6) {
-    order: 8;
-  }
-`
+const ROOT = '[data-sessions-mode]'
+
+function isHeaderButton(btn) {
+  if (btn.tagName !== 'BUTTON') return false
+  const kids = btn.children
+  if (kids.length < 4) return false
+  if (!(kids[0] instanceof SVGElement)) return false
+  return Boolean(btn.querySelector('span.min-w-0.flex-1'))
+}
+
+function polish() {
+  document.querySelectorAll(`${ROOT} button`).forEach(btn => {
+    if (!isHeaderButton(btn)) return
+    const icon = btn.children[1]
+    if (!icon || icon === btn.lastElementChild) return
+    btn.appendChild(icon)
+  })
+}
 
 export default {
   id: ID,
@@ -28,13 +40,10 @@ export default {
   description: 'Session-list polish: channel group headers show their platform icon right-aligned after the session count instead of before the name.',
   defaultEnabled: true,
   register(ctx) {
-    let style = document.getElementById(STYLE_ID)
-    if (!style) {
-      style = document.createElement('style')
-      style.id = STYLE_ID
-      style.textContent = CSS
-      document.head.appendChild(style)
-    }
-    ctx.onDispose(() => document.getElementById(STYLE_ID)?.remove())
+    polish()
+    const obs = new MutationObserver(() => polish())
+    const root = document.querySelector(ROOT) || document.body
+    obs.observe(root, { childList: true, subtree: true })
+    ctx.onDispose(() => obs.disconnect())
   }
 }
