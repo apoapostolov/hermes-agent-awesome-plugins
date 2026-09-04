@@ -21,7 +21,11 @@ function isHeaderButton(btn) {
   if (btn.tagName !== 'BUTTON') return false
   const kids = btn.children
   if (kids.length < 4) return false
-  if (!(kids[0] instanceof SVGElement)) return false
+  // Child 0 is the collapse chevron - a codicon font glyph (span/i), not an
+  // svg. Match it by its codicon chevron-right class.
+  const first = kids[0]
+  const cls = String(first.className || '')
+  if (!/chevron(-right)?\b/.test(cls) && !(first.querySelector && first.querySelector('[class*="chevron"]'))) return false
   return Boolean(btn.querySelector('span.min-w-0.flex-1'))
 }
 
