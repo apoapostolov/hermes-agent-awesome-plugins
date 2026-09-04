@@ -1,0 +1,13 @@
+name: ui-polish-for-hermes
+version: 1.0.0
+description: "Session-list polish: channel group headers show their platform icon right-aligned after the session count instead of before the name."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/ui-polish-for-hermes
+tags:
+  - desktop
+  - appearance
+  - sessions
+  - ui
