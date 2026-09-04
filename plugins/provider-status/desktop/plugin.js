@@ -823,7 +823,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
           className: 'h-6 w-2.6rem rounded border px-0.5 text-[0.65rem] tabular-nums text-center ' + (open ? 'border-(--ui-accent) ' : ''),
           style: {
             width: '2.6rem',
-            background: 'var(--ui-bg-elevated, var(--background))',
+            background: 'transparent',
             borderColor: open ? 'var(--ui-accent)' : 'var(--ui-border)',
             color: val ? 'var(--ui-text-secondary, var(--foreground))' : 'var(--ui-text-quaternary, var(--foreground))',
           },
@@ -1251,6 +1251,20 @@ function SetupBody({ variant } = {}) {
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metaWaiting, metaLive, pids.join(',')])
+  // Add-provider picker: custom themed dropdown (native select popup ignores
+  // page theming — white popup in dark mode).
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  useEffect(() => {
+    if (!addMenuOpen) return
+    const close = e => {
+      const t = e.target
+      if (t && t.closest && t.closest('[data-add-picker]')) return
+      setAddMenuOpen(false)
+    }
+    document.addEventListener('mousedown', close, true)
+    return () => document.removeEventListener('mousedown', close, true)
+  }, [addMenuOpen])
+
   if (metaWaiting) return jsx('div', { className: 'p-2 text-xs', children: 'Loading…' })
 
   const banner = (!metaLive) ? jsxs('div', {
@@ -1281,20 +1295,6 @@ function SetupBody({ variant } = {}) {
       onDragEnd: finishDrag,
       onRemove: removeProvider,
     }))
-  // Add-provider picker: custom themed dropdown (native select popup ignores
-  // page theming — white popup in dark mode).
-  const [addMenuOpen, setAddMenuOpen] = useState(false)
-  useEffect(() => {
-    if (!addMenuOpen) return
-    const close = e => {
-      const t = e.target
-      if (t && t.closest && t.closest('[data-add-picker]')) return
-      setAddMenuOpen(false)
-    }
-    document.addEventListener('mousedown', close, true)
-    return () => document.removeEventListener('mousedown', close, true)
-  }, [addMenuOpen])
-
   const addRow = addable.length
     ? jsxs('div', { className: 'flex items-center gap-2', children: [
         jsxs('div', { 'data-add-picker': '', className: 'relative flex-1 min-w-0', children: [
