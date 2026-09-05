@@ -226,8 +226,7 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
   if (multi) { valueText = ''; valueCls = ''; valueStyle = { color: 'var(--ui-accent)' }; tag = '' }
 
   return jsxs('span', {
-    className: cn('inline-flex h-full items-center gap-1 px-1.5 text-[0.6875rem] tabular-nums cursor-pointer',
-      active && 'border-b-2 border-(--ui-accent)'),
+    className: 'inline-flex h-full items-center gap-1 px-1.5 text-[0.6875rem] tabular-nums cursor-pointer',
     title: _chipTitle(id, status) + (active ? '  · active model' : ''),
     onClick: async () => {
       const ok = await onRefresh()
