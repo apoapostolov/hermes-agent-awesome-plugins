@@ -248,9 +248,10 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
             let shown = seg.slice(1)
             if (!isNaN(payload)) {
               if (arrow === '↑') {
-                // 5h: payload is remaining; show USED (0 = empty window, 100 = burnt)
+                // 5h: payload is remaining; show USED (0 = empty window, 100 = burnt).
+                // GLM reports firm percentages — round, never decimals.
                 const used = 100 - payload
-                shown = (used < 10 ? used.toFixed(1) : Math.round(used)) + '%'
+                shown = Math.round(used) + '%'
                 if (used >= 90) { cls = 'text-destructive font-semibold'; segColor = null }
                 else if (used >= 80) { cls = 'font-semibold'; segColor = AMBER }
                 else segColor = AMBER
