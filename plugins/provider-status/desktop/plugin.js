@@ -175,7 +175,7 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
     //   credit (deepseek):       bold when <$5, red+bold when <$1
     // Every value gets a gray direction arrow so the trend reads at a glance.
 
-    const fmtPct = v => (id !== 'grok' && v < 10 ? v.toFixed(1) : Math.round(v)) + '%'
+    const fmtPct = v => (id === 'tavily' ? v.toFixed(1) : Math.round(v)) + '%'
     const AMBER = '#f59e0b' // matches SignalDot warn
 
   // Which kind is this provider's headline number?
@@ -257,7 +257,7 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
                 else segColor = AMBER
               } else {
                 // decreasing: show remaining as sent
-                shown = (payload < 10 ? payload.toFixed(1) : Math.round(payload)) + '%'
+                shown = Math.round(payload) + '%'
                 if (payload <= 10) cls = 'text-destructive font-semibold'
                 else if (payload <= 20) { cls = 'font-semibold'; segColor = AMBER }
                 else segColor = AMBER
@@ -675,8 +675,14 @@ function StatusBadge({ st }) {
 // Header: [gripper] [Name] [Login/OAuth] [Key field flex-1] [Badge] [☐] [+]
 // SDK Button/Input/Tooltip for a polished look matching Hermes dialogs.
 
-function _quotaText(quotas) {
-  return (quotas || []).map(q => (q.display != null ? `${q.label}: ${q.display}` : `${q.label}: ${q.percent}%`)).join('\n')
+function _quotaText(quotas, id) {
+  // Whole-number percents everywhere except Tavily, whose Monthly figure is
+  // meaningfully fractional.
+  return (quotas || []).map(q => {
+    if (q.display != null) return `${q.label}: ${q.display}`
+    const pct = id === 'tavily' ? (Math.round(q.percent * 10) / 10) : Math.round(q.percent)
+    return `${q.label}: ${pct}%`
+  }).join('\n')
 }
 
 function _quotaData(status) {
@@ -686,7 +692,7 @@ function _quotaData(status) {
     const label = labels[String(w?.label || '').toLowerCase()]
     const pct = Number(w?.pct)
     return label && Number.isFinite(pct)
-      ? [{ label, percent: Math.max(0, Math.min(100, Math.round((100 - pct) * 10) / 10)) }]
+      ? [{ label, percent: Math.max(0, Math.min(100, Math.round(100 - pct))) }]
       : []
   })
   if (out.length) return out
@@ -734,7 +740,7 @@ function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
   // error keeps the plain reason. Everything renders on ONE line with a fine
   // dot (spaced both sides) between segments — single line-box, so the app's
   // tooltip chip background covers the whole label.
-  const quotaRows = _quotaText(effectiveQuotas)
+  const quotaRows = _quotaText(effectiveQuotas, pid)
   const segments = [
     effectiveTone === 'ok' ? 'Healthy' : fallback,
     ...(quotaRows ? quotaRows.split('\n') : []),
