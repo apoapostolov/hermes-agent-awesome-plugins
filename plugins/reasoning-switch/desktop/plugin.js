@@ -165,7 +165,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
   useEffect(() => {
     const t = setInterval(() => {
       const sid = host.state.focusedSessionId.get()
-      const rem = sid ? storage.get('remaining', {})[sid]
+      const rem = sid ? storage.get('remaining', {})[sid] : undefined
       setRemaining(Number.isFinite(rem) ? rem : null)
     }, 500)
     return () => clearInterval(t)
