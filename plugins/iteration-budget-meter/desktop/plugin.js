@@ -9,14 +9,13 @@
  *
  * v1.2.0: popover redesigned — average tool calls per request, ratio of
  * requests hitting the max, and a ceiling suggestion derived from both
- * (see ceilingSuggestion). The per-turn delta mechanism from 1.1.0 is
- * unchanged: focusedUsage.calls is session_api_calls — CUMULATIVE for the
- * whole session, never reset per turn. Every idle observation records the
- * cumulative counter as the baseline; the chip displays
- * max(0, calls - baseline) during the next turn. A defensive clamp
- * (calls < baseline -> rebaseline) keeps session switches from ever
- * showing a bogus number. The chip can therefore never display the
- * cumulative counter or exceed the cap.
+ * (see ceilingSuggestion).
+ * v1.2.1: chained-continuation fix. The gateway emits message.complete and a
+ * busy dip between chained segments of one logical request (goal follow-ups,
+ * queued drains, auto-continue), which reset the counter mid-request. A
+ * GAP_MS grace window now separates a real request boundary (idle persists
+ * past the window -> commit peak + rebaseline) from a chained segment (busy
+ * returns inside the window -> same request continues).
  */
 import { cn, host, Tip as Tooltip, Popover, PopoverContent, PopoverTrigger, useValue } from '@hermes/plugin-sdk'
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
@@ -34,7 +33,9 @@ const RED = '#ef4444'
 // ceiling-suggestion stats.
 const _turnPeaks = []
 const MAX_TURNS = 30
+const GAP_MS = 4000 // idle window that ends a request; shorter gaps = chained continuation
 const MIN_SAMPLE_FOR_SUGGESTION = 5 // finished requests before suggesting a ceiling
+const MIN_HITS = 2 // ...and the cap must have been hit at least twice
 const MIN_HIT_RATIO = 0.2 // suggest only when >= 20% of requests hit the cap
 const MIN_AVG_FRAC = 0.5 // ...and the average is at least half the cap
 
@@ -56,8 +57,9 @@ function ceilingSuggestion(peaks) {
   const n = peaks.length
   if (n < MIN_SAMPLE_FOR_SUGGESTION) return null
   const avg = peaks.reduce((a, b) => a + b, 0) / n
-  const ratio = peaks.filter((p) => p >= CAP).length / n
-  if (ratio < MIN_HIT_RATIO || avg < CAP * MIN_AVG_FRAC) return null
+  const hits = peaks.filter((p) => p >= CAP).length
+  const ratio = hits / n
+  if (hits < MIN_HITS || ratio < MIN_HIT_RATIO || avg < CAP * MIN_AVG_FRAC) return null
   const need = Math.max(avg * (2 - ratio), CAP * (1 + ratio))
   const suggested = Math.ceil(need / 15) * 15
   return suggested > CAP ? suggested : null
@@ -72,39 +74,78 @@ function IterBudgetChip() {
 
   const wasBusy = useRef(false)
   const peak = useRef(0)
-  // Cumulative session counter observed at the last turn boundary (idle).
-  // Null until the first observation; set while idle, clamped while running.
+  // Cumulative session counter observed at the request's start boundary.
+  // Null until the first observation; clamped while running.
   const base = useRef(null)
+  // Chained-continuation guard (v1.2.1): the gateway emits message.complete +
+  // a busy dip between chained segments of ONE logical request (goal
+  // follow-ups, queued-prompt drains, synthetic/auto-continue turns), so a
+  // busy->idle edge must NOT immediately commit the peak and rebaseline.
+  // Arm a grace window instead: if busy returns before the window ends, the
+  // same request continues (base and peak survive); if the session stays idle
+  // for GAP_MS, the timeout commits the peak and rebaselines to the value
+  // observed at the idle edge (usage merges that land later cannot shift it).
+  const commitTimer = useRef(null)
+  const pendingPeak = useRef(0)
+  const armCalls = useRef(null)
+
+  const cancelCommit = () => {
+    if (commitTimer.current !== null) {
+      clearTimeout(commitTimer.current)
+      commitTimer.current = null
+    }
+    pendingPeak.current = 0
+    armCalls.current = null
+  }
 
   useEffect(() => {
     const isBusy = !!busy
     const calls = usage && typeof usage.calls === 'number' && usage.calls >= 0 ? usage.calls : null
 
     if (!isBusy) {
-      // Turn just ended: record this turn's peak BEFORE rebaselining.
       if (wasBusy.current) {
-        const finalDelta = base.current !== null && calls !== null ? Math.max(0, calls - base.current) : peak.current
-        if (finalDelta > 0) pushPeak(finalDelta)
-        peak.current = 0
+        // Request may be over OR just chaining: arm the grace window.
+        pendingPeak.current = peak.current
+        armCalls.current = calls !== null && base.current !== null ? Math.max(base.current, calls) : calls
+        commitTimer.current = setTimeout(() => {
+          commitTimer.current = null
+          if (pendingPeak.current > 0) pushPeak(pendingPeak.current)
+          if (armCalls.current !== null && (base.current === null || armCalls.current >= base.current)) {
+            base.current = armCalls.current
+          }
+          pendingPeak.current = 0
+          armCalls.current = null
+          peak.current = 0
+          bump(Date.now())
+        }, GAP_MS)
         bump(Date.now())
+      } else if (base.current === null && calls !== null) {
+        // First observation while idle seeds the baseline.
+        base.current = calls
       }
-      // Idle: whatever the focused session shows now IS the next turn's zero.
-      if (calls !== null) base.current = calls
     } else {
-      if (!wasBusy.current) {
-        peak.current = 0 // fresh turn
-        bump(Date.now())
-      }
+      if (commitTimer.current !== null) cancelCommit() // chained segment: same request
       if (calls !== null) {
-        // Rebaseline on session switch / first mount (prevents negatives and
-        // cumulative leaks); never let the display run backwards.
-        if (base.current === null || calls < base.current) base.current = calls
+        // Rebaseline on session switch / first mount; the old peak belonged
+        // to the old baseline, so reset it with the base.
+        if (base.current === null || calls < base.current) {
+          base.current = calls
+          peak.current = 0
+        }
         const delta = calls - base.current
         if (delta > peak.current) peak.current = delta
       }
     }
     wasBusy.current = isBusy
   }, [busy, usage])
+
+  // Timeout cleanup on unmount.
+  useEffect(
+    () => () => {
+      if (commitTimer.current !== null) clearTimeout(commitTimer.current)
+    },
+    []
+  )
 
   // Hidden while idle — the chip only exists during a running turn.
   if (!busy) return null
@@ -157,7 +198,7 @@ function IterBudgetChip() {
       jsx(PopoverContent, {
         side: 'top',
         align: 'end',
-        className: 'min-w-[17rem] p-3 text-[0.75rem]',
+        className: 'w-max max-w-[24rem] p-3 text-[0.75rem]',
         children: jsxs(Fragment, {
           children: [
             jsxs('div', {
@@ -182,9 +223,9 @@ function IterBudgetChip() {
                       ],
                     }),
                     jsxs('div', {
-                      className: 'mt-1',
+                      className: 'mt-1 whitespace-nowrap',
                       children: [
-                        'Ratio of requests hitting max tool calls: ',
+                        'Max tool calls requests: ',
                         jsx('span', {
                           className: 'font-medium',
                           children: fmtPct(ratio) + ' (' + hits + ' of ' + nDone + ')',
@@ -193,9 +234,14 @@ function IterBudgetChip() {
                     }),
                     suggest !== null
                       ? jsxs('div', {
-                          className: 'mt-1',
+                          className: 'mt-1 whitespace-nowrap',
                           style: { color: ACCENT },
                           children: [
+                            jsx('i', {
+                              className: 'codicon codicon-light-bulb',
+                              'aria-hidden': 'true',
+                              style: { fontSize: '12px', marginRight: '4px' },
+                            }),
                             'Consider increasing tool calls to: ',
                             jsx('span', { className: 'font-medium', children: '~' + suggest }),
                           ],
