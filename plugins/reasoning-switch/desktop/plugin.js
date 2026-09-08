@@ -284,7 +284,7 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
             jsx(DialogTitle, { children: 'Reasoning Switch' }),
             jsx('p', {
               className: 'text-xs text-(--ui-text-tertiary)',
-              children: ['Click of status bar to rotate reasoning levels.', jsx('br', {}), 'You can limit high reasoning to number of prompts before auto-demoting.']
+              children: ['Click of status bar to rotate reasoning levels.', jsx('br', {}), 'You can limit high reasoning to number of prompts.']
             }),
           ],
         }),
