@@ -144,7 +144,7 @@ function IterBudgetChip() {
             children: jsxs(Fragment, {
               children: [
                 jsx('i', {
-                  className: 'codicon codicon-debug-restart',
+                  className: 'codicon codicon-tools',
                   'aria-hidden': 'true',
                   style: { fontSize: '12px', marginRight: '3px', opacity: 0.9 },
                 }),
