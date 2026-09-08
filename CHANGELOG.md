@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.0] - 2026-09-08
+
+### Added
+
+- **iteration-budget-meter:** status-bar chip that shows the focused session's per-turn iteration usage (N/60) while a turn runs. Amber near the cap, red at cap; the popover lists recent turn peaks and the last cap-forced summary. Counts only the current turn, so the number can never exceed the cap.
+
 ## [1.7.0] - 2026-09-01
 
 ### Fixed
