@@ -26,6 +26,6 @@ plugins:
     ref: 3a5a693758e971c16c19203d1e2631de942fd058
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/iteration-budget-meter
-    ref: 8040dd7de907801b00baa24991b120dfc8b5b5f8
+    ref: d7afd13934b114358c8c36eed793d17e53cf752d
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync
