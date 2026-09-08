@@ -246,7 +246,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
           e.stopPropagation()
           onOpenDialog()
         },
-        className: 'inline-flex items-center justify-center cursor-pointer text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
+        className: 'inline-flex items-center justify-center cursor-pointer text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground',
         children: jsx(Codicon, { name: 'settings-gear', size: '0.7rem' }),
       }),
     ],
