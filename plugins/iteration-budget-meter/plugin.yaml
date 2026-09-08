@@ -1,5 +1,5 @@
 name: iteration-budget-meter
-version: 1.1.0
+version: 1.1.1
 description: "Status-bar iteration budget meter — shows the focused session's per-turn iteration usage (N/60) while a turn runs, with a hover tooltip and a click popover for recent turn peaks and the last cap-forced summary. v1.1.0: fixed cumulative-counter leak (displayed session total instead of per-turn delta, counting past 60 across turns)."
 author: Apostol Apostolov
 license: MIT
