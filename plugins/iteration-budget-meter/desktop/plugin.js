@@ -124,7 +124,16 @@ function IterBudgetChip() {
             ),
             style: { color },
             onClick: () => bump(Date.now()), // refresh only this chip's details
-            children: jsx('span', { children: countText + '/60' }),
+            children: jsxs(Fragment, {
+              children: [
+                jsx('i', {
+                  className: 'codicon codicon-debug-restart',
+                  'aria-hidden': 'true',
+                  style: { fontSize: '12px', marginRight: '3px', opacity: 0.9 },
+                }),
+                jsx('span', { children: countText + '/60' }),
+              ],
+            }),
           }),
         }),
       }),
