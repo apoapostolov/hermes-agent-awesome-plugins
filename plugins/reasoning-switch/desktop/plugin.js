@@ -276,15 +276,15 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
     open,
     onOpenChange,
     children: jsx(DialogContent, {
-      className: 'w-fit min-w-[24rem] max-w-[92vw]',
+      fitContent: true,
+      className: 'min-w-[24rem]',
       children: [
         jsxs(DialogHeader, {
           children: [
             jsx(DialogTitle, { children: 'Reasoning Switch' }),
             jsx('p', {
               className: 'text-xs text-(--ui-text-tertiary)',
-              children:
-                'Click the statusbar word to rotate through the checked levels. A prompt limit demotes to the next lower checked level after N user prompts.',
+              children: 'Click the word to rotate. A prompt limit auto-demotes after N prompts.',
             }),
           ],
         }),
