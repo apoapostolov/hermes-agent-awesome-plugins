@@ -1,23 +1,22 @@
 /**
  * Iteration Budget Meter — statusbar chip showing the FOCUSED SESSION's
  * per-turn iteration usage (N/60) while a turn runs, with a one-line hover
- * tooltip and a click popover for recent turn peaks and the last cap-forced
- * summary.
+ * tooltip and a click popover with per-request stats.
  *
  * Data source (pure renderer, no backend, no polling, no writes):
  *   - "is a turn running" -> host.state.busy
  *   - raw counter         -> host.state.focusedUsage.calls
  *
- * v1.1.0 FIX (was 1.0.0, cron build): focusedUsage.calls is
- * session_api_calls — CUMULATIVE for the whole session, never reset per
- * turn. 1.0.0 displayed it raw, so after the cap the chip kept counting up
- * across turns (70/60, 90/60). The real per-turn budget
- * (agent.iteration_budget) is NOT in the usage payload, so the delta is
- * computed renderer-side: every idle observation records the cumulative
- * counter as the baseline, and the chip displays max(0, calls - baseline)
- * during the next turn. A defensive clamp (calls < baseline -> rebaseline)
- * keeps session switches from ever showing a bogus number. The chip can
- * therefore never display the cumulative counter.
+ * v1.2.0: popover redesigned — average tool calls per request, ratio of
+ * requests hitting the max, and a ceiling suggestion derived from both
+ * (see ceilingSuggestion). The per-turn delta mechanism from 1.1.0 is
+ * unchanged: focusedUsage.calls is session_api_calls — CUMULATIVE for the
+ * whole session, never reset per turn. Every idle observation records the
+ * cumulative counter as the baseline; the chip displays
+ * max(0, calls - baseline) during the next turn. A defensive clamp
+ * (calls < baseline -> rebaseline) keeps session switches from ever
+ * showing a bogus number. The chip can therefore never display the
+ * cumulative counter or exceed the cap.
  */
 import { cn, host, Tip as Tooltip, Popover, PopoverContent, PopoverTrigger, useValue } from '@hermes/plugin-sdk'
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
@@ -30,31 +29,45 @@ const ACCENT = 'var(--ui-accent)'
 const AMBER = '#f59e0b' // same warn tone the app's status dot uses
 const RED = '#ef4444'
 
-// Module-scoped history, kept across chip mounts for the life of the window.
-// `_peaks` holds the last 10 completed turns' observed peak count (oldest->newest).
-const _peaks = []
-const MAX_PEAKS = 10
-let _lastCapHitAt = 0 // ms epoch when this chip first observed a turn reach the cap
+// Module-scoped per-request history (oldest->newest), kept across chip mounts
+// for the life of the window. Feeds the popover's average / hit-ratio /
+// ceiling-suggestion stats.
+const _turnPeaks = []
+const MAX_TURNS = 30
+const MIN_SAMPLE_FOR_SUGGESTION = 5 // finished requests before suggesting a ceiling
+const MIN_HIT_RATIO = 0.2 // suggest only when >= 20% of requests hit the cap
+const MIN_AVG_FRAC = 0.5 // ...and the average is at least half the cap
 
 function pushPeak(v) {
-  _peaks.push(v)
-  if (_peaks.length > MAX_PEAKS) _peaks.shift()
+  _turnPeaks.push(v)
+  if (_turnPeaks.length > MAX_TURNS) _turnPeaks.shift()
 }
 
-function fmtWhen(ms) {
-  if (!ms) return 'never'
-  const d = new Date(ms)
-  const today = new Date()
-  const sameDay = d.toDateString() === today.toDateString()
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  return sameDay ? 'today, ' + time : d.toLocaleDateString() + ' ' + time
+function fmtPct(r) {
+  return (r * 100).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + '%'
+}
+
+// Ceiling suggestion: the new cap must cover the observed average plus an
+// allowance that grows with how often requests get truncated. Anchor case
+// (Apo): avg 45/60 with ~30% of requests hitting the cap -> suggest 90.
+//   need = max(avg * (2 - ratio), cap * (1 + ratio)); round UP to a multiple
+//   of 15; suggest only when the result exceeds the current cap.
+function ceilingSuggestion(peaks) {
+  const n = peaks.length
+  if (n < MIN_SAMPLE_FOR_SUGGESTION) return null
+  const avg = peaks.reduce((a, b) => a + b, 0) / n
+  const ratio = peaks.filter((p) => p >= CAP).length / n
+  if (ratio < MIN_HIT_RATIO || avg < CAP * MIN_AVG_FRAC) return null
+  const need = Math.max(avg * (2 - ratio), CAP * (1 + ratio))
+  const suggested = Math.ceil(need / 15) * 15
+  return suggested > CAP ? suggested : null
 }
 
 function IterBudgetChip() {
   const busy = useValue(host.state.busy)
   const usage = useValue(host.state.focusedUsage)
   // Bumping this re-renders the chip so the popover re-reads module history
-  // (turn peaks, last cap-hit) on click and on each turn boundary.
+  // (per-request stats) on click and on each turn boundary.
   const [, bump] = useState(0)
 
   const wasBusy = useRef(false)
@@ -88,7 +101,6 @@ function IterBudgetChip() {
         if (base.current === null || calls < base.current) base.current = calls
         const delta = calls - base.current
         if (delta > peak.current) peak.current = delta
-        if (delta >= CAP && !_lastCapHitAt) _lastCapHitAt = Date.now()
       }
     }
     wasBusy.current = isBusy
@@ -108,7 +120,12 @@ function IterBudgetChip() {
   // One line, middle-dot separators: 'iteration budget · 52/60 · this turn · cap 60'
   const label = 'iteration budget' + dot + countText + '/60' + dot + 'this turn' + dot + 'cap 60'
 
-  const peak10 = _peaks.length ? Math.max(..._peaks.slice(-10)) : null
+  // Per-request stats over the recorded window.
+  const nDone = _turnPeaks.length
+  const avg = nDone ? Math.round(_turnPeaks.reduce((a, b) => a + b, 0) / nDone) : null
+  const hits = nDone ? _turnPeaks.filter((p) => p >= CAP).length : 0
+  const ratio = nDone ? hits / nDone : null
+  const suggest = ceilingSuggestion(_turnPeaks)
 
   return jsx(Popover, {
     children: [
@@ -140,7 +157,7 @@ function IterBudgetChip() {
       jsx(PopoverContent, {
         side: 'top',
         align: 'end',
-        className: 'min-w-[15rem] p-3 text-[0.75rem]',
+        className: 'min-w-[17rem] p-3 text-[0.75rem]',
         children: jsxs(Fragment, {
           children: [
             jsxs('div', {
@@ -150,17 +167,47 @@ function IterBudgetChip() {
                 jsx('span', { style: { color }, children: countText + ' of 60' }),
               ],
             }),
-            jsx('div', {
-              className: 'mt-1 text-(--ui-text-tertiary)',
-              children:
-                peak10 !== null
-                  ? 'Highest of the last 10 turns: ' + peak10 + ' of 60'
-                  : 'No finished turns recorded yet.',
-            }),
-            jsx('div', {
-              className: 'mt-1 text-(--ui-text-tertiary)',
-              children: 'Last time the cap forced a summary: ' + fmtWhen(_lastCapHitAt),
-            }),
+            nDone === 0
+              ? jsx('div', {
+                  className: 'mt-1 text-(--ui-text-tertiary)',
+                  children: 'No finished requests recorded yet.',
+                })
+              : jsxs(Fragment, {
+                  children: [
+                    jsxs('div', {
+                      className: 'mt-1',
+                      children: [
+                        'Average tool calls per request: ',
+                        jsx('span', { className: 'font-medium', children: String(avg) }),
+                      ],
+                    }),
+                    jsxs('div', {
+                      className: 'mt-1',
+                      children: [
+                        'Ratio of requests hitting max tool calls: ',
+                        jsx('span', {
+                          className: 'font-medium',
+                          children: fmtPct(ratio) + ' (' + hits + ' of ' + nDone + ')',
+                        }),
+                      ],
+                    }),
+                    suggest !== null
+                      ? jsxs('div', {
+                          className: 'mt-1',
+                          style: { color: ACCENT },
+                          children: [
+                            'Consider increasing tool calls to: ',
+                            jsx('span', { className: 'font-medium', children: '~' + suggest }),
+                          ],
+                        })
+                      : null,
+                    jsx('div', {
+                      className: 'mt-1 text-[0.6875rem] text-(--ui-text-quaternary)',
+                      children:
+                        'Based on the last ' + nDone + ' finished request' + (nDone === 1 ? '' : 's') + '.',
+                    }),
+                  ],
+                }),
             atCap
               ? jsx('div', {
                   className: 'mt-2 text-[0.6875rem]',
@@ -168,10 +215,6 @@ function IterBudgetChip() {
                   children: 'At the cap — the model is asked to summarise and wrap up.',
                 })
               : null,
-            jsx('div', {
-              className: 'mt-2 text-[0.6875rem] text-(--ui-text-quaternary)',
-              children: 'Counts this turn only. Resets when a new turn starts.',
-            }),
           ],
         }),
       }),
