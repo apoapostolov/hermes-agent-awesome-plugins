@@ -276,7 +276,7 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
     open,
     onOpenChange,
     children: jsx(DialogContent, {
-      className: 'max-w-lg',
+      className: 'w-fit min-w-[24rem] max-w-[92vw]',
       children: [
         jsxs(DialogHeader, {
           children: [
@@ -289,13 +289,17 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
           ],
         }),
         jsx('div', {
-          className: 'flex flex-col gap-1.5 py-2',
+          className: 'flex w-max flex-col gap-1.5 py-2',
           children: ASCENDING.map(lv => {
             const entry = cfg.levels[lv]
             const isCurrent = cfg.current === lv
             return jsxs('div', {
+              'data-rs-row': '',
               className: 'flex items-center gap-2 rounded-md px-2 py-1.5',
-              style: { border: '1px solid var(--ui-stroke-secondary, var(--ui-border))' },
+              style: {
+                border: '1px solid var(--ui-stroke-secondary, var(--ui-border))',
+                ...(entry.color ? { '--rs-color': entry.color } : {}),
+              },
               children: [
                 jsx(Checkbox, {
                   checked: entry.included,
@@ -351,7 +355,10 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
 }
 
 // Small themed dropdown (native select; color-scheme pinned per app mode).
+// The closed select mirrors the chosen color in its text and border.
 function ColorSelect({ value, onChange }) {
+  const chosen = COLOR_CHOICES.find(c => c.value === value)
+  const active = value && chosen
   return jsx('select', {
     'data-rs-select': '',
     value,
@@ -359,11 +366,18 @@ function ColorSelect({ value, onChange }) {
     className: 'h-6 rounded-md border text-xs px-1.5 shrink-0',
     style: {
       background: 'transparent',
-      color: 'var(--ui-text-secondary, var(--foreground))',
-      borderColor: 'var(--ui-border)',
+      color: active ? value : 'var(--ui-text-secondary, var(--foreground))',
+      borderColor: active ? value : 'var(--ui-border)',
     },
     children: COLOR_CHOICES.map(c =>
-      jsx('option', { value: c.value, style: { background: 'var(--card, inherit)', color: 'inherit' }, children: c.label }, c.label)
+      jsx('option', {
+        value: c.value,
+        style: {
+          background: 'var(--ui-bg-elevated, var(--background, #222))',
+          color: 'var(--ui-text-secondary, var(--foreground))',
+        },
+        children: c.label,
+      }, c.label)
     ),
   })
 }
@@ -442,6 +456,19 @@ export default {
       html[data-hermes-mode="dark"] select[data-rs-select],
       html.dark select[data-rs-select] { color-scheme: dark; }
       html[data-hermes-mode="light"] select[data-rs-select] { color-scheme: light; }
+      select[data-rs-select] option {
+        background: var(--ui-bg-elevated, var(--background, inherit));
+        color: var(--ui-text-secondary, var(--foreground));
+      }
+      /* a chosen color tints the row's checkbox checked state */
+      [data-rs-row] [data-slot="checkbox"][data-state="checked"] {
+        border-color: var(--rs-color, var(--ui-accent)) !important;
+        background: color-mix(in srgb, var(--rs-color, var(--ui-accent)) 55%, transparent) !important;
+      }
+      /* number inputs: no vertical spinner arrows */
+      [data-rs-row] input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+      [data-rs-row] input[type="number"]::-webkit-outer-spin-button,
+      [data-rs-row] input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     `
     document.head.appendChild(_styleEl)
     ctx.onDispose(() => {
