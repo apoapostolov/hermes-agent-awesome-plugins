@@ -1398,7 +1398,7 @@ export default {
     ctx.register({
       id: 'gear',
       area: STATUSBAR_AREAS.right,
-      order: 210,
+      order: 51, // right after the provider chips (50); other plugins sit further right
       render: () => jsx(PluginErrorBoundary, { children: jsx(ExpGearMenu, {}) }),
     })
   },

@@ -284,7 +284,7 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
             jsx(DialogTitle, { children: 'Reasoning Switch' }),
             jsx('p', {
               className: 'text-xs text-(--ui-text-tertiary)',
-              children: 'Click the word to rotate. A prompt limit auto-demotes after N prompts.',
+              children: 'Click the word to rotate; a limit auto-demotes after N.',
             }),
           ],
         }),
