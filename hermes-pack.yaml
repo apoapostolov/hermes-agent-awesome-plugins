@@ -1,29 +1,26 @@
 name: hermes-agent-awesome-plugins
-description: Hand-picked Hermes plugins that actually matter. Pack pins provider-status, tool-break, better-colors, drag-to-pin-session, opaque-composer, scroll-on-switch, and busy-shortcuts to reproducible SHAs.
+description: Hand-picked Hermes plugins that actually matter. Pack pins provider-status, tool-break, better-colors, drag-to-pin-session, opaque-composer, scroll-on-switch, and iteration-budget-meter to reproducible SHAs.
 version: 1.8.0
 author: Apostol Apostolov
 plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/provider-status
-    ref: 9f8559024a4975fc9cfd21b6486f036c9cc48e8d
+    ref: 872ca2cf25895bbdc37d925e80d16c0ee59a1d0e
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/tool-break
     ref: 9e543e23c888de4f2285979394e79d784ec8636a
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/better-colors
-    ref: 9f8559024a4975fc9cfd21b6486f036c9cc48e8d
+    ref: b19288a2f79b2b80c4eca494e276b36d41e5d45a
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/drag-to-pin-session
-    ref: 9f8559024a4975fc9cfd21b6486f036c9cc48e8d
+    ref: f7a2bd0622d4e582cd0a63b9f72aaeeb88843907
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/opaque-composer
     ref: e382ef35349a32a6e17d89cce61e1778002c2b8a
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/scroll-on-switch
-    ref: bae84a627b00ecb65808d4b99137fb0305bca846
-  - repo: apoapostolov/hermes-agent-awesome-plugins
-    subdir: plugins/busy-shortcuts
-    ref: 3a5a693758e971c16c19203d1e2631de942fd058
+    ref: 0a5c0d20dc439d158a6cbd0171da25a902aff14c
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/iteration-budget-meter
     ref: 53fffb78c17e8d55b6103f2be5478a859ea18699

@@ -1,14 +1,16 @@
 # Hermes Agent Awesome Plugins
 
-A Hermes Agent plugin pack. Seven plugins, pinned to exact SHAs in `hermes-pack.yaml`. Install the pack, not a GitHub Release.
+A Hermes Agent plugin pack. Six plugins, pinned to exact SHAs in `hermes-pack.yaml`. Install the pack, not a GitHub Release.
 
 Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
-## What's New in 1.7.0
+## What's New in 1.8.0
 
-**Opaque Composer** keeps the desktop composer solid while you scroll, so earlier message text stays readable.
+**Provider Status** got a performance overhaul: quota checks queue and run in parallel instead of blocking the status bar, clicking a chip refreshes only that provider, and the setup dialog opens instantly during any in-flight refresh. A single chip click went from a ~9s full sweep to one provider roundtrip.
 
-**Scroll on Switch** lands at the newest message when you switch sessions, including newly mounted sessions, and never reacts to new messages or AI streaming.
+**Reasoning Switch** is new: rotate the focused session's reasoning effort from the status bar, with per-level colors, rotation checkboxes, and prompt limits that automatically demote (for example, High for 3 prompts, then back to Medium).
+
+**Iteration Budget Meter** is new: watch the tool-call budget of the focused session live in the status bar.
 
 See [CHANGELOG.md](CHANGELOG.md) for the notes.
 
@@ -22,7 +24,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the notes.
 | [drag‑to‑pin‑session](plugins/drag-to-pin-session/README.md) | Reorganize your pinned sessions with drag-and-drop. Drag a session into the Pinned section to pin it, or drag it out to unpin it. |
 | [opaque‑composer](plugins/opaque-composer/README.md) | Keep the desktop composer solid while scrolling so conversation text stays readable. |
 | [scroll‑on‑switch](plugins/scroll-on-switch/README.md) | Keep the active session transcript at the bottom when switching sessions. |
-| [busy‑shortcuts](plugins/busy-shortcuts/README.md) | Add `/i` for interrupt mode and `/s` for steer mode. Hermes' built-in `/q` remains the queue shortcut. |
+| [reasoning‑switch](plugins/reasoning-switch/README.md) | Rotate the focused session's reasoning effort from the status bar, with per-level colors, rotation checkboxes, and prompt limits that auto-demote. |
+| [iteration‑budget‑meter](plugins/iteration-budget-meter/README.md) | Watch the tool-call budget of the focused session live in the status bar. |
 
 ## Install
 
@@ -47,12 +50,12 @@ From a Hermes session that can see this repo, you can also ask it to read `herme
 
 `hermes-pack.yaml` is the source of truth: `repo` + `subdir` + 40-char `ref` per plugin. `hermes plugins pack install` fans out to ordinary pinned installs.
 
-Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop entry. `better-colors`, `drag-to-pin-session`, `opaque-composer`, and `scroll-on-switch` are desktop-only.
+Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop entry. `better-colors`, `drag-to-pin-session`, `opaque-composer`, `scroll-on-switch`, `reasoning-switch`, and `iteration-budget-meter` are desktop-only.
 
 ## Requirements
 
 - Hermes Agent `>= 0.21.0` (plugin packs)
-- Windows / macOS / Linux. `tool-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX. `better-colors`, `drag-to-pin-session`, `opaque-composer`, and `scroll-on-switch` are desktop-only.
+- Windows / macOS / Linux. `tool-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX. `better-colors`, `drag-to-pin-session`, `opaque-composer`, `scroll-on-switch`, `reasoning-switch`, and `iteration-budget-meter` are desktop-only.
 
 ## Documentation
 
@@ -62,7 +65,8 @@ Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop
 - [drag-to-pin-session](plugins/drag-to-pin-session/README.md)
 - [opaque-composer](plugins/opaque-composer/README.md)
 - [scroll-on-switch](plugins/scroll-on-switch/README.md)
-- [busy-shortcuts](plugins/busy-shortcuts/README.md)
+- [reasoning-switch](plugins/reasoning-switch/README.md)
+- [iteration-budget-meter](plugins/iteration-budget-meter/README.md)
 - [hermes-awesome-plugins-sync](skills/hermes-awesome-plugins-sync/SKILL.md) — maintainer skill to mirror live plugin dirs into this repo and repin `hermes-pack.yaml`
 
 ## Support
