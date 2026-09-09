@@ -255,6 +255,15 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
 
 // Prompt tick shared with the subscriber above (module-level to avoid rebinds).
 let _tickPrompt = () => {}
+
+// The app's window-open policy denies every target=_blank window.open (CVE
+// hardening); the sanctioned external-link door is the OS bridge's
+// openExternal, handed to us at register() and stored here.
+let _openExternal = null
+const SOURCE_URL = 'https://github.com/apoapostolov/hermes-agent-awesome-plugins'
+function openSourceLink() {
+  _openExternal?.(SOURCE_URL)
+}
 function tickPrompt(sid) {
   _tickPrompt(sid)
 }
@@ -280,8 +289,18 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
       className: 'min-w-[24rem]',
       children: [
         jsxs(DialogHeader, {
+          className: 'flex flex-row items-center justify-between gap-2 pr-8 h-7 -mt-2',
           children: [
             jsx(DialogTitle, { children: 'Reasoning Switch' }),
+            jsx('a', {
+              href: 'https://github.com/apoapostolov/hermes-agent-awesome-plugins',
+              title: 'Source on GitHub',
+              target: '_blank',
+              rel: 'noreferrer',
+              onClick: e => { e.preventDefault(); openSourceLink() },
+              className: 'inline-flex items-center text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
+              children: jsx(Codicon, { name: 'github', size: '0.7rem' }),
+            }),
             jsx('p', {
               className: 'text-xs text-(--ui-text-tertiary)',
               children: ['Click of status bar to rotate reasoning levels.', jsx('br', {}), 'You can limit high reasoning to number of prompts.']
@@ -346,17 +365,7 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
                 ? `${includedCount} level${includedCount === 1 ? '' : 's'} in rotation`
                 : 'No levels in rotation — clicking the word does nothing',
             }),
-            jsxs('div', { className: 'flex items-center gap-2', children: [
-              jsx('a', {
-                href: 'https://github.com/apoapostolov/hermes-agent-awesome-plugins',
-                title: 'Source on GitHub',
-                target: '_blank',
-                rel: 'noreferrer',
-                className: 'inline-flex items-center text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
-                children: jsx(Codicon, { name: 'github', size: '0.7rem' }),
-              }),
-              jsx(Button, { variant: 'outline', size: 'sm', onClick: () => onOpenChange(false), children: 'Done' }),
-            ]}),
+            jsx(Button, { variant: 'outline', size: 'sm', onClick: () => onOpenChange(false), children: 'Done' }),
           ],
         }),
       ],
@@ -458,6 +467,7 @@ export default {
 
   register(ctx) {
     _storage = ctx.storage
+    _openExternal = ctx.os?.openExternal ?? null
 
     // Native select popup: pin color-scheme to the app's resolved mode so the
     // dropdown list is not white-on-white in dark mode (OS may disagree).

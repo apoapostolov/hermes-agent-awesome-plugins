@@ -1,5 +1,5 @@
 name: reasoning-switch
-version: 1.0.8
+version: 1.1.0
 description: "Rotate the focused session's reasoning effort from the statusbar; dialog configures the rotation levels, their colors, and per-level prompt limits."
 author: Apostol Apostolov
 defaultEnabled: false

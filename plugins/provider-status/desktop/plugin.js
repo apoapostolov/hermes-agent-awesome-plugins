@@ -474,6 +474,14 @@ function GearMenu() {
                   className: 'h-6 w-12 rounded border bg-transparent px-1.5 text-[0.7rem] tabular-nums text-right',
                   style: { borderColor: 'var(--ui-border)', color: 'var(--ui-text-secondary)' } }),
                 jsx('span', { children: 'min' }),
+                jsx('a', {
+                  href: 'https://github.com/apoapostolov/hermes-agent-awesome-plugins',
+                  title: 'Source on GitHub',
+                  target: '_blank',
+                  rel: 'noreferrer',
+                  className: 'inline-flex items-center ml-1.5 text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
+                  children: jsx(Codicon, { name: 'github', size: '0.7rem' }),
+                }),
               ]}),
             ]}),
             jsx(SetupBody, { onDone: () => setOpen(false) }),
@@ -574,19 +582,17 @@ function ExpGearMenu() {
                   className: 'h-6 w-12 rounded border bg-transparent px-1.5 text-[0.7rem] tabular-nums text-right',
                   style: { borderColor: 'var(--ui-border)', color: 'var(--ui-text-secondary)' } }),
                 jsx('span', { children: 'min' }),
+                jsx('a', {
+                  href: 'https://github.com/apoapostolov/hermes-agent-awesome-plugins',
+                  title: 'Source on GitHub',
+                  target: '_blank',
+                  rel: 'noreferrer',
+                  className: 'inline-flex items-center ml-1.5 text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
+                  children: jsx(Codicon, { name: 'github', size: '0.7rem' }),
+                }),
               ]}),
             ]}),
             jsx(SetupBody, { variant: 'hermes' }),
-            jsxs('div', { className: 'flex items-center justify-end gap-1 -mb-1', children: [
-              jsx('a', {
-                href: 'https://github.com/apoapostolov/hermes-agent-awesome-plugins',
-                title: 'Source on GitHub',
-                target: '_blank',
-                rel: 'noreferrer',
-                className: 'inline-flex items-center text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
-                children: jsx(Codicon, { name: 'github', size: '0.7rem' }),
-              }),
-            ]}),
           ],
         }),
       }),
@@ -1371,6 +1377,7 @@ export default {
 
   register(ctx) {
     _rest = ctx.rest // plugin-scoped REST door to /api/plugins/provider-status (auth handled)
+    _openExternal = ctx.os?.openExternal ?? null
 
   // Theme fixes: native <select> popups ignore inherited colors and render
   // light-on-light in dark mode; the SDK checkbox checked fill (bg-primary) is
