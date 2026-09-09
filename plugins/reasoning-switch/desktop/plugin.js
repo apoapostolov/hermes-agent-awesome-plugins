@@ -301,11 +301,11 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
               className: 'inline-flex items-center text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
               children: jsx(Codicon, { name: 'github', size: '0.7rem' }),
             }),
-            jsx('p', {
-              className: 'text-xs text-(--ui-text-tertiary)',
-              children: ['Click of status bar to rotate reasoning levels.', jsx('br', {}), 'You can limit high reasoning to number of prompts.']
-            }),
           ],
+        }),
+        jsx('p', {
+          className: 'text-xs text-(--ui-text-tertiary)',
+          children: ['Click of status bar to rotate reasoning levels.', jsx('br', {}), 'You can limit high reasoning to number of prompts.'],
         }),
         jsx('div', {
           className: 'flex w-max flex-col gap-1.5 py-2',
