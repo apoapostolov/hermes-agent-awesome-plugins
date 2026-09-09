@@ -286,6 +286,8 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
 // ── status query hook ─────────────────────────────────────────────
 
 let _rest = null // injected at register(ctx) — ctx.rest hits /api/plugins/provider-status
+let _openExternal = null // ctx.os.openExternal: the app DENIES target=_blank window.open
+// (window-open-policy.ts, CVE-2026-70608), so external links go through the OS bridge.
 
 function useProviderStatus(pollMinutes) {
   return useQuery({
@@ -479,6 +481,7 @@ function GearMenu() {
                   title: 'Source on GitHub',
                   target: '_blank',
                   rel: 'noreferrer',
+                  onClick: e => { e.preventDefault(); _openExternal?.('https://github.com/apoapostolov/hermes-agent-awesome-plugins') },
                   className: 'inline-flex items-center ml-1.5 text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
                   children: jsx(Codicon, { name: 'github', size: '0.7rem' }),
                 }),
@@ -587,6 +590,7 @@ function ExpGearMenu() {
                   title: 'Source on GitHub',
                   target: '_blank',
                   rel: 'noreferrer',
+                  onClick: e => { e.preventDefault(); _openExternal?.('https://github.com/apoapostolov/hermes-agent-awesome-plugins') },
                   className: 'inline-flex items-center ml-1.5 text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
                   children: jsx(Codicon, { name: 'github', size: '0.7rem' }),
                 }),
