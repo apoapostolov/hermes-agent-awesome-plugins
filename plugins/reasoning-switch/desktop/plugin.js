@@ -346,7 +346,17 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
                 ? `${includedCount} level${includedCount === 1 ? '' : 's'} in rotation`
                 : 'No levels in rotation — clicking the word does nothing',
             }),
-            jsx(Button, { variant: 'outline', size: 'sm', onClick: () => onOpenChange(false), children: 'Done' }),
+            jsxs('div', { className: 'flex items-center gap-2', children: [
+              jsx('a', {
+                href: 'https://github.com/apoapostolov/hermes-agent-awesome-plugins',
+                title: 'Source on GitHub',
+                target: '_blank',
+                rel: 'noreferrer',
+                className: 'inline-flex items-center text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
+                children: jsx(Codicon, { name: 'github', size: '0.7rem' }),
+              }),
+              jsx(Button, { variant: 'outline', size: 'sm', onClick: () => onOpenChange(false), children: 'Done' }),
+            ]}),
           ],
         }),
       ],

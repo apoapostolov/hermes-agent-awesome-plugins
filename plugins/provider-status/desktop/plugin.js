@@ -577,6 +577,16 @@ function ExpGearMenu() {
               ]}),
             ]}),
             jsx(SetupBody, { variant: 'hermes' }),
+            jsxs('div', { className: 'flex items-center justify-end gap-1 -mb-1', children: [
+              jsx('a', {
+                href: 'https://github.com/apoapostolov/hermes-agent-awesome-plugins',
+                title: 'Source on GitHub',
+                target: '_blank',
+                rel: 'noreferrer',
+                className: 'inline-flex items-center text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
+                children: jsx(Codicon, { name: 'github', size: '0.7rem' }),
+              }),
+            ]}),
           ],
         }),
       }),
