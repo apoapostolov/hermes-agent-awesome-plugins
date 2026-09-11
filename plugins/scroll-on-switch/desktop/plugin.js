@@ -1,91 +1,93 @@
 /**
  * Scroll on Switch for Hermes.
  *
- * Keep-alive session tabs deliberately keep their scroll position while
- * hidden, so switching back to a tab reopens it wherever you left it.
- * This plugin snaps a pane back to the bottom the moment it becomes the
- * visible pane, instead of restoring the stale position.
+ * Switching to a session should land on the newest message. The desktop now
+ * windows older turns, restores a saved distance-from-bottom, and re-applies
+ * that offset while pages prepend. The app's own jump control is the snap
+ * path: `button.thread-jump-button` runs `requestScrollToBottom` (re-arm
+ * stick-to-bottom and cancel restore). `scrollTop` only covers growth after
+ * that click, or a missing button.
  *
- * The transcript viewport is `[data-slot="aui_thread-viewport"]`. An
- * inactive keep-alive tab sits inside an element carrying
- * `data-pane-hidden`. Watching for that attribute to disappear from a
- * viewport's ancestors gives the exact switch-to moment; one
- * `scrollTop = scrollHeight` snap then lands the reader at the newest
- * message.
+ * Trigger: `[data-slot="aui_thread-viewport"]` leaving a `data-pane-hidden`
+ * ancestor, or mounting already visible. Not streaming. Wheel-up yields.
  */
 
 const ID = 'scroll-on-switch'
 const VIEWPORT = '[data-slot="aui_thread-viewport"]'
 const HIDDEN = '[data-pane-hidden]'
 const MARK = 'data-sos-armed'
+const JUMP_BUTTON = 'button.thread-jump-button'
+const NEAR_BOTTOM_PX = 8
+const YANK_PX = 64
+
+function distanceFromBottom(el) {
+  return Math.max(0, el.scrollHeight - el.scrollTop - el.clientHeight)
+}
+
+function clickNativeJump() {
+  const btn = document.querySelector(JUMP_BUTTON)
+  if (btn) btn.click()
+}
 
 function snapToBottom(el) {
   el.scrollTop = el.scrollHeight
 }
 
-/**
- * Is this viewport inside a currently-hidden keep-alive pane?
- */
 function isInHiddenPane(el) {
   return Boolean(el.closest(HIDDEN))
 }
 
-/**
- * React can mount a session directly as visible, or finish rendering messages
- * after the viewport becomes visible. Track both cases and retry while the
- * transcript is still growing.
- */
 function start() {
   const viewports = new WeakMap()
   const states = new Set()
 
   const scheduleSnap = (el, state) => {
     state.timers.forEach(clearTimeout)
-    // Content keeps changing after the switch: long transcripts mount nodes
-    // late, and panels (tasks/todos) mount or expand even later. Snap now,
-    // then re-snap on every size change via ResizeObserver; the watcher
-    // retires 8s after the last change so it never runs forever.
-    //
-    // The app re-enables scroll anchoring whenever it considers the reader
-    // "not following" (data-following=false). A panel whose height oscillates
-    // then re-anchors the scroll to a mid-list node on every size change,
-    // actively dragging the reader away from the bottom. While the snap
-    // session is live, force overflow-anchor:none so nothing fights the snap;
-    // restore the app's value when the watcher retires.
-    const prevAnchor = el.style.overflowAnchor
-    el.style.overflowAnchor = 'none'
+    let jumped = false
+    let ro = null
+    let retire = null
+
     const snapNow = () => {
       if (state.hidden || !document.contains(el)) return false
+      const dist = distanceFromBottom(el)
+      if (dist > NEAR_BOTTOM_PX && !jumped) {
+        jumped = true
+        clickNativeJump()
+      } else if (dist > YANK_PX) {
+        clickNativeJump()
+      }
       snapToBottom(el)
       return true
     }
-    snapNow()
-    // Re-snap while the transcript (or a panel inside it — task panels mount
-    // and expand LATE, well past any fixed ladder) changes size. ResizeObserver
-    // sees every growth burst no matter how late or slow; the watcher retires
-    // after ~8s of no growth so it never runs forever.
-    let ro = null
-    let retire = null
+
+    const onWheel = e => {
+      if (e.deltaY < 0) stop()
+    }
+
     const stop = () => {
       if (ro) ro.disconnect()
       if (retire) clearTimeout(retire)
       ro = retire = null
-      el.style.overflowAnchor = prevAnchor
+      el.removeEventListener('wheel', onWheel)
     }
+
+    snapNow()
+
     ro = new ResizeObserver(() => {
       if (state.hidden || !document.contains(el)) { stop(); return }
       snapNow()
       clearTimeout(retire)
       retire = setTimeout(stop, 8000)
     })
-    // arm: observe the scroller's content wrapper + first child (panel root)
-    const armObserver = () => {
-      const target = el.firstElementChild || el
-      try { ro.observe(target); if (target.firstElementChild) ro.observe(target.firstElementChild) } catch {}
-      clearTimeout(retire)
-      retire = setTimeout(stop, 8000)
-    }
-    armObserver()
+
+    const target = el.firstElementChild || el
+    try {
+      ro.observe(target)
+      if (target.firstElementChild) ro.observe(target.firstElementChild)
+    } catch {}
+    clearTimeout(retire)
+    retire = setTimeout(stop, 8000)
+    el.addEventListener('wheel', onWheel, { passive: true })
     state.stopWatcher = stop
   }
 
@@ -114,8 +116,6 @@ function start() {
     })
   }
 
-  // The active session may be mounted already, so treat every visible
-  // viewport in the initial pass as an activation too.
   sweep()
 
   let scheduled = false
