@@ -94,6 +94,70 @@ def test_approve_mocked(tmp_path: Path) -> None:
     assert left == ["deadbeef"]
 
 
+def test_prepare_stale_replace_becomes_add() -> None:
+    class Store:
+        memory_entries = ["keep me"]
+        user_entries = []
+
+    payload = {
+        "action": "batch",
+        "target": "memory",
+        "operations": [
+            {"action": "replace", "content": "new fact"},
+            {"action": "remove", "old_text": "gone already"},
+            {"action": "add", "content": "also add"},
+        ],
+    }
+    out = mod.prepare_payload(payload, Store())
+    assert out["operations"] == [
+        {"action": "add", "content": "also add"},
+    ]
+
+
+def test_prepare_guesses_replace_old() -> None:
+    class Store:
+        memory_entries = ["Password manager: Proton Pass; old line"]
+        user_entries = []
+
+    payload = {
+        "action": "batch",
+        "target": "memory",
+        "operations": [{"action": "replace", "content": "Password manager: Proton Pass; new line"}],
+    }
+    out = mod.prepare_payload(payload, Store())
+    assert out["operations"][0]["action"] == "replace"
+    assert "Password manager" in out["operations"][0]["old_text"]
+
+
+def test_approve_stale_empty_counts_applied(tmp_path: Path) -> None:
+    _write_pending(tmp_path, "abcd1234")
+
+    class Store:
+        memory_entries = ["keep me"]
+        user_entries = []
+
+        def reset_consolidation_failures(self):
+            return None
+
+    def apply_should_not_run(payload, store):
+        raise AssertionError("empty batch must not call apply")
+
+    rec_path = tmp_path / "pending" / "memory" / "abcd1234.json"
+    rec = json.loads(rec_path.read_text(encoding="utf-8"))
+    rec["payload"]["operations"] = [{"action": "remove", "old_text": "gone already"}]
+    rec_path.write_text(json.dumps(rec), encoding="utf-8")
+    out = mod.decide(
+        "approve",
+        ["abcd1234"],
+        home=tmp_path,
+        apply_fn=apply_should_not_run,
+        store=Store(),
+    )
+    assert out["applied"] == 1
+    assert out["failed"] == []
+    assert mod.list_items(tmp_path) == []
+
+
 def test_approve_failure_keeps_file(tmp_path: Path) -> None:
     _write_pending(tmp_path, "abcd1234")
 
@@ -115,5 +179,8 @@ if __name__ == "__main__":
         test_pending_and_full(root / "busy")
         test_reject(root / "drop")
         test_approve_mocked(root / "ok")
+        test_prepare_stale_replace_becomes_add()
+        test_prepare_guesses_replace_old()
+        test_approve_stale_empty_counts_applied(root / "stale")
         test_approve_failure_keeps_file(root / "fail")
     print("ok")

@@ -169,6 +169,86 @@ def read_state(home: Path | None = None) -> dict:
         return {"ok": False, "items": []}
 
 
+def _store_entries(store, target: str) -> list[str]:
+    if target == "user":
+        return [str(x) for x in (getattr(store, "user_entries", None) or [])]
+    return [str(x) for x in (getattr(store, "memory_entries", None) or [])]
+
+
+def _unique_hits(entries: list[str], old: str) -> list[int]:
+    if not old:
+        return []
+    return [i for i, entry in enumerate(entries) if old in entry]
+
+
+def _guess_old(entries: list[str], content: str) -> str | None:
+    if not content or len(content) < 16:
+        return None
+    key = content[:24]
+    hits = [entry for entry in entries if entry.startswith(key) or content.startswith(entry[:24])]
+    if len(hits) != 1:
+        return None
+    entry = hits[0]
+    for n in (48, 32, 24):
+        needle = entry[:n]
+        if needle and sum(1 for item in entries if needle in item) == 1:
+            return needle
+    return entry[:80]
+
+
+def _prepare_op(op: dict, entries: list[str]) -> dict | None:
+    act = str(op.get("action") or "").strip().lower()
+    content = str(op.get("content") or op.get("new_text") or "").strip()
+    old = str(op.get("old_text") or "").strip()
+    if act == "add":
+        return {"action": "add", "content": content} if content else None
+    if act == "remove":
+        if len(_unique_hits(entries, old)) == 1:
+            return {"action": "remove", "old_text": old}
+        return None
+    if act == "replace":
+        if len(_unique_hits(entries, old)) == 1 and content:
+            return {"action": "replace", "old_text": old, "content": content}
+        guessed = _guess_old(entries, content)
+        if guessed and content:
+            return {"action": "replace", "old_text": guessed, "content": content}
+        return None
+    return None
+
+
+def prepare_payload(payload: dict, store) -> dict:
+    if not isinstance(payload, dict):
+        return {}
+    target = payload.get("target") or "memory"
+    if target not in ("memory", "user"):
+        target = "memory"
+    action = str(payload.get("action") or "").strip().lower()
+    entries = _store_entries(store, target)
+    if action == "batch":
+        ops = []
+        for op in payload.get("operations") or []:
+            if isinstance(op, dict):
+                fixed = _prepare_op(op, entries)
+                if fixed:
+                    ops.append(fixed)
+        out = dict(payload)
+        out["target"] = target
+        out["action"] = "batch"
+        out["operations"] = ops
+        return out
+    if action == "replace":
+        content = str(payload.get("content") or payload.get("new_text") or "").strip()
+        old = str(payload.get("old_text") or "").strip()
+        if len(_unique_hits(entries, old)) == 1 and content:
+            return {**payload, "action": "replace", "target": target, "content": content, "old_text": old}
+        guessed = _guess_old(entries, content)
+        if guessed and content:
+            return {**payload, "action": "replace", "target": target, "content": content, "old_text": guessed}
+        if content:
+            return {**payload, "action": "add", "target": target, "content": content}
+    return dict(payload)
+
+
 def reject_ids(ids: list[str], home: Path) -> dict:
     folder = pending_dir(home)
     n = 0
@@ -218,7 +298,29 @@ def approve_ids(ids: list[str], home: Path, apply_fn=None, store=None) -> dict:
         if not isinstance(rec, dict):
             failed.append({"id": pid, "error": "bad record"})
             continue
-        ok, err = _apply_one(rec, apply_fn, store)
+        payload = rec.get("payload") if isinstance(rec.get("payload"), dict) else {}
+        prepared = prepare_payload(payload, store)
+        reset = getattr(store, "reset_consolidation_failures", None)
+        if callable(reset):
+            reset()
+        load = getattr(store, "load_from_disk", None)
+        if callable(load):
+            load()
+            prepared = prepare_payload(payload, store)
+
+        def attempt(body: dict) -> tuple[bool, str]:
+            if body.get("action") == "batch" and not body.get("operations"):
+                return True, "stale"
+            return _apply_one({"payload": body}, apply_fn, store)
+
+        ok, err = attempt(prepared)
+        if not ok and "over the limit" in (err or "").lower():
+            slim = dict(prepared)
+            if slim.get("action") == "batch":
+                slim["operations"] = [
+                    op for op in (slim.get("operations") or []) if op.get("action") != "add"
+                ]
+            ok, err = attempt(slim)
         if ok:
             try:
                 path.unlink()

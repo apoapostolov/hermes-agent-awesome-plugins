@@ -2,7 +2,7 @@
   "name": "memory-review",
   "label": "Memory-Review",
   "description": "Pending memory-review state for the desktop dialog",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "api": "plugin_api.py",
   "tab": {
     "path": "/memory-review",

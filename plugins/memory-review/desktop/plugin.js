@@ -96,6 +96,51 @@ function runSlash(command) {
     .then(res => String((res && (res.output || res.message || res.result)) || ''))
 }
 
+function overLimit(err) {
+  return /over the limit/i.test(String(err || ''))
+}
+
+function visibleComposer() {
+  const nodes = Array.from(document.querySelectorAll('[data-composer-target]'))
+  const el = nodes.find(n => !n.closest('[data-pane-hidden]'))
+  if (!el) return null
+  const surfaceId = el.getAttribute('data-composer-surface-id')
+  if (!surfaceId) return null
+  return {
+    target: el.getAttribute('data-composer-target') || 'main',
+    surfaceId,
+  }
+}
+
+function sendHiddenPrompt(text) {
+  const composer = visibleComposer()
+  if (!composer) return false
+  window.dispatchEvent(
+    new CustomEvent('hermes:composer-submit', {
+      detail: {
+        text,
+        target: composer.target,
+        surfaceId: composer.surfaceId,
+        displayKind: 'hidden',
+      },
+    })
+  )
+  return true
+}
+
+function compactPrompt(target) {
+  const file = target === 'user' ? 'USER.md' : 'MEMORY.md'
+  return [
+    'The user clicked Consolidate in Memory-Review.',
+    'Run one memory consolidation round on ' + file + '.',
+    'Follow the memory-compaction skill.',
+    'Target at most 70% of that store char cap.',
+    'Merge overlapping entries and drop only ephemeral facts.',
+    'Never touch skills, identity, credentials, or hard rules.',
+    'Use one memory tool batch. This click is the approval to apply it.',
+  ].join(' ')
+}
+
 function parsePendingOutput(text) {
   const items = []
   for (const line of String(text || '').split(/\r?\n/)) {
@@ -159,7 +204,11 @@ function displayParts(item) {
     ops = parsed.ops
   }
   const action = (ops[0] && ops[0].action) || 'replace'
-  const text = ops.map(o => o.text).filter(Boolean).join(DOT)
+  const text = ops
+    .filter(o => o.action !== 'remove')
+    .map(o => o.text)
+    .filter(Boolean)
+    .join(DOT)
   return { target, action, text }
 }
 
@@ -179,7 +228,12 @@ function pickAll(items) {
 
 function StoreMeter({ glyph, label, info }) {
   if (!info) return null
-  const pct = Math.max(0, Math.min(100, Number(info.pct) || 0))
+  const used = Number(info.used)
+  const limit = Number(info.limit)
+  const pct =
+    limit > 0
+      ? Math.max(0, Math.min(100, Math.round((100 * used) / limit)))
+      : Math.max(0, Math.min(100, Number(info.pct) || 0))
   const n = Number(info.entries) || 0
   return jsxs('div', {
     className: 'flex items-center gap-1.5 text-[0.65rem] leading-none text-(--ui-text-quaternary)',
@@ -212,22 +266,27 @@ function StoreMeter({ glyph, label, info }) {
 function refreshState() {
   const gen = ++fetchGen
   const restP = rest ? rest('/state').catch(() => null) : Promise.resolve(null)
-  const slashP = runSlash('/memory pending').catch(() => '')
-  return Promise.all([restP, slashP]).then(([data, text]) => {
+  return restP.then(data => {
     if (gen !== fetchGen) return lastState
     const restItems = data && Array.isArray(data.items) ? data.items : []
-    const slashItems = parsePendingOutput(text)
-    const items = restItems.length ? restItems : slashItems
-    const pending = items.length || Number(data && data.pending) || 0
-    lastState = {
-      ok: !(data && data.ok === false && !items.length),
-      pending,
-      memory_full: Boolean(data && data.memory_full),
-      user_full: Boolean(data && data.user_full),
-      stores: (data && data.stores) || null,
-      items,
+    const finish = items => {
+      lastState = {
+        ok: !(data && data.ok === false && !items.length),
+        pending: items.length || Number(data && data.pending) || 0,
+        memory_full: Boolean(data && data.memory_full),
+        user_full: Boolean(data && data.user_full),
+        stores: (data && data.stores) || null,
+        items,
+      }
+      return lastState
     }
-    return lastState
+    if (data && data.stores) return finish(restItems)
+    return runSlash('/memory pending')
+      .catch(() => '')
+      .then(text => {
+        if (gen !== fetchGen) return lastState
+        return finish(restItems.length ? restItems : parsePendingOutput(text))
+      })
   })
 }
 
@@ -349,6 +408,7 @@ function ReviewDialog({ open, onOpenChange }) {
   const [picked, setPicked] = useState(() => pickAll((lastState && lastState.items) || []))
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
+  const [fails, setFails] = useState({})
 
   useEffect(() => {
     if (!open) return
@@ -392,11 +452,37 @@ function ReviewDialog({ open, onOpenChange }) {
   const ids = items.map(item => item.id).filter(Boolean)
   const selected = ids.filter(id => picked[id])
   const allOn = ids.length > 0 && selected.length === ids.length
+  const fitFail = items.find(item => overLimit(fails[item.id]))
 
   const toggleAll = value => {
     const next = {}
     if (value) for (const id of ids) next[id] = true
     setPicked(next)
+  }
+
+  const compact = () => {
+    if (busy) return
+    const target = fitFail && displayParts(fitFail).target === 'user' ? 'user' : 'memory'
+    if (!sendHiddenPrompt(compactPrompt(target))) {
+      setNote('No composer for a consolidation round')
+      return
+    }
+    setBusy(true)
+    setNote('Consolidation running')
+    let left = 8
+    const tick = () => {
+      refreshState().then(data => {
+        if (data) setState(data)
+        left -= 1
+        if (left <= 0) {
+          setBusy(false)
+          setNote('Consolidation round sent')
+          return
+        }
+        window.setTimeout(tick, 2500)
+      })
+    }
+    window.setTimeout(tick, 1500)
   }
 
   const run = action => {
@@ -422,14 +508,22 @@ function ReviewDialog({ open, onOpenChange }) {
       })
       .catch(() => viaSlash().then(() => ({ ok: true })))
       .then(out => {
+        const applied = Number(out && out.applied) || 0
         const failed = (out && out.failed) || []
+        const err = failed[0] && failed[0].error ? String(failed[0].error).split('\n')[0] : ''
+        const nextFails = {}
+        for (const row of failed) {
+          if (row && row.id) nextFails[row.id] = row.error || 'failed'
+        }
+        setFails(nextFails)
         if (action === 'approve') {
           setNote(
             failed.length
-              ? 'Approved ' + (out.applied || selected.length) + ', ' + failed.length + ' failed'
-              : 'Approved ' + (out.applied || selected.length)
+              ? 'Approved ' + applied + ', ' + failed.length + ' failed' + (err ? ': ' + err : '')
+              : 'Approved ' + applied
           )
         } else {
+          setFails({})
           setNote('Rejected ' + (out.rejected || selected.length))
         }
         return refreshState()
@@ -516,7 +610,7 @@ function ReviewDialog({ open, onOpenChange }) {
               ? items.map(item => {
                   const parts = displayParts(item)
                   return jsxs(
-                    'label',
+                    'div',
                     {
                       'data-mrc-row': '',
                       className: 'flex items-center gap-2 px-2 py-1.5 text-xs',
@@ -570,10 +664,25 @@ function ReviewDialog({ open, onOpenChange }) {
         jsxs('div', {
           className: 'flex flex-col gap-1.5 pt-1',
           children: [
-            note || busy
-              ? jsx('span', {
-                  className: 'text-[0.65rem] text-(--ui-text-quaternary)',
-                  children: note || 'Working',
+            note || busy || fitFail
+              ? jsxs('div', {
+                  className: 'flex items-center gap-2',
+                  children: [
+                    jsx('span', {
+                      className: 'min-w-0 flex-1 truncate text-[0.65rem] text-(--ui-text-quaternary)',
+                      title: note || (fitFail && String(fails[fitFail.id]).split('\n')[0]) || '',
+                      children: note || (busy ? 'Working' : String(fails[fitFail.id]).split('\n')[0]),
+                    }),
+                    fitFail
+                      ? jsx(Button, {
+                          variant: 'outline',
+                          className: 'h-6 shrink-0 px-2 text-[0.65rem]',
+                          disabled: busy,
+                          onClick: compact,
+                          children: 'Consolidate',
+                        })
+                      : null,
+                  ],
                 })
               : null,
             jsxs('div', {
