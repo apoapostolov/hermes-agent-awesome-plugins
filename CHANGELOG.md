@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.0] - 2026-09-13
+
+### Changed
+
+- **memory-review:** renamed from `memory-review-command`. Opens a review dialog instead of sending `/memory pending`. Rows show store and action glyphs, plus dim fill bars for each store.
+
 ## [1.9.0] - 2026-09-12
 
 ### Added

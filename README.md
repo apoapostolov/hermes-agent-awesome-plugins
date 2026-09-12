@@ -4,9 +4,9 @@ A Hermes Agent plugin pack. Nine plugins, pinned to exact SHAs in `hermes-pack.y
 
 Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
-## What's New in 1.9.0
+## What's New in 1.10.0
 
-**Memory Review Command** is new: right-click empty app chrome for a menu row that sends `/memory pending` when a staged write is waiting or a store is full. Grayed out when memory is clean. It never approves or discards entries.
+**Memory-Review** is the renamed memory dialog: check staged writes, then approve or reject. Glyphs mark store and action. Dim bars show how full each store is.
 
 See [CHANGELOG.md](CHANGELOG.md) for the notes.
 
@@ -22,7 +22,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the notes.
 | [scroll‑on‑switch](plugins/scroll-on-switch/README.md) | Keep the active session transcript at the bottom when switching sessions. |
 | [reasoning‑switch](plugins/reasoning-switch/README.md) | Rotate the focused session's reasoning effort from the status bar, with per-level colors, rotation checkboxes, and prompt limits that auto-demote. |
 | [iteration‑budget‑meter](plugins/iteration-budget-meter/README.md) | Watch the tool-call budget of the focused session live in the status bar. |
-| [memory‑review‑command](plugins/memory-review-command/README.md) | Native menu command that sends `/memory pending` when a staged write is waiting or a store is full. |
+| [memory‑review](plugins/memory-review/README.md) | Dialog to checkbox staged memory writes and approve or reject them. |
 
 ## Install
 
@@ -47,12 +47,12 @@ From a Hermes session that can see this repo, you can also ask it to read `herme
 
 `hermes-pack.yaml` is the source of truth: `repo` + `subdir` + 40-char `ref` per plugin. `hermes plugins pack install` fans out to ordinary pinned installs.
 
-Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop entry. `better-colors`, `drag-to-pin-session`, `opaque-composer`, `scroll-on-switch`, `reasoning-switch`, `iteration-budget-meter`, and `memory-review-command` are desktop-only.
+Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop entry. `better-colors`, `drag-to-pin-session`, `opaque-composer`, `scroll-on-switch`, `reasoning-switch`, `iteration-budget-meter`, and `memory-review` are desktop-only.
 
 ## Requirements
 
 - Hermes Agent `>= 0.21.0` (plugin packs)
-- Windows / macOS / Linux. `tool-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX. `better-colors`, `drag-to-pin-session`, `opaque-composer`, `scroll-on-switch`, `reasoning-switch`, `iteration-budget-meter`, and `memory-review-command` are desktop-only.
+- Windows / macOS / Linux. `tool-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX. `better-colors`, `drag-to-pin-session`, `opaque-composer`, `scroll-on-switch`, `reasoning-switch`, `iteration-budget-meter`, and `memory-review` are desktop-only.
 
 ## Documentation
 
@@ -64,7 +64,7 @@ Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop
 - [scroll-on-switch](plugins/scroll-on-switch/README.md)
 - [reasoning-switch](plugins/reasoning-switch/README.md)
 - [iteration-budget-meter](plugins/iteration-budget-meter/README.md)
-- [memory-review-command](plugins/memory-review-command/README.md)
+- [memory-review](plugins/memory-review/README.md)
 - [hermes-awesome-plugins-sync](skills/hermes-awesome-plugins-sync/SKILL.md) — maintainer skill to mirror live plugin dirs into this repo and repin `hermes-pack.yaml`
 
 ## Support
