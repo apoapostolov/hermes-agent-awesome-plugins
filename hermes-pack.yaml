@@ -1,6 +1,6 @@
 name: hermes-agent-awesome-plugins
-description: Hand-picked Hermes plugins that actually matter. Pack pins provider-status, tool-break, better-colors, drag-to-pin-session, opaque-composer, scroll-on-switch, and iteration-budget-meter to reproducible SHAs.
-version: 1.8.0
+description: Hand-picked Hermes plugins that actually matter. Pack pins provider-status, tool-break, better-colors, drag-to-pin-session, opaque-composer, scroll-on-switch, iteration-budget-meter, and memory-review-command to reproducible SHAs.
+version: 1.9.0
 author: Apostol Apostolov
 plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
@@ -24,5 +24,8 @@ plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/iteration-budget-meter
     ref: 53fffb78c17e8d55b6103f2be5478a859ea18699
+  - repo: apoapostolov/hermes-agent-awesome-plugins
+    subdir: plugins/memory-review-command
+    ref: d0cd09bb9b20eeeef6c29c0a39e7c192c41ddb14
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync

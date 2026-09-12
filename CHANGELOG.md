@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.9.0] - 2026-09-12
+
+### Added
+
+- **memory-review-command:** a native shell-menu command that sends `/memory pending` through the composer when a staged memory write is waiting or a store is full. The row stays grayed out when memory is clean and never approves or discards entries.
+
 ## [1.8.0] - 2026-09-08
 
 ### Added
