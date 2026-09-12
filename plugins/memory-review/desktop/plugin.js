@@ -182,25 +182,25 @@ function StoreMeter({ glyph, label, info }) {
   const pct = Math.max(0, Math.min(100, Number(info.pct) || 0))
   const n = Number(info.entries) || 0
   return jsxs('div', {
-    className: 'flex items-center gap-2 text-[0.65rem] leading-none text-(--ui-text-quaternary)',
+    className: 'flex items-center gap-1.5 text-[0.65rem] leading-none text-(--ui-text-quaternary)',
     children: [
       jsx(Codicon, { name: glyph, size: '0.65rem' }),
-      jsx('span', { className: 'w-12 shrink-0', children: label }),
+      jsx('span', { children: label }),
       jsx('span', {
-        className: 'w-14 shrink-0 tabular-nums',
+        className: 'tabular-nums',
         children: n + (n === 1 ? ' entry' : ' entries'),
       }),
-      jsx('span', { className: 'w-7 shrink-0 tabular-nums text-right', children: pct + '%' }),
+      jsx('span', { className: 'tabular-nums', children: pct + '%' }),
       jsx('div', {
-        className: 'h-[3px] min-w-[5rem] flex-1 overflow-hidden rounded-full',
+        className: 'h-1.5 w-10 shrink-0 overflow-hidden rounded-full',
         style: {
-          background: 'color-mix(in srgb, var(--ui-text-quaternary) 14%, transparent)',
+          background: 'color-mix(in srgb, var(--ui-text-quaternary) 18%, transparent)',
         },
         children: jsx('div', {
           className: 'h-full rounded-full',
           style: {
             width: pct + '%',
-            background: 'color-mix(in srgb, var(--ui-text-tertiary) 38%, transparent)',
+            background: 'color-mix(in srgb, var(--ui-text-tertiary) 55%, transparent)',
             transition: 'width 320ms ease',
           },
         }),
@@ -477,7 +477,7 @@ function ReviewDialog({ open, onOpenChange }) {
         }),
         state.stores
           ? jsxs('div', {
-              className: 'flex flex-col gap-1.5',
+              className: 'flex items-center justify-between gap-4',
               children: [
                 jsx(StoreMeter, {
                   glyph: 'note',
