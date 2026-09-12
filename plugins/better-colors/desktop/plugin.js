@@ -435,9 +435,10 @@ function ensureStyle() {
     [${EXTRA_ATTR}="glyphs"] {
       display: grid;
       grid-template-columns: repeat(6, 1fr);
-      gap: 0.25rem;
+      gap: 0.375rem;
       max-height: 12.5rem;
       overflow-y: auto;
+      margin-right: -0.5rem;
     }
     [${EXTRA_ATTR}="glyph-btn"],
     [${EXTRA_ATTR}="glyph-clear"] {
