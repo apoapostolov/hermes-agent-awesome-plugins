@@ -20,7 +20,7 @@ plugins:
     ref: e382ef35349a32a6e17d89cce61e1778002c2b8a
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/scroll-on-switch
-    ref: 9f67d8fb83803231bb22f78fde67dfd08414b2aa
+    ref: b14185d3ea87a57a1a74ebdcf3179d41ffdb43e7
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/iteration-budget-meter
     ref: 53fffb78c17e8d55b6103f2be5478a859ea18699
