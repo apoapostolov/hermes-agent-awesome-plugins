@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.2] - 2026-09-13
+
+### Changed
+
+- **memory-review:** 1.2.1. Approve skips dead replace/remove ops. An over-budget error shows Consolidate above Reject/Approve. Store meters refresh from `/state` without waiting on slash.
+
 ## [1.10.1] - 2026-09-13
 
 ### Changed

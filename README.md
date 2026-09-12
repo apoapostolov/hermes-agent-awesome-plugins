@@ -4,9 +4,9 @@ A Hermes Agent plugin pack. Nine plugins, pinned to exact SHAs in `hermes-pack.y
 
 Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
-## What's New in 1.10.1
+## What's New in 1.10.2
 
-**Memory-Review** 1.1.0 puts Memory and User store meters on one row, User on the right, with a small bar after the percent.
+**Memory-Review** 1.2.1: over-budget rows can start a consolidation round. Meters read live store use when the dialog opens.
 
 See [CHANGELOG.md](CHANGELOG.md) for the notes.
 
