@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.1] - 2026-09-13
+
+### Changed
+
+- **memory-review:** 1.1.0. Memory and User meters share one row. User sits on the right. A small bar follows the percent.
+
 ## [1.10.0] - 2026-09-13
 
 ### Changed

@@ -4,9 +4,9 @@ A Hermes Agent plugin pack. Nine plugins, pinned to exact SHAs in `hermes-pack.y
 
 Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
-## What's New in 1.10.0
+## What's New in 1.10.1
 
-**Memory-Review** is the renamed memory dialog: check staged writes, then approve or reject. Glyphs mark store and action. Dim bars show how full each store is.
+**Memory-Review** 1.1.0 puts Memory and User store meters on one row, User on the right, with a small bar after the percent.
 
 See [CHANGELOG.md](CHANGELOG.md) for the notes.
 
