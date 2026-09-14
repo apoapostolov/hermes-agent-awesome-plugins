@@ -571,7 +571,7 @@ function ExpGearMenu() {
               ? 'bg-[color-mix(in_srgb,var(--ui-bg-elevated)_42%,transparent)] backdrop-blur-2xl'
               : 'bg-(--ui-chat-bubble-background)'
           ),
-          bodyClassName: 'gap-3 overflow-auto max-h-[70vh]',
+          bodyClassName: 'gap-3 overflow-auto max-h-[70vh] min-h-[26rem]',
           children: [
             jsxs(DialogHeader, { className: 'flex flex-row items-center justify-between gap-2 pr-8 h-7 -mt-2', children: [
               jsx(DialogTitle, { children: 'Providers' }),
@@ -1288,7 +1288,32 @@ function SetupBody({ variant } = {}) {
       setAddMenuOpen(false)
     }
     document.addEventListener('mousedown', close, true)
-    return () => document.removeEventListener('mousedown', close, true)
+    // The menu is absolutely positioned inside the dialog body's scroll
+    // container, so overflow-auto clips it. While the menu is open, lift the
+    // clip on the scroll ancestors (restored exactly on close) so the list
+    // drops out of the dialog instead of painting through a hairline slit.
+    const picker = document.querySelector('[data-add-picker]')
+    const lifted = []
+    if (picker) {
+      let node = picker.parentElement
+      while (node && node !== document.body) {
+        const st = node.style
+        if (getComputedStyle(node).overflowY !== 'visible') {
+          lifted.push([node, st.overflow, st.overflowY, st.maxHeight])
+          st.overflow = 'visible'
+          st.maxHeight = 'none'
+        }
+        node = node.parentElement
+      }
+    }
+    return () => {
+      document.removeEventListener('mousedown', close, true)
+      for (const [node, ov, ovy, mh] of lifted) {
+        node.style.overflow = ov
+        node.style.overflowY = ovy
+        node.style.maxHeight = mh
+      }
+    }
   }, [addMenuOpen])
 
   if (metaWaiting) return jsx('div', { className: 'p-2 text-xs', children: 'Loading…' })
