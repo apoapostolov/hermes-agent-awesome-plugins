@@ -7,7 +7,7 @@ Never let a stalled tool call force you to cancel a long task. Abort an in-fligh
 - **`/again`** same kill, then reissue the exact call (max 2 per fingerprint).
 - **`/again <hint>`** same with a tweak.
 - **`/break-status`** JSON payload for the desktop strip.
-- Desktop strip: name + time pill, Break / Message / Again / gear per spawn. Elapsed color grades, auto-break thresholds, per-tool hide list (all in `localStorage` under `intelligent-tool-break.*`).
+- Desktop strip: name + time pill, Break / Message / Again / gear per spawn. Elapsed color grades, auto-break thresholds, per-tool hide list (all in `localStorage` under `intelligent-tool-break.*`). Background `terminal`/`process` spawns reuse the native composer status stack: Break / Message / Again land on those rows instead of a second strip.
 
 Previously published as `hermes-break`, then renamed to `intelligent-tool-break`. Same commands.
 
