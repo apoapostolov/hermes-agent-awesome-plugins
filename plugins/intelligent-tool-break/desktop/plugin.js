@@ -320,25 +320,6 @@ function backgroundStatusRows(stack) {
   return [...stack.querySelectorAll('.flex.min-h-6.items-center')].filter(row => row.querySelector('button'))
 }
 
-function backgroundHeaders(stack) {
-  if (!stack) {
-    return []
-  }
-  const headers = []
-  for (const icon of stack.querySelectorAll('.codicon-server-process')) {
-    let node = icon.parentElement
-    for (let i = 0; i < 8 && node; i++) {
-      const cls = String(node.className || '')
-      if (cls.includes('flex') && node.querySelector('button[aria-expanded]')) {
-        headers.push(node)
-        break
-      }
-      node = node.parentElement
-    }
-  }
-  return headers
-}
-
 function nativeRowTitle(row) {
   const span = row.querySelector('.truncate')
   return String((span && span.textContent) || '').trim()
@@ -394,11 +375,11 @@ function clearNativeHooks() {
 
 let lastNativePaintKey = ''
 
-function fillActionHost(hostEl, tool, newest, onGear) {
+function fillActionHost(hostEl, tool, onGear, withGear) {
   const breakCmd = tool && tool.id ? `/break --id ${tool.id}` : '/break'
   const againCmd = tool && tool.id ? `/again --id ${tool.id}` : '/again'
   const againOff = Boolean(tool && tool.again_disabled)
-  const sig = `${breakCmd}|${againCmd}|${newest ? 1 : 0}|${againOff ? 1 : 0}`
+  const sig = `${breakCmd}|${againCmd}|${againOff ? 1 : 0}|${withGear ? 1 : 0}`
   if (hostEl.getAttribute('data-itb-sig') === sig) {
     return
   }
@@ -407,18 +388,18 @@ function fillActionHost(hostEl, tool, newest, onGear) {
   hostEl.appendChild(makeNativeBtn('Break', 'Kill this spawn. Keep the turn.', false, () => {
     void breakNow(breakCmd)
   }))
-  if (newest) {
-    hostEl.appendChild(makeNativeBtn('Message', 'Put /break in the composer so you can type a hint.', false, injectBreakMessage))
-    hostEl.appendChild(
-      makeNativeBtn(
-        'Again',
-        againOff ? 'Again used twice on this call. Break instead.' : 'Kill and reissue this call once.',
-        againOff,
-        () => {
-          void breakNow(againCmd)
-        }
-      )
+  hostEl.appendChild(makeNativeBtn('Message', 'Put /break in the composer so you can type a hint.', false, injectBreakMessage))
+  hostEl.appendChild(
+    makeNativeBtn(
+      'Again',
+      againOff ? 'Again used twice on this call. Break instead.' : 'Kill and reissue this call once.',
+      againOff,
+      () => {
+        void breakNow(againCmd)
+      }
     )
+  )
+  if (withGear) {
     const gear = document.createElement('button')
     gear.type = 'button'
     gear.className = GEAR
@@ -438,13 +419,34 @@ function fillActionHost(hostEl, tool, newest, onGear) {
   }
 }
 
-function ensureHook(parent) {
-  let hostEl = parent.querySelector(`[${NATIVE_HOOK}]`)
+function xSlot(row) {
+  const icon = row.querySelector('.codicon-close')
+  if (!icon) {
+    return null
+  }
+  let node = icon.parentElement
+  while (node && node !== row) {
+    if (node.parentElement === row) {
+      return node
+    }
+    node = node.parentElement
+  }
+  return icon.parentElement
+}
+
+function ensureRowHook(row) {
+  const slot = xSlot(row)
+  let hostEl = row.querySelector(`[${NATIVE_HOOK}]`)
   if (!hostEl) {
     hostEl = document.createElement('div')
     hostEl.setAttribute(NATIVE_HOOK, '1')
     hostEl.className = 'flex shrink-0 items-center gap-0.5'
-    parent.appendChild(hostEl)
+  }
+  const parent = (slot && slot.parentElement) || row
+  if (slot && hostEl.nextElementSibling !== slot) {
+    parent.insertBefore(hostEl, slot)
+  } else if (!hostEl.parentElement) {
+    row.appendChild(hostEl)
   }
   return hostEl
 }
@@ -457,36 +459,26 @@ function paintNativeStack(tools, newestId, onGear) {
     return hooked
   }
   const spawn = tools.filter(isSpawnTool)
-  const headers = backgroundHeaders(stack)
   const rows = backgroundStatusRows(stack)
   const keep = new Set()
-  const paintKey = `${headers.length}:${rows.length}:${spawn.length}`
+  const paintKey = `${rows.length}:${spawn.length}`
   if (paintKey !== lastNativePaintKey) {
     lastNativePaintKey = paintKey
     console.warn('[intelligent-tool-break] native paint', {
-      headers: headers.length,
       rows: rows.length,
       spawn: spawn.length
     })
   }
-  if (!headers.length && !rows.length) {
+  if (!rows.length) {
     clearNativeHooks()
     return hooked
   }
-  headers.forEach((header, index) => {
-    const title = String(header.textContent || '').trim()
-    const tool = matchSpawnTool(title, spawn) || spawn[0] || null
-    const key = (tool && toolKey(tool)) || `header-${index}`
-    hooked.add(key)
-    keep.add(header)
-    fillActionHost(ensureHook(header), tool, true, onGear)
-  })
   rows.forEach((row, index) => {
     const tool = matchSpawnTool(nativeRowTitle(row), spawn) || spawn[0] || null
     const key = (tool && toolKey(tool)) || `row-${index}`
     hooked.add(key)
     keep.add(row)
-    fillActionHost(ensureHook(row), tool, Boolean(headers.length) ? false : index === 0, onGear)
+    fillActionHost(ensureRowHook(row), tool, onGear, index === 0)
   })
   document.querySelectorAll(`[${NATIVE_HOOK}]`).forEach(node => {
     if (!keep.has(node.parentElement)) {
