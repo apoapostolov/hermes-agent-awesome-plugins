@@ -418,27 +418,35 @@ function rowStartMs(row, tool) {
 }
 
 function ensurePill(row, tool, now, grades) {
-  const slot = xSlot(row)
-  let pill = row.querySelector(`[${NATIVE_PILL}]`)
+  const title = row.querySelector('.truncate')
+  if (!title || !title.parentElement) {
+    return null
+  }
+  title.style.flexGrow = '0'
+  title.style.flexShrink = '1'
+  title.style.minWidth = '0'
+  let pill = title.parentElement.querySelector(`[${NATIVE_PILL}]`)
   if (!pill) {
     pill = document.createElement('span')
     pill.setAttribute(NATIVE_PILL, '1')
-    pill.className = PILL
-    if (slot && slot.parentElement === row) {
-      row.insertBefore(pill, slot)
-    } else {
-      row.appendChild(pill)
-    }
+    title.insertAdjacentElement('afterend', pill)
   }
+  row.querySelectorAll(`[${NATIVE_PILL}]`).forEach(node => {
+    if (node !== pill) {
+      node.remove()
+    }
+  })
+  pill.className = 'shrink-0 font-mono text-[0.62rem] tabular-nums leading-4'
+  pill.style.color = 'color-mix(in srgb, var(--ui-text-tertiary) 72%, transparent)'
+  pill.style.fontWeight = '500'
+  pill.style.background = 'transparent'
+  pill.style.flexShrink = '0'
+  pill.style.marginLeft = '0.35rem'
   const waited = Math.max(0, now - rowStartMs(row, tool))
-  const tone = gradeStyle(waited / 1000, grades)
   const clock = fmtElapsed(waited)
   if (pill.textContent !== clock) {
     pill.textContent = clock
   }
-  pill.style.color = tone.color
-  pill.style.fontWeight = String(tone.fontWeight)
-  pill.style.background = 'color-mix(in srgb, var(--ui-bg-quaternary) 80%, transparent)'
   return pill
 }
 
@@ -467,7 +475,7 @@ function fillActionHost(hostEl, tool) {
   const breakCmd = tool && tool.id ? `/break --id ${tool.id}` : '/break'
   const againCmd = tool && tool.id ? `/again --id ${tool.id}` : '/again'
   const againOff = Boolean(tool && tool.again_disabled)
-  const sig = `${breakCmd}|${againCmd}|${againOff ? 1 : 0}|fit4`
+  const sig = `${breakCmd}|${againCmd}|${againOff ? 1 : 0}|overlay1`
   if (hostEl.getAttribute('data-itb-sig') === sig) {
     return
   }
@@ -518,9 +526,15 @@ function ensureRowHook(row) {
     hostEl.className = 'flex shrink-0 items-center gap-0'
   }
   if (slot) {
+    slot.style.position = 'relative'
     slot.style.overflow = 'visible'
     slot.style.flexWrap = 'nowrap'
-    slot.style.maxWidth = 'none'
+    hostEl.style.position = 'absolute'
+    hostEl.style.right = '1.15rem'
+    hostEl.style.top = '50%'
+    hostEl.style.transform = 'translateY(-50%)'
+    hostEl.style.zIndex = '2'
+    hostEl.style.background = 'color-mix(in srgb, var(--ui-chat-surface-background, var(--ui-bg-primary)) 90%, transparent)'
     if (hostEl.parentElement !== slot || slot.firstElementChild !== hostEl) {
       slot.insertBefore(hostEl, slot.firstChild)
     }
