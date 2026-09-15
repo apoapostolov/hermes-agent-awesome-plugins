@@ -422,9 +422,16 @@ function ensurePill(row, tool, now, grades) {
   if (!title || !title.parentElement) {
     return null
   }
+  title.style.flex = '0 1 auto'
   title.style.flexGrow = '0'
   title.style.flexShrink = '1'
+  title.style.flexBasis = 'auto'
   title.style.minWidth = '0'
+  title.style.maxWidth = 'calc(100% - 3.25rem)'
+  title.style.width = 'auto'
+  title.style.overflow = 'hidden'
+  title.style.textOverflow = 'ellipsis'
+  title.style.whiteSpace = 'nowrap'
   let pill = title.parentElement.querySelector(`[${NATIVE_PILL}]`)
   if (!pill) {
     pill = document.createElement('span')
