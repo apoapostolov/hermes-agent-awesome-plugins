@@ -374,11 +374,17 @@ function toolKey(tool) {
   return String((tool && (tool.id || tool.name)) || '')
 }
 
+const NATIVE_BTN =
+  'h-6 shrink-0 whitespace-nowrap rounded-md px-1.5 text-[0.65rem] font-semibold text-(--ui-text-primary) hover:bg-(--chrome-action-hover)'
+const NATIVE_BTN_OFF =
+  'h-6 shrink-0 whitespace-nowrap rounded-md px-1.5 text-[0.65rem] font-semibold text-(--ui-text-tertiary) opacity-40 cursor-not-allowed'
+
 function makeNativeBtn(label, title, disabled, onClick) {
   const btn = document.createElement('button')
   btn.type = 'button'
-  btn.className = disabled ? BTN_OFF : BTN
+  btn.className = disabled ? NATIVE_BTN_OFF : NATIVE_BTN
   btn.textContent = label
+  btn.style.flexShrink = '0'
   btn.title = title.replace(/\n/g, ' ')
   btn.disabled = Boolean(disabled)
   btn.addEventListener('pointerdown', event => {
@@ -423,11 +429,14 @@ function fillActionHost(hostEl, tool) {
   const breakCmd = tool && tool.id ? `/break --id ${tool.id}` : '/break'
   const againCmd = tool && tool.id ? `/again --id ${tool.id}` : '/again'
   const againOff = Boolean(tool && tool.again_disabled)
-  const sig = `${breakCmd}|${againCmd}|${againOff ? 1 : 0}`
+  const sig = `${breakCmd}|${againCmd}|${againOff ? 1 : 0}|fit3`
   if (hostEl.getAttribute('data-itb-sig') === sig) {
     return
   }
   hostEl.setAttribute('data-itb-sig', sig)
+  hostEl.className = 'flex shrink-0 items-center gap-0.5 whitespace-nowrap'
+  hostEl.style.flexShrink = '0'
+  hostEl.style.minWidth = 'max-content'
   hostEl.replaceChildren()
   hostEl.appendChild(makeNativeBtn('Break', 'Kill this spawn. Keep the turn.', false, () => {
     void breakNow(breakCmd)
@@ -437,9 +446,11 @@ function fillActionHost(hostEl, tool) {
     makeNativeBtn(
       'Again',
       againOff ? 'Again used twice on this call. Break instead.' : 'Kill and reissue this call once.',
-      againOff,
+      false,
       () => {
-        void breakNow(againCmd)
+        if (!againOff) {
+          void breakNow(againCmd)
+        }
       }
     )
   )
@@ -469,6 +480,9 @@ function ensureRowHook(row) {
     hostEl.className = 'flex shrink-0 items-center gap-0.5'
   }
   if (slot) {
+    slot.style.overflow = 'visible'
+    slot.style.flexWrap = 'nowrap'
+    slot.style.maxWidth = 'none'
     if (hostEl.parentElement !== slot || slot.firstElementChild !== hostEl) {
       slot.insertBefore(hostEl, slot.firstChild)
     }
