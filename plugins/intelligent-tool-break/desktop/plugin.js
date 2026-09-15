@@ -1064,7 +1064,7 @@ function BreakBar() {
 
 export default {
   id: ID,
-  name: 'Break',
+  name: 'Intelligent Tool Break',
   register(ctx) {
     ctx.onDispose(() => {
       clearNativeHooks()
