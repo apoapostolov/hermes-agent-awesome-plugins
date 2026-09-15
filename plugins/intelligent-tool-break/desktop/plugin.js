@@ -291,6 +291,8 @@ function visibleTools(status, hide) {
 
 const NATIVE_HOOK = 'data-itb-actions'
 const NATIVE_GEAR = 'data-itb-gear'
+const NATIVE_PILL = 'data-itb-pill'
+const firstSeen = new Map()
 
 function isSpawnTool(tool) {
   const name = String(tool && tool.name ? tool.name : '').toLowerCase()
@@ -401,7 +403,43 @@ function makeNativeBtn(label, title, disabled, onClick) {
 }
 
 function clearNativeHooks() {
-  document.querySelectorAll(`[${NATIVE_HOOK}], [${NATIVE_GEAR}]`).forEach(node => node.remove())
+  document.querySelectorAll(`[${NATIVE_HOOK}], [${NATIVE_GEAR}], [${NATIVE_PILL}]`).forEach(node => node.remove())
+}
+
+function rowStartMs(row, tool) {
+  if (tool && tool.started_wall) {
+    return Number(tool.started_wall) * 1000
+  }
+  const title = nativeRowTitle(row) || 'row'
+  if (!firstSeen.has(title)) {
+    firstSeen.set(title, Date.now())
+  }
+  return firstSeen.get(title)
+}
+
+function ensurePill(row, tool, now, grades) {
+  const slot = xSlot(row)
+  let pill = row.querySelector(`[${NATIVE_PILL}]`)
+  if (!pill) {
+    pill = document.createElement('span')
+    pill.setAttribute(NATIVE_PILL, '1')
+    pill.className = PILL
+    if (slot && slot.parentElement === row) {
+      row.insertBefore(pill, slot)
+    } else {
+      row.appendChild(pill)
+    }
+  }
+  const waited = Math.max(0, now - rowStartMs(row, tool))
+  const tone = gradeStyle(waited / 1000, grades)
+  const clock = fmtElapsed(waited)
+  if (pill.textContent !== clock) {
+    pill.textContent = clock
+  }
+  pill.style.color = tone.color
+  pill.style.fontWeight = String(tone.fontWeight)
+  pill.style.background = 'color-mix(in srgb, var(--ui-bg-quaternary) 80%, transparent)'
+  return pill
 }
 
 function makeGearButton(onGear) {
@@ -504,7 +542,7 @@ function ensureHeaderGear(header, onGear) {
   return hostEl
 }
 
-function paintNativeStack(tools, newestId, onGear) {
+function paintNativeStack(tools, newestId, onGear, grades) {
   const hooked = new Set()
   const stack = visibleStatusStack()
   if (!stack) {
@@ -543,8 +581,15 @@ function paintNativeStack(tools, newestId, onGear) {
       keep.add(slot)
     }
     fillActionHost(ensureRowHook(row), tool)
+    keep.add(ensurePill(row, tool, Date.now(), grades || loadGrades()))
   })
-  document.querySelectorAll(`[${NATIVE_HOOK}], [${NATIVE_GEAR}]`).forEach(node => {
+  const liveTitles = new Set(rows.map(row => nativeRowTitle(row) || 'row'))
+  for (const title of Array.from(firstSeen.keys())) {
+    if (!liveTitles.has(title)) {
+      firstSeen.delete(title)
+    }
+  }
+  document.querySelectorAll(`[${NATIVE_HOOK}], [${NATIVE_GEAR}], [${NATIVE_PILL}]`).forEach(node => {
     if (!keep.has(node.parentElement) && !keep.has(node)) {
       node.remove()
     }
@@ -935,7 +980,7 @@ function BreakBar() {
         return
       }
       const newestId = tools[0] ? tools[0].id : ''
-      const next = paintNativeStack(tools, newestId, () => setOpen(true))
+      const next = paintNativeStack(tools, newestId, () => setOpen(true), loadGrades())
       setHooked(prev => {
         if (prev.size === next.size && [...next].every(id => prev.has(id))) {
           return prev
@@ -949,7 +994,9 @@ function BreakBar() {
         records.every(
           record =>
             record.target.closest &&
-            (record.target.closest(`[${NATIVE_HOOK}]`) || record.target.closest(`[${NATIVE_GEAR}]`))
+            (record.target.closest(`[${NATIVE_HOOK}]`) ||
+              record.target.closest(`[${NATIVE_GEAR}]`) ||
+              record.target.closest(`[${NATIVE_PILL}]`))
         )
       ) {
         return
@@ -965,7 +1012,7 @@ function BreakBar() {
     apply()
     const obs = new MutationObserver(schedule)
     obs.observe(document.body, { childList: true, subtree: true })
-    const timer = window.setInterval(apply, 1000)
+    const timer = window.setInterval(apply, 250)
     return () => {
       stop = true
       obs.disconnect()
