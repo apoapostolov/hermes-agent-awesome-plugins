@@ -375,9 +375,9 @@ function toolKey(tool) {
 }
 
 const NATIVE_BTN =
-  'h-6 shrink-0 whitespace-nowrap rounded-md px-1.5 text-[0.65rem] font-semibold text-(--ui-text-primary) hover:bg-(--chrome-action-hover)'
+  'h-6 shrink-0 whitespace-nowrap rounded-md px-1 text-[0.65rem] font-semibold text-(--ui-text-primary) hover:bg-(--chrome-action-hover)'
 const NATIVE_BTN_OFF =
-  'h-6 shrink-0 whitespace-nowrap rounded-md px-1.5 text-[0.65rem] font-semibold text-(--ui-text-tertiary) opacity-40 cursor-not-allowed'
+  'h-6 shrink-0 whitespace-nowrap rounded-md px-1 text-[0.65rem] font-semibold text-(--ui-text-tertiary) opacity-40 cursor-not-allowed'
 
 function makeNativeBtn(label, title, disabled, onClick) {
   const btn = document.createElement('button')
@@ -429,12 +429,12 @@ function fillActionHost(hostEl, tool) {
   const breakCmd = tool && tool.id ? `/break --id ${tool.id}` : '/break'
   const againCmd = tool && tool.id ? `/again --id ${tool.id}` : '/again'
   const againOff = Boolean(tool && tool.again_disabled)
-  const sig = `${breakCmd}|${againCmd}|${againOff ? 1 : 0}|fit3`
+  const sig = `${breakCmd}|${againCmd}|${againOff ? 1 : 0}|fit4`
   if (hostEl.getAttribute('data-itb-sig') === sig) {
     return
   }
   hostEl.setAttribute('data-itb-sig', sig)
-  hostEl.className = 'flex shrink-0 items-center gap-0.5 whitespace-nowrap'
+  hostEl.className = 'flex shrink-0 items-center gap-0 whitespace-nowrap'
   hostEl.style.flexShrink = '0'
   hostEl.style.minWidth = 'max-content'
   hostEl.replaceChildren()
@@ -477,7 +477,7 @@ function ensureRowHook(row) {
   if (!hostEl) {
     hostEl = document.createElement('div')
     hostEl.setAttribute(NATIVE_HOOK, '1')
-    hostEl.className = 'flex shrink-0 items-center gap-0.5'
+    hostEl.className = 'flex shrink-0 items-center gap-0'
   }
   if (slot) {
     slot.style.overflow = 'visible'
