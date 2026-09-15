@@ -290,6 +290,7 @@ function visibleTools(status, hide) {
 }
 
 const NATIVE_HOOK = 'data-itb-actions'
+const NATIVE_GEAR = 'data-itb-gear'
 
 function isSpawnTool(tool) {
   const name = String(tool && tool.name ? tool.name : '').toLowerCase()
@@ -318,6 +319,30 @@ function backgroundStatusRows(stack) {
     return closeRows
   }
   return [...stack.querySelectorAll('.flex.min-h-6.items-center')].filter(row => row.querySelector('button'))
+}
+
+function backgroundHeaders(stack) {
+  if (!stack) {
+    return []
+  }
+  const headers = []
+  for (const icon of stack.querySelectorAll('.codicon-server-process')) {
+    let node = icon.parentElement
+    for (let i = 0; i < 8 && node; i++) {
+      const cls = String(node.className || '')
+      if (cls.includes('flex') && node.querySelector('button[aria-expanded]')) {
+        headers.push(node)
+        break
+      }
+      node = node.parentElement
+    }
+  }
+  return headers
+}
+
+function nativeBackgroundPresent() {
+  const stack = visibleStatusStack()
+  return Boolean(stack && stack.querySelector('.codicon-server-process'))
 }
 
 function nativeRowTitle(row) {
@@ -370,16 +395,35 @@ function makeNativeBtn(label, title, disabled, onClick) {
 }
 
 function clearNativeHooks() {
-  document.querySelectorAll(`[${NATIVE_HOOK}]`).forEach(node => node.remove())
+  document.querySelectorAll(`[${NATIVE_HOOK}], [${NATIVE_GEAR}]`).forEach(node => node.remove())
+}
+
+function makeGearButton(onGear) {
+  const gear = document.createElement('button')
+  gear.type = 'button'
+  gear.className = GEAR
+  gear.setAttribute('aria-label', 'Break settings')
+  gear.title = 'Grades, auto break, hide list'
+  gear.addEventListener('pointerdown', event => event.stopPropagation())
+  gear.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    onGear()
+  })
+  const icon = document.createElement('i')
+  icon.className = 'codicon codicon-settings-gear'
+  icon.style.fontSize = '0.7rem'
+  gear.appendChild(icon)
+  return gear
 }
 
 let lastNativePaintKey = ''
 
-function fillActionHost(hostEl, tool, onGear, withGear) {
+function fillActionHost(hostEl, tool) {
   const breakCmd = tool && tool.id ? `/break --id ${tool.id}` : '/break'
   const againCmd = tool && tool.id ? `/again --id ${tool.id}` : '/again'
   const againOff = Boolean(tool && tool.again_disabled)
-  const sig = `${breakCmd}|${againCmd}|${againOff ? 1 : 0}|${withGear ? 1 : 0}`
+  const sig = `${breakCmd}|${againCmd}|${againOff ? 1 : 0}`
   if (hostEl.getAttribute('data-itb-sig') === sig) {
     return
   }
@@ -399,24 +443,6 @@ function fillActionHost(hostEl, tool, onGear, withGear) {
       }
     )
   )
-  if (withGear) {
-    const gear = document.createElement('button')
-    gear.type = 'button'
-    gear.className = GEAR
-    gear.setAttribute('aria-label', 'Break settings')
-    gear.title = 'Grades, auto break, hide list'
-    gear.addEventListener('pointerdown', event => event.stopPropagation())
-    gear.addEventListener('click', event => {
-      event.preventDefault()
-      event.stopPropagation()
-      onGear()
-    })
-    const icon = document.createElement('i')
-    icon.className = 'codicon codicon-settings-gear'
-    icon.style.fontSize = '0.7rem'
-    gear.appendChild(icon)
-    hostEl.appendChild(gear)
-  }
 }
 
 function xSlot(row) {
@@ -442,11 +468,24 @@ function ensureRowHook(row) {
     hostEl.setAttribute(NATIVE_HOOK, '1')
     hostEl.className = 'flex shrink-0 items-center gap-0.5'
   }
-  const parent = (slot && slot.parentElement) || row
-  if (slot && hostEl.nextElementSibling !== slot) {
-    parent.insertBefore(hostEl, slot)
+  if (slot) {
+    if (hostEl.parentElement !== slot || slot.firstElementChild !== hostEl) {
+      slot.insertBefore(hostEl, slot.firstChild)
+    }
   } else if (!hostEl.parentElement) {
     row.appendChild(hostEl)
+  }
+  return hostEl
+}
+
+function ensureHeaderGear(header, onGear) {
+  let hostEl = header.querySelector(`[${NATIVE_GEAR}]`)
+  if (!hostEl) {
+    hostEl = document.createElement('div')
+    hostEl.setAttribute(NATIVE_GEAR, '1')
+    hostEl.className = 'flex shrink-0 items-center'
+    header.appendChild(hostEl)
+    hostEl.appendChild(makeGearButton(onGear))
   }
   return hostEl
 }
@@ -460,28 +499,39 @@ function paintNativeStack(tools, newestId, onGear) {
   }
   const spawn = tools.filter(isSpawnTool)
   const rows = backgroundStatusRows(stack)
+  const headers = backgroundHeaders(stack)
   const keep = new Set()
-  const paintKey = `${rows.length}:${spawn.length}`
+  const paintKey = `${headers.length}:${rows.length}:${spawn.length}`
   if (paintKey !== lastNativePaintKey) {
     lastNativePaintKey = paintKey
     console.warn('[intelligent-tool-break] native paint', {
+      headers: headers.length,
       rows: rows.length,
       spawn: spawn.length
     })
   }
-  if (!rows.length) {
+  if (!headers.length && !rows.length) {
     clearNativeHooks()
     return hooked
   }
+  headers.forEach(header => {
+    keep.add(header)
+    keep.add(ensureHeaderGear(header, onGear))
+    hooked.add('header')
+  })
   rows.forEach((row, index) => {
     const tool = matchSpawnTool(nativeRowTitle(row), spawn) || spawn[0] || null
     const key = (tool && toolKey(tool)) || `row-${index}`
     hooked.add(key)
     keep.add(row)
-    fillActionHost(ensureRowHook(row), tool, onGear, index === 0)
+    const slot = xSlot(row)
+    if (slot) {
+      keep.add(slot)
+    }
+    fillActionHost(ensureRowHook(row), tool)
   })
-  document.querySelectorAll(`[${NATIVE_HOOK}]`).forEach(node => {
-    if (!keep.has(node.parentElement)) {
+  document.querySelectorAll(`[${NATIVE_HOOK}], [${NATIVE_GEAR}]`).forEach(node => {
+    if (!keep.has(node.parentElement) && !keep.has(node)) {
       node.remove()
     }
   })
@@ -854,7 +904,7 @@ function BreakBar() {
   }, [status.inflight, status.tools.length])
 
   const tools = visibleTools(status, hide)
-  const nativeLive = hooked.size > 0
+  const nativeLive = hooked.size > 0 || nativeBackgroundPresent()
   const shown = tools.filter(tool => {
     if (nativeLive && isSpawnTool(tool)) {
       return false
@@ -880,7 +930,14 @@ function BreakBar() {
       })
     }
     const schedule = records => {
-      if (records && records.every(record => record.target.closest && record.target.closest(`[${NATIVE_HOOK}]`))) {
+      if (
+        records &&
+        records.every(
+          record =>
+            record.target.closest &&
+            (record.target.closest(`[${NATIVE_HOOK}]`) || record.target.closest(`[${NATIVE_GEAR}]`))
+        )
+      ) {
         return
       }
       if (frame) {
