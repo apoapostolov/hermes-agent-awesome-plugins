@@ -311,7 +311,32 @@ function backgroundStatusRows(stack) {
   if (!stack) {
     return []
   }
-  return [...stack.querySelectorAll('[class*="status-row"]')].filter(row => row.querySelector('.codicon-close'))
+  const closeRows = [...stack.querySelectorAll('[class*="status-row"]')].filter(row =>
+    row.querySelector('.codicon-close')
+  )
+  if (closeRows.length) {
+    return closeRows
+  }
+  return [...stack.querySelectorAll('.flex.min-h-6.items-center')].filter(row => row.querySelector('button'))
+}
+
+function backgroundHeaders(stack) {
+  if (!stack) {
+    return []
+  }
+  const headers = []
+  for (const icon of stack.querySelectorAll('.codicon-server-process')) {
+    let node = icon.parentElement
+    for (let i = 0; i < 8 && node; i++) {
+      const cls = String(node.className || '')
+      if (cls.includes('flex') && node.querySelector('button[aria-expanded]')) {
+        headers.push(node)
+        break
+      }
+      node = node.parentElement
+    }
+  }
+  return headers
 }
 
 function nativeRowTitle(row) {
@@ -367,72 +392,101 @@ function clearNativeHooks() {
   document.querySelectorAll(`[${NATIVE_HOOK}]`).forEach(node => node.remove())
 }
 
+let lastNativePaintKey = ''
+
+function fillActionHost(hostEl, tool, newest, onGear) {
+  const breakCmd = tool && tool.id ? `/break --id ${tool.id}` : '/break'
+  const againCmd = tool && tool.id ? `/again --id ${tool.id}` : '/again'
+  const againOff = Boolean(tool && tool.again_disabled)
+  const sig = `${breakCmd}|${againCmd}|${newest ? 1 : 0}|${againOff ? 1 : 0}`
+  if (hostEl.getAttribute('data-itb-sig') === sig) {
+    return
+  }
+  hostEl.setAttribute('data-itb-sig', sig)
+  hostEl.replaceChildren()
+  hostEl.appendChild(makeNativeBtn('Break', 'Kill this spawn. Keep the turn.', false, () => {
+    void breakNow(breakCmd)
+  }))
+  if (newest) {
+    hostEl.appendChild(makeNativeBtn('Message', 'Put /break in the composer so you can type a hint.', false, injectBreakMessage))
+    hostEl.appendChild(
+      makeNativeBtn(
+        'Again',
+        againOff ? 'Again used twice on this call. Break instead.' : 'Kill and reissue this call once.',
+        againOff,
+        () => {
+          void breakNow(againCmd)
+        }
+      )
+    )
+    const gear = document.createElement('button')
+    gear.type = 'button'
+    gear.className = GEAR
+    gear.setAttribute('aria-label', 'Break settings')
+    gear.title = 'Grades, auto break, hide list'
+    gear.addEventListener('pointerdown', event => event.stopPropagation())
+    gear.addEventListener('click', event => {
+      event.preventDefault()
+      event.stopPropagation()
+      onGear()
+    })
+    const icon = document.createElement('i')
+    icon.className = 'codicon codicon-settings-gear'
+    icon.style.fontSize = '0.7rem'
+    gear.appendChild(icon)
+    hostEl.appendChild(gear)
+  }
+}
+
+function ensureHook(parent) {
+  let hostEl = parent.querySelector(`[${NATIVE_HOOK}]`)
+  if (!hostEl) {
+    hostEl = document.createElement('div')
+    hostEl.setAttribute(NATIVE_HOOK, '1')
+    hostEl.className = 'flex shrink-0 items-center gap-0.5'
+    parent.appendChild(hostEl)
+  }
+  return hostEl
+}
+
 function paintNativeStack(tools, newestId, onGear) {
   const hooked = new Set()
   const stack = visibleStatusStack()
+  if (!stack) {
+    clearNativeHooks()
+    return hooked
+  }
   const spawn = tools.filter(isSpawnTool)
-  if (!stack || !spawn.length) {
-    clearNativeHooks()
-    return hooked
-  }
+  const headers = backgroundHeaders(stack)
   const rows = backgroundStatusRows(stack)
-  if (!rows.length) {
+  const keep = new Set()
+  const paintKey = `${headers.length}:${rows.length}:${spawn.length}`
+  if (paintKey !== lastNativePaintKey) {
+    lastNativePaintKey = paintKey
+    console.warn('[intelligent-tool-break] native paint', {
+      headers: headers.length,
+      rows: rows.length,
+      spawn: spawn.length
+    })
+  }
+  if (!headers.length && !rows.length) {
     clearNativeHooks()
     return hooked
   }
-  const keep = new Set()
+  headers.forEach((header, index) => {
+    const title = String(header.textContent || '').trim()
+    const tool = matchSpawnTool(title, spawn) || spawn[0] || null
+    const key = (tool && toolKey(tool)) || `header-${index}`
+    hooked.add(key)
+    keep.add(header)
+    fillActionHost(ensureHook(header), tool, true, onGear)
+  })
   rows.forEach((row, index) => {
-    const tool = matchSpawnTool(nativeRowTitle(row), spawn)
-    if (!tool) {
-      return
-    }
-    const key = toolKey(tool) || `row-${index}`
+    const tool = matchSpawnTool(nativeRowTitle(row), spawn) || spawn[0] || null
+    const key = (tool && toolKey(tool)) || `row-${index}`
     hooked.add(key)
     keep.add(row)
-    let hostEl = row.querySelector(`[${NATIVE_HOOK}]`)
-    if (!hostEl) {
-      hostEl = document.createElement('div')
-      hostEl.setAttribute(NATIVE_HOOK, '1')
-      hostEl.className = 'flex shrink-0 items-center gap-0.5'
-      row.appendChild(hostEl)
-    }
-    const newest = toolKey(tool) === String(newestId || '') || (index === 0 && !newestId)
-    const breakCmd = tool.id ? `/break --id ${tool.id}` : '/break'
-    const againCmd = tool.id ? `/again --id ${tool.id}` : '/again'
-    const againOff = tool.again_disabled === true
-    hostEl.replaceChildren()
-    hostEl.appendChild(makeNativeBtn('Break', 'Kill this spawn. Keep the turn.', false, () => {
-      void breakNow(breakCmd)
-    }))
-    if (newest) {
-      hostEl.appendChild(makeNativeBtn('Message', 'Put /break in the composer so you can type a hint.', false, injectBreakMessage))
-      hostEl.appendChild(
-        makeNativeBtn(
-          'Again',
-          againOff ? 'Again used twice on this call. Break instead.' : 'Kill and reissue this call once.',
-          againOff,
-          () => {
-            void breakNow(againCmd)
-          }
-        )
-      )
-      const gear = document.createElement('button')
-      gear.type = 'button'
-      gear.className = GEAR
-      gear.setAttribute('aria-label', 'Break settings')
-      gear.title = 'Grades, auto break, hide list'
-      gear.addEventListener('pointerdown', event => event.stopPropagation())
-      gear.addEventListener('click', event => {
-        event.preventDefault()
-        event.stopPropagation()
-        onGear()
-      })
-      const icon = document.createElement('i')
-      icon.className = 'codicon codicon-settings-gear'
-      icon.style.fontSize = '0.7rem'
-      gear.appendChild(icon)
-      hostEl.appendChild(gear)
-    }
+    fillActionHost(ensureHook(row), tool, Boolean(headers.length) ? false : index === 0, onGear)
   })
   document.querySelectorAll(`[${NATIVE_HOOK}]`).forEach(node => {
     if (!keep.has(node.parentElement)) {
@@ -808,39 +862,55 @@ function BreakBar() {
   }, [status.inflight, status.tools.length])
 
   const tools = visibleTools(status, hide)
-  const shown = tools.filter(tool => !hooked.has(toolKey(tool)))
+  const nativeLive = hooked.size > 0
+  const shown = tools.filter(tool => {
+    if (nativeLive && isSpawnTool(tool)) {
+      return false
+    }
+    return !hooked.has(toolKey(tool))
+  })
   const toolsKey = tools.map(tool => `${toolKey(tool)}:${tool.again_disabled ? 1 : 0}`).join('|')
 
   useEffect(() => {
-    const newestId = tools[0] ? tools[0].id : ''
-    const next = paintNativeStack(tools, newestId, () => setOpen(true))
-    setHooked(prev => {
-      if (prev.size === next.size && [...next].every(id => prev.has(id))) {
-        return prev
-      }
-      return next
-    })
-    const stack = visibleStatusStack()
-    if (!stack) {
-      return undefined
-    }
-    const obs = new MutationObserver(records => {
-      if (records.every(record => {
-        const node = record.target
-        return node.closest && node.closest(`[${NATIVE_HOOK}]`)
-      })) {
+    let stop = false
+    let frame = 0
+    const apply = () => {
+      if (stop) {
         return
       }
-      const painted = paintNativeStack(tools, newestId, () => setOpen(true))
+      const newestId = tools[0] ? tools[0].id : ''
+      const next = paintNativeStack(tools, newestId, () => setOpen(true))
       setHooked(prev => {
-        if (prev.size === painted.size && [...painted].every(id => prev.has(id))) {
+        if (prev.size === next.size && [...next].every(id => prev.has(id))) {
           return prev
         }
-        return painted
+        return next
       })
-    })
-    obs.observe(stack, { childList: true, subtree: true })
-    return () => obs.disconnect()
+    }
+    const schedule = records => {
+      if (records && records.every(record => record.target.closest && record.target.closest(`[${NATIVE_HOOK}]`))) {
+        return
+      }
+      if (frame) {
+        return
+      }
+      frame = window.requestAnimationFrame(() => {
+        frame = 0
+        apply()
+      })
+    }
+    apply()
+    const obs = new MutationObserver(schedule)
+    obs.observe(document.body, { childList: true, subtree: true })
+    const timer = window.setInterval(apply, 1000)
+    return () => {
+      stop = true
+      obs.disconnect()
+      window.clearInterval(timer)
+      if (frame) {
+        window.cancelAnimationFrame(frame)
+      }
+    }
   }, [toolsKey])
 
   // Elapsed-time clock only while there are visible tools to animate;
