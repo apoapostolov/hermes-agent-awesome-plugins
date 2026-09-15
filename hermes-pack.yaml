@@ -8,7 +8,7 @@ plugins:
     ref: 872ca2cf25895bbdc37d925e80d16c0ee59a1d0e
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/intelligent-tool-break
-    ref: b83fb9a6ff823c37c48571dd86146f20999425f3
+    ref: 525f1f69d6f7a87b7d1846cfb5b1765f1db0e249
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/better-session-appearance
     ref: cb3a0b9
