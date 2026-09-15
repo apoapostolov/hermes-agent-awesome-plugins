@@ -1,4 +1,4 @@
-# tool-break
+# Intelligent Tool Break
 
 Never let a stalled tool call force you to cancel a long task. Abort an in-flight call with `/break`, instruct with `/break {message}`, or force it to repeat with `/again`.
 
@@ -7,9 +7,9 @@ Never let a stalled tool call force you to cancel a long task. Abort an in-fligh
 - **`/again`** same kill, then reissue the exact call (max 2 per fingerprint).
 - **`/again <hint>`** same with a tweak.
 - **`/break-status`** JSON payload for the desktop strip.
-- Desktop strip: name + time pill, Break / Message / Again / gear per spawn. Elapsed color grades, auto-break thresholds, per-tool hide list (all in `localStorage` under `tool-break.*`).
+- Desktop strip: name + time pill, Break / Message / Again / gear per spawn. Elapsed color grades, auto-break thresholds, per-tool hide list (all in `localStorage` under `intelligent-tool-break.*`).
 
-Previously published as `hermes-break`. Same commands.
+Previously published as `hermes-break`, then renamed to `intelligent-tool-break`. Same commands.
 
 ## Files
 

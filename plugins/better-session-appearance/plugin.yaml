@@ -1,0 +1,12 @@
+name: better-session-appearance
+version: 1.1.5
+description: "Better Session Appearance: improve your session list with full name color, bolding, and a Codicon icon when a session is idle."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/better-session-appearance
+tags:
+  - desktop
+  - appearance
+  - sessions

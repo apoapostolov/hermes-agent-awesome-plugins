@@ -5,15 +5,15 @@
  * flipped for the current mode). Bold is optional. Appearance submenu
  * gets a glyph gallery that replaces the idle bullet.
  *
- * Live door: desktop-plugins/better-colors/plugin.js (auto-on).
+ * Live door: desktop-plugins/better-session-appearance/plugin.js (auto-on).
  */
 
-const ID = 'better-colors'
+const ID = 'better-session-appearance'
 const ROW = '[data-sessions-mode] .row-hover'
 const TITLE = '.hover-marquee'
 const IDLE_DOT = 'span.size-1.rounded-full'
-const EXTRA_ATTR = 'data-better-colors'
-const STYLE_ID = 'better-colors-style'
+const EXTRA_ATTR = 'data-better-session-appearance'
+const STYLE_ID = 'better-session-appearance-style'
 
 const GLYPH_NAMES = [
   "account", "activate-breakpoints", "add-small", "add", "agent", "archive",

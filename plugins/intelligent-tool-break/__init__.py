@@ -469,7 +469,7 @@ def _kill_registry_since(started_wall: float) -> int:
         try:
             from tools.process_registry import process_registry
 
-            process_registry.kill_process(sid, source="tool-break")
+            process_registry.kill_process(sid, source="intelligent-tool-break")
             n += 1
         except Exception:
             pass

@@ -1,4 +1,4 @@
-"""Local checks for tool-break rewrite helpers."""
+"""Local checks for Intelligent Tool Break rewrite helpers."""
 from __future__ import annotations
 
 import importlib.util

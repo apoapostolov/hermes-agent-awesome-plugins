@@ -1,4 +1,4 @@
-# better-colors
+# Better Session Appearance
 
 Desktop plugin for **session list appearance**: titles take the Appearance color, optional per-session bold, extra colors in the picker, and a Codicon idle-bullet.
 
@@ -16,4 +16,4 @@ Desktop plugin for **session list appearance**: titles take the Appearance color
 
 A MutationObserver restyles sidebar rows from the idle-dot color (`hermes.desktop.sessionColors`) and injects extra controls into `ColorSwatches`. Extra colors go through the picker's own `onChange`. Glyphs and bold live in plugin storage, keyed by session id.
 
-Drop `desktop/plugin.js` in `$HERMES_HOME/desktop-plugins/better-colors/` for auto-on, or keep it under `plugins/better-colors/desktop/` and enable it in Settings → Plugins.
+Drop `desktop/plugin.js` in `$HERMES_HOME/desktop-plugins/better-session-appearance/` for auto-on, or keep it under `plugins/better-session-appearance/desktop/` and enable it in Settings → Plugins.
