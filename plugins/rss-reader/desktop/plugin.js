@@ -1907,7 +1907,8 @@ var styles = `
 .hermes-rss .rss-tabs-pills button{border:0;background:transparent;border-radius:0;padding:2px 0;font-size:12px;line-height:1.4;color:var(--ui-text-secondary)}
 .hermes-rss .rss-tabs-pills button[aria-selected=true]{border-bottom:2px solid var(--ui-accent);background:transparent;color:var(--ui-text-primary,var(--foreground))}
 .hermes-rss .rss-list-items{overflow:auto;flex:1;padding:8px}
-.hermes-rss .rss-card{display:flex;flex-direction:row;align-items:center;width:100%;border:1px solid transparent;background:transparent;color:inherit;text-align:left;padding:18px 14px;border-radius:8px;margin-bottom:3px;outline:none;box-shadow:none}
+.hermes-rss .rss-card{display:flex;flex-direction:column;align-items:stretch;width:100%;border:1px solid transparent;background:transparent;color:inherit;text-align:left;padding:18px 14px;border-radius:8px;margin-bottom:3px;outline:none;box-shadow:none}
+.hermes-rss .rss-card-body{display:flex;flex-direction:row;align-items:center;gap:10px;min-width:0}
 .hermes-rss .rss-list-items button.rss-card:focus,.hermes-rss .rss-list-items button.rss-card:focus-visible{outline:none;box-shadow:none;outline-offset:0}
 .hermes-rss .rss-list-items button.rss-card[aria-selected=true],.hermes-rss .rss-list-items button.rss-card[aria-selected=true]:focus,.hermes-rss .rss-list-items button.rss-card[aria-selected=true]:focus-visible{outline:2px solid var(--ui-accent);outline-offset:3px}
 .hermes-rss .rss-card:hover{background:color-mix(in srgb,var(--ui-text-secondary) 5%,transparent)}
@@ -1919,10 +1920,9 @@ var styles = `
 .hermes-rss .rss-card-read .rss-card-title{color:var(--ui-text-secondary);font-weight:500}
 .hermes-rss .rss-card-read .rss-card-excerpt{color:var(--ui-text-tertiary)}
 .hermes-rss .rss-card-title{font-size:15px;font-weight:600;line-height:1.45;margin:8px 0}.hermes-rss .rss-card-meta{display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--ui-text-tertiary)}
-.hermes-rss .rss-card:not(:has(.rss-card-thumb)) .rss-card-meta{padding-right:66px}
 .hermes-rss .rss-card-excerpt{font-size:12px;color:var(--ui-text-secondary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .hermes-rss .rss-card-main{min-width:0;flex:1}
-.hermes-rss .rss-card-thumb{flex-shrink:0;width:56px;height:56px;border-radius:6px;overflow:hidden;margin-left:10px;position:relative;top:5px;background:color-mix(in srgb,var(--ui-text-secondary) 10%,transparent)}
+.hermes-rss .rss-card-thumb{flex-shrink:0;width:56px;height:56px;border-radius:6px;overflow:hidden;position:relative;top:5px;background:color-mix(in srgb,var(--ui-text-secondary) 10%,transparent)}
 .hermes-rss .rss-card-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .hermes-rss .rss-chip{display:inline-flex;align-items:center;padding:4px 8px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;font-size:10px;color:var(--ui-text-secondary)}
 .hermes-rss .rss-tabs{display:flex;gap:22px;border-bottom:1px solid var(--ui-stroke-secondary);margin:24px 0}
@@ -2726,24 +2726,26 @@ function ReaderProfile({ ctx, owner }) {
               "aria-selected": selected === item.id,
               onClick: () => openArticle(item),
               children: [
-                /* @__PURE__ */ jsxs("div", { className: "rss-card-main", children: [
-                  /* @__PURE__ */ jsxs("div", { className: "rss-card-meta", children: [
-                    /* @__PURE__ */ jsxs("span", { children: [
-                      !item.is_read ? "\u25CF " : "",
-                      item.feed_title
-                    ] }),
-                    /* @__PURE__ */ jsxs("span", { className: "rss-card-meta-right", children: [
-                      pill && /* @__PURE__ */ jsx("span", { className: "rss-card-pill", style: { "--rss-tag": pill.color || "currentColor" }, children: pill.label }),
-                      /* @__PURE__ */ jsx("span", { children: date(item.published_at) })
-                    ] })
+                /* @__PURE__ */ jsxs("div", { className: "rss-card-meta", children: [
+                  /* @__PURE__ */ jsxs("span", { children: [
+                    !item.is_read ? "\u25CF " : "",
+                    item.feed_title
                   ] }),
-                  /* @__PURE__ */ jsxs("div", { className: "rss-card-title", children: [
-                    item.title,
-                    item.is_saved ? " \u2606" : ""
-                  ] }),
-                  /* @__PURE__ */ jsx("p", { className: "rss-card-excerpt", children: item.excerpt })
+                  /* @__PURE__ */ jsxs("span", { className: "rss-card-meta-right", children: [
+                    pill && /* @__PURE__ */ jsx("span", { className: "rss-card-pill", style: { "--rss-tag": pill.color || "currentColor" }, children: pill.label }),
+                    /* @__PURE__ */ jsx("span", { children: date(item.published_at) })
+                  ] })
                 ] }),
-                item.image && /* @__PURE__ */ jsx("span", { className: "rss-card-thumb", "aria-hidden": "true", children: /* @__PURE__ */ jsx("img", { src: item.image, alt: "", loading: "lazy", onError: (event) => { event.currentTarget.parentElement.style.display = "none"; } }) })
+                /* @__PURE__ */ jsxs("div", { className: "rss-card-body", children: [
+                  /* @__PURE__ */ jsxs("div", { className: "rss-card-main", children: [
+                    /* @__PURE__ */ jsxs("div", { className: "rss-card-title", children: [
+                      item.title,
+                      item.is_saved ? " \u2606" : ""
+                    ] }),
+                    /* @__PURE__ */ jsx("p", { className: "rss-card-excerpt", children: item.excerpt })
+                  ] }),
+                  item.image && /* @__PURE__ */ jsx("span", { className: "rss-card-thumb", "aria-hidden": "true", children: /* @__PURE__ */ jsx("img", { src: item.image, alt: "", loading: "lazy", onError: (event) => { event.currentTarget.parentElement.style.display = "none"; } }) })
+                ] })
               ]
             },
             item.id
