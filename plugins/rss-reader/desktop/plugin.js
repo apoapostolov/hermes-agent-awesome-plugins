@@ -366,27 +366,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
           if (!feed) throw new Error("Subscription not found.");
           try {
             const result = await fetchFeed2(feed.url);
-            const outcome = await write((library) => mergeFeed(library, feed.id, result));
-            if (outcome.added > 0 && Array.isArray(body.captureFull) && body.captureFull.includes(feed.id)) {
-              let ok = 0;
-              for (const freshItem of outcome.fresh.slice(0, 10)) {
-                try {
-                  const fullBody = await captureFn(freshItem.url);
-                  await write((library2) => {
-                    const target = library2.articles.find((a) => a.id === freshItem.id);
-                    if (target && fullBody && fullBody.length > target.body.length) {
-                      target.body = fullBody;
-                      target.captured = true;
-                    }
-                  });
-                  ok++;
-                } catch {
-                  // Paywalls, JS-only pages, and bot blocks keep the feed excerpt.
-                }
-              }
-              outcome.captured = ok;
-            }
-            return outcome;
+            return await write((library) => mergeFeed(library, feed.id, result));
           } catch (error) {
             await write((library) => {
               const current = library.feeds.find((f) => f.id === feed.id);
@@ -495,22 +475,21 @@ function currentOwner(host2) {
 function publishLibraryChange(owner) {
   window.dispatchEvent(new CustomEvent("hermes-rss-library-changed", { detail: { owner } }));
 }
-async function refreshSubscriptions(library, { feedId = null, shouldContinue = () => true, captureFeedIds = [] } = {}) {
+async function refreshSubscriptions(library, { feedId = null, shouldContinue = () => true } = {}) {
   const feeds = await library("/feeds");
   let added = 0, failed = 0;
+  const fresh = [];
   for (const feed of feeds) {
     if (!shouldContinue()) break;
     if (feedId && feed.id !== feedId) continue;
     try {
-      const result = await library(`/feeds/${feed.id}/refresh`, {
-        method: "POST",
-        body: { captureFull: captureFeedIds === null || captureFeedIds.includes(feed.id) ? [feed.id] : [] }
-      });
-      added += result.added;
+      const result = await library(`/feeds/${feed.id}/refresh`, { method: "POST", body: {} });
+      added += result.added || 0;
+      if (Array.isArray(result.fresh)) fresh.push(...result.fresh);
     }
     catch { failed++; }
   }
-  return { added, failed };
+  return { added, failed, fresh };
 }
 function startAutoRefresh(ctx, host2, options = {}) {
   const schedule = options.setInterval || setInterval;
@@ -541,7 +520,9 @@ function startAutoRefresh(ctx, host2, options = {}) {
       if (now() - Number(ctx.storage.get(`lastRefresh:${owner}`, 0)) < period) return;
       const canContinue = () => !stopped && currentOwner(host2) === owner && readSettings(ctx, owner).autoRefresh;
       if (!canContinue()) return;
-      await refreshSubscriptions(makeLibrary(owner), { shouldContinue: canContinue });
+      await refreshSubscriptions(makeLibrary(owner), { shouldContinue: canContinue }).then((result) => {
+        if (readSettings(ctx, owner).fullCapture && result.fresh?.length) captureEnqueue(owner, result.fresh);
+      });
       ctx.storage.set(`lastRefresh:${owner}`, now());
       if (!stopped) notify(owner);
     };
@@ -556,6 +537,105 @@ function startAutoRefresh(ctx, host2, options = {}) {
   const timer = schedule(() => { void tick(); }, 15000);
   void tick();
   return () => { stopped = true; unschedule(timer); };
+}
+
+var captureEnqueue = (owner, items, options) => 0;
+var captureActive = 0;
+var captureWaiters = [];
+function withCaptureSlot(work) {
+  return new Promise((resolve, reject) => {
+    const run = () => {
+      captureActive++;
+      Promise.resolve().then(work).then(resolve, reject).finally(() => {
+        captureActive--;
+        const next = captureWaiters.shift();
+        if (next) next();
+      });
+    };
+    if (captureActive < 2) run();
+    else captureWaiters.push(run);
+  });
+}
+function startCaptureWorker(ctx, host2) {
+  let stopped = false;
+  const active = new Set();
+  const CONCURRENCY = 2;
+  const MAX_QUEUE = 80;
+  const MAX_ATTEMPTS = 2;
+  const storeKey = (owner) => `captureQueue:${owner}`;
+  const load = (owner) => {
+    const raw = ctx.storage.get(storeKey(owner), []) || [];
+    return Array.isArray(raw) ? raw.filter((j) => j && j.id && j.url) : [];
+  };
+  const save = (owner, q) => ctx.storage.set(storeKey(owner), q.slice(0, MAX_QUEUE));
+  const enqueue = (owner, items, { front = false } = {}) => {
+    if (stopped || !items?.length) return 0;
+    let q = load(owner);
+    const have = new Map(q.map((j) => [j.id, j]));
+    const incoming = [];
+    for (const item of items) {
+      if (!item?.id || !item?.url) continue;
+      if (have.has(item.id)) {
+        if (front) {
+          const existing = have.get(item.id);
+          q = [existing, ...q.filter((j) => j.id !== item.id)];
+        }
+        continue;
+      }
+      have.set(item.id, item);
+      incoming.push({ id: item.id, url: item.url, attempts: 0 });
+    }
+    if (incoming.length) q = front ? incoming.concat(q) : q.concat(incoming);
+    save(owner, q);
+    void pump();
+    return incoming.length;
+  };
+  async function pump() {
+    if (stopped) return;
+    const owner = currentOwner(host2);
+    while (!stopped && active.size < CONCURRENCY) {
+      const q = load(owner);
+      const job = q.find((j) => !active.has(j.id));
+      if (!job) break;
+      active.add(job.id);
+      void runJob(owner, job).finally(() => {
+        active.delete(job.id);
+        if (!stopped) void pump();
+      });
+    }
+  }
+  async function runJob(owner, job) {
+    const library = createLibrary(owner, (url2) => fetchFeed(host2, url2), transact);
+    try {
+      const article = await library(`/articles/${job.id}`);
+      if (!article?.url || article.captured) {
+        save(owner, load(owner).filter((j) => j.id !== job.id));
+        return;
+      }
+      const fullBody = await captureArticle(host2, job.url);
+      if (stopped || currentOwner(host2) !== owner) return;
+      if (fullBody && fullBody.length > (article.body || "").length) {
+        await library(`/articles/${job.id}/capture`, { method: "POST", body: { body: fullBody } });
+        publishLibraryChange(owner);
+      }
+      save(owner, load(owner).filter((j) => j.id !== job.id));
+    } catch {
+      if (stopped || currentOwner(host2) !== owner) return;
+      const q = load(owner);
+      const cur = q.find((j) => j.id === job.id);
+      if (!cur) return;
+      cur.attempts = (cur.attempts || 0) + 1;
+      if (cur.attempts >= MAX_ATTEMPTS) save(owner, q.filter((j) => j.id !== job.id));
+      else {
+        save(owner, q.filter((j) => j.id !== job.id).concat([cur]));
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+  }
+  captureEnqueue = enqueue;
+  void pump();
+  const timer = setInterval(() => { if (!stopped) void pump(); }, 4000);
+  return () => { stopped = true; clearInterval(timer); captureEnqueue = () => 0; };
 }
 
 // src/feed-transport.mjs
@@ -806,15 +886,7 @@ function parseFeed(xml, base) {
 async function captureArticle(host2, rawUrl) {
   const route = await currentRoute(host2);
   const owner = JSON.stringify([route.connectionId, route.profile]);
-  const previous = pendingFetches.get(owner) || Promise.resolve();
-  const work = previous.catch(() => {
-  }).then(() => captureArticleNow(host2, rawUrl, route, owner));
-  pendingFetches.set(owner, work);
-  try {
-    return await work;
-  } finally {
-    if (pendingFetches.get(owner) === work) pendingFetches.delete(owner);
-  }
+  return withCaptureSlot(() => captureArticleNow(host2, rawUrl, route, owner));
 }
 function httpsSrc(value) {
   const v = String(value || "").trim();
@@ -1456,6 +1528,7 @@ function ReaderProfile({ ctx, owner }) {
   const openArticle = (item) => {
     setSelected(item.id);
     setTab("article");
+    if (settings.fullCapture && item.url && !item.captured) captureEnqueue(owner, [{ id: item.id, url: item.url }], { front: true });
     if (!settings.markReadOnOpen || item.is_read) return;
     // Update all cached views immediately, then persist through the same library.
     client.setQueriesData({ queryKey: [...key, "articles"] }, rows =>
@@ -1471,11 +1544,11 @@ function ReaderProfile({ ctx, owner }) {
   const refreshFeeds = async () => {
     const result = await refreshSubscriptions(libraryRequest, {
       feedId,
-      shouldContinue: () => currentOwner(host) === owner,
-      captureFeedIds: readSettings(ctx, owner).fullCapture ? null : []
+      shouldContinue: () => currentOwner(host) === owner
     });
     if (!feedId) ctx.storage.set(`lastRefresh:${owner}`, Date.now());
-    setNotice(`${result.added} new articles${result.failed ? ` · ${result.failed} feeds could not refresh. Select a feed for details.` : " · Up to date."}`);
+    const queued = settings.fullCapture && result.fresh?.length ? captureEnqueue(owner, result.fresh) : 0;
+    setNotice(`${result.added} new articles${result.failed ? ` · ${result.failed} feeds could not refresh. Select a feed for details.` : " · Up to date."}${queued ? ` · Capturing ${queued} in the background.` : ""}`);
   };
   const markAllRead = () => act("Marking read…", async () => {
     const result = await libraryRequest("/articles/read-all", { method: "POST", body: { feed_id: feedId } });
@@ -1587,6 +1660,10 @@ function ReaderProfile({ ctx, owner }) {
     ctx.storage.set(`settings:${owner}`, next);
     setSettings(next);
     setDraft(next);
+    if (next.fullCapture) {
+      const backlog = (articles.data || []).filter((a) => a.url && !a.captured).slice(0, 40).map((a) => ({ id: a.id, url: a.url }));
+      captureEnqueue(owner, backlog);
+    }
     publishLibraryChange(owner);
     setNotice("Reader settings saved.");
     setSettingsOpen(false);
@@ -1758,10 +1835,10 @@ function ReaderProfile({ ctx, owner }) {
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("label", { className: "rss-setting", children: [
             jsx("input", { type: "checkbox", checked: draft.fullCapture, onChange: event => setDraft({ ...draft, fullCapture: event.target.checked }) }),
-            "Capture full articles on refresh"
+            "Capture full articles in the background"
           ] }),
         ] }),
-        jsx("p", { className: "rss-muted rss-small", children: "When on, every new article is fetched from its website and the feed excerpt is replaced with the full text (up to 10 per refresh). Paywalled and script-only pages keep the excerpt. You can always load the full text of the open article from its action row." }),
+        jsx("p", { className: "rss-muted rss-small", children: "When on, new articles are queued after refresh and captured two at a time in the background. Opening an article jumps it to the front of the queue. Paywalled and script-only pages keep the excerpt. You can always recapture the open article from its action row." }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
       jsxs("div", { className: "rss-settings-library", "aria-label": "Library", children: [
@@ -2241,6 +2318,7 @@ var plugin_default = {
   defaultEnabled: true,
   register(ctx) {
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
+    ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);
     ctx.register({
       id: "page",
       area: ROUTES_AREA,
