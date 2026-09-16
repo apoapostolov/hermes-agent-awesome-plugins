@@ -450,6 +450,7 @@ function GearMenu() {
         open,
         onOpenChange: setOpen,
         children: jsx(DialogContent, {
+          onOpenAutoFocus: e => e.preventDefault(),
           className: cn(
             'max-w-md rounded-xl border-(--ui-stroke-secondary)',
             // Glass UI on (html[data-hermes-glass]): thin the fill so the window
@@ -565,6 +566,7 @@ function ExpGearMenu() {
         open,
         onOpenChange: setOpen,
         children: jsx(DialogContent, {
+          onOpenAutoFocus: e => e.preventDefault(),
           className: cn(
             'max-w-lg rounded-xl shadow-nous border-(--ui-accent)',
             glass
