@@ -2086,8 +2086,11 @@ var styles = `
 .hermes-rss .rss-tabs{display:flex;gap:22px;border-bottom:1px solid var(--ui-stroke-secondary);margin:24px 0}
 .hermes-rss .rss-tabs button{background:transparent;border:0;border-bottom:2px solid transparent;color:var(--ui-text-secondary);padding:10px 0}
 .hermes-rss .rss-tabs button[aria-selected=true]{border-bottom-color:var(--ui-accent);color:var(--ui-text-primary,var(--foreground))}
-.hermes-rss .rss-empty{padding:48px 24px;text-align:center;max-width:450px;margin:auto}.hermes-rss .rss-empty-mark{font-size:32px;color:var(--ui-accent);margin-bottom:20px}
+.hermes-rss .rss-empty{padding:48px 24px;text-align:center;max-width:28rem;margin:auto}.hermes-rss .rss-empty-mark{font-size:32px;color:var(--ui-accent);margin-bottom:20px}
 .hermes-rss .rss-empty h2{font-size:19px}.hermes-rss .rss-empty p{color:var(--ui-text-secondary);margin:10px 0 18px}
+.hermes-rss .rss-empty-features{text-align:left;list-style:disc;padding:0 0 0 1.15em;margin:4px auto 0;color:var(--ui-text-secondary);font-size:13px;line-height:1.45}
+.hermes-rss .rss-empty-features li{margin:0 0 0.85em}.hermes-rss .rss-empty-features li:last-child{margin-bottom:0}
+.hermes-rss .rss-empty-features b{color:var(--ui-text-primary,var(--foreground));font-weight:700}
 .hermes-rss .rss-notice{margin:0;padding:10px 24px;border-bottom:1px solid var(--ui-stroke-secondary);background:color-mix(in srgb,var(--ui-accent) 6%,transparent);font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .hermes-rss .rss-notice-float{flex-shrink:0;border-radius:0;margin:0;box-shadow:none;border:0;border-bottom:1px solid var(--ui-stroke-secondary)}
 .hermes-rss .rss-notice-close{border:0;background:transparent;color:var(--ui-text-secondary);padding:2px 6px;font-size:16px;line-height:1;border-radius:4px}
@@ -3025,7 +3028,7 @@ function ReaderProfile({ ctx, owner }) {
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
                 jsx("input", { type: "checkbox", checked: draft.autoRefresh, disabled: typeof ctx.onDispose !== "function", onChange: event => setDraft({ ...draft, autoRefresh: event.target.checked }) }),
-                "Automatically refresh feeds"
+                "Automatically Refresh Feeds"
               ] }),
               jsxs("label", { className: "rss-setting rss-setting-inline", children: [
                 "Every",
@@ -3033,54 +3036,55 @@ function ReaderProfile({ ctx, owner }) {
                 "minutes"
               ] })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Runs while Hermes is open. No AI. This profile only." : "This Hermes version needs an SDK update for background refresh. Manual refresh still works." })
+            jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Fetches new posts on this interval while Hermes is open. Applies to this profile only." : "Background refresh is unavailable on this Hermes build. Use Refresh." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "Capturing" }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
                 jsx("input", { type: "checkbox", checked: draft.fullCapture, onChange: event => setDraft({ ...draft, fullCapture: event.target.checked }) }),
-                "Capture full articles in the background"
+                "Capture Full Articles"
               ] })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "Captures new posts after refresh. Kept until they leave the list." }),
+            jsx("p", { className: "rss-muted rss-small", children: "After a refresh, new posts are fetched as full pages and kept while they remain in the list." }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
                 jsx("input", { type: "checkbox", checked: draft.paywallServices, onChange: event => setDraft({ ...draft, paywallServices: event.target.checked }) }),
-                "Use paywall removing services (EXPERIMENTAL)"
+                "Use Paywall Removing Services (Experimental)"
               ] })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "When a capture looks paywalled or short, tries archive.today, 12ft.io, PrintFriendly, then the Wayback Machine." })
+            jsx("p", { className: "rss-muted rss-small", children: "When a capture is short or blocked, later public copies of the page are tried." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "Reading" }),
             jsx("label", { className: "rss-setting", children: [
               jsx("input", { type: "checkbox", checked: draft.markReadOnOpen, onChange: event => setDraft({ ...draft, markReadOnOpen: event.target.checked }) }),
-              "Mark articles as read when opened"
-            ] })
+              "Mark Articles Read When Opened"
+            ] }),
+            jsx("p", { className: "rss-muted rss-small", children: "Opening an article marks it read in this list." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
-            jsx("h2", { className: "rss-settings-header", children: "AI grading" }),
+            jsx("h2", { className: "rss-settings-header", children: "AI Grading" }),
             jsx("label", { className: "rss-setting", children: [
               jsx("input", { type: "checkbox", checked: draft.aiGrading, onChange: event => setDraft({ ...draft, aiGrading: event.target.checked }) }),
-              "Grade articles by importance"
+              "Grade Articles By Importance"
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "After a refresh, every ungraded article goes to the auxiliary model in one batch and the list tints when the answer arrives. Nothing is sent while this is off." }),
+            jsx("p", { className: "rss-muted rss-small", children: "After a refresh, ungraded articles are scored and tinted in the list. Nothing is sent while this is off." }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsxs("label", { className: "rss-skill-field", children: [
-                jsx("span", { children: "Preference skill" }),
+                jsx("span", { children: "Preference Skill" }),
                 jsx(Input, { "aria-label": "Grading preference skill name", placeholder: DEFAULT_GRADING_SKILL, value: draft.gradingSkill, maxLength: 60, onChange: event => setDraft({ ...draft, gradingSkill: event.target.value }) })
               ] }),
               jsx(Button, { type: "button", disabled: disabled || !articles.data?.length, onClick: gradeNow, children: "Grade" })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: `Loaded while grading. If ${DEFAULT_GRADING_SKILL} is missing it is created with a starter rubric when the reader loads, for Hermes to maintain.` })
+            jsx("p", { className: "rss-muted rss-small", children: "This skill supplies the scoring rubric and the list colours. A missing skill is created with a starter rubric when the reader loads." })
           ] })
         ] }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
       jsxs("div", { className: "rss-settings-library", "aria-label": "Library", children: [
         jsx("h2", { className: "rss-settings-header", children: "Library" }),
-        jsx("p", { className: "rss-muted rss-small", children: "Import or export subscriptions as OPML. This does not change refresh settings." }),
+        jsx("p", { className: "rss-muted rss-small", children: "Import or export your subscription list as OPML." }),
         jsxs("div", { className: "rss-tools", children: [
           jsx(Button, { type: "button", disabled, onClick: chooseFile, children: "Import OPML" }),
           jsx(Button, { type: "button", variant: "ghost", disabled: disabled || !feeds.data?.length, onClick: exportFeeds, children: "Export OPML" })
@@ -3236,7 +3240,7 @@ function ReaderProfile({ ctx, owner }) {
             ]
           }, group.key || "ungrouped");
         }),
-        !feeds.data?.length && jsx("p", { className: "rss-muted rss-small", style: { padding: "0 10px" }, children: "Your feeds will appear here." })
+        !feeds.data?.length && jsx("p", { className: "rss-muted rss-small", style: { padding: "0 10px" }, children: "Subscribed feeds appear here." })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "rss-list", children: [
         jsxs("div", { className: "rss-list-head", children: [
@@ -3277,7 +3281,7 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           searchDrawerOpen && jsxs("div", { className: "rss-search-drawer", "aria-label": "Current search", children: [
             jsxs("label", { className: "rss-stack", children: ["Exclude phrase", jsx(Input, { value: exclude, maxLength: 200, placeholder: "e.g. promo code", onChange: event => { setExclude(event.target.value); setLimit(100); } })] }),
-            jsx("p", { className: "rss-muted rss-small", children: "Literal phrases in titles and feed text, ignoring case." }),
+            jsx("p", { className: "rss-muted rss-small", children: "Matches these phrases in titles and feed text, ignoring case." }),
             jsxs("form", { className: "rss-tools", onSubmit: saveSearch, children: [
               jsx(Input, { "aria-label": "Saved search name", placeholder: "Name this search", value: searchName, maxLength: 200, required: true, onChange: event => setSearchName(event.target.value) }),
               jsx(Button, { type: "submit", disabled: disabled || !searchName.trim() || filters.isPending || !!filters.error, children: "Save search" })
@@ -3303,9 +3307,9 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           !feeds.error && !articles.error && articles.isPending && /* @__PURE__ */ jsx(Empty, { title: "Loading your library\u2026" }),
           !articles.isPending && !articles.error && !feeds.error && !articles.data?.length && jsxs(Empty, {
-            title: query || exclude || feedId || mutes.length && !showHidden ? "No matching articles" : view === "saved" ? "No saved articles yet" : view === "unread" ? "You're all caught up" : feeds.data?.length ? "No articles yet" : "Make room for good reading",
+            title: query || exclude || feedId || mutes.length && !showHidden ? "No Matching Articles" : view === "saved" ? "No Saved Articles" : view === "unread" ? "No Unread Articles" : feeds.data?.length ? "No Articles Yet" : "No Subscriptions Yet",
             children: [
-              jsx("p", { children: query || exclude || feedId || mutes.length && !showHidden ? (mutes.length && !showHidden ? "Try clearing a filter or showing articles hidden by mute rules." : "Try a different phrase or clear a filter to see more articles.") : view === "saved" ? "Save an article to find it here later." : view === "unread" ? "There are no unread articles in this view." : feeds.data?.length ? "Refresh your feeds to fetch articles." : "Subscribe to a feed or import your subscriptions with OPML." }),
+              jsx("p", { children: query || exclude || feedId || mutes.length && !showHidden ? (mutes.length && !showHidden ? "Clear a filter, or show articles hidden by mute rules." : "Try a different phrase, or clear a filter.") : view === "saved" ? "Save an article to keep it in this view." : view === "unread" ? "There are no unread articles in this view." : feeds.data?.length ? "Refresh your feeds to fetch articles." : "Subscribe to a feed, or import subscriptions as OPML." }),
               jsxs("div", { className: "rss-tools", style: { justifyContent: "center" }, children: [
                 (query || exclude || feedId || view !== "all") && jsx(Button, { variant: "outline", onClick: resetFilters, children: "Clear filters" }),
                 mutes.length > 0 && !showHidden && jsx(Button, { variant: "outline", onClick: () => { setShowHidden(true); setLimit(100); }, children: "Show hidden articles" }),
@@ -3364,9 +3368,13 @@ function ReaderProfile({ ctx, owner }) {
           notice && jsx("button", { type: "button", className: "rss-notice-close", "aria-label": "Dismiss notification", onClick: () => setNotice(""), children: "×" })
         ] }),
         /* @__PURE__ */ jsx(Fragment, { children:
-        !selected ? /* @__PURE__ */ jsx("div", { className: "rss-detail-inner", children: /* @__PURE__ */ jsxs(Empty, { title: "Follow your curiosity", children: [
-          /* @__PURE__ */ jsx("p", { children: "Pick an article to read, unpack its ideas with Hermes, or look for evidence beyond the headline." }),
-          /* @__PURE__ */ jsx("div", { className: "rss-note", children: "AI runs only when you ask. Feed refresh uses standard network utilities on the connected gateway. Selected text goes to your configured model. Source checks use your Hermes web tools." })
+        !selected ? /* @__PURE__ */ jsx("div", { className: "rss-detail-inner", children: /* @__PURE__ */ jsxs(Empty, { title: "Choose An Article", children: [
+          /* @__PURE__ */ jsx("p", { children: "Select a post in the list. These tools act on that article." }),
+          /* @__PURE__ */ jsxs("ul", { className: "rss-empty-features", children: [
+            /* @__PURE__ */ jsxs("li", { children: [jsx("b", { children: "Full Article. " }), "Replaces the feed excerpt with the page text so you can read it here. Images from that page stay in the article."] }),
+            /* @__PURE__ */ jsxs("li", { children: [jsx("b", { children: "Sources. " }), "Starts a source check on this article using your Hermes web tools. Claims are tested against what those tools return."] }),
+            /* @__PURE__ */ jsxs("li", { children: [jsx("b", { children: "Discuss with Hermes. " }), "Opens a conversation about this article on your configured model. The feed text is the starting material."] })
+          ] })
         ] }) }) :
         detail.isPending ? /* @__PURE__ */ jsx("div", { className: "rss-detail-inner", children: /* @__PURE__ */ jsx(Empty, { title: "Opening article\u2026" }) }) :
         detail.error ? /* @__PURE__ */ jsx("div", { className: "rss-detail-inner", children: /* @__PURE__ */ jsxs(Empty, { title: "Article unavailable", children: [
