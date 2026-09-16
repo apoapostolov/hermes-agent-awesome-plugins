@@ -2218,7 +2218,7 @@ var styles = `
 .hermes-rss .rss-feed-info{display:grid;gap:2px;min-width:0}.hermes-rss .rss-feed-status{font-size:10px;color:var(--ui-text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hermes-rss .rss-feed-status-error{color:var(--ui-danger,var(--ui-text-secondary))}
 .hermes-rss .rss-feed-header-error{margin-top:8px;color:var(--ui-danger,var(--ui-text-secondary))}
 .hermes-rss .rss-settings{padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);display:grid;gap:10px}.hermes-rss .rss-settings h2{font-size:15px;margin:0}.hermes-rss .rss-setting{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.hermes-rss .rss-setting input[type=number]{width:90px}.hermes-rss .rss-setting input[type=checkbox]{accent-color:var(--ui-accent)}
-.hermes-rss .rss-setting select{min-width:148px;height:28px}
+.hermes-rss .rss-setting select{min-width:148px;height:26px;padding:2px 8px;line-height:20px}
 .hermes-rss .rss-settings-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;grid-auto-flow:column;gap:10px 24px;align-items:stretch}
 .hermes-rss .rss-settings-block{display:flex;flex-direction:column;gap:8px;min-width:0;min-height:100%}
 .hermes-rss .rss-settings-block .rss-settings-header{margin-top:0;padding-top:0;border-top:0}
