@@ -1,6 +1,6 @@
 name: drag-to-pin-session
-version: 1.0.0
-description: "Reorganize your pinned sessions with drag-and-drop. Drag a session into the Pinned section to pin it, or drag it out to unpin."
+version: 1.1.0
+description: "Reorganize your pinned sessions with drag-and-drop. Drag a session into Pinned to pin it at the drop slot, or drag it out to unpin."
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2

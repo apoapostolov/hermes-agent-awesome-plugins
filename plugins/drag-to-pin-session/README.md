@@ -2,7 +2,7 @@
 
 Make the **Pinned** section of the Sessions sidebar a drag container.
 
-- Drag a session row into **Pinned** → pins it
+- Drag a session row into **Pinned** → pins it at the drop slot
 - Drag a pinned row out into **Sessions** → unpins it
 
 No rebuild, no restart. The UI half hot-reloads.
@@ -35,11 +35,12 @@ threshold rather than native HTML5 DnD, which collided with both.
 
 - Dragging the row **body** pins/unpins. The grabber stays pure reorder, the
   kebab keeps its own gestures.
-- The row's identity is read off React fiber props, then the row's **own
-  `onPin`** is called. That resolves to `pinSession` in Sessions and
-  `unpinSession` in Pinned, so the real store atom updates, the backend
-  `pinned` flag PATCHes, and the state survives reloads and other windows.
-  No localStorage poking the in-memory store would never see.
+- The row's identity is read off React fiber props. Unpin still calls the
+  row's **own `onPin`**. Incoming pins walk the recents section for
+  `onTogglePin`, which is the store's `pinSession(id, index)`, and pass the
+  visual insert index from the pointer (midpoint of each pinned row). A drop
+  line follows the slot while dragging. The backend `pinned` flag still
+  PATCHes, and the order lives in the pinned-ids atom, so it survives reloads.
 - dnd-kit also reacts to the drag. Its cross-list reorder is visually a no-op
   but flips the flat list into manual sort, so the plugin resets that after
   dnd-kit's own pointerup.

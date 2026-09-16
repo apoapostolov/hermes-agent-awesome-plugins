@@ -3,7 +3,7 @@
  *
  * Makes the Pinned section of the Sessions sidebar a drop container:
  *
- *   drag a session row into Pinned    -> pin it
+ *   drag a session row into Pinned    -> pin it at the drop slot
  *   drag a pinned row out to Sessions -> unpin it
  *
  * Hot-loads, no rebuild, no restart. LIVE door:
@@ -17,6 +17,10 @@
  *
  * The grabber ([data-reorder-handle]) is deliberately left alone: it stays
  * pure reorder. Dragging the row BODY is what pins/unpins.
+ *
+ * Incoming pins use the app's pinSession(id, index). The row's onPin wrapper
+ * always appends; walking the recents section fiber for onTogglePin reaches
+ * the real store call, which takes an insert index.
  */
 
 const ID = 'drag-to-pin-session'
@@ -24,6 +28,7 @@ const ROW = '.row-hover'
 const SKIP = '[data-row-actions], [data-reorder-handle]'
 const OVER_ATTR = 'data-dtp-over'
 const STYLE_ID = 'drag-to-pin-style'
+const GAP_ID = 'drag-to-pin-gap'
 
 // Localized "Pinned" section labels (i18n en/ar/ja/zh/zh-hant).
 const PINNED_LABELS = new Set(['Pinned', 'المثبتة', 'ピン留め', '已置顶', '已釘選'])
@@ -36,6 +41,15 @@ const CSS = `
   background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-accent) 55%, transparent);
   border-radius: 0.5rem;
+}
+#${GAP_ID} {
+  position: fixed;
+  z-index: 9999;
+  height: 2px;
+  pointer-events: none;
+  border-radius: 1px;
+  background: var(--ui-accent);
+  display: none;
 }
 `
 
@@ -56,7 +70,7 @@ function fiberOf(el) {
   return null
 }
 
-function findProps(el, test, cap = 90) {
+function findProps(el, test, cap = 120) {
   const root = fiberOf(el)
   if (!root) return null
 
@@ -116,6 +130,27 @@ function contains(group, x, y) {
   return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
 }
 
+function pinnedRows(group) {
+  if (!group) return []
+
+  const content = group.querySelector('[data-slot="sidebar-group-content"]')
+
+  return [...(content || group).querySelectorAll(ROW)]
+}
+
+/** Visual insert index among currently rendered pinned rows (0..length). */
+function dropIndex(group, y) {
+  const rows = pinnedRows(group)
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i].getBoundingClientRect()
+
+    if (y < r.top + r.height / 2) return i
+  }
+
+  return rows.length
+}
+
 function mark(group, on) {
   if (!group) return
 
@@ -126,10 +161,47 @@ function mark(group, on) {
   }
 }
 
+function gapEl() {
+  return document.getElementById(GAP_ID)
+}
+
+function showGap(group, y) {
+  const el = gapEl()
+  if (!el || !group) return
+
+  const rows = pinnedRows(group)
+  const box = group.getBoundingClientRect()
+  let top
+
+  if (!rows.length) {
+    const content = group.querySelector('[data-slot="sidebar-group-content"]')
+    top = content ? content.getBoundingClientRect().top + 4 : box.bottom - 6
+  } else {
+    const i = dropIndex(group, y)
+
+    top =
+      i >= rows.length
+        ? rows[rows.length - 1].getBoundingClientRect().bottom
+        : rows[i].getBoundingClientRect().top
+  }
+
+  el.style.left = `${box.left + 8}px`
+  el.style.width = `${Math.max(0, box.width - 16)}px`
+  el.style.top = `${top - 1}px`
+  el.style.display = 'block'
+}
+
+function hideGap() {
+  const el = gapEl()
+  if (el) el.style.display = 'none'
+}
+
 function clearMarks() {
   for (const node of document.querySelectorAll(`[${OVER_ATTR}]`)) {
     node.removeAttribute(OVER_ATTR)
   }
+
+  hideGap()
 }
 
 // ── Row identity ─────────────────────────────────────────────────────────────
@@ -143,6 +215,24 @@ function clearMarks() {
  */
 function rowProps(row) {
   return findProps(row, p => p.session && typeof p.session.id === 'string' && typeof p.onPin === 'function')
+}
+
+/** Durable pin key: lineage root when present, else the live session id. */
+function pinIdOf(session) {
+  if (!session) return null
+
+  return session._lineage_root_id || session.id
+}
+
+/**
+ * Recents section's onTogglePin is the store's pinSession(id, index?).
+ * The row's onPin wrapper drops the index, so incoming pins would always
+ * append without this.
+ */
+function pinCall(row) {
+  const props = findProps(row, p => typeof p.onTogglePin === 'function' && p.pinned === false)
+
+  return props ? props.onTogglePin : null
 }
 
 /** The section's reorder callback, needed to undo dnd-kit's reorder below. */
@@ -189,6 +279,7 @@ function onPointerDown(event) {
     props,
     source,
     reorder: reorderFn(row),
+    pin: source === 'recents' ? pinCall(row) : null,
     x0: event.clientX,
     y0: event.clientY,
     engaged: false
@@ -211,10 +302,17 @@ function onPointerMove(event) {
   if (!secs) return
 
   const { x, y } = { x: event.clientX, y: event.clientY }
+  const overPinned = drag.source === 'recents' && contains(secs.pinned, x, y)
+  const overRecents = drag.source === 'pinned' && contains(secs.recents, x, y)
 
-  // Light the section that would actually receive the drop.
-  mark(secs.pinned, drag.source === 'recents' && contains(secs.pinned, x, y))
-  mark(secs.recents, drag.source === 'pinned' && contains(secs.recents, x, y))
+  mark(secs.pinned, overPinned)
+  mark(secs.recents, overRecents)
+
+  if (overPinned) {
+    showGap(secs.pinned, y)
+  } else {
+    hideGap()
+  }
 }
 
 function teardown() {
@@ -248,8 +346,16 @@ function onPointerUp(event) {
 
   if (!pin && !unpin) return
 
+  const id = pin ? pinIdOf(finished.props.session) : null
+  const index = pin ? dropIndex(secs.pinned, y) : 0
+  const indexed = pin && typeof finished.pin === 'function' && id
+
   try {
-    finished.props.onPin()
+    if (indexed) {
+      finished.pin(id, index)
+    } else {
+      finished.props.onPin()
+    }
   } catch (err) {
     console.warn(`[${ID}] pin toggle failed`, err)
 
@@ -259,12 +365,19 @@ function onPointerUp(event) {
   // dnd-kit ran off the same press. Its reorder is a no-op across lists
   // visually (the row leaves the list it was dragged from), but it flips
   // the flat list into MANUAL order — a sticky sort change the user never
-  // asked for. Empty order ids switch the list back to its normal sort;
-  // run after dnd-kit's own pointerup so it is the last write.
-  if (pin && finished.reorder) {
+  // asked for. Empty order ids switch the list back to its normal sort.
+  // Re-apply the pin index after that write so a late dnd-kit permutation
+  // cannot shove the new pin to the bottom.
+  if (pin) {
     setTimeout(() => {
       try {
-        finished.reorder([])
+        if (indexed) finished.pin(id, index)
+      } catch {
+        /* store call may have gone */
+      }
+
+      try {
+        finished.reorder?.([])
       } catch {
         /* list may have unmounted */
       }
@@ -304,6 +417,10 @@ function start() {
   style.textContent = CSS
   document.head.appendChild(style)
 
+  const gap = document.createElement('div')
+  gap.id = GAP_ID
+  document.body.appendChild(gap)
+
   window.addEventListener('pointerdown', onPointerDown, true)
   document.addEventListener('click', onClickCapture, true)
 
@@ -314,6 +431,7 @@ function start() {
     window.removeEventListener('pointerup', onPointerUp, true)
     window.removeEventListener('pointercancel', onPointerCancel, true)
     document.getElementById(STYLE_ID)?.remove()
+    document.getElementById(GAP_ID)?.remove()
     clearMarks()
     drag = null
   }
@@ -322,7 +440,7 @@ function start() {
 export default {
   id: ID,
   name: 'Drag to Pin',
-  description: 'Drag a session into the Pinned section to pin it, drag it out to unpin.',
+  description: 'Drag a session into Pinned to pin it at the drop slot, drag it out to unpin.',
   defaultEnabled: true,
   register(ctx) {
     ctx.onDispose(start())
