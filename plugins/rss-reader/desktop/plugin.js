@@ -1348,6 +1348,8 @@ var styles = `
 .hermes-rss .rss-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:var(--ui-text-secondary);font-size:14px}
 .hermes-rss .rss-icon-btn:hover:not(:disabled){color:var(--foreground);background:var(--chrome-action-hover)}
 .hermes-rss .rss-icon-btn:disabled{opacity:.4;cursor:default}
+.hermes-rss .rss-icon-btn-done{opacity:.4}
+.hermes-rss .rss-icon-btn-done:hover:not(:disabled){opacity:.7}
 .hermes-rss .rss-body{white-space:pre-wrap;font-size:15.5px;line-height:1.75;overflow-wrap:break-word;color:var(--ui-text-primary,var(--foreground));margin:22px 0 0;letter-spacing:.1px}
 .hermes-rss .rss-detail .rss-body p,.hermes-rss .rss-detail .rss-body h1,.hermes-rss .rss-detail .rss-body h2,.hermes-rss .rss-detail .rss-body h3,.hermes-rss .rss-detail .rss-body ul,.hermes-rss .rss-detail .rss-body ol,.hermes-rss .rss-detail .rss-body blockquote{margin:0 0 1.05em}
 .hermes-rss .rss-detail .rss-body h1{font-size:1.35em;line-height:1.3}
@@ -2231,7 +2233,7 @@ function ReaderProfile({ ctx, owner }) {
               "button",
               {
                 type: "button",
-                className: "rss-icon-btn",
+                className: `rss-icon-btn${article.captured ? " rss-icon-btn-done" : ""}`,
                 disabled: disabled || !article.url,
                 "aria-label": article.captured ? "Recapture full article" : "Load full article",
                 title: article.captured ? "Recapture full article" : "Load full article from the original page",
