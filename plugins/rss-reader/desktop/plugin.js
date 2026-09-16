@@ -2612,7 +2612,7 @@ html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
 
 // src/plugin.jsx
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
-var ID = "hermes-rss-reader";
+var ID = "rss-reader";
 var SOURCE_URL = "https://github.com/apoapostolov/hermes-agent-awesome-plugins";
 // Personal GitHub promo for Apo's pack. Never include this logo or link in PRs to other projects.
 var labels = {
