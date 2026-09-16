@@ -1405,8 +1405,8 @@ var styles = `
 .hermes-rss .rss-feed-header-error{margin-top:8px;color:var(--ui-danger,var(--ui-text-secondary))}
 .hermes-rss .rss-settings{padding:18px 28px;border-bottom:1px solid var(--ui-stroke-secondary);display:grid;gap:16px}.hermes-rss .rss-settings h2{font-size:16px;margin:0}.hermes-rss .rss-setting{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.hermes-rss .rss-setting input[type=number]{width:90px}.hermes-rss .rss-setting input[type=checkbox]{accent-color:var(--ui-accent)}
 .hermes-rss .rss-settings-library{display:grid;gap:12px;padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
-.hermes-rss .rss-filter-panel{display:grid;grid-template-columns:1fr 1fr;gap:14px 24px;padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);max-height:45vh;overflow:auto;flex-shrink:0}
-.hermes-rss .rss-filter-column{display:grid;align-content:start;gap:8px;min-width:0}.hermes-rss .rss-filter-column h2{font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--ui-text-tertiary);margin:0}.hermes-rss .rss-filter-column input,.hermes-rss .rss-filter-column select{min-width:0;max-width:100%;padding:4px 8px;font-size:12px;height:26px}
+.hermes-rss .rss-filter-panel{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;padding:14px 28px;border-bottom:1px solid var(--ui-stroke-secondary);max-height:40vh;overflow:auto;flex-shrink:0}
+.hermes-rss .rss-filter-column{display:grid;align-content:start;gap:6px;min-width:0}.hermes-rss .rss-filter-column input,.hermes-rss .rss-filter-column select{min-width:0;max-width:100%;padding:4px 8px;font-size:12px;height:26px}
 .hermes-rss .rss-filter-panel button{padding:4px 10px;font-size:12px;height:26px;min-height:0;line-height:1.2}
 .hermes-rss .rss-filter-panel .rss-small{line-height:1.45}
 .hermes-rss select{font:inherit;color:inherit;background:var(--ui-bg-primary,var(--background));border:1px solid var(--ui-stroke-secondary);border-radius:5px;padding:7px;max-width:100%}
@@ -1850,29 +1850,28 @@ function ReaderProfile({ ctx, owner }) {
     ] }),
     filtersOpen && jsxs("div", { className: "rss-filter-panel", "aria-label": "Filters and saved searches", children: [
       jsxs("div", { className: "rss-filter-column", children: [
-        jsx("h2", { children: "Current search" }),
+        jsx("h2", { className: "rss-settings-header", children: "Current search" }),
         jsxs("label", { className: "rss-stack", children: ["Exclude phrase", jsx(Input, { value: exclude, maxLength: 200, placeholder: "e.g. promo code", onChange: event => { setExclude(event.target.value); setLimit(100); } })] }),
-        jsx("p", { className: "rss-muted rss-small", children: "Search and exclusion match literal phrases in titles and feed text, ignoring case." }),
+        jsx("p", { className: "rss-muted rss-small", children: "Literal phrases in titles and feed text, ignoring case." }),
         jsxs("form", { className: "rss-tools", onSubmit: saveSearch, children: [
           jsx(Input, { "aria-label": "Saved search name", placeholder: "Name this search", value: searchName, maxLength: 200, required: true, onChange: event => setSearchName(event.target.value) }),
           jsx(Button, { type: "submit", disabled: disabled || !searchName.trim() || filters.isPending || !!filters.error, children: "Save search" })
         ] }),
-        jsx("p", { className: "rss-muted rss-small", children: "Saves the current phrase, exclusion, feed, view, and show-hidden choice." }),
         searches.map(search => jsxs("div", { className: "rss-tools", children: [
           jsx(Button, { variant: "ghost", onClick: () => openSearch(search), children: search.name }),
           jsx(Button, { variant: "ghost", disabled, "aria-label": `Remove saved search ${search.name}`, onClick: () => removeFilter("searches", search.id), children: "Remove" })
         ] }, search.id))
       ] }),
       jsxs("div", { className: "rss-filter-column", children: [
-        jsx("h2", { children: "Mute rules" }),
-        jsx("p", { className: "rss-muted rss-small", children: "Hide matching titles and feed text in every view. Nothing is deleted or marked read. Unread totals include hidden articles." }),
-        jsxs("form", { className: "rss-stack", onSubmit: addMute, children: [
+        jsx("h2", { className: "rss-settings-header", children: "Mute rules" }),
+        jsx("p", { className: "rss-muted rss-small", children: "Hides matches in every view. Unread counts still include them." }),
+        jsxs("form", { className: "rss-tools", onSubmit: addMute, children: [
           jsx(Input, { "aria-label": "Mute phrase", placeholder: "e.g. coupon", value: mutePhrase, maxLength: 200, required: true, onChange: event => setMutePhrase(event.target.value) }),
           jsxs("select", { "aria-label": "Mute rule feed", value: muteFeed, onChange: event => setMuteFeed(event.target.value), children: [
             jsx("option", { value: "", children: "All feeds" }),
             (feeds.data || []).map(feed => jsx("option", { value: feed.id, children: feed.title }, feed.id))
           ] }),
-          jsx(Button, { type: "submit", disabled: disabled || !mutePhrase.trim() || filters.isPending || !!filters.error, children: "Add mute rule" })
+          jsx(Button, { type: "submit", disabled: disabled || !mutePhrase.trim() || filters.isPending || !!filters.error, children: "Add mute" })
         ] }),
         mutes.map(rule => jsxs("div", { className: "rss-tools", children: [
           jsx("span", { className: "rss-small", children: `${rule.phrase} · ${rule.feed_id ? (feeds.data || []).find(feed => feed.id === rule.feed_id)?.title || "Removed feed" : "All feeds"}` }),
@@ -1896,7 +1895,7 @@ function ReaderProfile({ ctx, owner }) {
             "minutes"
           ] })
         ] }),
-        jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Refreshes the active profile while Hermes is open, even outside RSS. No AI calls run automatically. Settings apply to this profile." : "This Hermes version needs an SDK update for background refresh. Manual refresh still works." }),
+        jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Runs while Hermes is open. No AI. This profile only." : "This Hermes version needs an SDK update for background refresh. Manual refresh still works." }),
         jsx("h2", { className: "rss-settings-header", children: "Reading" }),
         jsx("label", { className: "rss-setting", children: [
           jsx("input", { type: "checkbox", checked: draft.markReadOnOpen, onChange: event => setDraft({ ...draft, markReadOnOpen: event.target.checked }) }),
@@ -1909,7 +1908,7 @@ function ReaderProfile({ ctx, owner }) {
             "Capture full articles in the background"
           ] }),
         ] }),
-        jsx("p", { className: "rss-muted rss-small", children: "When on, new articles are queued after refresh and captured two at a time in the background. Full text is kept in this library until the article drops out of the list, so a Hermes restart does not recapture it. Opening an article jumps it to the front of the queue. Paywalled and script-only pages keep the excerpt." }),
+        jsx("p", { className: "rss-muted rss-small", children: "Captures new posts after refresh. Kept until they leave the list." }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
       jsxs("div", { className: "rss-settings-library", "aria-label": "Library", children: [
