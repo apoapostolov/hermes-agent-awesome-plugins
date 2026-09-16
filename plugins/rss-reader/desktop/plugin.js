@@ -1103,6 +1103,7 @@ var styles = `
 .hermes-rss .rss-list-items{overflow:auto;flex:1;padding:8px}
 .hermes-rss .rss-card{display:block;width:100%;border:1px solid transparent;background:transparent;color:inherit;text-align:left;padding:18px 14px;border-radius:8px;margin-bottom:3px;outline:none;box-shadow:none}
 .hermes-rss .rss-list-items button.rss-card:focus,.hermes-rss .rss-list-items button.rss-card:focus-visible{outline:none;box-shadow:none;outline-offset:0}
+.hermes-rss .rss-list-items button.rss-card[aria-selected=true],.hermes-rss .rss-list-items button.rss-card[aria-selected=true]:focus,.hermes-rss .rss-list-items button.rss-card[aria-selected=true]:focus-visible{outline:2px solid var(--ui-accent);outline-offset:3px}
 .hermes-rss .rss-card:hover{background:color-mix(in srgb,var(--ui-text-secondary) 5%,transparent)}
 .hermes-rss .rss-card[aria-selected=true]{background:color-mix(in srgb,var(--ui-accent) 7%,transparent);border-color:color-mix(in srgb,var(--ui-accent) 24%,transparent)}
 .hermes-rss .rss-card-read .rss-card-title{color:var(--ui-text-secondary);font-weight:500}
@@ -1382,8 +1383,9 @@ function ReaderProfile({ ctx, owner }) {
           openArticle(item);
           requestAnimationFrame(() => {
             const scroller = document.querySelector(".hermes-rss .rss-list-items");
-            const card = scroller?.querySelector(`.rss-card[aria-selected="true"]`);
+            const card = scroller?.querySelectorAll(".rss-card")[next];
             if (!scroller || !card) return;
+            card.focus({ preventScroll: true });
             const view = scroller.getBoundingClientRect();
             const box = card.getBoundingClientRect();
             const cardTop = box.top - view.top;
