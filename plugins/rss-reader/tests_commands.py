@@ -35,7 +35,33 @@ class RssCommandTests(unittest.TestCase):
             ("add", {"source": "example.com", "folder": ""}),
         )
 
-    def test_handle_writes_one_json_record(self):
+    def test_mark_read_digest_and_health_forms(self):
+        self.assertEqual(rss._parse("mark-read all"), ("mark-read", {"scope": "all"}))
+        self.assertEqual(
+            rss._parse("mark-read folder Research"),
+            ("mark-read", {"scope": "folder", "target": "Research"}),
+        )
+        self.assertEqual(
+            rss._parse("mark-read feed Daily News"),
+            ("mark-read", {"scope": "feed", "target": "Daily News"}),
+        )
+        self.assertEqual(
+            rss._parse("digest unread 7d"),
+            ("digest", {"scope": "unread", "days": 7}),
+        )
+        self.assertEqual(
+            rss._parse("digest unread"),
+            ("digest", {"scope": "unread", "days": None}),
+        )
+        self.assertEqual(rss._parse("digest saved"), ("digest", {"scope": "saved"}))
+        self.assertEqual(rss._parse("health"), ("health", {}))
+        with self.assertRaises(ValueError):
+            rss._parse("mark-read")
+        with self.assertRaises(ValueError):
+            rss._parse("digest unread 366d")
+        with self.assertRaises(ValueError):
+            rss._parse("health now")
+
         with tempfile.TemporaryDirectory() as directory:
             queue = Path(directory) / "commands.jsonl"
             with patch.object(rss, "_queue_path", return_value=queue):

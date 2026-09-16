@@ -4,7 +4,7 @@
 
 ### Added
 
-- **rss-reader:** version `1.0.0` → `1.0.1`. Adds `/rss refresh`, refresh-period settings, feed-wide mute commands, session-based grading refinement, and website/feed discovery for subscriptions.
+- **rss-reader:** version `1.0.0` → `1.0.1`. Adds `/rss refresh`, refresh-period settings, feed-wide mute commands, session-based grading refinement using the `rss-reader-plugin` skill, website/feed discovery for subscriptions, scoped unread triage, grouped digest sessions, and read-only feed health diagnostics. The legacy `rss-reader-grading` and `rss-importance-grading` skill slugs map to the new name.
 
 ## [1.10.2] - 2026-09-13
 

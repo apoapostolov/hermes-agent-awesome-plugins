@@ -24,8 +24,8 @@ the code audit in `AUDIT.md`.
   or another folder).
 - **Mute rules and list funnel.** Phrase plus folder/feed scope, hit counts,
   filter glyph in the list head.
-- **AI tagging.** Preference skill `rss-reader-grading` (old slug
-  `rss-importance-grading` still maps). Pills and card tints from the skill
+- **AI tagging.** Preference skill `rss-reader-plugin` (legacy slugs
+  `rss-importance-grading` and `rss-reader-grading` still map). Pills and card tints from the skill
   tag table. Grades cache by url/identity and are not sent again. Order by
   Importance sorts by tag rank 0-100, then date.
 - **Saved set for Hermes.** Settings **Preference Report** writes

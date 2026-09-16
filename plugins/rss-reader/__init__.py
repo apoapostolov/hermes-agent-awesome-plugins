@@ -34,8 +34,10 @@ def _queue_path() -> Path:
 
 def _usage() -> str:
     return (
-        "Usage: /rss refresh [XXm] | /rss mute <keyword> | /rss refine <XXd> | "
-        "/rss add <url or website>[, name] to <folder>"
+        "Usage: /rss refresh [XXm] | /rss mute <keyword> | /rss refine [XXd] | "
+        "/rss add <url or website>[, name] [to <folder>] | "
+        "/rss mark-read {all|feed <name>|folder <name>} | "
+        "/rss digest {unread [XXd]|saved} | /rss health"
     )
 
 
@@ -69,6 +71,34 @@ def _parse(raw_args: str) -> tuple[str, dict[str, Any]] | None:
         if not match or int(match.group("days")) > _MAX_DAYS:
             raise ValueError("Refinement period must be 1d to 365d, for example 30d.")
         return "refine", {"days": int(match.group("days"))}
+
+    if action == "mark-read":
+        parts = rest.split(None, 1)
+        scope = parts[0].lower() if parts else ""
+        if scope == "all" and len(parts) == 1:
+            return "mark-read", {"scope": "all"}
+        if scope not in {"feed", "folder"} or len(parts) != 2 or not parts[1].strip():
+            raise ValueError("Usage: /rss mark-read all | feed <name> | folder <name>")
+        return "mark-read", {"scope": scope, "target": parts[1].strip()[:100]}
+
+    if action == "digest":
+        parts = rest.split(None, 1)
+        scope = parts[0].lower() if parts else ""
+        if scope == "saved" and len(parts) == 1:
+            return "digest", {"scope": "saved"}
+        if scope != "unread":
+            raise ValueError("Usage: /rss digest unread [XXd] | saved")
+        if len(parts) == 1:
+            return "digest", {"scope": "unread", "days": None}
+        match = _REFINE_RE.fullmatch(parts[1].strip())
+        if not match or int(match.group("days")) > _MAX_DAYS:
+            raise ValueError("Digest period must be 1d to 365d, for example 7d.")
+        return "digest", {"scope": "unread", "days": int(match.group("days"))}
+
+    if action == "health":
+        if rest:
+            raise ValueError("Usage: /rss health")
+        return "health", {}
 
     if action == "add":
         match = re.fullmatch(r"(.+?)\s+to\s+(.+)", rest, re.IGNORECASE)
@@ -115,6 +145,14 @@ def _handle(raw_args: str) -> str:
         return f"RSS Reader mute queued for: {payload['phrase']}"
     if action == "refine":
         return f"RSS Reader refinement queued for the last {payload['days']} days."
+    if action == "mark-read":
+        scope = payload["scope"] if payload["scope"] == "all" else f"{payload['scope']} {payload['target']}"
+        return f"RSS Reader mark-read queued for {scope}."
+    if action == "digest":
+        period = f" from the last {payload['days']} days" if payload.get("days") else ""
+        return f"RSS Reader {payload['scope']} digest queued{period}."
+    if action == "health":
+        return "RSS Reader health check queued."
     return f"RSS Reader subscription queued for {payload['source']}."
 
 
@@ -123,8 +161,8 @@ def register(ctx=None):
         ctx.register_command(
             "rss",
             handler=_handle,
-            description="Control RSS Reader feeds, refresh, mutes, and grading preferences.",
-            args_hint="refresh [XXm] | mute <keyword> | refine <XXd> | add <website> to <folder>",
+            description="Control RSS Reader feeds, refresh, mutes, grading, triage, and health.",
+            args_hint="refresh [XXm] | mute <keyword> | refine [XXd] | add <website> [to <folder>] | mark-read {all|feed <name>|folder <name>} | digest {unread [XXd]|saved} | health",
             argument_mode="mixed",
         )
     return None
