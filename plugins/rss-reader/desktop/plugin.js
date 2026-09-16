@@ -2765,7 +2765,7 @@ function ReaderProfile({ ctx, owner }) {
   useEffect(() => { if (feedToRemove) confirmation.current?.focus(); }, [feedToRemove]);
   useEffect(() => {
     if (!notice) return undefined;
-    const timer = setTimeout(() => setNotice(""), 10000);
+    const timer = setTimeout(() => setNotice(""), 5000);
     return () => clearTimeout(timer);
   }, [notice]);
   const key = [ID, owner];
