@@ -2044,7 +2044,7 @@ var styles = `
 .hermes-rss blockquote{margin:10px 0;padding-left:14px;border-left:2px solid var(--ui-stroke-secondary);white-space:pre-wrap}
 .hermes-rss .rss-form{padding:20px 28px;border-bottom:1px solid var(--ui-stroke-secondary);display:flex;gap:10px;align-items:end;flex-wrap:wrap}.hermes-rss .rss-form label{display:grid;gap:7px;flex:1;min-width:150px}
 .hermes-rss .rss-form input{width:100%}.hermes-rss .rss-small{font-size:11px}.hermes-rss .rss-stack{display:grid;gap:12px}
-.hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}.hermes-rss .rss-nav .rss-feed-open{flex:1;min-width:0}.hermes-rss .rss-nav .rss-unsubscribe{width:26px;flex-shrink:0;padding:7px;justify-content:center;color:var(--ui-text-tertiary)}
+.hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}.hermes-rss .rss-nav .rss-feed-open{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:9px 10px;cursor:pointer}.hermes-rss .rss-nav .rss-unsubscribe{width:26px;flex-shrink:0;padding:7px;justify-content:center;color:var(--ui-text-tertiary)}
 .hermes-rss .rss-feed-info{display:grid;gap:2px;min-width:0}.hermes-rss .rss-feed-status{font-size:10px;color:var(--ui-text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hermes-rss .rss-feed-status-error{color:var(--ui-danger,var(--ui-text-secondary))}
 .hermes-rss .rss-feed-header-error{margin-top:8px;color:var(--ui-danger,var(--ui-text-secondary))}
 .hermes-rss .rss-settings{padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);display:grid;gap:10px}.hermes-rss .rss-settings h2{font-size:15px;margin:0}.hermes-rss .rss-setting{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.hermes-rss .rss-setting input[type=number]{width:90px}.hermes-rss .rss-setting input[type=checkbox]{accent-color:var(--ui-accent)}
@@ -2420,6 +2420,9 @@ function ReaderProfile({ ctx, owner }) {
   });
   const dragOrderRef = useRef(null);
   const dragFeedId = useRef(null);
+  const dragFolderRef = useRef(null);
+  const dragIndexRef = useRef(null);
+  const navRef = useRef(null);
   const suppressFolderClick = useRef(false);
   const confirmation = useRef(null);
   useEffect(() => { if (feedToRemove) confirmation.current?.focus(); }, [feedToRemove]);
@@ -2695,16 +2698,18 @@ function ReaderProfile({ ctx, owner }) {
   const startDrag = feed => {
     dragFeedId.current = feed.id;
     dragOrderRef.current = displayedFeeds.map(f => f.id);
-    setDraggingId(feed.id);
-    setDragTargetFolder(folderOf(feed));
-    // Seed the landing spot where the row already sits: grabbing must not move
-    // the list before the pointer does.
+    dragFolderRef.current = folderOf(feed);
     const rest = displayedFeeds.filter(f => f.id !== feed.id).length;
-    setDragDropIndex(Math.min(displayedFeeds.findIndex(f => f.id === feed.id), rest));
+    dragIndexRef.current = Math.min(Math.max(displayedFeeds.findIndex(f => f.id === feed.id), 0), rest);
+    setDraggingId(feed.id);
+    setDragTargetFolder(dragFolderRef.current);
+    setDragDropIndex(dragIndexRef.current);
   };
   const endDrag = () => {
     dragFeedId.current = null;
     dragOrderRef.current = null;
+    dragFolderRef.current = null;
+    dragIndexRef.current = null;
     setDraggingId(null);
     setDragDropIndex(null);
     setDragTargetFolder(null);
@@ -2721,46 +2726,69 @@ function ReaderProfile({ ctx, owner }) {
     event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
     if (feed.id === dragged) return;
-    setDragTargetFolder(folderOf(feed));
+    dragFolderRef.current = folderOf(feed);
+    setDragTargetFolder(dragFolderRef.current);
     const rect = event.currentTarget.getBoundingClientRect();
     const target = feedDropIndex(displayedFeeds, dragged, feed.id, event.clientY > rect.top + rect.height / 2);
-    if (target !== null && target !== dragDropIndex) setDragDropIndex(target);
+    if (target !== null) {
+      dragIndexRef.current = target;
+      if (target !== dragDropIndex) setDragDropIndex(target);
+    }
   };
   const handleFolderDragOver = key => event => {
     const dragged = dragFeedId.current;
     if (!dragged) return;
-    if (event.target.closest && event.target.closest(".rss-feed-row")) return;
+    const node = event.target.nodeType === 1 ? event.target : event.target.parentElement;
+    if (node && node.closest && node.closest(".rss-feed-row")) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
+    dragFolderRef.current = key;
     setDragTargetFolder(key);
     const rest = displayedFeeds.filter(f => f.id !== dragged);
     const idx = rest.findIndex(f => folderOf(f) === key);
     const target = idx < 0 ? rest.length : idx;
+    dragIndexRef.current = target;
     if (target !== dragDropIndex) setDragDropIndex(target);
   };
-  const handleDrop = () => event => {
-    event.preventDefault();
-    event.stopPropagation();
-    const dragged = dragFeedId.current;
-    const folder = dragTargetFolder;
-    const index = dragDropIndex;
-    if (!dragged) { endDrag(); return; }
+  const persistFeedMove = (dragged, index, folder) => {
     const next = applyFeedMove(displayedFeeds, dragged, index, folder);
-    suppressFolderClick.current = true;
-    endDrag();
     const order = next.map(f => f.id);
     const folders = Object.fromEntries(next.map(f => [f.id, folderOf(f)]));
     const sameOrder = order.join("\n") === displayedFeeds.map(f => f.id).join("\n");
     const sameFolders = displayedFeeds.every(f => folderOf(f) === folderOf(next.find(n => n.id === f.id) || {}));
     if (sameOrder && sameFolders) return;
     setDragOrder(order);
-    act("Reordering…", async () => {
-      await libraryRequest("/feeds/reorder", { method: "POST", body: { order, folders } });
+    void libraryRequest("/feeds/reorder", { method: "POST", body: { order, folders } }).then(() => {
       refresh();
       setDragOrder(null);
+    }).catch((error) => {
+      setDragOrder(null);
+      setNotice(error?.message || "Could not move the feed.");
     });
   };
+  const handleDrop = () => event => {
+    event.preventDefault();
+    event.stopPropagation();
+    const dragged = dragFeedId.current;
+    const folder = dragFolderRef.current;
+    const index = dragIndexRef.current;
+    if (!dragged) return;
+    suppressFolderClick.current = true;
+    persistFeedMove(dragged, index, folder);
+    endDrag();
+  };
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el || !reorderMode) return undefined;
+    const allow = event => {
+      if (!dragFeedId.current) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    };
+    el.addEventListener("dragover", allow);
+    return () => el.removeEventListener("dragover", allow);
+  }, [reorderMode]);
   const saveSettings = event => {
     event.preventDefault();
     const minutes = Number(draft.refreshMinutes);
@@ -3085,7 +3113,7 @@ function ReaderProfile({ ctx, owner }) {
       }
     ),
     /* @__PURE__ */ jsxs("div", { className: `rss-layout ${selected ? "has-selection" : ""}`, children: [
-      /* @__PURE__ */ jsxs("nav", { className: `rss-nav${draggingId ? " rss-nav-reordering" : ""}`, "aria-label": "Feed navigation", children: [
+      /* @__PURE__ */ jsxs("nav", { ref: navRef, className: `rss-nav${draggingId ? " rss-nav-reordering" : ""}`, "aria-label": "Feed navigation", children: [
         jsx("div", { className: "rss-nav-views", children: [
           ["all", "All articles"],
           ["unread", "Unread"],
@@ -3127,6 +3155,8 @@ function ReaderProfile({ ctx, owner }) {
                   if (suppressFolderClick.current) { suppressFolderClick.current = false; return; }
                   toggleFolder(group.key);
                 },
+                onDragOver: reorderMode ? handleFolderDragOver(group.key) : undefined,
+                onDrop: reorderMode ? handleDrop() : undefined,
                 onKeyDown: event => {
                   if (event.key !== "Enter" && event.key !== " ") return;
                   event.preventDefault();
@@ -3150,7 +3180,7 @@ function ReaderProfile({ ctx, owner }) {
                 reorderMode && jsx("span", { className: "rss-feed-edit", "aria-hidden": "true", title: "Drag to reorder", children:
                   jsx("span", { className: "rss-grip", children: jsx("i", { className: "codicon codicon-gripper", "aria-hidden": "true" }) })
                 }),
-                jsxs("button", { type: "button", className: "rss-feed-open", draggable: false, "aria-current": feedId === feed.id,
+                jsxs(reorderMode ? "div" : "button", { type: reorderMode ? undefined : "button", className: "rss-feed-open", role: reorderMode ? "button" : undefined, draggable: false, "aria-current": feedId === feed.id,
                   title: `${feed.folder ? feed.folder + " / " : ""}${feed.title}`,
                   onClick: () => selectView("all", feed.id), children: [
                     jsxs("span", { className: "rss-feed-info", children: [
