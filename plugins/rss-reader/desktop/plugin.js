@@ -2188,6 +2188,7 @@ var styles = `
 .hermes-rss .rss-article-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0;margin:18px 0 0;flex-wrap:nowrap;width:100%;max-width:none}
 .hermes-rss .rss-detail .rss-tools.rss-article-actions{margin:18px 0 0}
 .hermes-rss .rss-discuss-row{display:flex;align-items:center;gap:8px;margin:4px 0 0;width:100%;max-width:none}
+.hermes-rss .rss-continue-row{display:flex;justify-content:flex-end;margin:4px 0 0;width:100%}
 .hermes-rss .rss-discuss-row input{flex:1;min-width:0;height:28px;padding:4px 10px;font-size:12px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;background:transparent;color:inherit}
 .hermes-rss .rss-icon-row{display:inline-flex;align-items:center;gap:2px}
 .hermes-rss .rss-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:var(--ui-text-secondary);font-size:14px}
@@ -3986,11 +3987,9 @@ function ReaderProfile({ ctx, owner }) {
           jsx(Input, { "aria-label": "Ask a Question, or Personalize the Discussion", placeholder: "Ask a Question, or Personalize the Discussion", value: discussNote, maxLength: 2000, autoFocus: true, onChange: event => setDiscussNote(event.target.value) }),
           jsx(Button, { type: "submit", disabled, children: "Start" })
         ] }),
-        latestChat && /* @__PURE__ */ jsx(
+        latestChat && jsx("div", { className: "rss-continue-row", children: jsx(
           Button,
           {
-            variant: "ghost",
-            size: "sm",
             disabled,
             onClick: () => act(
               "Opening\u2026",
@@ -3998,7 +3997,7 @@ function ReaderProfile({ ctx, owner }) {
             ),
             children: "Continue last conversation \u2197"
           }
-        ),
+        ) }),
         tab === "article" && (() => {
           const rich = bodyToRichHtml(article.body || "", article.image);
           const gradeTag = gradingTagFor(settings.gradingTags, article.grade?.level);
