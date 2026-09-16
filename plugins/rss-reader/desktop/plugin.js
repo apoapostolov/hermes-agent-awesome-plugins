@@ -2084,10 +2084,13 @@ var styles = `
 .hermes-rss .rss-nav-heading .rss-edit-toggle:first-of-type{margin-left:auto}
 .hermes-rss .rss-folder-create{display:flex;align-items:center;gap:6px;padding:0 8px 8px}
 .hermes-rss .rss-nav .rss-folder-create input{flex:1;min-width:0;height:26px;padding:4px 8px;font-size:12px;width:auto}
-.hermes-rss .rss-nav .rss-folder-create button{width:auto;flex:0 0 auto;padding:4px 8px;height:26px}
-.hermes-rss .rss-folder-tools{display:flex;align-items:center;gap:0;flex-shrink:0}
-.hermes-rss .rss-nav .rss-folder-tools button{width:18px;height:22px;padding:0;margin:0;flex:0 0 18px;border:0;background:transparent;color:var(--ui-text-tertiary);display:inline-flex;align-items:center;justify-content:center}
+.hermes-rss .rss-nav .rss-folder-create button{width:14px;height:18px;padding:0;margin:0;flex:0 0 14px;border:0;background:transparent;color:var(--ui-text-tertiary);display:inline-flex;align-items:center;justify-content:center}
+.hermes-rss .rss-nav .rss-folder-create button:hover{color:var(--foreground)}
+.hermes-rss .rss-nav .rss-folder-create .codicon{font-size:10px;line-height:1;display:block}
+.hermes-rss .rss-folder-tools{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:6px;padding:0 4px}
+.hermes-rss .rss-nav .rss-folder-tools button{width:14px;height:18px;padding:0;margin:0;flex:0 0 14px;border:0;background:transparent;color:var(--ui-text-tertiary);display:inline-flex;align-items:center;justify-content:center}
 .hermes-rss .rss-nav .rss-folder-tools button:hover{color:var(--foreground)}
+.hermes-rss .rss-nav .rss-folder-tools .codicon{font-size:10px;line-height:1;display:block}
 .hermes-rss .rss-nav .rss-folder-header input{flex:1;min-width:0;height:22px;padding:2px 6px;font-size:11px;width:auto;text-transform:none;letter-spacing:0;font-weight:600}
 .hermes-rss .rss-edit-toggle .codicon{font-size:9px;line-height:1;display:block}
 .hermes-rss .rss-edit-toggle[aria-pressed=true]{color:var(--ui-accent)}
@@ -2206,6 +2209,8 @@ var styles = `
 .hermes-rss .rss-form{padding:20px 28px;border-bottom:1px solid var(--ui-stroke-secondary);display:flex;gap:10px;align-items:end;flex-wrap:wrap}.hermes-rss .rss-form label{display:grid;gap:7px;flex:1;min-width:150px}
 .hermes-rss .rss-form input{width:100%}.hermes-rss .rss-small{font-size:11px}.hermes-rss .rss-stack{display:grid;gap:12px}
 .hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}.hermes-rss .rss-nav .rss-feed-open{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:9px 10px;cursor:pointer}.hermes-rss .rss-nav .rss-unsubscribe{width:26px;flex-shrink:0;padding:7px;justify-content:center;color:var(--ui-text-tertiary)}
+.hermes-rss .rss-nav .rss-unsubscribe-edit{width:14px;height:18px;flex:0 0 14px;padding:0;margin:0 4px 0 6px;display:inline-flex;align-items:center;justify-content:center}
+.hermes-rss .rss-nav .rss-unsubscribe-edit .codicon{font-size:10px;line-height:1;display:block}
 .hermes-rss .rss-feed-info{display:grid;gap:2px;min-width:0}.hermes-rss .rss-feed-status{font-size:10px;color:var(--ui-text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hermes-rss .rss-feed-status-error{color:var(--ui-danger,var(--ui-text-secondary))}
 .hermes-rss .rss-feed-header-error{margin-top:8px;color:var(--ui-danger,var(--ui-text-secondary))}
 .hermes-rss .rss-settings{padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);display:grid;gap:10px}.hermes-rss .rss-settings h2{font-size:15px;margin:0}.hermes-rss .rss-setting{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.hermes-rss .rss-setting input[type=number]{width:90px}.hermes-rss .rss-setting input[type=checkbox]{accent-color:var(--ui-accent)}
@@ -3503,8 +3508,8 @@ function ReaderProfile({ ctx, owner }) {
           runFolderAction({ action: "create", name: folderCreate }, "Folder created.");
         }, children: [
           jsx(Input, { "aria-label": "New folder name", placeholder: "Folder name", value: folderCreate, maxLength: 100, autoFocus: true, onChange: event => setFolderCreate(event.target.value) }),
-          jsx(Button, { type: "submit", disabled: disabled || !normalizeFolderName(folderCreate), children: "Add" }),
-          jsx(Button, { type: "button", variant: "ghost", disabled, onClick: () => setFolderCreate(null), children: "Cancel" })
+          jsx("button", { type: "submit", disabled: disabled || !normalizeFolderName(folderCreate), title: "Add folder", "aria-label": "Add folder", children: jsx("i", { className: "codicon codicon-add", "aria-hidden": "true" }) }),
+          jsx("button", { type: "button", disabled, title: "Cancel", "aria-label": "Cancel", onClick: () => setFolderCreate(null), children: jsx("i", { className: "codicon codicon-close", "aria-hidden": "true" }) })
         ] }),
         groupedFeeds.map((group) => {
           const open = folderIsOpen(group.key) || !!(draggingId && dragTargetFolder === group.key);
@@ -3541,7 +3546,7 @@ function ReaderProfile({ ctx, owner }) {
                       if (event.key === "Escape") { event.preventDefault(); setFolderRename(null); }
                     } }) })
                     : jsx("span", { className: "rss-folder-name", onClick: reorderMode && group.key ? event => { event.stopPropagation(); setFolderRename({ key: group.key, value: group.key }); } : undefined, children: group.title }),
-                  jsx("span", { className: "rss-count", children: group.unread || "" }),
+                  !reorderMode && jsx("span", { className: "rss-count", children: group.unread || "" }),
                   reorderMode && group.key && jsxs("span", { className: "rss-folder-tools", onClick: event => event.stopPropagation(), children: [
                     jsx("button", { type: "button", title: "Rename folder", "aria-label": `Rename ${group.title}`, onClick: () => setFolderRename({ key: group.key, value: group.key }), children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) }),
                     jsx("button", { type: "button", title: "Delete folder", "aria-label": `Delete ${group.title}`, onClick: () => { setFolderDeleteDest(""); setFolderToDelete({ key: group.key, title: group.title, count: group.feeds.length }); }, children: jsx("i", { className: "codicon codicon-trash", "aria-hidden": "true" }) })
