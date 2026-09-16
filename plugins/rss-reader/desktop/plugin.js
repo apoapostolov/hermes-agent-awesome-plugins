@@ -1178,7 +1178,7 @@ async function rssCommandQueue(host2, route) {
   };
   let family = families.get(owner);
   if (!family) {
-    family = (await run("echo %OS%")).trim() === "Windows_NT" ? "windows" : "posix";
+    family = (await run("powershell.exe -NoProfile -NonInteractive '$env:OS'", true)).trim() === "Windows_NT" ? "windows" : "posix";
     families.set(owner, family);
   }
   const text = await run(rssCommandReadCommand(family));
