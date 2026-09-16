@@ -2080,7 +2080,7 @@ var styles = `
 .hermes-rss h1{font-size:24px;letter-spacing:-.8px;font-weight:650;margin:0 0 5px}.hermes-rss h2{font-size:20px;letter-spacing:-.4px;line-height:1.4;margin:0 0 12px}
 .hermes-rss .rss-top h1{font-size:15px;letter-spacing:-.2px;margin:0;line-height:1.3}
 .hermes-rss .rss-top .rss-tools{gap:6px}
-.hermes-rss .rss-top .rss-tools button{padding:4px 10px;font-size:12px;height:26px;min-height:0;line-height:1.2}
+.hermes-rss .rss-top .rss-tools button{padding:4px 10px;font-size:12px;height:26px;min-height:0;line-height:1.2;display:inline-flex;align-items:center;gap:6px}
 .hermes-rss .rss-top .rss-source-link{display:inline-flex;align-items:center;color:var(--ui-text-quaternary,var(--ui-text-tertiary));line-height:1}
 .hermes-rss .rss-top .rss-source-link:hover{color:var(--ui-text-secondary)}
 .hermes-rss p{margin:0;line-height:1.7}.hermes-rss .rss-muted{color:var(--ui-text-secondary)}
@@ -3301,17 +3301,20 @@ function ReaderProfile({ ctx, owner }) {
         /* @__PURE__ */ jsx("h1", { children: "RSS Reader" })
       }),
       /* @__PURE__ */ jsxs("div", { className: "rss-tools", children: [
-        /* @__PURE__ */ jsx(
+        /* @__PURE__ */ jsxs(
           Button,
           {
             variant: "outline",
             disabled: disabled || !feeds.data?.length,
             onClick: () => act("Refreshing\u2026", refreshFeeds),
-            children: refreshButtonLabel(lastRefreshAt, nowTick)
+            children: [
+              jsx(Codicon, { name: "refresh", size: "0.7rem" }),
+              refreshButtonLabel(lastRefreshAt, nowTick)
+            ]
           }
         ),
-        jsx(Button, { variant: "ghost", "aria-expanded": filtersOpen, onClick: () => setFiltersOpen(!filtersOpen), children: "Filters" }),
-        jsx(Button, { variant: "ghost", "aria-expanded": settingsOpen, onClick: () => { setDraft(readSettings(ctx, owner)); setSettingsOpen(!settingsOpen); }, children: "Settings" }),
+        jsxs(Button, { variant: "ghost", "aria-expanded": filtersOpen, onClick: () => setFiltersOpen(!filtersOpen), children: [jsx(Codicon, { name: "filter", size: "0.7rem" }), "Filters"] }),
+        jsxs(Button, { variant: "ghost", "aria-expanded": settingsOpen, onClick: () => { setDraft(readSettings(ctx, owner)); setSettingsOpen(!settingsOpen); }, children: [jsx(Codicon, { name: "settings-gear", size: "0.7rem" }), "Settings"] }),
         /* @__PURE__ */ jsx(Button, { onClick: () => setAdding(!adding), disabled, children: "+ Subscribe" }),
         /* @__PURE__ */ jsx("a", {
           href: SOURCE_URL,
