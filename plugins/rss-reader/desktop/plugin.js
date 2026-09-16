@@ -846,7 +846,14 @@ function extractReadable(html) {
       else if (name === "li") parts.push({ tag: "li", text: content });
       else parts.push({ tag: `h${Math.min(3, Number(name[1]) || 3)}`, text: content });
     }
-    text = parts.map((part) => part.tag.startsWith("h") ? `\n\n## ${part.text}\n\n` : part.tag === "li" ? `\u2022 ${part.text}` : part.text).join("\n\n");
+    text = "";
+    let prevLi = false;
+    for (const part of parts) {
+      const piece = part.tag.startsWith("h") ? `## ${part.text}` : part.tag === "li" ? `\u2022 ${part.text}` : part.text;
+      const gap = text ? (prevLi && part.tag === "li" ? "\n" : "\n\n") : "";
+      text += gap + piece;
+      prevLi = part.tag === "li";
+    }
   } else {
     template.content.querySelectorAll("p,div,li,br,h1,h2,h3,blockquote").forEach((n) => n.append("\n"));
     text = template.content.textContent.replace(/[^\S\n]+/g, " ").replace(/\n\s*\n/g, "\n\n").trim();
@@ -970,7 +977,7 @@ function bodyToRichHtml(raw) {
       continue;
     }
     if (inCode) { codeBuffer.push(lineRaw); continue; }
-    if (!trimmed) { flushParagraph(); closeList(); continue; }
+    if (!trimmed) { flushParagraph(); continue; }
     const heading = /^(#{1,4})\s+(.*)$/.exec(trimmed);
     if (heading) {
       flushParagraph(); closeList();
@@ -998,12 +1005,13 @@ function bodyToRichHtml(raw) {
       out.push(`<blockquote>${renderInline(escapeHtml(trimmed.replace(/^(&gt;|>)\s?/, "")))}</blockquote>`);
       continue;
     }
+    closeList();
     paragraph.push(trimmed);
   }
   if (inCode) out.push(`<pre><code>${escapeHtml(codeBuffer.join("\n"))}</code></pre>`);
   flushParagraph();
   closeList();
-  return { html: out.join("\n"), isHtml: false };
+  return { html: out.join(""), isHtml: false };
 }
 
 // src/styles.mjs
@@ -1061,7 +1069,9 @@ var styles = `
 .hermes-rss .rss-detail .rss-body h2{font-size:1.2em;line-height:1.35}
 .hermes-rss .rss-detail .rss-body h3{font-size:1.05em;line-height:1.4}
 .hermes-rss .rss-detail .rss-body ul,.hermes-rss .rss-detail .rss-body ol{padding-left:1.4em}
-.hermes-rss .rss-detail .rss-body li{margin-bottom:.4em}
+.hermes-rss .rss-detail .rss-body li{margin:0;padding:0}
+.hermes-rss .rss-detail .rss-body li + li{margin-top:.15em}
+.hermes-rss .rss-detail .rss-body li > p{margin:0}
 .hermes-rss .rss-detail .rss-body blockquote{margin:1em 0;padding:2px 0 2px 14px;border-left:2px solid var(--ui-stroke-secondary);color:var(--ui-text-secondary);font-style:italic}
 .hermes-rss .rss-detail .rss-body a{color:var(--ui-accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--ui-accent) 40%,transparent)}
 .hermes-rss .rss-detail .rss-body code{font-size:.88em;background:color-mix(in srgb,var(--ui-text-secondary) 12%,transparent);border-radius:4px;padding:1px 5px}
@@ -1073,10 +1083,12 @@ var styles = `
 .hermes-rss .rss-rich th,.hermes-rss .rss-rich td{border:1px solid var(--ui-stroke-secondary);padding:6px 10px;text-align:left}
 .hermes-rss .rss-rich th{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent);font-weight:650}
 .hermes-rss .rss-rich h4{font-size:1em;margin:1.2em 0 .5em}
+.hermes-rss .rss-rich{white-space:normal}
 .hermes-rss .rss-rich .rss-list-md{white-space:normal;list-style:disc outside;padding-left:1.5em;margin:0 0 1.05em}
-.hermes-rss .rss-rich .rss-list-md li{display:list-item;margin:0 0 .35em;white-space:normal}
+.hermes-rss .rss-rich .rss-list-md li{display:list-item;margin:0;padding:0;white-space:normal}
+.hermes-rss .rss-rich .rss-list-md li + li{margin-top:.15em}
 .hermes-rss .rss-rich .rss-list-md li::before{content:none}
-.hermes-rss .rss-rich .rss-list-md p{margin:0;white-space:normal}
+.hermes-rss .rss-rich .rss-list-md p,.hermes-rss .rss-rich li > p{margin:0;white-space:normal}
 .hermes-rss .rss-rich ul.rss-ol{list-style:decimal}
 .hermes-rss .rss-rich figcaption,.hermes-rss .rss-rich small{color:var(--ui-text-secondary);font-size:.85em}
 .hermes-rss .rss-settings-header{font-size:15px;font-weight:700;letter-spacing:-.2px;margin:4px 0 2px;color:var(--ui-text-primary,var(--foreground))}
