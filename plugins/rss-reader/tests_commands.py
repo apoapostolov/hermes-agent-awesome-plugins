@@ -73,9 +73,10 @@ class RssCommandTests(unittest.TestCase):
             self.assertTrue(row["id"])
     def test_refresh_transport_avoids_python_exec_flags(self):
         plugin = (_ENTRYPOINT.parent / "desktop" / "plugin.js").read_text(encoding="utf-8")
-        self.assertIn("async function rssCommandQueue", plugin)
-        self.assertIn('host.rest("/commands"', plugin)
-        self.assertIn('host.rest("/feed"', plugin)
+        self.assertIn("var rssRest = null", plugin)
+        self.assertIn("rssRest = typeof ctx.rest === \"function\" ? ctx.rest : null", plugin)
+        self.assertIn('rssRest("/commands"', plugin)
+        self.assertIn('rssRest("/feed"', plugin)
         self.assertNotIn("Test-Path -LiteralPath", plugin)
         self.assertNotIn("Get-Content -Raw -LiteralPath", plugin)
         self.assertNotIn("Resolve-DnsName", plugin)

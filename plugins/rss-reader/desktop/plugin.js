@@ -14,6 +14,7 @@ import {
 } from "@hermes/plugin-sdk";
 
 var RSS_DEBUG_PREFIX = "[rss-reader-debug]";
+var rssRest = null;
 function rssDebug(event, details = {}) {
   try {
     const safe = {};
@@ -1186,7 +1187,7 @@ var rssCommandBusy = false;
 async function rssCommandQueue(host2, route) {
   const owner = JSON.stringify([route.connectionId, route.profile]);
   assertOwner(host2, route);
-  const commands = await host.rest("/commands", { method: "GET" });
+  const commands = await rssRest("/commands", { method: "GET" });
   assertOwner(host2, route);
   return Array.isArray(commands) ? commands.filter(command => command && command.id && command.action && command.payload && typeof command.payload === "object") : [];
 }
@@ -1718,7 +1719,7 @@ function publicIPv4(value) {
   return !(a === 0 || a === 10 || a === 127 || a >= 224 || a === 100 && b >= 64 && b <= 127 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && (b === 0 || b === 168 || b === 88 && c === 99) || a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113);
 }
 async function fetchFeedViaApi(rawUrl) {
-  const response = await host.rest("/feed", {
+  const response = await rssRest("/feed", {
     method: "POST",
     body: { url: publicUrl(rawUrl).href }
   });
@@ -4368,6 +4369,8 @@ var plugin_default = {
   version: "1.0.1",
   defaultEnabled: true,
   register(ctx) {
+    rssRest = typeof ctx.rest === "function" ? ctx.rest : null;
+    if (!rssRest) throw new Error("RSS Reader requires the plugin REST API.");
     rssDebug("register", { id: ID, version: "1.0.1" });
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
     if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
