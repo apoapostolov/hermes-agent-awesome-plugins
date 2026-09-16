@@ -2163,8 +2163,7 @@ function ReaderProfile({ ctx, owner }) {
           jsx(Button, { variant: "ghost", disabled, "aria-label": `Remove mute rule ${rule.phrase}`, onClick: () => removeFilter("mutes", rule.id), children: "Remove" })
         ] }, rule.id))
       ] }),
-      filters.error && jsx("p", { role: "alert", children: filters.error.message }),
-      jsx(Button, { variant: "ghost", onClick: () => setFiltersOpen(false), children: "Close filters" })
+      filters.error && jsx("p", { role: "alert", children: filters.error.message })
     ] }),
     settingsOpen && jsxs("div", { className: "rss-settings", children: [
       jsxs("form", { className: "rss-stack", "aria-label": "Reader settings", onSubmit: saveSettings, children: [
