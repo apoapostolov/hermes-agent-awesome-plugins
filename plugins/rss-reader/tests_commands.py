@@ -83,6 +83,8 @@ class RssCommandTests(unittest.TestCase):
         self.assertNotIn("gzip -c", plugin)
         self.assertNotIn("cut -c", plugin)
         self.assertIn("powershell.exe -NoProfile -NonInteractive", plugin)
+        self.assertIn("'$env:TEMP'", plugin)
+        self.assertNotIn("echo %TEMP%", plugin)
 
 
 if __name__ == "__main__":

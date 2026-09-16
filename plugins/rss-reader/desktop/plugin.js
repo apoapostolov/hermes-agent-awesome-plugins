@@ -1790,7 +1790,7 @@ async function fetchFeedNow(host2, rawUrl, route) {
   let directory = caches.get(owner);
   if (!directory) {
     if (family === "windows") {
-      const temp = (await run("echo %TEMP%")).replace(/[\\/]+$/, "");
+      const temp = (await run("powershell.exe -NoProfile -NonInteractive '$env:TEMP'")).replace(/[\\/]+$/, "");
       directory = `${temp}\\hermes-rss.${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
       if (!isWindowsCache(directory))
         throw new Error("Could not create a private RSS download cache.");
@@ -2185,7 +2185,7 @@ async function captureArticleNow(host2, rawUrl, route, owner, options = {}) {
   let directory = caches.get(owner);
   if (!directory) {
     if (family === "windows") {
-      const temp = (await run("echo %TEMP%")).replace(/[\\/]+$/, "");
+      const temp = (await run("powershell.exe -NoProfile -NonInteractive '$env:TEMP'")).replace(/[\\/]+$/, "");
       directory = `${temp}\\hermes-rss.${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
       if (!isWindowsCache(directory))
         throw new Error("Could not create a private RSS download cache.");
