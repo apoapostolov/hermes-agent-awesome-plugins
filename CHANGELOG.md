@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.3] - 2026-09-16
+
+### Added
+
+- **rss-reader:** version `1.0.0` → `1.0.1`. Adds `/rss refresh`, refresh-period settings, feed-wide mute commands, session-based grading refinement, and website/feed discovery for subscriptions.
+
 ## [1.10.2] - 2026-09-13
 
 ### Changed

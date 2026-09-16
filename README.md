@@ -1,10 +1,12 @@
 # Hermes Agent Awesome Plugins
 
-A Hermes Agent plugin pack. Ten plugins live in this repo. Pack pins in `hermes-pack.yaml` are exact SHAs. Install the pack, not a GitHub Release.
+A Hermes Agent plugin pack. Eleven plugins live in this repo. Pack pins in `hermes-pack.yaml` are exact SHAs. Install the pack, not a GitHub Release.
 
 Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
-## What's New in 1.10.2
+## What's New in 1.10.3
+
+**RSS Reader** 1.0.1 adds `/rss` commands for refresh, refresh-period settings, feed-wide mutes, session-based grading refinement, and website/feed discovery when adding subscriptions.
 
 **Memory-Review** 1.2.1: over-budget rows can start a consolidation round. Meters read live store use when the dialog opens.
 
