@@ -1183,40 +1183,12 @@ function publishLibraryChange(owner, notice = "") {
   window.dispatchEvent(new CustomEvent("hermes-rss-library-changed", { detail: { owner, notice } }));
 }
 var rssCommandBusy = false;
-function rssCommandReadCommand(family) {
-  if (family === "windows") {
-    return powershellEncoded('$p=Join-Path $env:HERMES_HOME "rss-reader\\commands.jsonl"; if (!(Test-Path -LiteralPath $p)) { $p=Join-Path $env:LOCALAPPDATA "hermes\\rss-reader\\commands.jsonl" }; if (Test-Path -LiteralPath $p) { Get-Content -Raw -LiteralPath $p }');
-  }
-  return 'p="${HERMES_HOME:-$HOME/.hermes}/rss-reader/commands.jsonl"; [ -f "$p" ] && cat "$p" || true';
-}
 async function rssCommandQueue(host2, route) {
   const owner = JSON.stringify([route.connectionId, route.profile]);
-  const run = async (command) => {
-    try {
-      assertOwner(host2, route);
-      const result = await host2.requestProfile(route, "shell.exec", { command });
-      assertOwner(host2, route);
-      rssDebug("queue-shell", { command, code: result?.code, stdout: result?.stdout || "", stderr: result?.stderr || "" });
-      return result.code === 0 ? String(result.stdout || "") : "";
-    } catch (error) {
-      rssDebug("queue-shell-error", { command, message: error?.message || error, stack: error?.stack || "" });
-      throw error;
-    }
-  };
-  let family = families.get(owner);
-  if (!family) {
-    const probe = await run(powershellEncoded('$env:OS'));
-    family = probe.trim() === "Windows_NT" ? "windows" : "posix";
-    families.set(owner, family);
-    rssDebug("queue-family", { owner, probe, family });
-  }
-  const readCommand = rssCommandReadCommand(family);
-  const text = await run(readCommand);
-  const commands = String(text).split(/\r?\n/).map(line => {
-    try { return JSON.parse(line); } catch { return null; }
-  }).filter(command => command && command.id && command.action && command.payload && typeof command.payload === "object");
-  rssDebug("queue-read", { owner, family, command: readCommand, outputLength: text.length, commandCount: commands.length, commandIds: commands.map(command => command.id) });
-  return commands;
+  assertOwner(host2, route);
+  const commands = await host.rest("/commands", { method: "GET" });
+  assertOwner(host2, route);
+  return Array.isArray(commands) ? commands.filter(command => command && command.id && command.action && command.payload && typeof command.payload === "object") : [];
 }
 function rssCommandSeen(ctx, owner) {
   const value = storageGet(ctx, "commandSeen", owner, []);
@@ -1745,149 +1717,27 @@ function publicIPv4(value) {
   if ([a, b, c, d].some((n) => n > 255)) return false;
   return !(a === 0 || a === 10 || a === 127 || a >= 224 || a === 100 && b >= 64 && b <= 127 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && (b === 0 || b === 168 || b === 88 && c === 99) || a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113);
 }
+async function fetchFeedViaApi(rawUrl) {
+  const response = await host.rest("/feed", {
+    method: "POST",
+    body: { url: publicUrl(rawUrl).href }
+  });
+  if (!response || typeof response.text !== "string")
+    throw new Error("RSS backend returned an invalid feed response.");
+  return parseFeed(response.text, response.url || publicUrl(rawUrl).href);
+}
 async function fetchFeed(host2, rawUrl) {
   const route = await currentRoute(host2);
   const owner = JSON.stringify([route.connectionId, route.profile]);
   const previous = pendingFetches.get(owner) || Promise.resolve();
   const work = previous.catch(() => {
-  }).then(() => fetchFeedNow(host2, rawUrl, route));
+  }).then(() => fetchFeedViaApi(rawUrl));
   pendingFetches.set(owner, work);
   try {
     return await work;
   } finally {
     if (pendingFetches.get(owner) === work) pendingFetches.delete(owner);
   }
-}
-async function resolvePublicIPv4(run, family, hostname) {
-  if (family === "windows") {
-    const addresses = publicAddresses(
-      await run(
-        powershellEncoded(`Resolve-DnsName -Type A -Name ${powershellSingle(hostname)} -ErrorAction Stop | Where-Object { $_.Type -eq 'A' } | Select-Object -ExpandProperty IPAddress`)
-      )
-    );
-    if (!addresses)
-      throw new Error(
-        "Feed host must resolve to a public IPv4 address. Private networks are blocked."
-      );
-    return addresses;
-  }
-  const name = posixQuote(hostname);
-  const lookups = [
-    `dig +short +time=3 +tries=1 A ${name}`,
-    `getent ahostsv4 ${name}`,
-    `getent hosts ${name}`
-  ];
-  for (let i = 0; i < lookups.length; i++) {
-    const addresses = publicAddresses(await run(lookups[i], i < lookups.length - 1));
-    if (addresses) return addresses;
-  }
-  throw new Error(
-    "Feed host must resolve to a public IPv4 address. Private networks are blocked."
-  );
-}
-async function readPackedFeed(run, family, directory, feedPath) {
-  if (family === "windows") {
-    return withPackLock(directory, async () => {
-      const script = [
-        `$b=[IO.File]::ReadAllBytes(${powershellSingle(feedPath)})`,
-        "$m=[IO.MemoryStream]::new()",
-        "$g=[IO.Compression.GzipStream]::new($m,[IO.Compression.CompressionMode]::Compress)",
-        "$g.Write($b,0,$b.Length)",
-        "$g.Dispose()",
-        "$s=[Convert]::ToBase64String($m.ToArray())",
-        "if($s.Length -gt 600000){throw 'too-large'}",
-        "$s"
-      ].join("; ");
-      const packed = (await run(powershellEncoded(script))).replace(/\s+/g, "");
-      if (!packed || packed.length > 6e5)
-        throw new Error("Feed exceeds the compressed transport limit.");
-      return packed;
-    });
-  }
-  const file = posixQuote(feedPath);
-  const encoded = `gzip < ${file} | base64 | tr -d '\\n'`;
-  const length = Number(await run(`${encoded} | wc --bytes`));
-  if (!Number.isInteger(length) || length < 1 || length > 6e5)
-    throw new Error("Feed exceeds the compressed transport limit.");
-  let packed = "";
-  for (let offset = 0; offset < length; offset += 3500)
-    packed += await run(
-      `${encoded} | cut --characters ${offset + 1}-${Math.min(offset + 3500, length)}`
-    );
-  return packed;
-}
-async function fetchFeedNow(host2, rawUrl, route) {
-  const run = async (command, optional) => {
-    try {
-      assertOwner(host2, route);
-      const result = await host2.requestProfile(route, "shell.exec", { command });
-      assertOwner(host2, route);
-      rssDebug("feed-shell", { command, optional: !!optional, code: result?.code, stdout: result?.stdout || "", stderr: result?.stderr || "" });
-      if (result.code !== 0) {
-        if (optional) return "";
-        throw new Error(
-          `Feed command failed: ${(result.stderr || "This gateway needs curl plus gzip and base64 tools. Windows uses curl.exe and PowerShell. Linux and macOS use POSIX utilities.").slice(0, 350)}`
-        );
-      }
-      return result.stdout.trim();
-    } catch (error) {
-      rssDebug("feed-shell-error", { command, optional: !!optional, message: error?.message || error, stack: error?.stack || "" });
-      throw error;
-    }
-  };
-  const owner = JSON.stringify([route.connectionId, route.profile]);
-  let family = families.get(owner);
-  if (!family) {
-    const windowsProbe = await run(powershellEncoded('$env:OS'), true);
-    family = windowsProbe === "Windows_NT" ? "windows" : "posix";
-    families.set(owner, family);
-  }
-  let directory = caches.get(owner);
-  if (!directory) {
-    if (family === "windows") {
-      const temp = (await run(powershellEncoded('$env:TEMP'))).replace(/[\\/]+$/, "");
-      directory = `${temp}\\hermes-rss.${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
-      if (!isWindowsCache(directory))
-        throw new Error("Could not create a private RSS download cache.");
-      await run(`mkdir ${cmdQuote(directory)}`);
-    } else {
-      directory = await run("mktemp -d /tmp/hermes-rss.XXXXXXXX");
-      if (!isPosixCache(directory))
-        throw new Error("Could not create a private RSS download cache.");
-    }
-    caches.set(owner, directory);
-  }
-  const feedPath = family === "windows" ? `${directory}\\feed` : `${directory}/feed`;
-  const quote = family === "windows" ? cmdQuote : posixQuote;
-  const curl = family === "windows" ? "curl.exe" : "curl";
-  let url = publicUrl(rawUrl), success = false;
-  for (let redirect = 0; redirect < 4; redirect++) {
-    const addresses = await resolvePublicIPv4(run, family, url.hostname);
-    const port = url.port || (url.protocol === "https:" ? "443" : "80");
-    const info = await run(
-      `${curl} --disable --silent --show-error --noproxy ${quote("*")} --proto ${quote("=http,https")} --connect-timeout 8 --max-time 25 --max-filesize 2000000 --resolve ${quote(`${url.hostname}:${port}:${addresses[0]}`)} --header ${quote("Accept-Encoding: identity")} --user-agent ${quote("HermesRSS/0.2")} --output ${quote(feedPath)} --write-out ${quote("%{http_code} %{size_download} %{redirect_url}")} --url ${quote(url.href)}`
-    );
-    const match = /^(\d{3}) ([0-9]+)(?: (.*))?$/.exec(info);
-    if (!match) throw new Error("Invalid feed download response.");
-    const [, code, size, next] = match;
-    if (Number(size) > 2e6) throw new Error("Feed exceeds 2 MB.");
-    if (["301", "302", "303", "307", "308"].includes(code) && next) {
-      url = publicUrl(next);
-      continue;
-    }
-    if (code !== "200") throw new Error(`The feed returned HTTP ${code}.`);
-    success = true;
-    break;
-  }
-  if (!success) throw new Error("The feed redirects too many times.");
-  const packed = await readPackedFeed(run, family, directory, feedPath);
-  const bytes = base64ToBytes(packed);
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
-  const decoded = new Uint8Array(await new Response(stream).arrayBuffer());
-  if (decoded.length > 2e6) throw new Error("Feed exceeds 2 MB.");
-  const declaration = new TextDecoder().decode(decoded.slice(0, 200));
-  const encoding = /<\?xml[^>]+encoding=["']([^"']+)/i.exec(declaration)?.[1] || "utf-8";
-  return parseFeed(new TextDecoder(encoding).decode(decoded), url.href);
 }
 function cheapExcerpt(body) {
   return String(body || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim().slice(0, 240);
@@ -4522,14 +4372,6 @@ var plugin_default = {
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
     if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
     ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);
-    try {
-      // The rubric and the tag colours both live in the skill: scaffold it when
-      // it is missing, cache the table, then repaint so pills pick it up.
-      const owner = currentOwner(host);
-      void syncGradingTags(host, ctx, owner, readSettings(ctx, owner).gradingSkill).then(() => publishLibraryChange(owner));
-    } catch {
-      // Storage is not ready yet; the first grading run scaffolds the skill.
-    }
     ctx.register({
       id: "page",
       area: ROUTES_AREA,
