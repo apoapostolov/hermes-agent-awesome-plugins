@@ -781,8 +781,13 @@ function parseFeed(xml, base) {
     } catch {
     }
     const content = child(entry, "encoded", "content") || child(entry, "description", "summary");
+    const rawContent = content?.children.length ? new XMLSerializer().serializeToString(content) : text(content);
+    const enclosure = [...entry.children].find((n) => n.localName === "enclosure" && /^image\//.test(n.getAttribute("type") || ""));
+    const mediaNode = [...entry.getElementsByTagName("*")].find((n) => /^media:thumbnail$|^media:content$/i.test(n.nodeName) && (n.getAttribute("url") || "").startsWith("http"));
+    const inlineImg = /<img[\s>][^>]*\bsrc=["']?(https?:\/\/[^"'\s>]+)/i.exec(rawContent || "")?.[1];
+    const image = enclosure?.getAttribute("url") || mediaNode?.getAttribute("url") || inlineImg || "";
     const body = plainText(
-      content?.children.length ? new XMLSerializer().serializeToString(content) : text(content)
+      rawContent || ""
     ).slice(0, 16e3);
     const title2 = plainText(text(child(entry, "title"))).slice(0, 1e3) || "Untitled article";
     const rawDate = text(
@@ -794,6 +799,7 @@ function parseFeed(xml, base) {
       title: title2,
       url,
       body,
+      image,
       published_at: Number.isFinite(time) ? new Date(time).toISOString() : null
     };
   });
@@ -907,13 +913,16 @@ async function captureArticleNow(host2, rawUrl, route, owner) {
   const text = extractReadable(html);
   if (!text || text.length < 200)
     throw new Error("No readable article text found on the page.");
-  return plainText(text).slice(0, 6e4);
+  const leadImage = /<img[^>]*\bsrc=["']?(https?:\/\/[^"'\s>]+)[^>]*>/i.exec(text)?.[1] || "";
+  const body = "![](" + leadImage + ")\n\n" + plainText(text).slice(0, 6e4);
+  return leadImage ? body : body.replace(/^!\[\]\([^)]*\)\n\n/, "");
 }
 function escapeHtml(value) {
   return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 function renderInline(escaped) {
   return escaped
+    .replace(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g, '<img src="$2" alt="$1" loading="lazy">')
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, "$1<em>$2</em>")
@@ -1090,6 +1099,10 @@ var styles = `
 .hermes-rss .rss-card-read .rss-card-excerpt{color:var(--ui-text-tertiary)}
 .hermes-rss .rss-card-title{font-size:15px;font-weight:600;line-height:1.45;margin:8px 0}.hermes-rss .rss-card-meta{display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--ui-text-tertiary)}
 .hermes-rss .rss-card-excerpt{font-size:12px;color:var(--ui-text-secondary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hermes-rss .rss-card{flex-direction:row}
+.hermes-rss .rss-card-main{min-width:0;flex:1}
+.hermes-rss .rss-card-thumb{flex-shrink:0;width:56px;height:56px;border-radius:6px;overflow:hidden;margin-left:10px;background:color-mix(in srgb,var(--ui-text-secondary) 10%,transparent)}
+.hermes-rss .rss-card-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .hermes-rss .rss-chip{display:inline-flex;align-items:center;padding:4px 8px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;font-size:10px;color:var(--ui-text-secondary)}
 .hermes-rss .rss-tabs{display:flex;gap:22px;border-bottom:1px solid var(--ui-stroke-secondary);margin:24px 0}
 .hermes-rss .rss-tabs button{background:transparent;border:0;border-bottom:2px solid transparent;color:var(--ui-text-secondary);padding:10px 0}
@@ -1795,18 +1808,21 @@ function ReaderProfile({ ctx, owner }) {
               "aria-selected": selected === item.id,
               onClick: () => openArticle(item),
               children: [
-                /* @__PURE__ */ jsxs("div", { className: "rss-card-meta", children: [
-                  /* @__PURE__ */ jsxs("span", { children: [
-                    !item.is_read ? "\u25CF " : "",
-                    item.feed_title
+                /* @__PURE__ */ jsxs("div", { className: "rss-card-main", children: [
+                  /* @__PURE__ */ jsxs("div", { className: "rss-card-meta", children: [
+                    /* @__PURE__ */ jsxs("span", { children: [
+                      !item.is_read ? "\u25CF " : "",
+                      item.feed_title
+                    ] }),
+                    /* @__PURE__ */ jsx("span", { children: date(item.published_at) })
                   ] }),
-                  /* @__PURE__ */ jsx("span", { children: date(item.published_at) })
+                  /* @__PURE__ */ jsxs("div", { className: "rss-card-title", children: [
+                    item.title,
+                    item.is_saved ? " \u2606" : ""
+                  ] }),
+                  /* @__PURE__ */ jsx("p", { className: "rss-card-excerpt", children: item.excerpt })
                 ] }),
-                /* @__PURE__ */ jsxs("div", { className: "rss-card-title", children: [
-                  item.title,
-                  item.is_saved ? " \u2606" : ""
-                ] }),
-                /* @__PURE__ */ jsx("p", { className: "rss-card-excerpt", children: item.excerpt })
+                item.image && /* @__PURE__ */ jsx("span", { className: "rss-card-thumb", "aria-hidden": "true", children: /* @__PURE__ */ jsx("img", { src: item.image, alt: "", loading: "lazy", onError: (event) => { event.currentTarget.parentElement.style.display = "none"; } }) })
               ]
             },
             item.id
