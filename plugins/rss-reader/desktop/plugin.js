@@ -688,7 +688,15 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
     const url = new URL(path, "https://rss.invalid");
     const parts = url.pathname.split("/").filter(Boolean);
     if (parts[0] === "filters") {
-      if (method === "GET") return (await read()).filters || { searches: [], mutes: [] };
+      if (method === "GET") {
+        const library = await read();
+        const filters = library.filters || { searches: [], mutes: [] };
+        const articles = library.articles || [];
+        return {
+          searches: filters.searches || [],
+          mutes: (filters.mutes || []).map((rule) => ({ ...rule, hits: muteHitCount(articles, rule) }))
+        };
+      }
       if (!["searches", "mutes"].includes(parts[1])) throw new Error("Unknown filter operation.");
       return write((library) => {
         library.filters ||= { searches: [], mutes: [] };
@@ -697,11 +705,24 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
           library.filters[parts[1]] = entries.filter(entry => entry.id !== parts[2]);
           return;
         }
-        if (method !== "POST") throw new Error("Unknown filter operation.");
-        if (entries.length >= 50) throw new Error("Keep at most 50 entries of each filter type.");
         const phrase = value => typeof value === "string" ? value.trim().slice(0, 200) : "";
         const feed_id = typeof body.feed_id === "string" ? body.feed_id : "";
         if (feed_id && !library.feeds.some(feed => feed.id === feed_id)) throw new Error("Subscription not found.");
+        if (method === "PATCH") {
+          const entry = entries.find(item => item.id === parts[2]);
+          if (!entry) throw new Error("Filter not found.");
+          if (parts[1] === "mutes") {
+            const nextPhrase = phrase(body.phrase);
+            if (!nextPhrase) throw new Error("Enter a name or phrase.");
+            if (entries.some(rule => rule.id !== entry.id && rule.phrase.toLowerCase() === nextPhrase.toLowerCase() && rule.feed_id === feed_id))
+              throw new Error("That mute rule already exists.");
+            entry.phrase = nextPhrase;
+            entry.feed_id = feed_id;
+          }
+          return entry;
+        }
+        if (method !== "POST") throw new Error("Unknown filter operation.");
+        if (entries.length >= 50) throw new Error("Keep at most 50 entries of each filter type.");
         const entry = parts[1] === "mutes" ? { phrase: phrase(body.phrase), feed_id } : {
           name: phrase(body.name), query: phrase(body.query), exclude: phrase(body.exclude), feed_id,
           view: ["all", "unread", "saved"].includes(body.view) ? body.view : "all",
@@ -1991,20 +2012,45 @@ var styles = `
 .hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}.hermes-rss .rss-nav .rss-feed-open{flex:1;min-width:0}.hermes-rss .rss-nav .rss-unsubscribe{width:26px;flex-shrink:0;padding:7px;justify-content:center;color:var(--ui-text-tertiary)}
 .hermes-rss .rss-feed-info{display:grid;gap:2px;min-width:0}.hermes-rss .rss-feed-status{font-size:10px;color:var(--ui-text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hermes-rss .rss-feed-status-error{color:var(--ui-danger,var(--ui-text-secondary))}
 .hermes-rss .rss-feed-header-error{margin-top:8px;color:var(--ui-danger,var(--ui-text-secondary))}
-.hermes-rss .rss-settings{padding:18px 28px;border-bottom:1px solid var(--ui-stroke-secondary);display:grid;gap:16px}.hermes-rss .rss-settings h2{font-size:16px;margin:0}.hermes-rss .rss-setting{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.hermes-rss .rss-setting input[type=number]{width:90px}.hermes-rss .rss-setting input[type=checkbox]{accent-color:var(--ui-accent)}
-.hermes-rss .rss-settings-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;grid-auto-flow:column;gap:16px 28px;align-items:stretch}
+.hermes-rss .rss-settings{padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);display:grid;gap:10px}.hermes-rss .rss-settings h2{font-size:15px;margin:0}.hermes-rss .rss-setting{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.hermes-rss .rss-setting input[type=number]{width:90px}.hermes-rss .rss-setting input[type=checkbox]{accent-color:var(--ui-accent)}
+.hermes-rss .rss-settings-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;grid-auto-flow:column;gap:10px 24px;align-items:stretch}
 .hermes-rss .rss-settings-block{display:flex;flex-direction:column;gap:8px;min-width:0;min-height:100%}
 .hermes-rss .rss-settings-block .rss-settings-header{margin-top:0;padding-top:0;border-top:0}
 .hermes-rss .rss-settings-grid > .rss-settings-block:nth-child(2),.hermes-rss .rss-settings-grid > .rss-settings-block:nth-child(4){padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
 @media(max-width:760px){.hermes-rss .rss-settings-grid{grid-template-columns:1fr;grid-auto-flow:row;grid-template-rows:none}.hermes-rss .rss-settings-grid > .rss-settings-block:nth-child(n){padding-top:0;border-top:0}.hermes-rss .rss-settings-grid > .rss-settings-block:not(:first-child){padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}}
 .hermes-rss .rss-settings-library{display:grid;gap:12px;padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
-.hermes-rss .rss-filter-panel{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;padding:14px 28px;border-bottom:1px solid var(--ui-stroke-secondary);max-height:40vh;overflow:auto;flex-shrink:0}
-.hermes-rss .rss-filter-column{display:grid;align-content:start;gap:6px;min-width:0}.hermes-rss .rss-filter-column input,.hermes-rss .rss-filter-column select{min-width:0;max-width:100%;padding:4px 8px;font-size:12px;height:26px}
+.hermes-rss .rss-filter-panel{padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);max-height:36vh;overflow:auto;flex-shrink:0}
+.hermes-rss .rss-mute-grid{display:grid;grid-template-columns:minmax(200px,.85fr) minmax(280px,1.25fr);gap:12px 18px;align-items:start}
+.hermes-rss .rss-mute-form{display:grid;gap:8px;align-content:start}
+.hermes-rss .rss-mute-form .rss-tools{flex-wrap:wrap}
+.hermes-rss .rss-mute-table-wrap{overflow:auto;min-width:0;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:color-mix(in srgb,var(--ui-text-secondary) 4%,transparent)}
+.hermes-rss .rss-mute-table{width:100%;border-collapse:collapse;font-size:12px}
+.hermes-rss .rss-mute-table th{text-align:left;font-weight:650;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-text-tertiary);padding:7px 10px;background:color-mix(in srgb,var(--ui-text-secondary) 7%,transparent)}
+.hermes-rss .rss-mute-table td{padding:6px 10px;border-top:1px solid var(--ui-stroke-secondary);vertical-align:middle}
+.hermes-rss .rss-mute-table tr:hover td{background:color-mix(in srgb,var(--ui-text-secondary) 5%,transparent)}
+.hermes-rss .rss-mute-phrase{font-weight:600;color:var(--ui-text-primary,var(--foreground))}
+.hermes-rss .rss-mute-feed{color:var(--ui-text-secondary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hermes-rss .rss-mute-actions{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.hermes-rss .rss-mute-hits{min-width:1.6em;text-align:center;font-variant-numeric:tabular-nums;color:var(--ui-text-secondary);font-size:11px;font-weight:650}
+.hermes-rss .rss-mute-icon{width:22px;height:22px;padding:0;margin:0;border:0;background:transparent;color:var(--ui-text-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:4px}
+.hermes-rss .rss-filter-panel .rss-mute-icon{height:22px;width:22px;padding:0;min-height:0}
+.hermes-rss .rss-mute-icon:hover:not(:disabled){color:var(--foreground);background:var(--chrome-action-hover)}
+.hermes-rss .rss-mute-empty{padding:16px 12px;color:var(--ui-text-tertiary);font-size:12px}
 .hermes-rss .rss-filter-panel button{padding:4px 10px;font-size:12px;height:26px;min-height:0;line-height:1.2}
-.hermes-rss .rss-filter-panel .rss-small{line-height:1.45}
-.hermes-rss select{font:inherit;color:inherit;background:var(--ui-bg-primary,var(--background));border:1px solid var(--ui-stroke-secondary);border-radius:5px;padding:7px;max-width:100%}
+.hermes-rss .rss-filter-panel .rss-small{line-height:1.35}
+.hermes-rss .rss-list-search{display:flex;align-items:center;gap:4px;width:100%;min-width:0}
+.hermes-rss .rss-list-search input{flex:1;min-width:0}
+.hermes-rss .rss-list-filter-btn{width:26px;height:26px;padding:0;margin:0;border:0;background:transparent;color:var(--ui-text-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:5px;flex-shrink:0}
+.hermes-rss .rss-list-filter-btn:hover{color:var(--foreground);background:var(--chrome-action-hover)}
+.hermes-rss .rss-list-filter-btn[aria-expanded=true],.hermes-rss .rss-list-filter-btn[data-active=true]{color:var(--ui-accent)}
+.hermes-rss .rss-search-drawer{width:100%;display:grid;gap:8px;padding:8px 0 2px}
+.hermes-rss .rss-search-drawer .rss-tools{margin:0}
+.hermes-rss select{font:inherit;color:var(--ui-text-primary,var(--foreground));background:var(--ui-bg-elevated,var(--ui-bg-primary,var(--background)));border:1px solid var(--ui-stroke-secondary);border-radius:5px;padding:7px;max-width:100%}
+html[data-hermes-mode="dark"] .hermes-rss select,html.dark .hermes-rss select{color-scheme:dark}
+html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
+.hermes-rss select option{background:var(--ui-bg-elevated,var(--ui-bg-primary,var(--background)));color:var(--ui-text-primary,var(--foreground))}
 .hermes-rss .rss-filter-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.hermes-rss .rss-filter-chips button{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
-@media(max-width:760px){.hermes-rss .rss-filter-panel{grid-template-columns:1fr}}
+@media(max-width:760px){.hermes-rss .rss-mute-grid{grid-template-columns:1fr}}
 .hermes-rss .rss-confirm{padding:16px 28px;border-bottom:1px solid var(--ui-stroke-secondary)}.hermes-rss .rss-confirm h2{font-size:16px}.hermes-rss .rss-confirm .rss-tools{margin-top:12px}
 @media(max-width:1000px){.hermes-rss .rss-layout{grid-template-columns:145px minmax(210px,.85fr) minmax(260px,1fr)}.hermes-rss .rss-detail-inner{padding:22px 20px}.hermes-rss .rss-top{padding:20px}}
 @media(max-width:760px){.hermes-rss .rss-layout{grid-template-columns:125px 1fr}.hermes-rss .rss-detail{display:none}.hermes-rss .rss-layout.has-selection .rss-list{display:none}.hermes-rss .rss-layout.has-selection .rss-detail{display:block}.hermes-rss .rss-top{align-items:flex-start}.hermes-rss .rss-top p{display:none}}
@@ -2061,6 +2107,18 @@ function feedDropIndex(list, draggingId, feedId, isAfter) {
   const rest = (Array.isArray(list) ? list : []).filter((feed) => feed.id !== draggingId);
   const base = rest.findIndex((feed) => feed.id === feedId);
   return base < 0 ? null : base + (isAfter ? 1 : 0);
+}
+function muteHitCount(articles, rule) {
+  const phrase = String(rule?.phrase || "").toLowerCase();
+  if (!phrase) return 0;
+  const feedId = rule.feed_id || "";
+  let hits = 0;
+  for (const article of Array.isArray(articles) ? articles : []) {
+    if (feedId && article.feed_id !== feedId) continue;
+    const text = `${article.title || ""}\n${article.body || ""}`.toLowerCase();
+    if (text.includes(phrase)) hits++;
+  }
+  return hits;
 }
 function folderOf(feed) {
   return String(feed?.folder || "");
@@ -2133,9 +2191,11 @@ function ReaderProfile({ ctx, owner }) {
   const [exclude, setExclude] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [searchDrawerOpen, setSearchDrawerOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [mutePhrase, setMutePhrase] = useState("");
   const [muteFeed, setMuteFeed] = useState("");
+  const [editingMute, setEditingMute] = useState(null);
   const [tab, setTab] = useState("article");
   const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
@@ -2261,11 +2321,20 @@ function ReaderProfile({ ctx, owner }) {
   };
   const addMute = event => {
     event.preventDefault();
-    void act("Adding mute rule…", async () => {
-      await libraryRequest("/filters/mutes", { method: "POST", body: { phrase: mutePhrase, feed_id: muteFeed } });
-      setMutePhrase(""); setLimit(100); setSelected(null);
-      setNotice("Mute rule added. Articles stay in your library."); publishLibraryChange(owner);
+    void act(editingMute ? "Saving mute rule…" : "Adding mute rule…", async () => {
+      if (editingMute)
+        await libraryRequest(`/filters/mutes/${editingMute}`, { method: "PATCH", body: { phrase: mutePhrase, feed_id: muteFeed } });
+      else
+        await libraryRequest("/filters/mutes", { method: "POST", body: { phrase: mutePhrase, feed_id: muteFeed } });
+      setMutePhrase(""); setMuteFeed(""); setEditingMute(null); setLimit(100); setSelected(null);
+      setNotice(editingMute ? "Mute rule updated." : "Mute rule added. Articles stay in your library."); publishLibraryChange(owner);
     });
+  };
+  const startEditMute = rule => {
+    setEditingMute(rule.id);
+    setMutePhrase(rule.phrase);
+    setMuteFeed(rule.feed_id || "");
+    setFiltersOpen(true);
   };
   const removeFilter = (type, id) => act("Removing filter…", async () => {
     await libraryRequest(`/filters/${type}/${id}`, { method: "DELETE" });
@@ -2617,35 +2686,41 @@ function ReaderProfile({ ctx, owner }) {
         })
       ] })
     ] }),
-    filtersOpen && jsxs("div", { className: "rss-filter-panel", "aria-label": "Filters and saved searches", children: [
-      jsxs("div", { className: "rss-filter-column", children: [
-        jsx("h2", { className: "rss-settings-header", children: "Current search" }),
-        jsxs("label", { className: "rss-stack", children: ["Exclude phrase", jsx(Input, { value: exclude, maxLength: 200, placeholder: "e.g. promo code", onChange: event => { setExclude(event.target.value); setLimit(100); } })] }),
-        jsx("p", { className: "rss-muted rss-small", children: "Literal phrases in titles and feed text, ignoring case." }),
-        jsxs("form", { className: "rss-tools", onSubmit: saveSearch, children: [
-          jsx(Input, { "aria-label": "Saved search name", placeholder: "Name this search", value: searchName, maxLength: 200, required: true, onChange: event => setSearchName(event.target.value) }),
-          jsx(Button, { type: "submit", disabled: disabled || !searchName.trim() || filters.isPending || !!filters.error, children: "Save search" })
+    filtersOpen && jsxs("div", { className: "rss-filter-panel", "aria-label": "Mute rules", children: [
+      jsxs("div", { className: "rss-mute-grid", children: [
+        jsxs("div", { className: "rss-mute-form", children: [
+          jsx("h2", { className: "rss-settings-header", children: "Mute rules" }),
+          jsx("p", { className: "rss-muted rss-small", children: "Hides matches in every view. Unread counts still include them." }),
+          jsxs("form", { className: "rss-stack", onSubmit: addMute, children: [
+            jsx(Input, { "aria-label": "Mute phrase", placeholder: "e.g. coupon", value: mutePhrase, maxLength: 200, required: true, onChange: event => setMutePhrase(event.target.value) }),
+            jsxs("select", { "aria-label": "Mute rule feed", value: muteFeed, onChange: event => setMuteFeed(event.target.value), children: [
+              jsx("option", { value: "", children: "All feeds" }),
+              (feeds.data || []).map(feed => jsx("option", { value: feed.id, children: feed.title }, feed.id))
+            ] }),
+            jsxs("div", { className: "rss-tools", children: [
+              jsx(Button, { type: "submit", disabled: disabled || !mutePhrase.trim() || filters.isPending || !!filters.error, children: editingMute ? "Save rule" : "Add mute" }),
+              editingMute && jsx(Button, { type: "button", variant: "ghost", onClick: () => { setEditingMute(null); setMutePhrase(""); setMuteFeed(""); }, children: "Cancel" })
+            ] })
+          ] })
         ] }),
-        searches.map(search => jsxs("div", { className: "rss-tools", children: [
-          jsx(Button, { variant: "ghost", onClick: () => openSearch(search), children: search.name }),
-          jsx(Button, { variant: "ghost", disabled, "aria-label": `Remove saved search ${search.name}`, onClick: () => removeFilter("searches", search.id), children: "Remove" })
-        ] }, search.id))
-      ] }),
-      jsxs("div", { className: "rss-filter-column", children: [
-        jsx("h2", { className: "rss-settings-header", children: "Mute rules" }),
-        jsx("p", { className: "rss-muted rss-small", children: "Hides matches in every view. Unread counts still include them." }),
-        jsxs("form", { className: "rss-tools", onSubmit: addMute, children: [
-          jsx(Input, { "aria-label": "Mute phrase", placeholder: "e.g. coupon", value: mutePhrase, maxLength: 200, required: true, onChange: event => setMutePhrase(event.target.value) }),
-          jsxs("select", { "aria-label": "Mute rule feed", value: muteFeed, onChange: event => setMuteFeed(event.target.value), children: [
-            jsx("option", { value: "", children: "All feeds" }),
-            (feeds.data || []).map(feed => jsx("option", { value: feed.id, children: feed.title }, feed.id))
-          ] }),
-          jsx(Button, { type: "submit", disabled: disabled || !mutePhrase.trim() || filters.isPending || !!filters.error, children: "Add mute" })
-        ] }),
-        mutes.map(rule => jsxs("div", { className: "rss-tools", children: [
-          jsx("span", { className: "rss-small", children: `${rule.phrase} · ${rule.feed_id ? (feeds.data || []).find(feed => feed.id === rule.feed_id)?.title || "Removed feed" : "All feeds"}` }),
-          jsx(Button, { variant: "ghost", disabled, "aria-label": `Remove mute rule ${rule.phrase}`, onClick: () => removeFilter("mutes", rule.id), children: "Remove" })
-        ] }, rule.id))
+        jsx("div", { className: "rss-mute-table-wrap", children:
+          mutes.length ? jsxs("table", { className: "rss-mute-table", children: [
+            jsx("thead", { children: jsxs("tr", { children: [
+              jsx("th", { children: "Phrase" }),
+              jsx("th", { children: "Feed" }),
+              jsx("th", { children: "" })
+            ] }) }),
+            jsx("tbody", { children: mutes.map(rule => jsxs("tr", { children: [
+              jsx("td", { className: "rss-mute-phrase", children: rule.phrase }),
+              jsx("td", { className: "rss-mute-feed", title: rule.feed_id ? ((feeds.data || []).find(feed => feed.id === rule.feed_id)?.title || "Removed feed") : "All feeds", children: rule.feed_id ? ((feeds.data || []).find(feed => feed.id === rule.feed_id)?.title || "Removed feed") : "All feeds" }),
+              jsx("td", { children: jsxs("div", { className: "rss-mute-actions", children: [
+                jsx("button", { type: "button", className: "rss-mute-icon", disabled, title: "Edit rule", "aria-label": `Edit mute rule ${rule.phrase}`, onClick: () => startEditMute(rule), children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) }),
+                jsx("span", { className: "rss-mute-hits", title: `${rule.hits || 0} articles hidden right now`, children: rule.hits || 0 }),
+                jsx("button", { type: "button", className: "rss-mute-icon", disabled, title: "Delete rule", "aria-label": `Remove mute rule ${rule.phrase}`, onClick: () => removeFilter("mutes", rule.id), children: jsx("i", { className: "codicon codicon-trash", "aria-hidden": "true" }) })
+              ] }) })
+            ] }, rule.id)) })
+          ] }) : jsx("p", { className: "rss-mute-empty", children: "No mute rules yet." })
+        })
       ] }),
       filters.error && jsx("p", { role: "alert", children: filters.error.message })
     ] }),
@@ -2860,10 +2935,9 @@ function ReaderProfile({ ctx, owner }) {
         !feeds.data?.length && jsx("p", { className: "rss-muted rss-small", style: { padding: "0 10px" }, children: "Your feeds will appear here." })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "rss-list", children: [
-        /* @__PURE__ */ jsxs("div", { className: "rss-list-head", children: [
-          /* @__PURE__ */ jsx(
-            Input,
-            {
+        jsxs("div", { className: "rss-list-head", children: [
+          jsxs("div", { className: "rss-list-search", children: [
+            jsx(Input, {
               "aria-label": "Search articles",
               placeholder: "Search your articles\u2026",
               value: query,
@@ -2872,11 +2946,33 @@ function ReaderProfile({ ctx, owner }) {
                 setQuery(event.target.value);
                 setLimit(100);
               }
-            }
-          ),
-          /* @__PURE__ */ jsx("span", { className: "rss-list-meta", children:
-            /* @__PURE__ */ jsx("button", { type: "button", className: "rss-mark-read", disabled, onClick: markAllRead, "aria-label": feedId ? "Mark feed as read" : "Mark all as read", title: (feedId ? "Mark feed as read" : "Mark all as read") + " \u00b7 includes hidden articles and articles outside the current search.", children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-check-all", "aria-hidden": "true" }) })
-          }),
+            }),
+            jsx("button", {
+              type: "button",
+              className: "rss-list-filter-btn",
+              "aria-expanded": searchDrawerOpen,
+              "aria-label": "Search filters",
+              title: "Search filters",
+              "data-active": !!(exclude || searchName || searches.length),
+              onClick: () => setSearchDrawerOpen(!searchDrawerOpen),
+              children: jsx("i", { className: `codicon ${searchDrawerOpen ? "codicon-filter-filled" : "codicon-filter"}`, "aria-hidden": "true" })
+            }),
+            jsx("span", { className: "rss-list-meta", children:
+              jsx("button", { type: "button", className: "rss-mark-read", disabled, onClick: markAllRead, "aria-label": feedId ? "Mark feed as read" : "Mark all as read", title: (feedId ? "Mark feed as read" : "Mark all as read") + " \u00b7 includes hidden articles and articles outside the current search.", children: jsx("i", { className: "codicon codicon-check-all", "aria-hidden": "true" }) })
+            })
+          ] }),
+          searchDrawerOpen && jsxs("div", { className: "rss-search-drawer", "aria-label": "Current search", children: [
+            jsxs("label", { className: "rss-stack", children: ["Exclude phrase", jsx(Input, { value: exclude, maxLength: 200, placeholder: "e.g. promo code", onChange: event => { setExclude(event.target.value); setLimit(100); } })] }),
+            jsx("p", { className: "rss-muted rss-small", children: "Literal phrases in titles and feed text, ignoring case." }),
+            jsxs("form", { className: "rss-tools", onSubmit: saveSearch, children: [
+              jsx(Input, { "aria-label": "Saved search name", placeholder: "Name this search", value: searchName, maxLength: 200, required: true, onChange: event => setSearchName(event.target.value) }),
+              jsx(Button, { type: "submit", disabled: disabled || !searchName.trim() || filters.isPending || !!filters.error, children: "Save search" })
+            ] }),
+            searches.map(search => jsxs("div", { className: "rss-tools", children: [
+              jsx(Button, { variant: "ghost", onClick: () => openSearch(search), children: search.name }),
+              jsx(Button, { variant: "ghost", disabled, "aria-label": `Remove saved search ${search.name}`, onClick: () => removeFilter("searches", search.id), children: "Remove" })
+            ] }, search.id))
+          ] }),
           (query || exclude || feedId || view !== "all" || mutes.length > 0 || showHidden) && jsxs("div", { className: "rss-filter-chips", "aria-label": "Active filters", children: [
             query && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear search phrase", onClick: () => { setQuery(""); setLimit(100); }, children: `Search: ${query} ×` }),
             exclude && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear excluded phrase", onClick: () => { setExclude(""); setLimit(100); }, children: `Exclude: ${exclude} ×` }),

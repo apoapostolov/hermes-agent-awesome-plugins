@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("muteHitCount")].join("\n");
 const fns = {};
 new Function("exports", `${bundle}
 exports.profileFromOwner = profileFromOwner;
@@ -30,6 +30,7 @@ exports.folderOf = folderOf;
 exports.folderTitle = folderTitle;
 exports.groupFeedsByFolder = groupFeedsByFolder;
 exports.previewNavFeeds = previewNavFeeds;
+exports.muteHitCount = muteHitCount;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -59,5 +60,10 @@ const moved = fns.previewNavFeeds(
 );
 assert.equal(moved[0].id, "1");
 assert.equal(moved[0].folder, "News");
+assert.equal(fns.muteHitCount([
+  { title: "Coupon dump", body: "buy now", feed_id: "a" },
+  { title: "News", body: "plain", feed_id: "a" },
+  { title: "Coupon", body: "ok", feed_id: "b" }
+], { phrase: "coupon", feed_id: "a" }), 1);
 
-console.log("ok", 16);
+console.log("ok", 17);
