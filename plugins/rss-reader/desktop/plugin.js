@@ -1038,7 +1038,7 @@ var styles = `
 .hermes-rss .rss-detail{overflow:auto;padding:32px 44px 56px}
 .hermes-rss .rss-detail .rss-tools{margin:18px 0}
 .hermes-rss .rss-detail-inner{max-width:70ch;margin:0 auto}
-.hermes-rss .rss-detail h2{font-size:24px;letter-spacing:-.3px;line-height:1.3;margin:6px 0 14px;font-weight:700}
+.hermes-rss .rss-detail h2{font-size:24px;letter-spacing:-.3px;line-height:1.3;margin:6px 0 22px;font-weight:700}
 .hermes-rss .rss-detail .rss-eyebrow{margin-bottom:0}
 .hermes-rss .rss-detail .rss-body strong,.hermes-rss .rss-detail .rss-body b{font-weight:650}
 .hermes-rss .rss-detail .rss-body li::marker{color:var(--ui-text-tertiary)}
@@ -1351,10 +1351,16 @@ function ReaderProfile({ ctx, owner }) {
           requestAnimationFrame(() => {
             const scroller = document.querySelector(".hermes-rss .rss-list-items");
             const card = scroller?.querySelector(`.rss-card[aria-selected="true"]`);
-            if (scroller && card) {
-              const top = card.offsetTop - scroller.clientHeight / 2 + card.clientHeight / 2;
-              scroller.scrollTo({ top, behavior: "smooth" });
-            }
+            if (!scroller || !card) return;
+            const view = scroller.getBoundingClientRect();
+            const box = card.getBoundingClientRect();
+            const cardTop = box.top - view.top;
+            const cardBottom = cardTop + box.height;
+            const floor = view.height * 0.6;
+            let delta = 0;
+            if (cardTop < 0) delta = cardTop;
+            else if (cardBottom > floor) delta = cardBottom - floor;
+            if (delta) scroller.scrollTo({ top: scroller.scrollTop + delta, behavior: "smooth" });
           });
         }
       } else if (event.key === "s" && article) {
@@ -1824,7 +1830,6 @@ function ReaderProfile({ ctx, owner }) {
               "Could not open the original article."
             );
         }) : undefined, children: article.title }),
-        article.captured && jsx("span", { className: "rss-chip", style: { marginTop: 8, display: "inline-flex" }, children: "Full text" }),
         /* @__PURE__ */ jsxs("div", { className: "rss-tools rss-article-actions", children: [
           /* @__PURE__ */ jsxs("div", { className: "rss-icon-row", children: [
             /* @__PURE__ */ jsx(
