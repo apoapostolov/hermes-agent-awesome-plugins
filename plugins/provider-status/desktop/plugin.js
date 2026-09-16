@@ -1113,7 +1113,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
         jsx(Button, { variant: 'ghost', size: 'icon-xs', className: 'shrink-0 text-(--ui-text-quaternary) hover:text-destructive', onClick: () => onRemove && onRemove(pid), title: 'delete provider', children: jsx(Codicon, { name: 'trash', size: '0.75rem' }) }),
       ]}),
       // ── extra key rows ──
-      keys.slice(1).map((k, i) => jsxs('div', { className: 'flex items-center gap-2', children: [
+      keys.slice(1).map((k, i) => jsxs('div', { className: 'flex items-center gap-2 pl-7', children: [
         keyActiveRadio(i + 1),
         jsx('span', { className: 'text-[0.65rem] tabular-nums shrink-0 w-5 text-right', style: { color: 'var(--ui-text-quaternary)' }, children: '#' + (i + 2) }),
         jsx(Input, { type: 'password', value: k, onChange: e => setKeyAt(i + 1, e.target.value), onBlur: () => persist(), placeholder: `Key #${i + 2}`, size: 'sm', className: 'flex-1 h-6 font-mono text-[0.7rem]' }),
