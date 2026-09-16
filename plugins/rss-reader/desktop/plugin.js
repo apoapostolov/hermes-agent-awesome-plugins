@@ -1278,7 +1278,7 @@ var styles = `
 .hermes-rss .rss-nav .rss-eyebrow{padding:0 10px;margin-top:28px}.hermes-rss .rss-count{font-size:11px;font-variant-numeric:tabular-nums}
 .hermes-rss .rss-nav-heading{display:flex;align-items:center;padding:0 2px 0 10px;margin-top:28px;min-height:16px;width:100%;box-sizing:border-box}
 .hermes-rss .rss-nav-heading .rss-eyebrow{padding:0;margin:0;letter-spacing:.8px;white-space:nowrap;flex:1;min-width:0;line-height:1;display:flex;align-items:center}
-.hermes-rss .rss-nav .rss-edit-toggle,.hermes-rss .rss-nav-heading .rss-edit-toggle{width:16px;height:16px;padding:0;margin:0 -20px 0 auto;flex:0 0 16px;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);line-height:1}
+.hermes-rss .rss-nav .rss-edit-toggle,.hermes-rss .rss-nav-heading .rss-edit-toggle{width:16px;height:16px;padding:0;margin:0 -10px 0 auto;flex:0 0 16px;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);line-height:1}
 .hermes-rss .rss-edit-toggle .codicon{font-size:9px;line-height:1;display:block}
 .hermes-rss .rss-edit-toggle[aria-pressed=true]{color:var(--ui-accent)}
 .hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}
