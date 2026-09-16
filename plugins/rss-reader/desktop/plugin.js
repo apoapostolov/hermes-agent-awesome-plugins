@@ -1110,6 +1110,7 @@ var styles = `
 .hermes-rss .rss-empty{padding:48px 24px;text-align:center;max-width:450px;margin:auto}.hermes-rss .rss-empty-mark{font-size:32px;color:var(--ui-accent);margin-bottom:20px}
 .hermes-rss .rss-empty h2{font-size:19px}.hermes-rss .rss-empty p{color:var(--ui-text-secondary);margin:10px 0 18px}
 .hermes-rss .rss-notice{margin:0;padding:10px 24px;border-bottom:1px solid var(--ui-stroke-secondary);background:color-mix(in srgb,var(--ui-accent) 6%,transparent);font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hermes-rss .rss-notice-float{position:sticky;top:0;z-index:5;border:1px solid var(--ui-stroke-secondary);border-top:0;border-radius:0 0 8px 8px;margin:0 16px;box-shadow:0 4px 14px color-mix(in srgb,black 14%,transparent)}
 .hermes-rss .rss-notice-close{border:0;background:transparent;color:var(--ui-text-secondary);padding:2px 6px;font-size:16px;line-height:1;border-radius:4px}
 .hermes-rss .rss-notice-close:hover{background:color-mix(in srgb,var(--ui-text-secondary) 12%,transparent);color:var(--ui-text-primary,var(--foreground))}
 .hermes-rss .rss-note{padding:14px 16px;border:1px solid var(--ui-stroke-secondary);border-radius:8px;margin:18px 0;color:var(--ui-text-secondary);font-size:12px;line-height:1.7}
@@ -1558,10 +1559,6 @@ function ReaderProfile({ ctx, owner }) {
         /* @__PURE__ */ jsx(Button, { onClick: () => setAdding(!adding), disabled, children: "+ Subscribe" })
       ] })
     ] }),
-    (busy || notice) && jsxs("div", { className: "rss-notice", role: "status", children: [
-      jsx("span", { children: busy || notice }),
-      notice && jsx("button", { type: "button", className: "rss-notice-close", "aria-label": "Dismiss notification", onClick: () => setNotice(""), children: "×" })
-    ] }),
     filtersOpen && jsxs("div", { className: "rss-filter-panel", "aria-label": "Filters and saved searches", children: [
       jsxs("div", { className: "rss-filter-column", children: [
         jsx("h2", { children: "Current search" }),
@@ -1830,7 +1827,12 @@ function ReaderProfile({ ctx, owner }) {
           articles.data?.length === limit && limit < 500 && /* @__PURE__ */ jsx(Button, { variant: "ghost", onClick: () => setLimit(limit + 100), children: "Load more" })
         ] })
       ] }),
-      /* @__PURE__ */ jsx("main", { className: "rss-detail", children:
+      /* @__PURE__ */ jsxs("main", { className: "rss-detail", children: [
+        (busy || notice) && jsxs("div", { className: "rss-notice rss-notice-float", role: "status", children: [
+          jsx("span", { children: busy || notice }),
+          notice && jsx("button", { type: "button", className: "rss-notice-close", "aria-label": "Dismiss notification", onClick: () => setNotice(""), children: "×" })
+        ] }),
+        /* @__PURE__ */ jsx(Fragment, { children:
         !selected ? /* @__PURE__ */ jsx("div", { className: "rss-detail-inner", children: /* @__PURE__ */ jsxs(Empty, { title: "Follow your curiosity", children: [
           /* @__PURE__ */ jsx("p", { children: "Pick an article to read, unpack its ideas with Hermes, or look for evidence beyond the headline." }),
           /* @__PURE__ */ jsx("div", { className: "rss-note", children: "AI runs only when you ask. Feed refresh uses standard network utilities on the connected gateway. Selected text goes to your configured model. Source checks use your Hermes web tools." })
@@ -2084,7 +2086,9 @@ function ReaderProfile({ ctx, owner }) {
             }
           )
         ] }) })
-      ] }) }) })
+      ] }) })
+        })
+      ] })
     ] })
   ] });
 }
