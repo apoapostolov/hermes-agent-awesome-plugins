@@ -571,7 +571,7 @@ function ExpGearMenu() {
               ? 'bg-[color-mix(in_srgb,var(--ui-bg-elevated)_42%,transparent)] backdrop-blur-2xl'
               : 'bg-(--ui-chat-bubble-background)'
           ),
-          bodyClassName: 'gap-3 overflow-auto max-h-[70vh] min-h-[26rem]',
+          bodyClassName: 'gap-3 overflow-auto max-h-[80vh] min-h-[26rem]',
           children: [
             jsxs(DialogHeader, { className: 'flex flex-row items-center justify-between gap-2 pr-8 h-7 -mt-2', children: [
               jsx(DialogTitle, { children: 'Providers' }),
