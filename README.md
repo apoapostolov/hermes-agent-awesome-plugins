@@ -1,6 +1,6 @@
 # Hermes Agent Awesome Plugins
 
-A Hermes Agent plugin pack. Nine plugins, pinned to exact SHAs in `hermes-pack.yaml`. Install the pack, not a GitHub Release.
+A Hermes Agent plugin pack. Ten plugins live in this repo. Pack pins in `hermes-pack.yaml` are exact SHAs. Install the pack, not a GitHub Release.
 
 Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
 
@@ -23,6 +23,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the notes.
 | [reasoning‑switch](plugins/reasoning-switch/README.md) | Rotate the focused session's reasoning effort from the status bar, with per-level colors, rotation checkboxes, and prompt limits that auto-demote. |
 | [iteration‑budget‑meter](plugins/iteration-budget-meter/README.md) | Watch the tool-call budget of the focused session live in the status bar. |
 | [memory‑review](plugins/memory-review/README.md) | Dialog to checkbox staged memory writes and approve or reject them. |
+| [rss-reader](plugins/rss-reader/) | Three-column RSS page with folders, mute rules, reader-mode capture, and Google Reader keys. |
 
 ## Install
 
@@ -65,6 +66,7 @@ Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop
 - [reasoning-switch](plugins/reasoning-switch/README.md)
 - [iteration-budget-meter](plugins/iteration-budget-meter/README.md)
 - [memory-review](plugins/memory-review/README.md)
+- [rss-reader](plugins/rss-reader/)
 - [hermes-awesome-plugins-sync](skills/hermes-awesome-plugins-sync/SKILL.md) — maintainer skill to mirror live plugin dirs into this repo and repin `hermes-pack.yaml`
 
 ## Support
