@@ -430,7 +430,7 @@ async function requestOneshot(host2, route, extra) {
     const payload = await oneshotPayload(host2, extra, route);
     let response;
     try {
-      response = await host2.requestProfile(route, "llm.oneshot", payload);
+      response = await host2.requestProfile(route, "llm.oneshot", payload, 180000);
     } catch (error) {
       last = oneshotFailure(null, error);
       if (!isMissingSession(last)) throw new Error(last);
@@ -2326,10 +2326,10 @@ var styles = `
 .hermes-rss .rss-mute-table tr:hover td{background:color-mix(in srgb,var(--ui-text-secondary) 5%,transparent)}
 .hermes-rss .rss-mute-phrase{font-weight:600;color:var(--ui-text-primary,var(--foreground))}
 .hermes-rss .rss-mute-feed{color:var(--ui-text-secondary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hermes-rss .rss-mute-col-filtered{width:4.5em;text-align:right;font-variant-numeric:tabular-nums}
+.hermes-rss .rss-mute-col-filtered{width:4.5em;text-align:center;font-variant-numeric:tabular-nums}
 .hermes-rss .rss-mute-col-actions{width:1%;text-align:right;white-space:nowrap}
 .hermes-rss .rss-mute-actions{display:inline-flex;align-items:center;justify-content:flex-end;gap:2px;white-space:nowrap;width:100%}
-.hermes-rss .rss-mute-hits{min-width:1.6em;text-align:right;font-variant-numeric:tabular-nums;color:var(--ui-text-secondary);font-size:11px;font-weight:650}
+.hermes-rss .rss-mute-hits{min-width:1.6em;text-align:center;font-variant-numeric:tabular-nums;color:var(--ui-text-secondary);font-size:11px;font-weight:650}
 .hermes-rss .rss-mute-icon{width:22px;height:22px;padding:0;margin:0;border:0;background:transparent;color:var(--ui-text-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:4px}
 .hermes-rss .rss-filter-panel .rss-mute-icon{height:22px;width:22px;padding:0;min-height:0}
 .hermes-rss .rss-mute-icon:hover:not(:disabled){color:var(--foreground);background:var(--chrome-action-hover)}
