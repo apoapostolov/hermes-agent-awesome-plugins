@@ -164,7 +164,7 @@ function validateSummary(text, body) {
 
 // AI importance grading. One batched auxiliary-model call per pass, run off the
 // refresh path and never blocking the list: the grades land later and tint.
-var DEFAULT_GRADING_SKILL = "rss-importance-grading";
+var DEFAULT_GRADING_SKILL = "rss-reader-grading";
 // Every returned level is stored, "normal" included: it is what stops a later
 // pass from re-grading the same articles. The skill's tag table decides which
 // levels tint or carry a pill.
@@ -178,10 +178,10 @@ var GRADING_RUBRIC = [
 ].join("\n");
 // Used until the preference skill has been read; the skill's own table wins.
 var DEFAULT_GRADING_TAGS = [
-  { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12 },
-  { key: "interesting", label: "INTERESTING", color: "#d9a441", tint: 10 },
-  { key: "spam", label: "SPAM", color: "#6b6b6b", tint: 10 },
-  { key: "normal", label: "", color: "", tint: 0 }
+  { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
+  { key: "interesting", label: "INTERESTING", color: "#d9a441", tint: 10, rank: 70 },
+  { key: "normal", label: "", color: "", tint: 0, rank: 40 },
+  { key: "spam", label: "SPAM", color: "#6b6b6b", tint: 10, rank: 10 }
 ];
 var GRADING_LEVELS = DEFAULT_GRADING_TAGS.map((t) => t.key);
 function parseGradingTags(text) {
@@ -193,12 +193,14 @@ function parseGradingTags(text) {
   const tags = [];
   for (const row of rows) {
     if (!row.includes("|")) continue;
-    const [rawKey, rawLabel, rawColor, rawTint] = row.split("|").map((part) => String(part || "").trim());
+    const [rawKey, rawLabel, rawColor, rawTint, rawRank] = row.split("|").map((part) => String(part || "").trim());
     const key = rawKey.toLowerCase().replace(/[^a-z0-9_-]/g, "");
     if (!key || tags.some((t) => t.key === key)) continue;
     const hex = /^#?[0-9a-f]{3,8}$/i.test(rawColor) ? (rawColor.startsWith("#") ? rawColor : `#${rawColor}`) : "";
     const tint = Math.max(0, Math.min(40, Number.parseInt(rawTint, 10) || 0));
-    tags.push({ key, label: rawLabel.slice(0, 14), color: hex, tint });
+    const parsedRank = Number.parseInt(rawRank, 10);
+    const rank = Number.isFinite(parsedRank) ? Math.max(0, Math.min(100, parsedRank)) : 0;
+    tags.push({ key, label: rawLabel.slice(0, 14), color: hex, tint, rank });
   }
   return tags.length ? tags : DEFAULT_GRADING_TAGS;
 }
@@ -208,6 +210,23 @@ function gradingTagFor(tags, level) {
 }
 function gradingKeys(tags) {
   return (Array.isArray(tags) && tags.length ? tags : DEFAULT_GRADING_TAGS).map((tag) => tag.key);
+}
+function tagRank(tags, level) {
+  const tag = gradingTagFor(tags, level);
+  const n = Number(tag?.rank);
+  if (Number.isFinite(n)) return Math.max(0, Math.min(100, n));
+  const fallback = gradingTagFor(DEFAULT_GRADING_TAGS, level);
+  const raw = Number(fallback?.rank);
+  return Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0;
+}
+function sortArticlesByImportance(list, tags) {
+  const rows = Array.isArray(list) ? list.slice() : [];
+  rows.sort((a, b) => {
+    const rank = tagRank(tags, b?.grade?.level) - tagRank(tags, a?.grade?.level);
+    if (rank) return rank;
+    return String(b?.published_at || b?.received_at || "").localeCompare(String(a?.published_at || a?.received_at || ""));
+  });
+  return rows;
 }
 function readGradingTags(ctx, owner) {
   const stored = storageGet(ctx, "gradingTags", owner, null);
@@ -224,37 +243,40 @@ function cacheGradingTags(ctx, owner, tags) {
 var gradingRuns = /* @__PURE__ */ new Set();
 function gradingSkillName(value) {
   const slug = String(value || "").trim().replace(/[^A-Za-z0-9_-]/g, "").slice(0, 60);
+  if (slug === "rss-importance-grading") return "rss-reader-grading";
   return slug || DEFAULT_GRADING_SKILL;
 }
 function gradingScaffold(name) {
   return [
     "---",
     `name: ${name}`,
-    'description: "Use when grading RSS article importance. Rubric, tags, and colours for the RSS Reader AI grading option."',
-    "version: 1.0.0",
+    'description: "Use when grading RSS Reader articles. Tags, colours, ranks."',
+    "version: 1.1.0",
     "---",
     "",
-    "# RSS importance grading",
+    "# RSS Reader grading",
     "",
     "The RSS Reader sends every ungraded article in one batch and expects one",
     "verdict per article. Hermes maintains this file: change the levels, the rules,",
-    "or the tag colours below and the reader picks the change up on its next pass.",
+    "the tag colours, or the 0-100 ranks below and the reader picks the change up",
+    "on its next pass.",
     "",
     "## Tags",
     "",
     "The reader parses the fenced block below. One tag per line:",
-    "key | pill label | colour | card tint percent",
+    "key | pill label | colour | card tint percent | rank 0-100",
     "",
     "- key: what the model must return, lowercase, one word.",
     "- pill label: shown in the article list; leave empty for no pill.",
     "- colour: hex; leave empty for no pill and no tint.",
     "- card tint: 0-40, the percent of colour mixed into the card background.",
+    "- rank: 0-100, higher lists first when Order by Importance is on.",
     "",
     "```tags",
-    "important | IMPORTANT | #d9534f | 12",
-    "interesting | INTERESTING | #d9a441 | 10",
-    "spam | SPAM | #6b6b6b | 10",
-    "normal | | | 0",
+    "important | IMPORTANT | #d9534f | 12 | 100",
+    "interesting | INTERESTING | #d9a441 | 10 | 70",
+    "normal | | | 0 | 40",
+    "spam | SPAM | #6b6b6b | 10 | 10",
     "```",
     "",
     "## Levels",
@@ -1018,7 +1040,8 @@ function readSettings(ctx, owner) {
     fullCapture: stored.fullCapture === true,
     paywallServices: stored.paywallServices === true,
     aiGrading: stored.aiGrading === true,
-    gradingSkill: typeof stored.gradingSkill === "string" && stored.gradingSkill.trim() ? stored.gradingSkill : DEFAULT_GRADING_SKILL,
+    orderByImportance: stored.orderByImportance === true,
+    gradingSkill: gradingSkillName(typeof stored.gradingSkill === "string" ? stored.gradingSkill : ""),
     gradingTags: readGradingTags(ctx, owner)
   };
 }
@@ -2681,7 +2704,9 @@ function ReaderProfile({ ctx, owner }) {
       if (result.source) setNotice(`The full text came from ${result.source}.`);
     });
   };
-  const articleList = articles.data || [];
+  const articleList = settings.orderByImportance
+    ? sortArticlesByImportance(articles.data || [], settings.gradingTags)
+    : (articles.data || []);
   const selectedIndex = selected ? articleList.findIndex(a => a.id === selected) : -1;
   const listBeyondTop20 = scroller => {
     const cards = scroller?.querySelectorAll(".rss-card");
@@ -3125,11 +3150,18 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "AI Grading" }),
-            jsx("label", { className: "rss-setting", children: [
-              jsx("input", { type: "checkbox", checked: draft.aiGrading, onChange: event => setDraft({ ...draft, aiGrading: event.target.checked }) }),
-              "Article Tagging by AI"
+            jsxs("div", { className: "rss-setting-row", children: [
+              jsx("label", { className: "rss-setting", children: [
+                jsx("input", { type: "checkbox", checked: draft.aiGrading, onChange: event => setDraft({ ...draft, aiGrading: event.target.checked }) }),
+                "Article Tagging by AI"
+              ] }),
+              jsx("label", { className: "rss-setting", children: [
+                jsx("input", { type: "checkbox", checked: draft.orderByImportance === true, onChange: event => setDraft({ ...draft, orderByImportance: event.target.checked }) }),
+                "Order by Importance"
+              ] })
             ] }),
             jsx("p", { className: "rss-muted rss-small", children: "After a refresh, articles are sent to AI to identify important, interesting, or spam articles." }),
+            jsx("p", { className: "rss-muted rss-small", children: "When on, tagged articles are listed by the skill's tag rank, then by date." }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsxs("label", { className: "rss-skill-field", children: [
                 jsx("span", { children: "Preference Skill" }),
@@ -3380,7 +3412,7 @@ function ReaderProfile({ ctx, owner }) {
               ] })
             ]
           }),
-          (articles.data || []).map((item) => {
+          articleList.map((item) => {
             const tag = gradingTagFor(settings.gradingTags, item.grade?.level);
             const pill = tag && tag.label ? tag : null;
             const tint = pill && tag.color && tag.tint > 0

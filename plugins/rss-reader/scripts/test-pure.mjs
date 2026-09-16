@@ -18,9 +18,15 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags")].join("\n");
 const fns = {};
-new Function("exports", `${bundle}
+new Function("exports", `const DEFAULT_GRADING_TAGS = [
+  { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
+  { key: "interesting", label: "INTERESTING", color: "#d9a441", tint: 10, rank: 70 },
+  { key: "normal", label: "", color: "", tint: 0, rank: 40 },
+  { key: "spam", label: "SPAM", color: "#6b6b6b", tint: 10, rank: 10 }
+];
+${bundle}
 exports.profileFromOwner = profileFromOwner;
 exports.cheapExcerpt = cheapExcerpt;
 exports.firstBodyImage = firstBodyImage;
@@ -39,6 +45,9 @@ exports.isDesignPreviewGrade = isDesignPreviewGrade;
 exports.articleHasGrade = articleHasGrade;
 exports.rememberGrade = rememberGrade;
 exports.applyCachedGrade = applyCachedGrade;
+exports.parseGradingTags = parseGradingTags;
+exports.tagRank = tagRank;
+exports.sortArticlesByImportance = sortArticlesByImportance;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -100,4 +109,16 @@ const fake = { grade: { level: "important", reason: "Design preview: gone" } };
 assert.equal(fns.applyCachedGrade(gradeLib, fake), true);
 assert.equal(fake.grade, undefined);
 
-console.log("ok", 21);
+const parsed = fns.parseGradingTags("```tags\nimportant | IMPORTANT | #d9534f | 12 | 100\nspam | SPAM | #6b6b6b | 10 | 10\n```");
+assert.equal(parsed[0].rank, 100);
+assert.equal(parsed[1].rank, 10);
+assert.equal(fns.tagRank(parsed, "important"), 100);
+const ordered = fns.sortArticlesByImportance([
+  { id: "a", grade: { level: "spam" }, published_at: "2026-09-16" },
+  { id: "b", grade: { level: "important" }, published_at: "2026-09-01" },
+  { id: "c", grade: { level: "important" }, published_at: "2026-09-10" },
+  { id: "d", published_at: "2026-09-20" }
+], parsed);
+assert.equal(ordered.map((a) => a.id).join(""), "cbad");
+
+console.log("ok", 23);
