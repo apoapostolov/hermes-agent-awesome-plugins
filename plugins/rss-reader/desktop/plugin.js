@@ -1,5 +1,5 @@
 // src/plugin.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Codicon,
@@ -2003,7 +2003,7 @@ var styles = `
 .hermes-rss .rss-feed-edit button,.hermes-rss .rss-feed-edit .rss-grip{width:18px;height:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);font-size:12px}
 .hermes-rss .rss-grip{cursor:grab}
 .hermes-rss .rss-feed-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hermes-rss .rss-list{border-right:1px solid var(--ui-stroke-secondary);display:flex;flex-direction:column;min-height:0}
+.hermes-rss .rss-list{border-right:1px solid var(--ui-stroke-secondary);display:flex;flex-direction:column;min-height:0;position:relative}
 .hermes-rss .rss-list-head{padding:10px 12px;border-bottom:1px solid var(--ui-stroke-secondary);display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .hermes-rss .rss-list-head input{flex:1;min-width:120px;height:26px;padding:4px 8px;font-size:12px}
 .hermes-rss .rss-list-head .rss-list-meta{display:flex;align-items:center;gap:6px;white-space:nowrap}
@@ -2065,6 +2065,11 @@ var styles = `
 .hermes-rss .rss-tabs-pills button{border:0;background:transparent;border-radius:0;padding:2px 0;font-size:12px;line-height:1.4;color:var(--ui-text-secondary)}
 .hermes-rss .rss-tabs-pills button[aria-selected=true]{border-bottom:2px solid var(--ui-accent);background:transparent;color:var(--ui-text-primary,var(--foreground))}
 .hermes-rss .rss-list-items{overflow:auto;flex:1;padding:8px}
+.hermes-rss .rss-load-more{display:block;margin:14px auto 18px;font-weight:700;text-align:center;width:max-content}
+.hermes-rss .rss-list-jump{position:absolute;right:12px;bottom:12px;z-index:3;width:36px;height:36px;padding:0;border-radius:8px;border:1px solid var(--ui-stroke-secondary);background:var(--ui-bg,var(--card,var(--background)));color:var(--ui-text-secondary);display:inline-flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .18s ease}
+.hermes-rss .rss-list-jump[data-show=true]{opacity:1;pointer-events:auto}
+.hermes-rss .rss-list-jump:hover{color:var(--foreground);background:var(--chrome-action-hover)}
+.hermes-rss .rss-list-jump .codicon{font-size:16px;line-height:1;display:block}
 .hermes-rss .rss-card{display:flex;flex-direction:column;align-items:stretch;width:100%;border:1px solid transparent;background:transparent;color:inherit;text-align:left;padding:18px 14px;border-radius:8px;margin-bottom:3px;outline:none;box-shadow:none}
 .hermes-rss .rss-card-body{display:flex;flex-direction:row;align-items:center;gap:10px;min-width:0}
 .hermes-rss .rss-list-items button.rss-card:focus,.hermes-rss .rss-list-items button.rss-card:focus-visible{outline:none;box-shadow:none;outline-offset:0}
@@ -2464,6 +2469,10 @@ function ReaderProfile({ ctx, owner }) {
   const disabled = !!busy;
   const [notice, setNotice] = useState("");
   const [limit, setLimit] = useState(100);
+  const [listFab, setListFab] = useState(null);
+  const listRef = useRef(null);
+  const keepListScroll = useRef(null);
+  const savedListY = useRef(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState(() => readSettings(ctx, owner));
   const [draft, setDraft] = useState(() => readSettings(ctx, owner));
@@ -2504,6 +2513,7 @@ function ReaderProfile({ ctx, owner }) {
   const articles = useQuery({
     queryKey: [...key, "articles", feedId, view, query, exclude, showHidden, limit],
     queryFn: () => libraryRequest(`/articles?${params}`),
+    placeholderData: previous => previous,
     retry: false
   });
   const detail = useQuery({
@@ -2673,6 +2683,56 @@ function ReaderProfile({ ctx, owner }) {
   };
   const articleList = articles.data || [];
   const selectedIndex = selected ? articleList.findIndex(a => a.id === selected) : -1;
+  const listBeyondTop20 = scroller => {
+    const cards = scroller?.querySelectorAll(".rss-card");
+    if (!scroller || !cards || cards.length <= 20) return false;
+    return scroller.scrollTop + 8 > cards[19].offsetTop;
+  };
+  const onListScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    const beyond = listBeyondTop20(el);
+    setListFab(current => {
+      if (current === "down") {
+        if (beyond) { savedListY.current = null; return "up"; }
+        if (el.scrollTop > 24) { savedListY.current = null; return null; }
+        return "down";
+      }
+      return beyond ? "up" : null;
+    });
+  };
+  const jumpList = () => {
+    const el = listRef.current;
+    if (!el) return;
+    if (listFab === "down") {
+      const y = savedListY.current || 0;
+      savedListY.current = null;
+      setListFab("up");
+      el.scrollTo({ top: y, behavior: "smooth" });
+      return;
+    }
+    savedListY.current = el.scrollTop;
+    setListFab("down");
+    el.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const loadMore = () => {
+    const el = listRef.current;
+    if (el) keepListScroll.current = el.scrollTop;
+    setLimit(n => Math.min(500, n + 100));
+  };
+  useLayoutEffect(() => {
+    const y = keepListScroll.current;
+    if (y == null) return;
+    const el = listRef.current;
+    if (el) el.scrollTop = y;
+    keepListScroll.current = null;
+  }, [articleList.length, limit]);
+  useEffect(() => {
+    if (selectedIndex >= 0 && selectedIndex < 20 && listFab === "down") {
+      savedListY.current = null;
+      setListFab(null);
+    }
+  }, [selectedIndex]);
   useEffect(() => {
     const onKey = (event) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -3300,12 +3360,12 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           chosenFeed?.error && /* @__PURE__ */ jsx("p", { role: "status", className: "rss-small rss-feed-header-error", children: chosenFeed.error })
         ] }),
-        /* @__PURE__ */ jsxs("div", { className: "rss-list-items", children: [
+        /* @__PURE__ */ jsxs("div", { className: "rss-list-items", ref: listRef, onScroll: onListScroll, children: [
           (feeds.error || articles.error) && /* @__PURE__ */ jsxs(Empty, { title: "Could not open the library", children: [
             /* @__PURE__ */ jsx("p", { children: feeds.error?.message || articles.error?.message }),
             /* @__PURE__ */ jsx(Button, { onClick: refresh, children: "Retry" })
           ] }),
-          !feeds.error && !articles.error && articles.isPending && /* @__PURE__ */ jsx(Empty, { title: "Loading your library\u2026" }),
+          !feeds.error && !articles.error && articles.isPending && !articles.data?.length && /* @__PURE__ */ jsx(Empty, { title: "Loading your library\u2026" }),
           !articles.isPending && !articles.error && !feeds.error && !articles.data?.length && jsxs(Empty, {
             title: query || exclude || feedId || mutes.length && !showHidden ? "No Matching Articles" : view === "saved" ? "No Saved Articles" : view === "unread" ? "No Unread Articles" : feeds.data?.length ? "No Articles Yet" : "No Subscriptions Yet",
             children: [
@@ -3359,8 +3419,18 @@ function ReaderProfile({ ctx, owner }) {
             item.id
             );
           }),
-          articles.data?.length === limit && limit < 500 && /* @__PURE__ */ jsx(Button, { variant: "ghost", onClick: () => setLimit(limit + 100), children: "Load more" })
-        ] })
+          articles.data?.length === limit && limit < 500 && /* @__PURE__ */ jsx(Button, { type: "button", variant: "ghost", className: "rss-load-more", onClick: loadMore, children: "Load More" })
+        ] }),
+        jsx("button", {
+          type: "button",
+          className: "rss-list-jump",
+          "data-show": listFab ? "true" : "false",
+          "aria-hidden": !listFab,
+          "aria-label": listFab === "down" ? "Return to previous position" : "Scroll to top",
+          tabIndex: listFab ? 0 : -1,
+          onClick: jumpList,
+          children: jsx(Codicon, { name: listFab === "down" ? "arrow-down" : "arrow-up", size: "1rem" })
+        })
       ] }),
       /* @__PURE__ */ jsxs("main", { className: "rss-detail", children: [
         (busy || notice) && jsxs("div", { className: "rss-notice rss-notice-float", role: "status", children: [
