@@ -14,7 +14,7 @@ plugins:
     ref: cb3a0b9
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/drag-to-pin-session
-    ref: f7a2bd0622d4e582cd0a63b9f72aaeeb88843907
+    ref: 0ea2d5171305ae5294692944b9ca4750338b2589
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/opaque-composer
     ref: e382ef35349a32a6e17d89cce61e1778002c2b8a
