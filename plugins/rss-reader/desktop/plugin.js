@@ -1162,9 +1162,10 @@ function publishLibraryChange(owner, notice = "") {
 }
 var rssCommandBusy = false;
 function rssCommandReadCommand(family) {
-  const script = "import os,pathlib; h=os.environ.get('HERMES_HOME') or (pathlib.Path(os.environ.get('LOCALAPPDATA', str(pathlib.Path.home()))) / 'hermes'); p=pathlib.Path(h)/'rss-reader'/'commands.jsonl'; print(p.read_text(encoding='utf-8') if p.exists() else '', end='')";
-  const encoded = utf8Base64(script);
-  return `${family === "windows" ? "python" : "python3"} -c "import base64;exec(base64.b64decode('${encoded}'))"`;
+  if (family === "windows") {
+    return `if exist "%HERMES_HOME%\\rss-reader\\commands.jsonl" type "%HERMES_HOME%\\rss-reader\\commands.jsonl" else if exist "%LOCALAPPDATA%\\hermes\\rss-reader\\commands.jsonl" type "%LOCALAPPDATA%\\hermes\\rss-reader\\commands.jsonl"`;
+  }
+  return 'p="${HERMES_HOME:-$HOME/.hermes}/rss-reader/commands.jsonl"; [ -f "$p" ] && cat "$p" || true';
 }
 async function rssCommandQueue(host2, route) {
   const owner = JSON.stringify([route.connectionId, route.profile]);
@@ -1643,12 +1644,6 @@ function powershellSingle(value) {
     throw new Error("Could not create a private RSS download cache.");
   return `'${value}'`;
 }
-function pythonLiteral(value) {
-  const text = String(value).replace(/\\/g, "/");
-  if (/[\r\n']/.test(text))
-    throw new Error("Could not create a private RSS download cache.");
-  return `'${text}'`;
-}
 function ipv4Tokens(text) {
   return text.split(/\s+/).filter((v) => /^\d+(\.\d+){3}$/.test(v));
 }
@@ -1699,7 +1694,7 @@ async function resolvePublicIPv4(run, family, hostname) {
   if (family === "windows") {
     const addresses = publicAddresses(
       await run(
-        `python -c "import socket; print(chr(10).join(sorted({i[4][0] for i in socket.getaddrinfo(${pythonLiteral(hostname)}, None, socket.AF_INET)})))"`
+        `powershell -NoProfile -NonInteractive "Resolve-DnsName -Type A -Name ${powershellSingle(hostname)} -ErrorAction Stop | Where-Object { $_.Type -eq 'A' } | Select-Object -ExpandProperty IPAddress"`
       )
     );
     if (!addresses)
@@ -1725,9 +1720,17 @@ async function resolvePublicIPv4(run, family, hostname) {
 async function readPackedFeed(run, family, directory, feedPath) {
   if (family === "windows") {
     return withPackLock(directory, async () => {
-      const packed = (await run(
-        `python -c "import gzip,base64,pathlib; d=base64.b64encode(gzip.compress(pathlib.Path(${pythonLiteral(feedPath)}).read_bytes())).decode(); raise SystemExit('too-large') if len(d)>600000 else print(d,end='')"`
-      )).replace(/\s+/g, "");
+      const script = [
+        `$b=[IO.File]::ReadAllBytes(${powershellSingle(feedPath)})`,
+        "$m=[IO.MemoryStream]::new()",
+        "$g=[IO.Compression.GzipStream]::new($m,[IO.Compression.CompressionMode]::Compress)",
+        "$g.Write($b,0,$b.Length)",
+        "$g.Dispose()",
+        "$s=[Convert]::ToBase64String($m.ToArray())",
+        "if($s.Length -gt 600000){throw 'too-large'}",
+        "$s"
+      ].join("; ");
+      const packed = (await run(`powershell -NoProfile -NonInteractive "${script}"`)).replace(/\s+/g, "");
       if (!packed || packed.length > 6e5)
         throw new Error("Feed exceeds the compressed transport limit.");
       return packed;

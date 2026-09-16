@@ -71,6 +71,15 @@ class RssCommandTests(unittest.TestCase):
             self.assertEqual(row["action"], "refresh-period")
             self.assertEqual(row["payload"], {"minutes": 20})
             self.assertTrue(row["id"])
+    def test_refresh_transport_avoids_python_exec_flags(self):
+        plugin = (_ENTRYPOINT.parent / "desktop" / "plugin.js").read_text(encoding="utf-8")
+        self.assertIn("function rssCommandReadCommand", plugin)
+        self.assertIn("type", plugin)
+        self.assertIn("%HERMES_HOME%", plugin)
+        self.assertIn("Resolve-DnsName", plugin)
+        self.assertIn("GzipStream", plugin)
+        self.assertNotIn("python -c", plugin)
+        self.assertNotIn("pythonLiteral", plugin)
 
 
 if __name__ == "__main__":
