@@ -525,7 +525,8 @@ function readSettings(ctx, owner) {
     autoRefresh: stored.autoRefresh === true,
     refreshMinutes: Number.isInteger(stored.refreshMinutes) && stored.refreshMinutes >= 1 && stored.refreshMinutes <= 1440 ? stored.refreshMinutes : 15,
     markReadOnOpen: stored.markReadOnOpen !== false,
-    fullCapture: stored.fullCapture === true
+    fullCapture: stored.fullCapture === true,
+    paywallServices: stored.paywallServices === true
   };
 }
 function currentOwner(host2) {
@@ -671,7 +672,11 @@ function startCaptureWorker(ctx, host2) {
         save(owner, load(owner).filter((j) => j.id !== job.id));
         return;
       }
-      const fullBody = await captureArticle(host2, job.url);
+      const result = await captureArticle(host2, job.url, {
+        paywallServices: readSettings(ctx, owner).paywallServices,
+        knownLength: (article.body || "").length
+      });
+      const fullBody = result.body;
       if (stopped || currentOwner(host2) !== owner) return;
       if (fullBody && fullBody.length > (article.body || "").length) {
         await library(`/articles/${job.id}/capture`, { method: "POST", body: { body: fullBody } });
@@ -942,10 +947,10 @@ function parseFeed(xml, base) {
   });
   return { title, items };
 }
-async function captureArticle(host2, rawUrl) {
+async function captureArticle(host2, rawUrl, options = {}) {
   const route = await currentRoute(host2);
   const owner = JSON.stringify([route.connectionId, route.profile]);
-  return withCaptureSlot(() => captureArticleNow(host2, rawUrl, route, owner));
+  return withCaptureSlot(() => captureArticleNow(host2, rawUrl, route, owner, options));
 }
 function httpsSrc(value) {
   const v = String(value || "").trim();
@@ -997,24 +1002,127 @@ function inlineMarkdown(node) {
   }
   return clone.textContent.replace(/[^\S\n]+/g, " ").trim();
 }
-function extractReadable(html) {
+// Testing only: paywall mirrors tried in order for a page that looks paywalled
+// or truncated. `page` builds the fetchable URL; `scope` and `strip` narrow
+// reader extraction to that service's article container.
+var PAYWALL_SERVICES = [
+  { id: "archive-today", label: "archive.today", page: (href) => `https://archive.ph/newest/${href}`, scope: "#CONTENT" },
+  { id: "12ft", label: "12ft.io", page: (href) => `https://12ft.io/proxy?q=${encodeURIComponent(href)}` },
+  { id: "printfriendly", label: "PrintFriendly", page: (href) => `https://www.printfriendly.com/print?url=${encodeURIComponent(href)}`, scope: "#printarea, .pf-content" },
+  { id: "wayback", label: "the Wayback Machine", page: (href) => `https://web.archive.org/web/2/${href}`, strip: "#wm-ipp-base, #wm-ipp, #donato" }
+];
+var PAYWALL_TEXT_LIMIT = 4000;
+var PAYWALL_MARKERS = [
+  "subscribe to continue",
+  "subscribe to read",
+  "subscribe now to",
+  "to continue reading",
+  "continue reading this article",
+  "create a free account",
+  "sign in to continue",
+  "log in to continue",
+  "sign up to continue",
+  "this article is for subscribers",
+  "subscribers only",
+  "subscriber-only",
+  "become a member",
+  "already a subscriber",
+  "unlock this article",
+  "register to continue",
+  "you have reached your limit",
+  "articles remaining",
+  "start your free trial",
+  "enable javascript and cookies",
+  "just a moment",
+  "verify you are human",
+  "disable any ad blocker",
+  "access denied",
+  "archive.today webpage capture",
+  "the wayback machine has not archived"
+];
+function looksPaywalled(text) {
+  const value = String(text || "");
+  // Only short pages count: a long article may quote these words itself.
+  if (!value || value.length > PAYWALL_TEXT_LIMIT) return false;
+  const lower = value.toLowerCase();
+  return PAYWALL_MARKERS.some((marker) => lower.includes(marker));
+}
+function paywallServed(text, currentLength) {
+  if (!text || text.length < 600) return false;
+  if (looksPaywalled(text)) return false;
+  // Link farms ("recommended reading" blocks) are not article text. archive.ph
+  // rewrites every link through its own prefix, so real snapshots sit near 0.36.
+  if (linkShare(text) > 0.55) return false;
+  return text.length >= Math.max(600, currentLength + 200);
+}
+function linkShare(text) {
+  const links = String(text || "").match(/!?\[[^\]]*\]\([^)]*\)/g);
+  if (!links) return 0;
+  return links.join("").length / Math.max(1, String(text).length);
+}
+// A mirror that answers with a challenge, a rate limit, or a dead default page
+// is parked instead of retried for every queued article.
+var PAYWALL_BLOCK_MARKERS = [
+  "one more step",
+  "complete the security check",
+  "checking your browser",
+  "verify you are human",
+  "just a moment",
+  "captcha",
+  "rate limit",
+  "too many requests",
+  "web server is successfully installed"
+];
+function paywallBlocked(text) {
+  const value = String(text || "");
+  if (!value || value.length > PAYWALL_TEXT_LIMIT) return false;
+  const lower = value.toLowerCase();
+  return PAYWALL_BLOCK_MARKERS.some((marker) => lower.includes(marker));
+}
+var PAYWALL_COOLDOWN_MS = 10 * 60000;
+var paywallParked = /* @__PURE__ */ new Map();
+function paywallCooling(id) {
+  if ((paywallParked.get(id) || 0) <= Date.now()) {
+    paywallParked.delete(id);
+    return false;
+  }
+  return true;
+}
+function paywallCool(id) {
+  paywallParked.set(id, Date.now() + PAYWALL_COOLDOWN_MS);
+}
+function extractReadable(html, options = {}) {
   const cleaned = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<noscript[\s\S]*?<\/noscript>/gi, "").replace(/<svg[\s\S]*?<\/svg>/gi, "").replace(/<form[\s\S]*?<\/form>/gi, "").replace(/<nav[\s\S]*?<\/nav>/gi, "").replace(/<aside[\s\S]*?<\/aside>/gi, "").replace(/<footer[\s\S]*?<\/footer>/gi, "").replace(/<!--[\s\S]*?-->/g, "");
-  const articleMatch = /<article[\s>][\s\S]*?<\/article>/i.exec(cleaned);
-  let scope = articleMatch ? articleMatch[0] : cleaned;
-  if (!articleMatch) {
-    const mainMatch = /<main[\s>][\s\S]*?<\/main>/i.exec(cleaned);
-    if (mainMatch) scope = mainMatch[0];
+  let scope = "";
+  if (options.scope) {
+    const probe = document.createElement("template");
+    probe.innerHTML = cleaned;
+    scope = probe.content.querySelector(options.scope)?.outerHTML || "";
+  }
+  if (!scope) {
+    const articleMatch = /<article[\s>][\s\S]*?<\/article>/i.exec(cleaned);
+    scope = articleMatch ? articleMatch[0] : cleaned;
+    if (!articleMatch) {
+      const mainMatch = /<main[\s>][\s\S]*?<\/main>/i.exec(cleaned);
+      if (mainMatch) scope = mainMatch[0];
+    }
   }
   const template = document.createElement("template");
   template.innerHTML = scope;
-  template.content.querySelectorAll("script,style,noscript,svg,form,iframe,button,input,select,textarea,nav,aside,footer,header,[aria-hidden=true]").forEach((n) => n.remove());
-  const nodes = [...template.content.querySelectorAll("p,li,blockquote,pre,h1,h2,h3,h4,img,figure,table")];
+  template.content.querySelectorAll(`script,style,noscript,svg,form,iframe,button,input,select,textarea,nav,aside,footer,header,[aria-hidden=true]${options.strip ? `,${options.strip}` : ""}`).forEach((n) => n.remove());
+  const nodes = [...template.content.querySelectorAll("p,li,blockquote,pre,h1,h2,h3,h4,img,figure,table,div")];
   const parts = [];
   const seen = new Set();
   for (const node of nodes) {
     if (node.closest("table") && node.localName !== "table") continue;
     if (node.localName === "img" && node.closest("figure,p,li,h1,h2,h3,h4")) continue;
     if (node.localName === "p" && node.closest("li,blockquote,figure")) continue;
+    if (node.localName === "div") {
+      // Paragraphs rendered as divs (no <p> in the page) are prose too, but a
+      // wrapper div would duplicate the blocks it contains.
+      if (node.closest("li,blockquote,figure,table")) continue;
+      if (node.querySelector("p,li,div,blockquote,pre,table,figure,h1,h2,h3,h4,img")) continue;
+    }
     if (node.localName === "table") {
       const md = tableToMarkdown(node);
       if (md) parts.push(md);
@@ -1086,33 +1194,70 @@ async function captureArticleNow(host2, rawUrl, route, owner) {
   const pagePath = family === "windows" ? `${directory}\\page` : `${directory}/page`;
   const quote = family === "windows" ? cmdQuote : posixQuote;
   const curl = family === "windows" ? "curl.exe" : "curl";
-  let url = publicUrl(rawUrl), success = false;
-  for (let redirect = 0; redirect < 4; redirect++) {
-    const addresses = await resolvePublicIPv4(run, family, url.hostname);
-    const port = url.port || (url.protocol === "https:" ? "443" : "80");
-    const info = await run(
-      `${curl} --disable --silent --show-error --noproxy ${quote("*")} --proto ${quote("=http,https")} --connect-timeout 8 --max-time 25 --max-filesize 2000000 --resolve ${quote(`${url.hostname}:${port}:${addresses[0]}`)} --location --header ${quote("Accept: text/html,application/xhtml+xml")} --header ${quote("Accept-Encoding: identity")} --user-agent ${quote("Mozilla/5.0 (compatible; HermesRSS/0.2; reader mode)")} --output ${quote(pagePath)} --write-out ${quote("%{http_code} %{size_download}")} --url ${quote(url.href)}`
-    );
-    const match = /^(\d{3}) ([0-9]+)$/.exec(info);
-    if (!match) throw new Error("Invalid page download response.");
-    const code = match[1], size = match[2];
-    if (Number(size) > 2e6) throw new Error("Page exceeds 2 MB.");
-    if (code !== "200") throw new Error(`The page returned HTTP ${code}.`);
-    success = true;
-    break;
+  const readHtml = async (target) => {
+    let url = publicUrl(target), success = false;
+    for (let redirect = 0; redirect < 4; redirect++) {
+      const addresses = await resolvePublicIPv4(run, family, url.hostname);
+      const port = url.port || (url.protocol === "https:" ? "443" : "80");
+      const info = await run(
+        `${curl} --disable --silent --show-error --noproxy ${quote("*")} --proto ${quote("=http,https")} --connect-timeout 8 --max-time 25 --max-filesize 2000000 --resolve ${quote(`${url.hostname}:${port}:${addresses[0]}`)} --location --header ${quote("Accept: text/html,application/xhtml+xml")} --header ${quote("Accept-Encoding: identity")} --user-agent ${quote("Mozilla/5.0 (compatible; HermesRSS/0.2; reader mode)")} --output ${quote(pagePath)} --write-out ${quote("%{http_code} %{size_download}")} --url ${quote(url.href)}`
+      );
+      const match = /^(\d{3}) ([0-9]+)$/.exec(info);
+      if (!match) throw new Error("Invalid page download response.");
+      const code = match[1], size = match[2];
+      if (Number(size) > 2e6) throw new Error("Page exceeds 2 MB.");
+      if (code !== "200") throw new Error(`The page returned HTTP ${code}.`);
+      success = true;
+      break;
+    }
+    if (!success) throw new Error("The page redirects too many times.");
+    const packed = await readPackedFeed(run, family, directory, pagePath);
+    const bytes = Uint8Array.from(atob(packed), (c) => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+    const decoded = new Uint8Array(await new Response(stream).arrayBuffer());
+    if (decoded.length > 2e6) throw new Error("Page exceeds 2 MB.");
+    const declared = /<meta[^>]+charset=["']?([\w-]+)/i.exec(new TextDecoder("utf-8").decode(decoded.slice(0, 4096)))?.[1];
+    return new TextDecoder(declared && !/utf-?8/i.test(declared) ? declared : "utf-8").decode(decoded);
+  };
+  const finish = (text, source) => ({ body: text.slice(0, 6e4), source });
+  const usable = (text) => Boolean(text) && text.length >= 200;
+  const target = publicUrl(rawUrl);
+  const knownLength = Math.max(0, Number(options.knownLength) || 0);
+  let direct = "", directError = null;
+  try {
+    direct = extractReadable(await readHtml(target.href));
+  } catch (error) {
+    directError = error;
   }
-  if (!success) throw new Error("The page redirects too many times.");
-  const packed = await readPackedFeed(run, family, directory, pagePath);
-  const bytes = Uint8Array.from(atob(packed), (c) => c.charCodeAt(0));
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
-  const decoded = new Uint8Array(await new Response(stream).arrayBuffer());
-  if (decoded.length > 2e6) throw new Error("Page exceeds 2 MB.");
-  const declared = /<meta[^>]+charset=["']?([\w-]+)/i.exec(new TextDecoder("utf-8").decode(decoded.slice(0, 4096)))?.[1];
-  const html = new TextDecoder(declared && !/utf-?8/i.test(declared) ? declared : "utf-8").decode(decoded);
-  const text = extractReadable(html);
-  if (!text || text.length < 200)
-    throw new Error("No readable article text found on the page.");
-  return text.slice(0, 6e4);
+  if (!options.paywallServices) {
+    if (!usable(direct))
+      throw directError || new Error("No readable article text found on the page.");
+    return finish(direct, "");
+  }
+  // Testing only: a page with no text, a paywall notice, or text shorter than
+  // the feed's own copy retries through the mirror services in order. The first
+  // service that returns a longer readable article wins.
+  const truncated = usable(direct) && knownLength > 600 && direct.length < knownLength * 0.9;
+  if (!usable(direct) || looksPaywalled(direct) || truncated) {
+    for (const service of PAYWALL_SERVICES) {
+      if (paywallCooling(service.id)) continue;
+      try {
+        const text = extractReadable(await readHtml(service.page(target.href)), service);
+        if (paywallBlocked(text)) {
+          paywallCool(service.id);
+          continue;
+        }
+        if (paywallServed(text, direct.length)) return finish(text, service.label);
+      } catch (error) {
+        // HTTP 404 means that service holds no copy of this page. Anything
+        // else (a limit, a block, an unreachable host) parks it for a while.
+        if (!/HTTP 404\b/.test(String(error?.message || ""))) paywallCool(service.id);
+      }
+    }
+  }
+  if (!usable(direct))
+    throw directError || new Error("No readable article text found on the page.");
+  return finish(direct, "");
 }
 function escapeHtml(value) {
   return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -1319,7 +1464,7 @@ var styles = `
 .hermes-rss .rss-nav .rss-eyebrow{padding:0 10px;margin-top:28px}.hermes-rss .rss-count{font-size:11px;font-variant-numeric:tabular-nums}
 .hermes-rss .rss-nav-heading{display:flex;align-items:center;padding:0 2px 0 10px;margin-top:28px;min-height:16px;width:100%;box-sizing:border-box}
 .hermes-rss .rss-nav-heading .rss-eyebrow{padding:0;margin:0;letter-spacing:.8px;white-space:nowrap;flex:1;min-width:0;line-height:1;display:flex;align-items:center}
-.hermes-rss .rss-nav .rss-edit-toggle,.hermes-rss .rss-nav-heading .rss-edit-toggle{width:16px;height:16px;padding:0;margin:0 -10px 0 auto;flex:0 0 16px;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);line-height:1}
+.hermes-rss .rss-nav .rss-edit-toggle,.hermes-rss .rss-nav-heading .rss-edit-toggle{width:16px;height:16px;padding:0;margin:0 0 0 auto;flex:0 0 16px;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);line-height:1}
 .hermes-rss .rss-edit-toggle .codicon{font-size:9px;line-height:1;display:block}
 .hermes-rss .rss-edit-toggle[aria-pressed=true]{color:var(--ui-accent)}
 .hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}
@@ -1646,9 +1791,14 @@ function ReaderProfile({ ctx, owner }) {
     const target = article;
     if (!target?.url) return;
     void act("Capturing full article\u2026", async () => {
-      const fullBody = await captureArticle(host, target.url);
+      const result = await captureArticle(host, target.url, {
+        paywallServices: settings.paywallServices,
+        knownLength: (target.body || "").length
+      });
+      const fullBody = result.body;
       if (!fullBody || fullBody.length <= target.body.length) return;
       await libraryRequest(`/articles/${target.id}/capture`, { method: "POST", body: { body: fullBody } });
+      if (result.source) setNotice(`The full text came from ${result.source}.`);
     });
   };
   const articleList = articles.data || [];
@@ -1926,6 +2076,13 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
         ] }),
         jsx("p", { className: "rss-muted rss-small", children: "Captures new posts after refresh. Kept until they leave the list." }),
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsx("label", { className: "rss-setting", children: [
+            jsx("input", { type: "checkbox", checked: draft.paywallServices, onChange: event => setDraft({ ...draft, paywallServices: event.target.checked }) }),
+            "Use paywall removing services"
+          ] })
+        ] }),
+        jsx("p", { className: "rss-muted rss-small", children: "Testing only. When a capture looks paywalled or short, tries archive.today, 12ft.io, PrintFriendly, then the Wayback Machine." }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
       jsxs("div", { className: "rss-settings-library", "aria-label": "Library", children: [
