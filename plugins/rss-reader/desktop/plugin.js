@@ -2140,7 +2140,11 @@ var styles = `
 .hermes-rss .rss-settings-block .rss-settings-header{margin-top:0;padding-top:0;border-top:0}
 .hermes-rss .rss-settings-grid > .rss-settings-block:nth-child(2),.hermes-rss .rss-settings-grid > .rss-settings-block:nth-child(4){padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
 @media(max-width:760px){.hermes-rss .rss-settings-grid{grid-template-columns:1fr;grid-auto-flow:row;grid-template-rows:none}.hermes-rss .rss-settings-grid > .rss-settings-block:nth-child(n){padding-top:0;border-top:0}.hermes-rss .rss-settings-grid > .rss-settings-block:not(:first-child){padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}}
-.hermes-rss .rss-settings-library{display:grid;gap:12px;padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
+.hermes-rss .rss-settings-library{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
+.hermes-rss .rss-settings-library-head{display:flex;align-items:center;gap:10px;width:100%;min-width:0}
+.hermes-rss .rss-settings-library-head .rss-settings-header{margin:0;flex:1;min-width:0}
+.hermes-rss .rss-settings-library-head .rss-tools{margin:0 0 0 auto;justify-content:flex-end;flex-shrink:0}
+.hermes-rss .rss-settings-library > .rss-muted{width:100%;margin:0}
 .hermes-rss .rss-filter-panel{padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);overflow:visible;flex-shrink:0}
 .hermes-rss .rss-mute-grid{display:grid;grid-template-columns:minmax(200px,.85fr) minmax(280px,1.25fr);gap:12px 18px;align-items:start}
 .hermes-rss .rss-mute-form{display:grid;gap:8px;align-content:start}
@@ -3174,13 +3178,15 @@ function ReaderProfile({ ctx, owner }) {
         ] }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
-      jsxs("div", { className: "rss-settings-library", "aria-label": "Library", children: [
-        jsx("h2", { className: "rss-settings-header", children: "Library" }),
-        jsx("p", { className: "rss-muted rss-small", children: "Import or export your subscription list as OPML." }),
-        jsxs("div", { className: "rss-tools", children: [
-          jsx(Button, { type: "button", disabled, onClick: chooseFile, children: "Import OPML" }),
-          jsx(Button, { type: "button", variant: "ghost", disabled: disabled || !feeds.data?.length, onClick: exportFeeds, children: "Export OPML" })
-        ] })
+      jsxs("div", { className: "rss-settings-library", "aria-label": "Import/Export", children: [
+        jsxs("div", { className: "rss-settings-library-head", children: [
+          jsx("h2", { className: "rss-settings-header", children: "Import/Export" }),
+          jsxs("div", { className: "rss-tools", children: [
+            jsx(Button, { type: "button", disabled, onClick: chooseFile, children: "Import OPML" }),
+            jsx(Button, { type: "button", variant: "ghost", disabled: disabled || !feeds.data?.length, onClick: exportFeeds, children: "Export OPML" })
+          ] })
+        ] }),
+        jsx("p", { className: "rss-muted rss-small", children: "Import or export your subscription list as OPML." })
       ] })
     ] }),
     feedToRemove && jsxs("div", { className: "rss-confirm", role: "alertdialog", ref: confirmation, tabIndex: -1, "aria-labelledby": "rss-unsubscribe-title", children: [
