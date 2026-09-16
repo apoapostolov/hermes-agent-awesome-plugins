@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount")].join("\n");
 const fns = {};
 new Function("exports", `${bundle}
 exports.profileFromOwner = profileFromOwner;
@@ -30,6 +30,7 @@ exports.folderOf = folderOf;
 exports.folderTitle = folderTitle;
 exports.groupFeedsByFolder = groupFeedsByFolder;
 exports.previewNavFeeds = previewNavFeeds;
+exports.applyFeedMove = applyFeedMove;
 exports.muteScope = muteScope;
 exports.compactMuteScope = compactMuteScope;
 exports.muteAppliesToArticle = muteAppliesToArticle;
@@ -55,7 +56,15 @@ assert.equal(grouped.length, 2);
 assert.equal(grouped[0].title, "AI");
 assert.equal(grouped[0].unread, 5);
 assert.equal(grouped[1].title, "Ungrouped");
-const moved = fns.previewNavFeeds(
+const previewStay = fns.previewNavFeeds(
+  [{ id: "1", folder: "AI" }, { id: "2", folder: "News" }],
+  "1",
+  0,
+  "News"
+);
+assert.equal(previewStay[0].id, "1");
+assert.equal(previewStay[0].folder, "AI");
+const moved = fns.applyFeedMove(
   [{ id: "1", folder: "AI" }, { id: "2", folder: "News" }],
   "1",
   0,

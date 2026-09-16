@@ -1926,7 +1926,7 @@ var styles = `
 .hermes-rss .rss-nav .rss-nav-view[aria-current=true]{border-color:color-mix(in srgb,var(--ui-accent) 42%,transparent);background:color-mix(in srgb,var(--ui-accent) 14%,transparent);color:var(--ui-accent)}
 .hermes-rss .rss-nav .rss-eyebrow{padding:0 10px;margin-top:20px}.hermes-rss .rss-count{font-size:11px;font-variant-numeric:tabular-nums}
 .hermes-rss .rss-folder{margin:0 0 4px}
-.hermes-rss .rss-nav .rss-folder-header{width:100%;box-sizing:border-box;margin:0 0 4px;padding:6px 8px;border:0;border-radius:6px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent);color:var(--ui-text-tertiary);font-size:10px;font-weight:650;letter-spacing:1.5px;text-transform:uppercase;gap:6px}
+.hermes-rss .rss-nav .rss-folder-header{display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin:0 0 4px;padding:6px 8px;border:0;border-radius:6px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent);color:var(--ui-text-tertiary);font-size:10px;font-weight:650;letter-spacing:1.5px;text-transform:uppercase;gap:6px;cursor:pointer}
 .hermes-rss .rss-nav .rss-folder-header:hover{background:color-mix(in srgb,var(--ui-accent) 16%,transparent);color:var(--ui-text-secondary)}
 .hermes-rss .rss-folder-drop .rss-folder-header,.hermes-rss .rss-nav .rss-folder-header[data-drop=true]{outline:1px dashed var(--ui-accent);outline-offset:-1px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
 .hermes-rss .rss-folder-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
@@ -2328,11 +2328,28 @@ function groupFeedsByFolder(list) {
 function previewNavFeeds(list, draggingId, dropIndex, targetFolder) {
   const feeds = Array.isArray(list) ? list : [];
   if (!draggingId) return feeds;
-  const ordered = typeof dropIndex === "number" && Number.isFinite(dropIndex)
-    ? previewFeedOrder(feeds, draggingId, dropIndex)
-    : feeds;
-  if (typeof targetFolder !== "string") return ordered;
-  return ordered.map((feed) => feed.id === draggingId ? { ...feed, folder: targetFolder } : feed);
+  const moved = feeds.find((feed) => feed.id === draggingId);
+  if (!moved) return feeds;
+  // Keep the drag source in its original folder so the DOM node stays mounted.
+  // Crossing into another folder unmounts the row and cancels HTML5 drag.
+  if (typeof targetFolder === "string" && folderOf(moved) !== targetFolder) return feeds;
+  return previewFeedOrder(feeds, draggingId, dropIndex);
+}
+function applyFeedMove(list, draggingId, dropIndex, targetFolder) {
+  const feeds = Array.isArray(list) ? list : [];
+  const moved = feeds.find((feed) => feed.id === draggingId);
+  if (!moved) return feeds;
+  const folder = typeof targetFolder === "string" ? targetFolder : folderOf(moved);
+  const rest = feeds.filter((feed) => feed.id !== draggingId);
+  const stamped = { ...moved, folder };
+  let at;
+  if (typeof dropIndex === "number" && Number.isFinite(dropIndex))
+    at = Math.min(Math.max(Math.trunc(dropIndex), 0), rest.length);
+  else {
+    const idx = rest.findIndex((feed) => folderOf(feed) === folder);
+    at = idx < 0 ? rest.length : idx;
+  }
+  return [...rest.slice(0, at), stamped, ...rest.slice(at)];
 }
 function Reader({ ctx }) {
   const profile = useValue(host.state.profile);
@@ -2403,6 +2420,7 @@ function ReaderProfile({ ctx, owner }) {
   });
   const dragOrderRef = useRef(null);
   const dragFeedId = useRef(null);
+  const suppressFolderClick = useRef(false);
   const confirmation = useRef(null);
   useEffect(() => { if (feedToRemove) confirmation.current?.focus(); }, [feedToRemove]);
   useEffect(() => {
@@ -2692,14 +2710,15 @@ function ReaderProfile({ ctx, owner }) {
     setDragTargetFolder(null);
   };
   const handleDragStart = feed => event => {
-    startDrag(feed);
     event.dataTransfer.effectAllowed = "move";
     try { event.dataTransfer.setData("text/plain", feed.id); } catch {}
+    startDrag(feed);
   };
   const handleDragOver = feed => event => {
     const dragged = dragFeedId.current;
     if (!dragged) return;
     event.preventDefault();
+    event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
     if (feed.id === dragged) return;
     setDragTargetFolder(folderOf(feed));
@@ -2710,7 +2729,9 @@ function ReaderProfile({ ctx, owner }) {
   const handleFolderDragOver = key => event => {
     const dragged = dragFeedId.current;
     if (!dragged) return;
+    if (event.target.closest && event.target.closest(".rss-feed-row")) return;
     event.preventDefault();
+    event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
     setDragTargetFolder(key);
     const rest = displayedFeeds.filter(f => f.id !== dragged);
@@ -2720,10 +2741,14 @@ function ReaderProfile({ ctx, owner }) {
   };
   const handleDrop = () => event => {
     event.preventDefault();
+    event.stopPropagation();
     const dragged = dragFeedId.current;
-    const next = previewFeeds;
+    const folder = dragTargetFolder;
+    const index = dragDropIndex;
+    if (!dragged) { endDrag(); return; }
+    const next = applyFeedMove(displayedFeeds, dragged, index, folder);
+    suppressFolderClick.current = true;
     endDrag();
-    if (!dragged) return;
     const order = next.map(f => f.id);
     const folders = Object.fromEntries(next.map(f => [f.id, folderOf(f)]));
     const sameOrder = order.join("\n") === displayedFeeds.map(f => f.id).join("\n");
@@ -3089,15 +3114,24 @@ function ReaderProfile({ ctx, owner }) {
           const open = folderIsOpen(group.key) || !!(draggingId && dragTargetFolder === group.key);
           return jsxs("div", {
             className: `rss-folder${draggingId && dragTargetFolder === group.key ? " rss-folder-drop" : ""}`,
+            onDragOver: reorderMode ? handleFolderDragOver(group.key) : undefined,
+            onDrop: reorderMode ? handleDrop() : undefined,
             children: [
-              jsxs("button", {
-                type: "button",
+              jsxs("div", {
+                role: "button",
+                tabIndex: 0,
                 className: "rss-folder-header",
                 "aria-expanded": open,
                 "data-drop": draggingId && dragTargetFolder === group.key ? "true" : undefined,
-                onClick: () => toggleFolder(group.key),
-                onDragOver: reorderMode && draggingId ? handleFolderDragOver(group.key) : undefined,
-                onDrop: reorderMode && draggingId ? handleDrop() : undefined,
+                onClick: () => {
+                  if (suppressFolderClick.current) { suppressFolderClick.current = false; return; }
+                  toggleFolder(group.key);
+                },
+                onKeyDown: event => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  toggleFolder(group.key);
+                },
                 children: [
                   jsx("i", { className: `codicon codicon-chevron-right rss-folder-chevron${open ? " rss-folder-chevron-open" : ""}`, "aria-hidden": "true" }),
                   jsx("span", { className: "rss-folder-name", children: group.title }),
@@ -3109,14 +3143,14 @@ function ReaderProfile({ ctx, owner }) {
                 "data-feed-id": feed.id,
                 draggable: reorderMode,
                 onDragStart: reorderMode ? handleDragStart(feed) : undefined,
-                onDragOver: reorderMode && draggingId ? handleDragOver(feed) : undefined,
-                onDrop: reorderMode && draggingId ? handleDrop() : undefined,
+                onDragOver: reorderMode ? handleDragOver(feed) : undefined,
+                onDrop: reorderMode ? handleDrop() : undefined,
                 onDragEnd: endDrag,
                 children: [
                 reorderMode && jsx("span", { className: "rss-feed-edit", "aria-hidden": "true", title: "Drag to reorder", children:
                   jsx("span", { className: "rss-grip", children: jsx("i", { className: "codicon codicon-gripper", "aria-hidden": "true" }) })
                 }),
-                jsxs("button", { className: "rss-feed-open", "aria-current": feedId === feed.id,
+                jsxs("button", { type: "button", className: "rss-feed-open", draggable: false, "aria-current": feedId === feed.id,
                   title: `${feed.folder ? feed.folder + " / " : ""}${feed.title}`,
                   onClick: () => selectView("all", feed.id), children: [
                     jsxs("span", { className: "rss-feed-info", children: [
