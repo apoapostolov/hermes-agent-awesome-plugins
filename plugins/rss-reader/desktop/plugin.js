@@ -3975,7 +3975,7 @@ function ReaderProfile({ ctx, owner }) {
             exclude && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear excluded phrase", onClick: () => { setExclude(""); setLimit(100); }, children: `Exclude: ${exclude} ×` }),
             feedId && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear feed filter", onClick: () => selectView(view), children: `${chosenFeed?.title || "Removed feed"} ×` }),
             view !== "all" && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear view filter", onClick: () => selectView("all", feedId), children: `${view === "saved" ? "Saved" : "Unread"} ×` }),
-            jsx(Button, { size: "sm", variant: "ghost", onClick: resetFilters, children: "Reset filters" })
+            jsx(Button, { size: "sm", variant: "ghost", "aria-label": "Reset filters", title: "Reset filters", onClick: resetFilters, children: jsx(Codicon, { name: "clear-all", size: "0.9rem" }) })
           ] }),
           chosenFeed?.error && /* @__PURE__ */ jsx("p", { role: "status", className: "rss-small rss-feed-header-error", children: chosenFeed.error })
         ] }),
