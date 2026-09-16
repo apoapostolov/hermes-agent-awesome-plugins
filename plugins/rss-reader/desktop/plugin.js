@@ -2057,29 +2057,36 @@ var styles = `
 .hermes-rss .rss-filter-panel{padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);overflow:visible;flex-shrink:0}
 .hermes-rss .rss-mute-grid{display:grid;grid-template-columns:minmax(200px,.85fr) minmax(280px,1.25fr);gap:12px 18px;align-items:start}
 .hermes-rss .rss-mute-form{display:grid;gap:8px;align-content:start}
-.hermes-rss .rss-mute-create-row{display:flex;align-items:center;gap:8px;min-width:0}
-.hermes-rss .rss-mute-create-row input{flex:1;min-width:0}
-.hermes-rss .rss-picker{position:relative;flex:1;min-width:132px}
-.hermes-rss .rss-picker-toggle{width:100%;box-sizing:border-box;height:26px;margin:0;padding:4px 8px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;background:transparent;color:var(--ui-text-primary,var(--foreground));display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left}
-.hermes-rss .rss-picker-value{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hermes-rss .rss-picker-menu{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;max-height:240px;overflow:auto;padding:4px 0;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:var(--ui-bg-elevated,var(--ui-bg-primary,var(--background)));box-shadow:0 10px 24px color-mix(in srgb,#000 22%,transparent)}
-.hermes-rss .rss-picker-section{padding:2px 0}
-.hermes-rss .rss-filter-panel .rss-picker-toggle{height:26px;padding:4px 8px}
-.hermes-rss .rss-filter-panel .rss-picker-row{height:auto;min-height:0;padding:5px 10px;margin:0;width:100%;border:0;border-radius:0;background:transparent;color:inherit;display:flex;align-items:center;gap:8px;text-align:left;font-size:12px}
+.hermes-rss .rss-mute-create-row{display:flex;align-items:center;gap:6px;min-width:0;height:26px}
+.hermes-rss .rss-mute-create-row input{flex:1;min-width:0;height:26px;padding:4px 8px;font-size:12px;box-sizing:border-box}
+.hermes-rss .rss-picker{position:relative;flex:1;min-width:132px;height:26px;text-align:left}
+.hermes-rss .rss-picker-toggle{width:100%;box-sizing:border-box;height:26px;margin:0;padding:4px 8px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;background:transparent;color:var(--ui-text-primary,var(--foreground));display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;font-size:12px;line-height:1.2}
+.hermes-rss .rss-picker-value{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;flex:1}
+.hermes-rss .rss-picker-menu{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;max-height:240px;overflow:auto;padding:4px 0;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:var(--ui-bg-elevated,var(--ui-bg-primary,var(--background)));box-shadow:0 10px 24px color-mix(in srgb,#000 22%,transparent);text-align:left}
+.hermes-rss .rss-picker-section{padding:2px 0;text-align:left}
+.hermes-rss .rss-filter-panel .rss-picker-toggle{height:26px;padding:4px 8px;justify-content:space-between;text-align:left}
+.hermes-rss .rss-filter-panel .rss-picker-row{height:auto;min-height:0;padding:5px 10px;margin:0;width:100%;border:0;border-radius:0;background:transparent;color:inherit;display:flex;align-items:center;justify-content:flex-start;gap:8px;text-align:left;font-size:12px}
 .hermes-rss .rss-picker-row:hover{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent)}
 .hermes-rss .rss-picker-folder{font-weight:650}
 .hermes-rss .rss-picker-feed{padding-left:22px;font-weight:400}
-.hermes-rss .rss-picker-row input{accent-color:var(--ui-accent);margin:0}
+.hermes-rss .rss-picker-row input{accent-color:var(--ui-accent);margin:0;flex:0 0 auto}
+.hermes-rss .rss-picker-row span{text-align:left;flex:1;min-width:0}
+.hermes-rss .rss-mute-add{width:26px;height:26px;padding:0;margin:0;flex:0 0 26px;border:0;background:transparent;color:var(--ui-text-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:5px}
+.hermes-rss .rss-filter-panel .rss-mute-add{height:26px;width:26px;padding:0;min-height:0}
+.hermes-rss .rss-mute-add:hover:not(:disabled){color:var(--foreground);background:var(--chrome-action-hover)}
+.hermes-rss .rss-mute-add:disabled{opacity:.4}
 .hermes-rss .rss-mute-form .rss-tools{flex-wrap:wrap}
-.hermes-rss .rss-mute-table-wrap{overflow:auto;max-height:28vh;min-width:0;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:color-mix(in srgb,var(--ui-text-secondary) 4%,transparent)}
+.hermes-rss .rss-mute-table-wrap{overflow:auto;max-height:28vh;min-width:0;border:0;border-radius:0;background:transparent}
 .hermes-rss .rss-mute-table{width:100%;border-collapse:collapse;font-size:12px}
-.hermes-rss .rss-mute-table th{text-align:left;font-weight:650;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-text-tertiary);padding:7px 10px;background:color-mix(in srgb,var(--ui-text-secondary) 7%,transparent)}
-.hermes-rss .rss-mute-table td{padding:6px 10px;border-top:1px solid var(--ui-stroke-secondary);vertical-align:middle}
+.hermes-rss .rss-mute-table th{text-align:left;font-weight:650;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-text-tertiary);padding:7px 8px;background:transparent;border:0;border-bottom:1px solid var(--ui-stroke-secondary)}
+.hermes-rss .rss-mute-table td{padding:6px 8px;border:0;border-bottom:1px solid var(--ui-stroke-secondary);vertical-align:middle}
 .hermes-rss .rss-mute-table tr:hover td{background:color-mix(in srgb,var(--ui-text-secondary) 5%,transparent)}
 .hermes-rss .rss-mute-phrase{font-weight:600;color:var(--ui-text-primary,var(--foreground))}
 .hermes-rss .rss-mute-feed{color:var(--ui-text-secondary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hermes-rss .rss-mute-actions{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
-.hermes-rss .rss-mute-hits{min-width:1.6em;text-align:center;font-variant-numeric:tabular-nums;color:var(--ui-text-secondary);font-size:11px;font-weight:650}
+.hermes-rss .rss-mute-col-filtered{width:4.5em;text-align:right;font-variant-numeric:tabular-nums}
+.hermes-rss .rss-mute-col-actions{width:1%;text-align:right;white-space:nowrap}
+.hermes-rss .rss-mute-actions{display:inline-flex;align-items:center;justify-content:flex-end;gap:2px;white-space:nowrap;width:100%}
+.hermes-rss .rss-mute-hits{min-width:1.6em;text-align:right;font-variant-numeric:tabular-nums;color:var(--ui-text-secondary);font-size:11px;font-weight:650}
 .hermes-rss .rss-mute-icon{width:22px;height:22px;padding:0;margin:0;border:0;background:transparent;color:var(--ui-text-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:4px}
 .hermes-rss .rss-filter-panel .rss-mute-icon{height:22px;width:22px;padding:0;min-height:0}
 .hermes-rss .rss-mute-icon:hover:not(:disabled){color:var(--foreground);background:var(--chrome-action-hover)}
@@ -2885,27 +2892,26 @@ function ReaderProfile({ ctx, owner }) {
           jsxs("form", { className: "rss-stack", onSubmit: addMute, children: [
             jsxs("div", { className: "rss-mute-create-row", children: [
               jsx(Input, { "aria-label": "Mute phrase", placeholder: "e.g. coupon", value: mutePhrase, maxLength: 200, required: true, onChange: event => setMutePhrase(event.target.value) }),
-              jsx(MuteFeedPicker, { feeds: feeds.data || [], feedIds: muteFeeds, folders: muteFolders, onChange: ({ feedIds, folders }) => { setMuteFeeds(feedIds); setMuteFolders(folders); } })
-            ] }),
-            jsxs("div", { className: "rss-tools", children: [
-              jsx(Button, { type: "submit", disabled: disabled || !mutePhrase.trim() || filters.isPending || !!filters.error, children: editingMute ? "Save rule" : "Add mute" }),
-              editingMute && jsx(Button, { type: "button", variant: "ghost", onClick: () => { setEditingMute(null); setMutePhrase(""); setMuteFeeds([]); setMuteFolders([]); }, children: "Cancel" })
+              jsx(MuteFeedPicker, { feeds: feeds.data || [], feedIds: muteFeeds, folders: muteFolders, onChange: ({ feedIds, folders }) => { setMuteFeeds(feedIds); setMuteFolders(folders); } }),
+              jsx("button", { type: "submit", className: "rss-mute-add", disabled: disabled || !mutePhrase.trim() || filters.isPending || !!filters.error, title: editingMute ? "Save rule" : "Add mute", "aria-label": editingMute ? "Save mute rule" : "Add mute", children: jsx("i", { className: `codicon ${editingMute ? "codicon-check" : "codicon-add"}`, "aria-hidden": "true" }) }),
+              editingMute && jsx("button", { type: "button", className: "rss-mute-add", title: "Cancel", "aria-label": "Cancel editing mute rule", onClick: () => { setEditingMute(null); setMutePhrase(""); setMuteFeeds([]); setMuteFolders([]); }, children: jsx("i", { className: "codicon codicon-close", "aria-hidden": "true" }) })
             ] })
           ] })
         ] }),
         jsx("div", { className: "rss-mute-table-wrap", children:
           mutes.length ? jsxs("table", { className: "rss-mute-table", children: [
             jsx("thead", { children: jsxs("tr", { children: [
-              jsx("th", { children: "Phrase" }),
+              jsx("th", { children: "Rules" }),
               jsx("th", { children: "Feeds" }),
-              jsx("th", { children: "" })
+              jsx("th", { className: "rss-mute-col-filtered", children: "Filtered" }),
+              jsx("th", { className: "rss-mute-col-actions", children: "" })
             ] }) }),
             jsx("tbody", { children: mutes.map(rule => jsxs("tr", { children: [
               jsx("td", { className: "rss-mute-phrase", children: rule.phrase }),
               jsx("td", { className: "rss-mute-feed", title: muteScopeLabel(rule, feeds.data || []), children: muteScopeLabel(rule, feeds.data || []) }),
-              jsx("td", { children: jsxs("div", { className: "rss-mute-actions", children: [
+              jsx("td", { className: "rss-mute-col-filtered rss-mute-hits", title: `${rule.hits || 0} articles hidden right now`, children: rule.hits || 0 }),
+              jsx("td", { className: "rss-mute-col-actions", children: jsxs("div", { className: "rss-mute-actions", children: [
                 jsx("button", { type: "button", className: "rss-mute-icon", disabled, title: "Edit rule", "aria-label": `Edit mute rule ${rule.phrase}`, onClick: () => startEditMute(rule), children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) }),
-                jsx("span", { className: "rss-mute-hits", title: `${rule.hits || 0} articles hidden right now`, children: rule.hits || 0 }),
                 jsx("button", { type: "button", className: "rss-mute-icon", disabled, title: "Delete rule", "aria-label": `Remove mute rule ${rule.phrase}`, onClick: () => removeFilter("mutes", rule.id), children: jsx("i", { className: "codicon codicon-trash", "aria-hidden": "true" }) })
               ] }) })
             ] }, rule.id)) })
