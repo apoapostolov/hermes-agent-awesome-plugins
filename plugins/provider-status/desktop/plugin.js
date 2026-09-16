@@ -1086,7 +1086,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
         jsx('span', { className: 'text-[0.65rem] tabular-nums shrink-0 w-5 text-right', style: { color: 'var(--ui-text-quaternary)' }, children: '#' + (i + 2) }),
         jsx(Input, { type: 'password', value: k, onChange: e => setKeyAt(i + 1, e.target.value), onBlur: () => persist(), placeholder: `Key #${i + 2}`, size: 'sm', className: 'flex-1 h-6 font-mono text-[0.7rem]' }),
         resetDaySelect(i + 1),
-        jsx(SignalDot, { pid, tone: (probe?.keys || []).find(row => row.index === i + 1)?.tone, reason: (probe?.keys || []).find(row => row.index === i + 1)?.reason, quotas: (probe?.keys || []).find(row => row.index === i + 1)?.quotas, age: probeAge, onCheck }),
+        jsx(SignalDot, { pid, tone: (probe?.keys || []).find(row => row.index === i + 1)?.tone, reason: (probe?.keys || []).find(row => row.index === i + 1)?.reason, quotas: (probe?.keys || []).find(row => row.index === i + 1)?.quotas, age: probeAge, onCheck: c => checkProbe(pid, false, i + 1) }),
         jsx(Button, { variant: 'ghost', size: 'icon-xs', className: 'text-destructive', onClick: () => delKey(i + 1), title: 'remove', children: jsx(Codicon, { name: 'close', size: '0.7rem' }) }),
       ]}, i + 1)),
     ],
@@ -1209,7 +1209,9 @@ function SetupBody({ variant } = {}) {
   const pollMinutes = Math.max(1, Number(cfg.poll_minutes) || 5)
   const statusesRef = useRef(statuses)
   statusesRef.current = statuses
-  const checkProbe = React.useCallback(async (pid, force = false) => {
+  const checkProbe = React.useCallback(async (pid, force = false, keyIndex = null) => {
+    // keyIndex: for multi-key rows, return/dock THAT key's quotas instead of the
+    // active (index 0) key — hovering key #3 must check key #3, not reuse key #1.
     if (!_rest || !pid) return null
     try {
       let result = null
@@ -1253,6 +1255,15 @@ function SetupBody({ variant } = {}) {
           : primary
         setProbes(prev => ({ ...prev, [pid]: result }))
         setProbeAges(prev => ({ ...prev, [pid]: age }))
+        if (keyIndex != null && result.keys) {
+          // Per-key hover: quota fallback from the ACTIVE key would mislabel this
+          // row; only merge when this same row is actually key 0.
+          const row = result.keys.find(k => k.index === keyIndex) || null
+          if (row) {
+            const fb = keyIndex === 0 ? fallbackQuotas : []
+            return row.quotas?.length ? row : (fb.length ? { ...row, quotas: fb } : row)
+          }
+        }
         return withQuotas
       }
     } catch {}
