@@ -2072,64 +2072,16 @@ function extractReadable(html, options = {}) {
   return text.replace(/\n{3,}/g, "\n\n").trim();
 }
 async function captureArticleNow(host2, rawUrl, route, owner, options = {}) {
-  const run = async (command, optional) => {
-    assertOwner(host2, route);
-    const result = await host2.requestProfile(route, "shell.exec", { command });
-    assertOwner(host2, route);
-    if (result.code !== 0) {
-      if (optional) return "";
-      throw new Error("Capture failed: " + String(result.stderr || "the gateway needs curl plus gzip and base64 tools.").slice(0, 350));
-    }
-    return result.stdout.trim();
-  };
-  let family = families.get(owner);
-  if (!family) {
-    const windowsProbe = await run(powershellEncoded('$env:OS'), true);
-    family = windowsProbe === "Windows_NT" ? "windows" : "posix";
-    families.set(owner, family);
-  }
-  let directory = caches.get(owner);
-  if (!directory) {
-    if (family === "windows") {
-      const temp = (await run(powershellEncoded('$env:TEMP'))).replace(/[\\/]+$/, "");
-      directory = `${temp}\\hermes-rss.${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
-      if (!isWindowsCache(directory))
-        throw new Error("Could not create a private RSS download cache.");
-      await run(`mkdir ${cmdQuote(directory)}`);
-    } else {
-      directory = await run("mktemp -d /tmp/hermes-rss.XXXXXXXX");
-      if (!isPosixCache(directory))
-        throw new Error("Could not create a private RSS download cache.");
-    }
-    caches.set(owner, directory);
-  }
-  const pagePath = family === "windows" ? `${directory}\\page` : `${directory}/page`;
-  const quote = family === "windows" ? cmdQuote : posixQuote;
-  const curl = family === "windows" ? "curl.exe" : "curl";
   const readHtml = async (target) => {
-    let url = publicUrl(target), success = false;
-    for (let redirect = 0; redirect < 4; redirect++) {
-      const addresses = await resolvePublicIPv4(run, family, url.hostname);
-      const port = url.port || (url.protocol === "https:" ? "443" : "80");
-      const info = await run(
-        `${curl} --disable --silent --show-error --noproxy ${quote("*")} --proto ${quote("=http,https")} --connect-timeout 8 --max-time 25 --max-filesize 2000000 --resolve ${quote(`${url.hostname}:${port}:${addresses[0]}`)} --location --header ${quote("Accept: text/html,application/xhtml+xml")} --header ${quote("Accept-Encoding: identity")} --user-agent ${quote("Mozilla/5.0 (compatible; HermesRSS/0.2; reader mode)")} --output ${quote(pagePath)} --write-out ${quote("%{http_code} %{size_download}")} --url ${quote(url.href)}`
-      );
-      const match = /^(\d{3}) ([0-9]+)$/.exec(info);
-      if (!match) throw new Error("Invalid page download response.");
-      const code = match[1], size = match[2];
-      if (Number(size) > 2e6) throw new Error("Page exceeds 2 MB.");
-      if (code !== "200") throw new Error(`The page returned HTTP ${code}.`);
-      success = true;
-      break;
-    }
-    if (!success) throw new Error("The page redirects too many times.");
-    const packed = await readPackedFeed(run, family, directory, pagePath);
-    const bytes = base64ToBytes(packed);
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
-    const decoded = new Uint8Array(await new Response(stream).arrayBuffer());
-    if (decoded.length > 2e6) throw new Error("Page exceeds 2 MB.");
-    const declared = /<meta[^>]+charset=["']?([\w-]+)/i.exec(new TextDecoder("utf-8").decode(decoded.slice(0, 4096)))?.[1];
-    return new TextDecoder(declared && !/utf-?8/i.test(declared) ? declared : "utf-8").decode(decoded);
+    assertOwner(host2, route);
+    const response = await rssRest("/article", {
+      method: "POST",
+      body: { url: publicUrl(target).href }
+    });
+    assertOwner(host2, route);
+    if (!response || typeof response.text !== "string")
+      throw new Error("RSS backend returned an invalid article response.");
+    return response.text;
   };
   const finish = (text, source) => ({ body: text.slice(0, 6e4), source });
   const usable = (text) => Boolean(text) && text.length >= 200;
@@ -2146,9 +2098,6 @@ async function captureArticleNow(host2, rawUrl, route, owner, options = {}) {
       throw directError || new Error("No readable article text found on the page.");
     return finish(direct, "");
   }
-  // Testing only: a page with no text, a paywall notice, or text shorter than
-  // the feed's own copy retries through the mirror services in order. The first
-  // service that returns a longer readable article wins.
   const truncated = usable(direct) && knownLength > 600 && direct.length < knownLength * 0.9;
   if (!usable(direct) || looksPaywalled(direct) || truncated) {
     for (const service of PAYWALL_SERVICES) {
@@ -2161,9 +2110,7 @@ async function captureArticleNow(host2, rawUrl, route, owner, options = {}) {
         }
         if (paywallServed(text, direct.length)) return finish(text, service.label);
       } catch (error) {
-        // HTTP 404 means that service holds no copy of this page. Anything
-        // else (a limit, a block, an unreachable host) parks it for a while.
-        if (!/HTTP 404\b/.test(String(error?.message || ""))) paywallCool(service.id);
+        if (!/HTTP 404/.test(String(error?.message || ""))) paywallCool(service.id);
       }
     }
   }

@@ -76,6 +76,11 @@ def read_commands() -> list[dict]:
     return commands
 
 
+@router.post("/article")
+def fetch_article(payload: FeedRequest) -> dict[str, str | int]:
+    return fetch_feed(payload)
+
+
 @router.post("/feed")
 def fetch_feed(payload: FeedRequest) -> dict[str, str | int]:
     try:

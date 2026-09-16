@@ -87,7 +87,9 @@ class RssCommandTests(unittest.TestCase):
         self.assertNotIn("cut -c", plugin)
         self.assertIn("powershell.exe -NoProfile -NonInteractive", plugin)
         self.assertIn("'$env:OS'", plugin)
-        self.assertIn("'$env:TEMP'", plugin)
+        self.assertIn('rssRest("/article"', plugin)
+        self.assertNotIn("'$env:TEMP'", plugin)
+        self.assertNotIn("captureArticleNow(host2, rawUrl, route, owner, options = {}) {\n  const run", plugin)
         self.assertNotIn("echo %OS%", plugin)
         self.assertNotIn("echo %TEMP%", plugin)
 
