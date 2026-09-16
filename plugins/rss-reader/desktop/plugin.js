@@ -1431,10 +1431,6 @@ async function readPackedFeed(run, family, directory, feedPath) {
           `powershell -NoProfile -NonInteractive "$f=${powershellSingle(b64Path)}; if (-not (Test-Path -LiteralPath $f)) { '' } else { $t=[IO.File]::ReadAllText($f); $o=[Math]::Min(${offset}, $t.Length); $c=[Math]::Min(${count}, [Math]::Max(0, $t.Length - $o)); if ($c -le 0) { '' } else { $t.Substring($o,$c) } }"`
         );
       }
-      await run(
-        `powershell -NoProfile -NonInteractive "Remove-Item -LiteralPath ${powershellSingle(gzPath)},${powershellSingle(b64Path)} -ErrorAction SilentlyContinue"`,
-        true
-      );
       return packed;
     });
   }
