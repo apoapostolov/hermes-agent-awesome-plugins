@@ -358,6 +358,33 @@ function gradingScaffold(name) {
     ""
   ].join("\n");
 }
+async function ensureGradingSkill(host2, name) {
+  const skill = gradingSkillName(name);
+  if (typeof rssRest !== "function") throw new Error("RSS Reader requires the plugin REST API.");
+  const current = await rssRest(`/grading-skill?name=${encodeURIComponent(skill)}`, { method: "GET" });
+  if (String(current?.content || "").trim()) return current.content;
+  await rssRest("/grading-skill", {
+    method: "POST",
+    body: { name: skill, content: gradingScaffold(skill), create_if_missing: true }
+  });
+  return gradingScaffold(skill);
+}
+async function syncGradingTags(host2, ctx, owner, name) {
+  try {
+    await ensureGradingSkill(host2, name);
+    const tags = parseGradingTags(await readGradingSkill(host2, name));
+    cacheGradingTags(ctx, owner, tags);
+    return tags;
+  } catch {
+    return null;
+  }
+}
+async function readGradingSkill(host2, name) {
+  const skill = gradingSkillName(name);
+  if (typeof rssRest !== "function") throw new Error("RSS Reader requires the plugin REST API.");
+  const result = await rssRest(`/grading-skill?name=${encodeURIComponent(skill)}`, { method: "GET" });
+  return String(result?.content || "").slice(0, 8e3);
+}
 function gradingInstructions(skillText, tags) {
   const rubric = String(skillText || "").trim().slice(0, 6e3) || GRADING_RUBRIC;
   const keys = gradingKeys(tags);
