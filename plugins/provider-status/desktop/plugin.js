@@ -853,7 +853,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
             borderColor: open ? 'var(--ui-accent)' : 'var(--ui-border)',
             color: val ? 'var(--ui-text-secondary, var(--foreground))' : 'var(--ui-text-quaternary, var(--foreground))',
           },
-          children: val ? String(val) : 'None',
+          children: val ? dayLabel(val) : 'None',
         }),
         open ? jsx('div', {
           'data-day-menu': '',
@@ -1031,7 +1031,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
         className: 'flex items-center justify-end gap-1 text-[0.65rem] leading-none',
         style: { color: 'var(--ui-text-quaternary)' },
         children: [
-          jsx('span', { children: 'Key rotation:' }),
+          jsx('span', { children: 'Key rotation (set in Hermes config):' }),
           jsx('select', {
             'data-ps-select': '',
             value: poolStrategy,
