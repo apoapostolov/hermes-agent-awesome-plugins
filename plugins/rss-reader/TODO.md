@@ -9,40 +9,10 @@ the code audit in `AUDIT.md`.
 
 ---
 
-## Done
-
-- **Drag reorder with a live gap.** The subscription list previews the landing
-  spot while a row is in the air. `previewFeedOrder` and `feedDropIndex` are
-  module-scope helpers; a grab with no movement skips the round trip.
-- **Folders in the left nav.** Feeds group under folder headings with unread
-  counts. Empty folder is Ungrouped. Headers collapse. Pencil mode drags a
-  feed between open folders and onto a closed header (lands at the top).
-  `previewNavFeeds` keeps the source row mounted; `applyFeedMove` writes
-  folder plus order through `POST /feeds/reorder`. OPML import/export already
-  nested outlines, so grouped nav round-trips the same nesting. Pencil mode
-  also creates, renames, and deletes folders (delete moves feeds to Ungrouped
-  or another folder).
-- **Mute rules and list funnel.** Phrase plus folder/feed scope, hit counts,
-  filter glyph in the list head.
-- **AI tagging.** Preference skill `rss-reader-plugin` (legacy slugs
-  `rss-importance-grading` and `rss-reader-grading` still map). Pills and card tints from the skill
-  tag table. Grades cache by url/identity and are not sent again. Order by
-  Importance sorts by tag rank 0-100, then date.
-- **Saved set for Hermes.** Settings **Preference Report** writes
-  `%LOCALAPPDATA%/hermes/rss-reader/saved.json` (saved titles, per-feed
-  saved/read/unread, mutes) and `preference-report.md`. The report suggests
-  rubric edits. It does not edit the skill. This is the first cut of taste
-  memory in `PROPOSAL.md` §3. Card "more like this" later writes the same
-  files. Do not add a second profile.
-- **Load More and list jump.** Load More stays centered and does not reset
-  the middle column. Past the twentieth card, a square arrow jumps to the top
-  and can return.
-
----
-
 ## Still open
 
-Nothing left from this file. New AI-first slices go in `PROPOSAL.md` first.
+No current items. Add new implementation slices here when they are approved.
+New AI-first ideas belong in `PROPOSAL.md` first.
 
 ---
 
