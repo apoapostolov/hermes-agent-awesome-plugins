@@ -972,14 +972,14 @@ function bodyToRichHtml(raw) {
     const bullet = /^[-*\u2022+]\s+(.*)$/.exec(trimmed);
     if (bullet) {
       flushParagraph();
-      if (!inList) { out.push("<ul>"); inList = true; }
+      if (!inList) { out.push('<ul class="rss-list-md">'); inList = true; }
       out.push(`<li>${renderInline(escapeHtml(bullet[1]))}</li>`);
       continue;
     }
     const numbered = /^\d+[.)]\s+(.*)$/.exec(trimmed);
     if (numbered) {
       flushParagraph();
-      if (!inList) { out.push('<ul class="rss-ol">'); inList = true; }
+      if (!inList) { out.push('<ul class="rss-list-md rss-ol">'); inList = true; }
       out.push(`<li>${renderInline(escapeHtml(numbered[1]))}</li>`);
       continue;
     }
@@ -1065,7 +1065,11 @@ var styles = `
 .hermes-rss .rss-rich th,.hermes-rss .rss-rich td{border:1px solid var(--ui-stroke-secondary);padding:6px 10px;text-align:left}
 .hermes-rss .rss-rich th{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent);font-weight:650}
 .hermes-rss .rss-rich h4{font-size:1em;margin:1.2em 0 .5em}
-.hermes-rss .rss-rich ul.rss-ol{list-style:decimal;padding-left:1.4em}
+.hermes-rss .rss-rich .rss-list-md{white-space:normal;list-style:disc outside;padding-left:1.5em;margin:0 0 1.05em}
+.hermes-rss .rss-rich .rss-list-md li{display:list-item;margin:0 0 .35em;white-space:normal}
+.hermes-rss .rss-rich .rss-list-md li::before{content:none}
+.hermes-rss .rss-rich .rss-list-md p{margin:0;white-space:normal}
+.hermes-rss .rss-rich ul.rss-ol{list-style:decimal}
 .hermes-rss .rss-rich figcaption,.hermes-rss .rss-rich small{color:var(--ui-text-secondary);font-size:.85em}
 .hermes-rss .rss-settings-header{font-size:15px;font-weight:700;letter-spacing:-.2px;margin:4px 0 2px;color:var(--ui-text-primary,var(--foreground))}
 .hermes-rss .rss-settings-header:not(:first-child){margin-top:14px;padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
@@ -1077,7 +1081,9 @@ var styles = `
 .hermes-rss .rss-tabs-pills button{border:0;background:transparent;border-radius:0;padding:2px 0;font-size:12px;line-height:1.4;color:var(--ui-text-secondary)}
 .hermes-rss .rss-tabs-pills button[aria-selected=true]{border-bottom:2px solid var(--ui-accent);background:transparent;color:var(--ui-text-primary,var(--foreground))}
 .hermes-rss .rss-list-items{overflow:auto;flex:1;padding:8px}
-.hermes-rss .rss-card{display:block;width:100%;border:1px solid transparent;background:transparent;color:inherit;text-align:left;padding:18px 14px;border-radius:8px;margin-bottom:3px}
+.hermes-rss .rss-card{display:block;width:100%;border:1px solid transparent;background:transparent;color:inherit;text-align:left;padding:18px 14px;border-radius:8px;margin-bottom:3px;outline:none}
+.hermes-rss .rss-card:focus:not(:focus-visible){outline:none}
+.hermes-rss .rss-card:focus-visible{outline:2px solid var(--ui-accent);outline-offset:-2px}
 .hermes-rss .rss-card:hover{background:color-mix(in srgb,var(--ui-text-secondary) 5%,transparent)}
 .hermes-rss .rss-card[aria-selected=true]{background:color-mix(in srgb,var(--ui-accent) 7%,transparent);border-color:color-mix(in srgb,var(--ui-accent) 24%,transparent)}
 .hermes-rss .rss-card-read .rss-card-title{color:var(--ui-text-secondary);font-weight:500}
