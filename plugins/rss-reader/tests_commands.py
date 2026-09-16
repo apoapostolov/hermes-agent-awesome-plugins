@@ -1,0 +1,51 @@
+import importlib.util
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+
+_ENTRYPOINT = Path(__file__).with_name("__init__.py")
+_SPEC = importlib.util.spec_from_file_location("rss_reader_entrypoint", _ENTRYPOINT)
+rss = importlib.util.module_from_spec(_SPEC)
+assert _SPEC.loader is not None
+_SPEC.loader.exec_module(rss)
+
+
+class RssCommandTests(unittest.TestCase):
+    def test_refresh_forms(self):
+        self.assertEqual(rss._parse("refresh"), ("refresh", {}))
+        self.assertEqual(rss._parse("refresh 45m"), ("refresh-period", {"minutes": 45}))
+
+    def test_refine_defaults_and_bounds(self):
+        self.assertEqual(rss._parse("refine"), ("refine", {"days": 30}))
+        self.assertEqual(rss._parse("refine 14d"), ("refine", {"days": 14}))
+        with self.assertRaises(ValueError):
+            rss._parse("refine 366d")
+
+    def test_mute_and_add_scope(self):
+        self.assertEqual(rss._parse("mute model spam"), ("mute", {"phrase": "model spam"}))
+        self.assertEqual(
+            rss._parse("add example.com, Example to Research"),
+            ("add", {"source": "example.com, Example", "folder": "Research"}),
+        )
+        self.assertEqual(
+            rss._parse("add example.com"),
+            ("add", {"source": "example.com", "folder": ""}),
+        )
+
+    def test_handle_writes_one_json_record(self):
+        with tempfile.TemporaryDirectory() as directory:
+            queue = Path(directory) / "commands.jsonl"
+            with patch.object(rss, "_queue_path", return_value=queue):
+                message = rss._handle("refresh 20m")
+            self.assertIn("20 minutes", message)
+            row = json.loads(queue.read_text(encoding="utf-8"))
+            self.assertEqual(row["action"], "refresh-period")
+            self.assertEqual(row["payload"], {"minutes": 20})
+            self.assertTrue(row["id"])
+
+
+if __name__ == "__main__":
+    unittest.main()

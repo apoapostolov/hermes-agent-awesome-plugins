@@ -1104,8 +1104,162 @@ function readSettings(ctx, owner) {
 function currentOwner(host2) {
   return JSON.stringify([host2.state.connectionId?.get() || "local", host2.state.profile.get()]);
 }
-function publishLibraryChange(owner) {
-  window.dispatchEvent(new CustomEvent("hermes-rss-library-changed", { detail: { owner } }));
+function publishLibraryChange(owner, notice = "") {
+  window.dispatchEvent(new CustomEvent("hermes-rss-library-changed", { detail: { owner, notice } }));
+}
+var rssCommandBusy = false;
+function rssCommandReadCommand(family) {
+  const script = "import os,pathlib; h=os.environ.get('HERMES_HOME') or (pathlib.Path(os.environ.get('LOCALAPPDATA', str(pathlib.Path.home()))) / 'hermes'); p=pathlib.Path(h)/'rss-reader'/'commands.jsonl'; print(p.read_text(encoding='utf-8') if p.exists() else '', end='')";
+  const encoded = utf8Base64(script);
+  return `${family === "windows" ? "python" : "python3"} -c "import base64;exec(base64.b64decode('${encoded}'))"`;
+}
+async function rssCommandQueue(host2, route) {
+  const owner = JSON.stringify([route.connectionId, route.profile]);
+  const run = async (command) => {
+    assertOwner(host2, route);
+    const result = await host2.requestProfile(route, "shell.exec", { command });
+    assertOwner(host2, route);
+    return result.code === 0 ? String(result.stdout || "") : "";
+  };
+  let family = families.get(owner);
+  if (!family) {
+    family = (await run("echo %OS%")).trim() === "Windows_NT" ? "windows" : "posix";
+    families.set(owner, family);
+  }
+  const text = await run(rssCommandReadCommand(family));
+  return String(text).split(/\r?\n/).map(line => {
+    try { return JSON.parse(line); } catch { return null; }
+  }).filter(command => command && command.id && command.action && command.payload && typeof command.payload === "object");
+}
+function rssCommandSeen(ctx, owner) {
+  const value = storageGet(ctx, "commandSeen", owner, []);
+  return new Set(Array.isArray(value) ? value.filter(id => typeof id === "string") : []);
+}
+function rememberRssCommand(ctx, owner, seen, id) {
+  seen.add(id);
+  storageSet(ctx, "commandSeen", owner, [...seen].slice(-200));
+}
+function commandSourceParts(source) {
+  const raw = String(source || "").trim();
+  const comma = raw.indexOf(",");
+  if (comma < 0) return { input: raw, title: "" };
+  return { input: raw.slice(0, comma).trim(), title: raw.slice(comma + 1).trim().slice(0, 300) };
+}
+function commandWebsiteUrl(input) {
+  const value = String(input || "").trim();
+  if (/^https?:\/\//i.test(value)) return value;
+  if (/^[a-z0-9.-]+(?:\/.*)?$/i.test(value) && value.includes(".")) return `https://${value}`;
+  throw new Error("Give a website URL or a domain name so RSS Reader can discover its feed.");
+}
+async function discoverFeed(host2, input) {
+  const website = new URL(commandWebsiteUrl(input));
+  const candidates = [website.href];
+  const base = `${website.protocol}//${website.host}`;
+  for (const suffix of ["/feed", "/feed.xml", "/rss", "/rss.xml", "/atom.xml", "/index.xml", "/feeds/posts/default?alt=rss"])
+    candidates.push(`${base}${suffix}`);
+  const seen = new Set();
+  let lastError = null;
+  for (const candidate of candidates) {
+    if (seen.has(candidate)) continue;
+    seen.add(candidate);
+    try {
+      const parsed = await fetchFeed(host2, candidate);
+      return { url: candidate, title: parsed.title || "" };
+    } catch (error) { lastError = error; }
+  }
+  throw new Error(`Could not discover an RSS or Atom feed for ${website.hostname}.${lastError ? ` ${lastError.message}` : ""}`.slice(0, 500));
+}
+async function startRefinementConversation(host2, days) {
+  const route = await currentRoute(host2);
+  assertOwner(host2, route);
+  const title = `RSS · Refine grading · ${days} days`;
+  const created = await host2.requestProfile(route, "session.create", { profile: route.targetProfile, title });
+  if (!created?.session_id || !created?.stored_session_id) throw new Error("Hermes did not return a usable refinement session.");
+  assertOwner(host2, route);
+  await host2.requestProfile(route, "session.title", { session_id: created.session_id, title });
+  const text = [
+    "Refine my RSS Reader grading preferences.",
+    `Read my Hermes sessions from the last ${days} days using the available session tools. Look for explicit choices, repeated interests, saved articles, mutes, and corrections that reveal what matters to me in RSS feeds.`,
+    "Read the current rss-reader-grading skill before changing it. Update only that skill's rubric, levels, tag colours, or ranks when the evidence supports a change. Preserve the fenced tags format and keep the file usable by RSS Reader.",
+    "Then respond with a clear human-readable change report: Added, Changed, Removed, and Why. Name the evidence pattern behind each change. If the sessions do not support a change, say so and leave the skill untouched. Do not change other files, settings, subscriptions, or external services."
+  ].join("\n\n");
+  try {
+    await host2.requestProfile(route, "prompt.submit", { session_id: created.session_id, text });
+  } catch {
+    await host2.openSession(created.stored_session_id, { profile: route.profile, route, intent: "main" });
+    throw new Error("The refinement submit result is uncertain. Inspect the opened conversation before starting another refinement. No retry was sent.");
+  }
+  assertOwner(host2, route);
+  await host2.openSession(created.stored_session_id, { profile: route.profile, route, intent: "main" });
+}
+async function executeRssCommand(ctx, host2, owner, command) {
+  const library = createLibrary(owner, url => fetchFeed(host2, url), transact, null);
+  const payload = command.payload || {};
+  if (command.action === "refresh") {
+    const result = await refreshSubscriptions(library);
+    const at = Date.now();
+    storageSet(ctx, "lastRefresh", owner, at);
+    publishLibraryChange(owner, `${result.added} new articles${result.failed ? ` · ${result.failed} feeds could not refresh.` : " · Up to date."}`);
+    return;
+  }
+  if (command.action === "refresh-period") {
+    const next = readSettings(ctx, owner);
+    next.refreshMinutes = Math.max(1, Math.min(1440, Number(payload.minutes) || 15));
+    delete next.gradingTags;
+    storageSet(ctx, "settings", owner, next);
+    publishLibraryChange(owner, `Refresh period saved: every ${next.refreshMinutes} minutes.`);
+    return;
+  }
+  if (command.action === "mute") {
+    const phrase = String(payload.phrase || "").trim().slice(0, 200);
+    if (!phrase) throw new Error("Mute phrase is empty.");
+    await library("/filters/mutes", { method: "POST", body: { phrase, folders: [], feed_ids: [] } });
+    publishLibraryChange(owner, `Muted across all feeds: ${phrase}`);
+    return;
+  }
+  if (command.action === "refine") {
+    const days = Math.max(1, Math.min(365, Number(payload.days) || 30));
+    await startRefinementConversation(host2, days);
+    publishLibraryChange(owner, `Refinement session opened for the last ${days} days.`);
+    return;
+  }
+  if (command.action === "add") {
+    const parts = commandSourceParts(payload.source);
+    const discovered = await discoverFeed(host2, parts.input);
+    const feed = await library("/feeds", { method: "POST", body: { url: discovered.url, title: parts.title || discovered.title, folder: String(payload.folder || "").trim().slice(0, 100) } });
+    await library(`/feeds/${feed.id}/refresh`, { method: "POST", body: {} });
+    publishLibraryChange(owner, `Added ${parts.title || discovered.title || discovered.url}${payload.folder ? ` to ${payload.folder}` : ""}.`);
+    return;
+  }
+  throw new Error("Unknown RSS command.");
+}
+function startRssCommandBridge(ctx, host2) {
+  let stopped = false;
+  const poll = async () => {
+    if (stopped || rssCommandBusy) return;
+    rssCommandBusy = true;
+    try {
+      const route = await currentRoute(host2);
+      const owner = JSON.stringify([route.connectionId, route.profile]);
+      const seen = rssCommandSeen(ctx, owner);
+      const commands = await rssCommandQueue(host2, route);
+      for (const command of commands) {
+        if (seen.has(command.id)) continue;
+        try {
+          await executeRssCommand(ctx, host2, owner, command);
+          rememberRssCommand(ctx, owner, seen, command.id);
+        } catch (error) {
+          rememberRssCommand(ctx, owner, seen, command.id);
+          publishLibraryChange(owner, `RSS command failed: ${String(error?.message || error).slice(0, 300)}`);
+        }
+      }
+    } catch {
+      // The reader may be mounted before a connected profile is available.
+    } finally { rssCommandBusy = false; }
+  };
+  const timer = setInterval(() => { void poll(); }, 3000);
+  void poll();
+  return () => { stopped = true; clearInterval(timer); };
 }
 async function refreshSubscriptions(library, { feedId = null, shouldContinue = () => true } = {}) {
   const feeds = await library("/feeds");
@@ -1335,6 +1489,12 @@ function powershellSingle(value) {
     throw new Error("Could not create a private RSS download cache.");
   return `'${value}'`;
 }
+function pythonLiteral(value) {
+  const text = String(value).replace(/\\/g, "/");
+  if (/[\r\n']/.test(text))
+    throw new Error("Could not create a private RSS download cache.");
+  return `'${text}'`;
+}
 function ipv4Tokens(text) {
   return text.split(/\s+/).filter((v) => /^\d+(\.\d+){3}$/.test(v));
 }
@@ -1385,7 +1545,7 @@ async function resolvePublicIPv4(run, family, hostname) {
   if (family === "windows") {
     const addresses = publicAddresses(
       await run(
-        `powershell -NoProfile -NonInteractive "Resolve-DnsName -Name ${powershellSingle(hostname)} -Type A | Where-Object { $_.Type -eq 'A' } | Select-Object -ExpandProperty IPAddress"`
+        `python -c "import socket; print(chr(10).join(sorted({i[4][0] for i in socket.getaddrinfo(${pythonLiteral(hostname)}, None, socket.AF_INET)})))"`
       )
     );
     if (!addresses)
@@ -1411,26 +1571,11 @@ async function resolvePublicIPv4(run, family, hostname) {
 async function readPackedFeed(run, family, directory, feedPath) {
   if (family === "windows") {
     return withPackLock(directory, async () => {
-      const stamp = crypto.randomUUID().replaceAll("-", "").slice(0, 8);
-      const gzPath = `${directory}\pack.${stamp}.gz`;
-      const b64Path = `${directory}\pack.${stamp}.b64`;
-      await run(
-        `powershell -NoProfile -NonInteractive "Add-Type -AssemblyName System.IO.Compression; $in=[IO.File]::OpenRead(${powershellSingle(feedPath)}); $out=[IO.File]::Create(${powershellSingle(gzPath)}); $gzs=New-Object IO.Compression.GZipStream($out,[IO.Compression.CompressionMode]::Compress); $in.CopyTo($gzs); $gzs.Dispose(); $in.Dispose(); [IO.File]::WriteAllText(${powershellSingle(b64Path)},[Convert]::ToBase64String([IO.File]::ReadAllBytes(${powershellSingle(gzPath)})))"`
-      );
-      const length = Number(
-        await run(
-          `powershell -NoProfile -NonInteractive "$f=${powershellSingle(b64Path)}; if (-not (Test-Path -LiteralPath $f)) { 0 } else { [IO.File]::ReadAllText($f).Length }"`
-        )
-      );
-      if (!Number.isInteger(length) || length < 1 || length > 6e5)
+      const packed = (await run(
+        `python -c "import gzip,base64,pathlib; d=base64.b64encode(gzip.compress(pathlib.Path(${pythonLiteral(feedPath)}).read_bytes())).decode(); raise SystemExit('too-large') if len(d)>600000 else print(d,end='')"`
+      )).replace(/\s+/g, "");
+      if (!packed || packed.length > 6e5)
         throw new Error("Feed exceeds the compressed transport limit.");
-      let packed = "";
-      for (let offset = 0; offset < length; offset += 3500) {
-        const count = Math.min(3500, length - offset);
-        packed += await run(
-          `powershell -NoProfile -NonInteractive "$f=${powershellSingle(b64Path)}; if (-not (Test-Path -LiteralPath $f)) { '' } else { $t=[IO.File]::ReadAllText($f); $o=[Math]::Min(${offset}, $t.Length); $c=[Math]::Min(${count}, [Math]::Max(0, $t.Length - $o)); if ($c -le 0) { '' } else { $t.Substring($o,$c) } }"`
-        );
-      }
       return packed;
     });
   }
@@ -1454,7 +1599,7 @@ async function fetchFeedNow(host2, rawUrl, route) {
     if (result.code !== 0) {
       if (optional) return "";
       throw new Error(
-        `Feed command failed: ${(result.stderr || "This gateway needs curl plus gzip and base64 tools. Windows uses curl.exe and PowerShell. Linux and macOS use POSIX utilities.").slice(0, 350)}`
+        `Feed command failed: ${(result.stderr || "This gateway needs curl plus gzip and base64 tools. Windows uses curl.exe and python. Linux and macOS use POSIX utilities.").slice(0, 350)}`
       );
     }
     return result.stdout.trim();
@@ -2827,6 +2972,7 @@ function ReaderProfile({ ctx, owner }) {
       if (event.detail?.owner === owner) {
         void client.invalidateQueries({ queryKey: [ID, owner] });
         setSettings(readSettings(ctx, owner));
+        if (event.detail.notice) setNotice(event.detail.notice);
       }
     };
     window.addEventListener("hermes-rss-library-changed", changed);
@@ -4121,10 +4267,11 @@ var plugin_default = {
   id: ID,
   name: "RSS Reader",
   description: "RSS reader with reader-mode capture, edit-mode subscriptions, and keyboard shortcuts.",
-  version: "1.0.0",
+  version: "1.0.1",
   defaultEnabled: true,
   register(ctx) {
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
+    if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
     ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);
     try {
       // The rubric and the tag colours both live in the skill: scaffold it when
