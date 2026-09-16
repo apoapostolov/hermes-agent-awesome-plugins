@@ -1156,10 +1156,36 @@ function sanitizeRichHtml(source) {
   }
   return template.innerHTML;
 }
+function imageKey(url) {
+  const src = httpsSrc(url);
+  if (!src) return "";
+  try {
+    const parsed = new URL(src);
+    const path = parsed.pathname.replace(/\/+$/, "").toLowerCase().replace(/[-_]\d{2,5}x\d{2,5}(?=\.[a-z0-9]+$)/i, "");
+    return parsed.hostname.replace(/^www\./i, "").toLowerCase() + path;
+  } catch {
+    return src.split("?")[0].split("#")[0].toLowerCase();
+  }
+}
+function dedupeArticleImages(html, lead) {
+  const template = document.createElement("template");
+  const leadSrc = httpsSrc(lead);
+  template.innerHTML = (leadSrc ? `<p class="rss-lead"><img src="${escapeHtml(leadSrc)}" alt="" loading="lazy"></p>` : "") + String(html || "");
+  const seen = new Set();
+  for (const image of [...template.content.querySelectorAll("img")]) {
+    const key = imageKey(image.getAttribute("src"));
+    if (!key || seen.has(key)) {
+      const wrap = image.closest("p.rss-figure, p.rss-lead, figure");
+      if (wrap && wrap.querySelectorAll("img").length <= 1 && !wrap.textContent.trim()) wrap.remove();
+      else image.remove();
+      continue;
+    }
+    seen.add(key);
+  }
+  return template.innerHTML;
+}
 function withLeadImage(html, lead) {
-  const src = httpsSrc(lead);
-  if (!src || html.includes(src)) return html;
-  return `<p class="rss-lead"><img src="${escapeHtml(src)}" alt="" loading="lazy"></p>` + html;
+  return dedupeArticleImages(html, lead);
 }
 function mdTableHtml(rows) {
   const cells = rows.map((r) => r.replace(/^\||\|$/g, "").split("|").map((c) => c.trim()));
