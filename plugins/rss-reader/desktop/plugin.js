@@ -1624,9 +1624,10 @@ var styles = `
 .hermes-rss .rss-card-read .rss-card-title{color:var(--ui-text-secondary);font-weight:500}
 .hermes-rss .rss-card-read .rss-card-excerpt{color:var(--ui-text-tertiary)}
 .hermes-rss .rss-card-title{font-size:15px;font-weight:600;line-height:1.45;margin:8px 0}.hermes-rss .rss-card-meta{display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--ui-text-tertiary)}
+.hermes-rss .rss-card:not(:has(.rss-card-thumb)) .rss-card-meta{padding-right:66px}
 .hermes-rss .rss-card-excerpt{font-size:12px;color:var(--ui-text-secondary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .hermes-rss .rss-card-main{min-width:0;flex:1}
-.hermes-rss .rss-card-thumb{flex-shrink:0;width:56px;height:56px;border-radius:6px;overflow:hidden;margin-left:10px;background:color-mix(in srgb,var(--ui-text-secondary) 10%,transparent)}
+.hermes-rss .rss-card-thumb{flex-shrink:0;width:56px;height:56px;border-radius:6px;overflow:hidden;margin-left:10px;position:relative;top:5px;background:color-mix(in srgb,var(--ui-text-secondary) 10%,transparent)}
 .hermes-rss .rss-card-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .hermes-rss .rss-chip{display:inline-flex;align-items:center;padding:4px 8px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;font-size:10px;color:var(--ui-text-secondary)}
 .hermes-rss .rss-tabs{display:flex;gap:22px;border-bottom:1px solid var(--ui-stroke-secondary);margin:24px 0}
