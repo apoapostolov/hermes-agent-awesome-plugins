@@ -890,7 +890,7 @@ async function captureArticleNow(host2, rawUrl, route, owner) {
     );
     const match = /^(\d{3}) ([0-9]+)$/.exec(info);
     if (!match) throw new Error("Invalid page download response.");
-    const [code, size] = match;
+    const code = match[1], size = match[2];
     if (Number(size) > 2e6) throw new Error("Page exceeds 2 MB.");
     if (code !== "200") throw new Error(`The page returned HTTP ${code}.`);
     success = true;
@@ -1228,11 +1228,8 @@ function ReaderProfile({ ctx, owner }) {
     if (!target?.url) return;
     void act("Capturing full article\u2026", async () => {
       const fullBody = await captureArticle(host, target.url);
-      if (!fullBody || fullBody.length <= target.body.length) {
-        setNotice("No longer or fuller text found at the original page."); return;
-      }
+      if (!fullBody || fullBody.length <= target.body.length) return;
       await libraryRequest(`/articles/${target.id}/capture`, { method: "POST", body: { body: fullBody } });
-      setNotice("Full article text captured.");
     });
   };
   const articleList = articles.data || [];
