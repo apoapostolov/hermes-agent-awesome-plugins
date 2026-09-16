@@ -1626,6 +1626,24 @@ function startCaptureWorker(ctx, host2) {
 // src/feed-transport.mjs
 var posixQuote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
 var cmdQuote = (value) => `"${String(value).replaceAll('"', '""')}"`;
+function base64ToBytes(value) {
+  const text = String(value).replace(/\s+/g, "");
+  if (!text || text.length % 4 === 1) throw new Error("Invalid base64 transport payload.");
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const padding = text.endsWith("==") ? 2 : text.endsWith("=") ? 1 : 0;
+  const bytes = new Uint8Array(Math.floor(text.length * 3 / 4) - padding);
+  let offset = 0;
+  for (let i = 0; i < text.length; i += 4) {
+    const a = alphabet.indexOf(text[i]), b = alphabet.indexOf(text[i + 1]);
+    const c = text[i + 2] === "=" ? 0 : alphabet.indexOf(text[i + 2]);
+    const d = text[i + 3] === "=" ? 0 : alphabet.indexOf(text[i + 3]);
+    if (a < 0 || b < 0 || c < 0 || d < 0) throw new Error("Invalid base64 transport payload.");
+    if (offset < bytes.length) bytes[offset++] = (a << 2) | (b >> 4);
+    if (offset < bytes.length) bytes[offset++] = ((b & 15) << 4) | (c >> 2);
+    if (offset < bytes.length) bytes[offset++] = ((c & 3) << 6) | d;
+  }
+  return bytes;
+}
 var families = /* @__PURE__ */ new Map();
 var caches = /* @__PURE__ */ new Map();
 var pendingFetches = /* @__PURE__ */ new Map();
@@ -1808,7 +1826,7 @@ async function fetchFeedNow(host2, rawUrl, route) {
   }
   if (!success) throw new Error("The feed redirects too many times.");
   const packed = await readPackedFeed(run, family, directory, feedPath);
-  const bytes = Uint8Array.from(atob(packed), (c) => c.charCodeAt(0));
+  const bytes = base64ToBytes(packed);
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
   const decoded = new Uint8Array(await new Response(stream).arrayBuffer());
   if (decoded.length > 2e6) throw new Error("Feed exceeds 2 MB.");
@@ -2200,7 +2218,7 @@ async function captureArticleNow(host2, rawUrl, route, owner, options = {}) {
     }
     if (!success) throw new Error("The page redirects too many times.");
     const packed = await readPackedFeed(run, family, directory, pagePath);
-    const bytes = Uint8Array.from(atob(packed), (c) => c.charCodeAt(0));
+    const bytes = base64ToBytes(packed);
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
     const decoded = new Uint8Array(await new Response(stream).arrayBuffer());
     if (decoded.length > 2e6) throw new Error("Page exceeds 2 MB.");
