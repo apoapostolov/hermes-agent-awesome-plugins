@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel")].join("\n");
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -48,6 +48,7 @@ exports.applyCachedGrade = applyCachedGrade;
 exports.parseGradingTags = parseGradingTags;
 exports.tagRank = tagRank;
 exports.sortArticlesByImportance = sortArticlesByImportance;
+exports.refreshButtonLabel = refreshButtonLabel;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -120,5 +121,8 @@ const ordered = fns.sortArticlesByImportance([
   { id: "d", published_at: "2026-09-20" }
 ], parsed);
 assert.equal(ordered.map((a) => a.id).join(""), "cbad");
+assert.equal(fns.refreshButtonLabel(0, 1), "Refresh");
+assert.equal(fns.refreshButtonLabel(0, Date.now()), "Refresh");
+assert.equal(fns.refreshButtonLabel(1e12, 1e12 + 5 * 6e4), "Refresh \u00b7 5m");
 
-console.log("ok", 23);
+console.log("ok", 24);

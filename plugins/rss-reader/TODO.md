@@ -5,68 +5,78 @@ the code audit in `AUDIT.md`.
 
 - Live copy: `%LOCALAPPDATA%/hermes/plugins/rss-reader/`
 - Repo: `C:/git/hermes-agent-awesome-plugins/plugins/rss-reader/`
-- Ship a slice: edit live → `node --check` a `.mjs` copy → `node scripts/lint-plugin.mjs <live plugin.js>` → copy live to the repo → commit and push `main` → toggle the plugin in Capabilities.
+- Ship a slice: edit live → `node --check` a `.mjs` copy → `node scripts/lint-plugin.mjs <live plugin.js>` → copy live to the repo → commit and push `main` → toggle the plugin in Capabilities. Do not bump `plugin.yaml` version unless Apo asks.
 
 ---
 
 ## Done
 
 - **Drag reorder with a live gap.** The subscription list previews the landing
-  spot while a row is in the air, so the rows around it move aside instead of
-  the order only changing after the drop. Technique follows
-  `AI-Provider-Library-for-Foundry-VTT/scripts/ui/route-drag.mjs`: the source
-  slot closes and the destination slot opens. Here it rides the HTML5 drag
-  events the list already had. `previewFeedOrder` and `feedDropIndex` are
-  module-scope helpers; the dragged row is rendered styled at the insertion
-  index; a grab with no movement skips the round trip. Verified on the real
-  helpers (13 order cases) and by measuring the stack in a render: every shift
-  is a whole row, no overlap or hole, exact restore on abort.
+  spot while a row is in the air. `previewFeedOrder` and `feedDropIndex` are
+  module-scope helpers; a grab with no movement skips the round trip.
+- **Folders in the left nav.** Feeds group under folder headings with unread
+  counts. Empty folder is Ungrouped. Headers collapse. Pencil mode drags a
+  feed between open folders and onto a closed header (lands at the top).
+  `previewNavFeeds` keeps the source row mounted; `applyFeedMove` writes
+  folder plus order through `POST /feeds/reorder`. OPML import/export already
+  nested outlines, so grouped nav round-trips the same nesting.
+- **Mute rules and list funnel.** Phrase plus folder/feed scope, hit counts,
+  filter glyph in the list head.
+- **AI tagging.** Preference skill `rss-reader-grading` (old slug
+  `rss-importance-grading` still maps). Pills and card tints from the skill
+  tag table. Grades cache by url/identity and are not sent again. Order by
+  Importance sorts by tag rank 0-100, then date.
+- **Load More and list jump.** Load More stays centered and does not reset
+  the middle column. Past the twentieth card, a square arrow jumps to the top
+  and can return.
 
-## 1. Folders
+---
 
-**Status:** the data exists, the UI does not.
+## Still open
 
-`feed.folder` is real and already round-trips: OPML import writes it, `POST /feeds`
-accepts `{ url, folder }`, feed titles read `folder / title`, and OPML export
-rebuilds the nested outlines. The left nav ignores all of it and maps
-`library.feeds` to a flat `.rss-feed-row` list with grip-reorder and trash, so a
-folder you imported is invisible and unmanageable.
+Audit against the live plugin. Only leftover items from this file.
 
-- Nav: group feeds under folder headings with the folder's unread count, feeds
-  with no folder staying loose. Keep the heading style consistent with the
-  existing `rss-nav-heading` row that holds the pencil toggle.
-- Edit mode: drag a feed into another folder. The drag already persists as
-  `POST /feeds/reorder` with `{ order }`, so the payload has to carry the folder
-  as well. Add rename, create, and delete for a folder in the same mode.
-- OPML must round-trip through the grouped nav: import → grouped → export gives
-  the same nesting.
-- No regressions in filter/search, the `.rss-nav button` width, or the pencil
-  alignment (both were fixed deliberately, see the skill).
+### 1. Folders leftover management
 
-First slice: render the nav from a `folder → feeds` map with headings only, no
-drag or folder management. That is a pure render change on existing data.
+Shipped: grouped nav, unread counts, collapse, cross-folder drag, OPML
+nesting.
 
-## 2. Saved → Hermes preference analysis
+Still missing:
+
+- Rename a folder in pencil mode.
+- Create a folder in pencil mode.
+- Delete a folder in pencil mode (feeds need a destination: Ungrouped or
+  another folder).
+
+No regressions in filter/search, `.rss-nav button` width, or pencil
+alignment.
+
+### 2. Saved → Hermes preference analysis
 
 **Status:** not started. Saved works in-app; Hermes cannot see it.
 
-`is_saved` is a live feature: the star on a card and in the article pane, the
-`saved` view, and saved posts survive both unsubscribe and the 300-post
-retention trim. Nothing outside the plugin ever reads it, so the strongest
-signal Apo produces (what he stars, what he lets fall away) never reaches the
-model.
+`is_saved` is live: star on the card and article pane, `saved` view, saved
+posts survive unsubscribe and the 300-post trim. Nothing outside the plugin
+reads that set.
 
-- Expose the saved set to Hermes first. The whole library is one IndexedDB blob
-  (`hermes-rss-library`, store `libraries`, keyed per profile), which a Hermes
-  skill cannot read: this needs an export path (saved articles as JSON through
-  the plugin's shell bridge) or a Hermes-side reader for that store. Nothing
-  downstream is possible until this exists.
+Still missing:
+
+- Expose the saved set to Hermes. The library is one IndexedDB blob
+  (`hermes-rss-library`, store `libraries`, keyed per profile). A skill cannot
+  read it. Needs an export path (saved articles as JSON through the plugin
+  shell bridge) or a Hermes-side reader for that store.
 - Preference analysis: turn saved vs read vs ignored into a profile (feeds,
-  authors, topics, mute history) and feed it into grading. The rubric and tag
-  table already live in a skill (`rss-importance-grading`), so that is where the
-  loop closes: what Apo saves should move the rubric.
-- Decide the write path: auto-update the rubric, or emit a review report for Apo
-  to apply. A model pass that edits a skill unattended needs a guard, so the
-  first cut should be the report.
-- Decide whether this is the same system as the "more like this / less like this"
-  taste profile in `PROPOSAL.md` §3, or two systems. Do not build both.
+  authors, topics, mute history) and feed it into grading. The rubric lives in
+  `rss-reader-grading`. First cut should be a review report, not an unattended
+  skill edit.
+- Decide whether this is the same system as “more like this / less like this”
+  in `PROPOSAL.md` §3, or two systems. Do not build both.
+
+---
+
+## Not in this file
+
+AI-first slices that were never on this TODO live in `PROPOSAL.md`: digest,
+inline composer, full-text index, multi-select, feed health, library JSON
+backup, compact density. Do not treat those as open items here until they
+are added on purpose.

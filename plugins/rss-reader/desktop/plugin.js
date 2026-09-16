@@ -2229,6 +2229,11 @@ var refreshStatus = (value) => {
   if (hours < 24) return `Updated ${hours}h ago`;
   return `Updated ${Math.round(hours / 24)}d ago`;
 };
+function refreshButtonLabel(at, now) {
+  if (!at) return "Refresh";
+  const minutes = Math.max(0, Math.floor((Number(now) - Number(at)) / 6e4));
+  return "Refresh \u00b7 " + minutes + "m";
+}
 function Empty({ title, children }) {
   return /* @__PURE__ */ jsxs("div", { className: "rss-empty", children: [
     /* @__PURE__ */ jsx("div", { className: "rss-empty-mark", "aria-hidden": "true", children: "\u25D4" }),
@@ -2495,6 +2500,8 @@ function ReaderProfile({ ctx, owner }) {
   // Declared here: the keyboard-shortcut effect below reads it during render.
   const disabled = !!busy;
   const [notice, setNotice] = useState("");
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const [lastRefreshAt, setLastRefreshAt] = useState(() => Number(storageGet(ctx, "lastRefresh", owner, 0)) || 0);
   const [limit, setLimit] = useState(100);
   const [listFab, setListFab] = useState(null);
   const listRef = useRef(null);
@@ -2520,6 +2527,14 @@ function ReaderProfile({ ctx, owner }) {
   const navRef = useRef(null);
   const suppressFolderClick = useRef(false);
   const confirmation = useRef(null);
+  useEffect(() => {
+    const tick = () => {
+      setNowTick(Date.now());
+      setLastRefreshAt(Number(storageGet(ctx, "lastRefresh", owner, 0)) || 0);
+    };
+    const timer = setInterval(tick, 3e4);
+    return () => clearInterval(timer);
+  }, [ctx, owner]);
   useEffect(() => { if (feedToRemove) confirmation.current?.focus(); }, [feedToRemove]);
   useEffect(() => {
     if (!notice) return undefined;
@@ -2574,7 +2589,9 @@ function ReaderProfile({ ctx, owner }) {
       try {
         const result = await refreshSubscriptions(libraryRequest, { shouldContinue: () => !cancelled && currentOwner(host) === owner });
         if (cancelled) return;
-        storageSet(ctx, "lastRefresh", owner, Date.now());
+        const at = Date.now();
+        storageSet(ctx, "lastRefresh", owner, at);
+        setLastRefreshAt(at);
         if (s.fullCapture && result.fresh?.length) captureEnqueue(owner, result.fresh);
         client.invalidateQueries({ queryKey: key });
       } catch {
@@ -2665,7 +2682,11 @@ function ReaderProfile({ ctx, owner }) {
       feedId,
       shouldContinue: () => currentOwner(host) === owner
     });
-    if (!feedId) storageSet(ctx, "lastRefresh", owner, Date.now());
+    if (!feedId) {
+      const at = Date.now();
+      storageSet(ctx, "lastRefresh", owner, at);
+      setLastRefreshAt(at);
+    }
     const queued = settings.fullCapture && result.fresh?.length ? captureEnqueue(owner, result.fresh) : 0;
     // Grading is lazy: the refresh returns now and the tints land when it does.
     if (settings.aiGrading && result.fresh?.length) startGrading(host, () => library, owner, {
@@ -3053,7 +3074,7 @@ function ReaderProfile({ ctx, owner }) {
             variant: "outline",
             disabled: disabled || !feeds.data?.length,
             onClick: () => act("Refreshing\u2026", refreshFeeds),
-            children: "\u21BB Refresh"
+            children: refreshButtonLabel(lastRefreshAt, nowTick)
           }
         ),
         jsx(Button, { variant: "ghost", "aria-expanded": filtersOpen, onClick: () => setFiltersOpen(!filtersOpen), children: "Filters" }),
