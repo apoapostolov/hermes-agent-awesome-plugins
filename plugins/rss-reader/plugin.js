@@ -222,6 +222,7 @@ function mergeFeed(library, feedId, parsed) {
       byIdentity.set(article.identity, article);
   }
   let added = 0;
+  const fresh = [];
   for (const item of parsed.items) {
     const old = byIdentity.get(item.identity);
     if (old) {
@@ -242,6 +243,7 @@ function mergeFeed(library, feedId, parsed) {
       library.articles.push(article);
       byIdentity.set(item.identity, article);
       added++;
+      if (article.url) fresh.push(article);
     }
   }
   const unsaved = library.articles.filter((a) => a.feed_id === feedId && !a.is_saved).sort(
@@ -251,7 +253,7 @@ function mergeFeed(library, feedId, parsed) {
   );
   const remove = new Set(unsaved.slice(300).map((a) => a.id));
   library.articles = library.articles.filter((a) => !remove.has(a.id));
-  return { added };
+  return { added, fresh: fresh.map((a) => ({ id: a.id, url: a.url })) };
 }
 function parseOpml(content) {
   if (content.length > 2e6 || /<!DOCTYPE|<!ENTITY/i.test(content))
@@ -272,7 +274,7 @@ function parseOpml(content) {
   }));
 }
 var feedRefreshes = new Map();
-function createLibrary(owner, fetchFeed2, transaction = transact) {
+function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = null) {
   const read = () => transaction(owner);
   const write = (change) => transaction(owner, change);
   const add = (library, input) => {
@@ -364,7 +366,27 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
           if (!feed) throw new Error("Subscription not found.");
           try {
             const result = await fetchFeed2(feed.url);
-            return await write((library) => mergeFeed(library, feed.id, result));
+            const outcome = await write((library) => mergeFeed(library, feed.id, result));
+            if (outcome.added > 0 && Array.isArray(body.captureFull) && body.captureFull.includes(feed.id)) {
+              let ok = 0;
+              for (const freshItem of outcome.fresh.slice(0, 10)) {
+                try {
+                  const fullBody = await captureFn(freshItem.url);
+                  await write((library2) => {
+                    const target = library2.articles.find((a) => a.id === freshItem.id);
+                    if (target && fullBody && fullBody.length > target.body.length) {
+                      target.body = fullBody;
+                      target.captured = true;
+                    }
+                  });
+                  ok++;
+                } catch {
+                  // Paywalls, JS-only pages, and bot blocks keep the feed excerpt.
+                }
+              }
+              outcome.captured = ok;
+            }
+            return outcome;
           } catch (error) {
             await write((library) => {
               const current = library.feeds.find((f) => f.id === feed.id);
@@ -401,6 +423,16 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
             if (!article2) throw new Error("Article not found.");
             for (const key of ["is_saved", "is_read"])
               if (typeof body[key] === "boolean") article2[key] = body[key];
+          });
+        if (parts[2] === "capture" && method === "POST")
+          return write((library2) => {
+            const article3 = library2.articles.find((a) => a.id === parts[1]);
+            if (!article3) throw new Error("Article not found.");
+            if (typeof body.body === "string" && body.body.length > article3.body.length) {
+              article3.body = body.body.slice(0, 6e4);
+              article3.captured = true;
+              article3.actions = article3.actions.map((a) => ({ ...a, stale: true }));
+            }
           });
         if (parts[2] === "actions" && method === "POST")
           return write((library2) => {
@@ -453,7 +485,8 @@ function readSettings(ctx, owner) {
   return {
     autoRefresh: stored.autoRefresh === true,
     refreshMinutes: Number.isInteger(stored.refreshMinutes) && stored.refreshMinutes >= 1 && stored.refreshMinutes <= 1440 ? stored.refreshMinutes : 15,
-    markReadOnOpen: stored.markReadOnOpen !== false
+    markReadOnOpen: stored.markReadOnOpen !== false,
+    fullCapture: stored.fullCapture === true
   };
 }
 function currentOwner(host2) {
@@ -462,13 +495,19 @@ function currentOwner(host2) {
 function publishLibraryChange(owner) {
   window.dispatchEvent(new CustomEvent("hermes-rss-library-changed", { detail: { owner } }));
 }
-async function refreshSubscriptions(library, { feedId = null, shouldContinue = () => true } = {}) {
+async function refreshSubscriptions(library, { feedId = null, shouldContinue = () => true, captureFeedIds = [] } = {}) {
   const feeds = await library("/feeds");
   let added = 0, failed = 0;
   for (const feed of feeds) {
     if (!shouldContinue()) break;
     if (feedId && feed.id !== feedId) continue;
-    try { added += (await library(`/feeds/${feed.id}/refresh`, { method: "POST" })).added; }
+    try {
+      const result = await library(`/feeds/${feed.id}/refresh`, {
+        method: "POST",
+        body: { captureFull: captureFeedIds === null || captureFeedIds.includes(feed.id) ? [feed.id] : [] }
+      });
+      added += result.added;
+    }
     catch { failed++; }
   }
   return { added, failed };
@@ -477,7 +516,7 @@ function startAutoRefresh(ctx, host2, options = {}) {
   const schedule = options.setInterval || setInterval;
   const unschedule = options.clearInterval || clearInterval;
   const now = options.now || Date.now;
-  const makeLibrary = options.makeLibrary || ((owner) => createLibrary(owner, url => fetchFeed(host2, url)));
+  const makeLibrary = options.makeLibrary || ((owner) => createLibrary(owner, url => fetchFeed(host2, url), transact, null));
   const notify = options.notify || publishLibraryChange;
   const clocks = new Map();
   let stopped = false, running = false;
@@ -760,6 +799,116 @@ function parseFeed(xml, base) {
   });
   return { title, items };
 }
+async function captureArticle(host2, rawUrl) {
+  const route = await currentRoute(host2);
+  const owner = JSON.stringify([route.connectionId, route.profile]);
+  const previous = pendingFetches.get(owner) || Promise.resolve();
+  const work = previous.catch(() => {
+  }).then(() => captureArticleNow(host2, rawUrl, route, owner));
+  pendingFetches.set(owner, work);
+  try {
+    return await work;
+  } finally {
+    if (pendingFetches.get(owner) === work) pendingFetches.delete(owner);
+  }
+}
+function extractReadable(html) {
+  const cleaned = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<noscript[\s\S]*?<\/noscript>/gi, "").replace(/<svg[\s\S]*?<\/svg>/gi, "").replace(/<form[\s\S]*?<\/form>/gi, "").replace(/<nav[\s\S]*?<\/nav>/gi, "").replace(/<aside[\s\S]*?<\/aside>/gi, "").replace(/<footer[\s\S]*?<\/footer>/gi, "").replace(/<!--[\s\S]*?-->/g, "");
+  const articleMatch = /<article[\s>][\s\S]*?<\/article>/i.exec(cleaned);
+  let scope = articleMatch ? articleMatch[0] : cleaned;
+  if (!articleMatch) {
+    const mainMatch = /<main[\s>][\s\S]*?<\/main>/i.exec(cleaned);
+    if (mainMatch) scope = mainMatch[0];
+  }
+  const template = document.createElement("template");
+  template.innerHTML = scope;
+  template.content.querySelectorAll("script,style,noscript,svg,form,iframe,button,input,select,textarea,nav,aside,footer,header,[aria-hidden=true]").forEach((n) => n.remove());
+  const candidates = [...template.content.querySelectorAll("p,li,blockquote,pre,h1,h2,h3,h4")];
+  let text = "";
+  if (candidates.length >= 3) {
+    const seen = /* @__PURE__ */ new Set();
+    const parts = [];
+    for (const node of candidates) {
+      const name = node.localName;
+      const content = node.textContent.replace(/[^\S\n]+/g, " ").trim();
+      if (!content || content.length < 25 && !name.startsWith("h")) continue;
+      const key = content.slice(0, 80).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (name === "p" || name === "blockquote" || name === "pre")
+        parts.push({ tag: name, text: content });
+      else if (name === "li") parts.push({ tag: "li", text: content });
+      else parts.push({ tag: `h${Math.min(3, Number(name[1]) || 3)}`, text: content });
+    }
+    text = parts.map((part) => part.tag.startsWith("h") ? `\n\n## ${part.text}\n\n` : part.tag === "li" ? `\u2022 ${part.text}` : part.text).join("\n\n");
+  } else {
+    template.content.querySelectorAll("p,div,li,br,h1,h2,h3,blockquote").forEach((n) => n.append("\n"));
+    text = template.content.textContent.replace(/[^\S\n]+/g, " ").replace(/\n\s*\n/g, "\n\n").trim();
+  }
+  return text.replace(/\n{3,}/g, "\n\n").trim();
+}
+async function captureArticleNow(host2, rawUrl, route, owner) {
+  const run = async (command, optional) => {
+    assertOwner(host2, route);
+    const result = await host2.requestProfile(route, "shell.exec", { command });
+    assertOwner(host2, route);
+    if (result.code !== 0) {
+      if (optional) return "";
+      throw new Error("Capture failed: the gateway needs curl plus gzip and base64 tools.");
+    }
+    return result.stdout.trim();
+  };
+  let family = families.get(owner);
+  if (!family) {
+    family = (await run("echo %OS%")) === "Windows_NT" ? "windows" : "posix";
+    families.set(owner, family);
+  }
+  let directory = caches.get(owner);
+  if (!directory) {
+    if (family === "windows") {
+      const temp = (await run("echo %TEMP%")).replace(/[\\/]+$/, "");
+      directory = `${temp}\\hermes-rss.${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
+      if (!isWindowsCache(directory))
+        throw new Error("Could not create a private RSS download cache.");
+      await run(`mkdir ${cmdQuote(directory)}`);
+    } else {
+      directory = await run("mktemp -d /tmp/hermes-rss.XXXXXXXX");
+      if (!isPosixCache(directory))
+        throw new Error("Could not create a private RSS download cache.");
+    }
+    caches.set(owner, directory);
+  }
+  const pagePath = family === "windows" ? `${directory}\\page` : `${directory}/page`;
+  const quote = family === "windows" ? cmdQuote : posixQuote;
+  const curl = family === "windows" ? "curl.exe" : "curl";
+  let url = publicUrl(rawUrl), success = false;
+  for (let redirect = 0; redirect < 4; redirect++) {
+    const addresses = await resolvePublicIPv4(run, family, url.hostname);
+    const port = url.port || (url.protocol === "https:" ? "443" : "80");
+    const info = await run(
+      `${curl} --disable --silent --show-error --noproxy ${quote("*")} --proto ${quote("=http,https")} --connect-timeout 8 --max-time 25 --max-filesize 2000000 --resolve ${quote(`${url.hostname}:${port}:${addresses[0]}`)} --location --header ${quote("Accept: text/html,application/xhtml+xml")} --header ${quote("Accept-Encoding: identity")} --user-agent ${quote("Mozilla/5.0 (compatible; HermesRSS/0.2; reader mode)")} --output ${quote(pagePath)} --write-out ${quote("%{http_code} %{size_download}")} --url ${quote(url.href)}`
+    );
+    const match = /^(\d{3}) ([0-9]+)$/.exec(info);
+    if (!match) throw new Error("Invalid page download response.");
+    const [code, size] = match;
+    if (Number(size) > 2e6) throw new Error("Page exceeds 2 MB.");
+    if (code !== "200") throw new Error(`The page returned HTTP ${code}.`);
+    success = true;
+    break;
+  }
+  if (!success) throw new Error("The page redirects too many times.");
+  const packed = await readPackedFeed(run, family, directory, pagePath);
+  const bytes = Uint8Array.from(atob(packed), (c) => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+  const decoded = new Uint8Array(await new Response(stream).arrayBuffer());
+  if (decoded.length > 2e6) throw new Error("Page exceeds 2 MB.");
+  const declared = /<meta[^>]+charset=["']?([\w-]+)/i.exec(new TextDecoder("utf-8").decode(decoded.slice(0, 4096)))?.[1];
+  const html = new TextDecoder(declared && !/utf-?8/i.test(declared) ? declared : "utf-8").decode(decoded);
+  const text = extractReadable(html);
+  if (!text || text.length < 200)
+    throw new Error("No readable article text found on the page.");
+  return plainText(text).slice(0, 6e4);
+}
 
 // src/styles.mjs
 var styles = `
@@ -799,15 +948,18 @@ var styles = `
 .hermes-rss .rss-list-head .rss-mark-read{padding:4px 8px;font-size:11px;height:26px;min-height:0;line-height:1.2}
 .hermes-rss .rss-list-head .rss-filter-chips{margin-top:0}
 .hermes-rss .rss-detail{overflow:auto;padding:32px 44px 56px}
+.hermes-rss .rss-detail .rss-tools{margin:18px 0}
 .hermes-rss .rss-detail-inner{max-width:70ch;margin:0 auto}
-.hermes-rss .rss-detail h2{font-size:26px;letter-spacing:-.4px;line-height:1.25;margin:6px 0 14px;font-weight:700}
+.hermes-rss .rss-detail h2{font-size:24px;letter-spacing:-.3px;line-height:1.3;margin:6px 0 14px;font-weight:700}
 .hermes-rss .rss-detail .rss-eyebrow{margin-bottom:0}
+.hermes-rss .rss-detail .rss-body strong,.hermes-rss .rss-detail .rss-body b{font-weight:650}
+.hermes-rss .rss-detail .rss-body li::marker{color:var(--ui-text-tertiary)}
 .hermes-rss .rss-article-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0;margin:18px 0 0}
 .hermes-rss .rss-icon-row{display:inline-flex;align-items:center;gap:2px}
 .hermes-rss .rss-icon-btn{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:var(--ui-text-secondary);font-size:14px}
 .hermes-rss .rss-icon-btn:hover:not(:disabled){color:var(--foreground);background:var(--chrome-action-hover)}
 .hermes-rss .rss-icon-btn:disabled{opacity:.4;cursor:default}
-.hermes-rss .rss-body{white-space:pre-wrap;font-family:Georgia,'Iowan Old Style','Times New Roman',serif;font-size:16.5px;line-height:1.7;overflow-wrap:break-word;color:var(--ui-text-primary,var(--foreground));margin:22px 0 0}
+.hermes-rss .rss-body{white-space:pre-wrap;font-size:15.5px;line-height:1.75;overflow-wrap:break-word;color:var(--ui-text-primary,var(--foreground));margin:22px 0 0;letter-spacing:.1px}
 .hermes-rss .rss-detail .rss-body p,.hermes-rss .rss-detail .rss-body h1,.hermes-rss .rss-detail .rss-body h2,.hermes-rss .rss-detail .rss-body h3,.hermes-rss .rss-detail .rss-body ul,.hermes-rss .rss-detail .rss-body ol,.hermes-rss .rss-detail .rss-body blockquote{margin:0 0 1.05em}
 .hermes-rss .rss-detail .rss-body h1{font-size:1.35em;line-height:1.3}
 .hermes-rss .rss-detail .rss-body h2{font-size:1.2em;line-height:1.35}
@@ -832,12 +984,10 @@ var styles = `
 .hermes-rss .rss-card-read .rss-card-excerpt{color:var(--ui-text-tertiary)}
 .hermes-rss .rss-card-title{font-size:15px;font-weight:600;line-height:1.45;margin:8px 0}.hermes-rss .rss-card-meta{display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--ui-text-tertiary)}
 .hermes-rss .rss-card-excerpt{font-size:12px;color:var(--ui-text-secondary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.hermes-rss .rss-detail{overflow:auto;padding:28px 30px 48px}.hermes-rss .rss-detail .rss-tools{margin:18px 0}
 .hermes-rss .rss-chip{display:inline-flex;align-items:center;padding:4px 8px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;font-size:10px;color:var(--ui-text-secondary)}
 .hermes-rss .rss-tabs{display:flex;gap:22px;border-bottom:1px solid var(--ui-stroke-secondary);margin:24px 0}
 .hermes-rss .rss-tabs button{background:transparent;border:0;border-bottom:2px solid transparent;color:var(--ui-text-secondary);padding:10px 0}
 .hermes-rss .rss-tabs button[aria-selected=true]{border-bottom-color:var(--ui-accent);color:var(--ui-text-primary,var(--foreground))}
-.hermes-rss .rss-body{white-space:pre-wrap;font-size:14px;line-height:1.85;overflow-wrap:anywhere}
 .hermes-rss .rss-empty{padding:48px 24px;text-align:center;max-width:450px;margin:auto}.hermes-rss .rss-empty-mark{font-size:32px;color:var(--ui-accent);margin-bottom:20px}
 .hermes-rss .rss-empty h2{font-size:19px}.hermes-rss .rss-empty p{color:var(--ui-text-secondary);margin:10px 0 18px}
 .hermes-rss .rss-notice{margin:0;padding:10px 24px;border-bottom:1px solid var(--ui-stroke-secondary);background:color-mix(in srgb,var(--ui-accent) 6%,transparent);font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -912,7 +1062,7 @@ function Reader({ ctx }) {
 function ReaderProfile({ ctx, owner }) {
   const inFlight = useRef(false);
   const library = useMemo(
-    () => createLibrary(owner, (url2) => fetchFeed(host, url2)),
+    () => createLibrary(owner, (url2) => fetchFeed(host, url2), transact, (pageUrl) => captureArticle(host, pageUrl)),
     [owner]
   );
   const libraryRequest = async (...args) => {
@@ -1062,7 +1212,9 @@ function ReaderProfile({ ctx, owner }) {
   };
   const refreshFeeds = async () => {
     const result = await refreshSubscriptions(libraryRequest, {
-      feedId, shouldContinue: () => currentOwner(host) === owner
+      feedId,
+      shouldContinue: () => currentOwner(host) === owner,
+      captureFeedIds: readSettings(ctx, owner).fullCapture ? null : []
     });
     if (!feedId) ctx.storage.set(`lastRefresh:${owner}`, Date.now());
     setNotice(`${result.added} new articles${result.failed ? ` · ${result.failed} feeds could not refresh. Select a feed for details.` : " · Up to date."}`);
@@ -1071,6 +1223,18 @@ function ReaderProfile({ ctx, owner }) {
     const result = await libraryRequest("/articles/read-all", { method: "POST", body: { feed_id: feedId } });
     setNotice(`${result.count} article${result.count === 1 ? "" : "s"} marked as read.`);
   });
+  const captureOpen = () => {
+    const target = article;
+    if (!target?.url) return;
+    void act("Capturing full article\u2026", async () => {
+      const fullBody = await captureArticle(host, target.url);
+      if (!fullBody || fullBody.length <= target.body.length) {
+        setNotice("No longer or fuller text found at the original page."); return;
+      }
+      await libraryRequest(`/articles/${target.id}/capture`, { method: "POST", body: { body: fullBody } });
+      setNotice("Full article text captured.");
+    });
+  };
   const articleList = articles.data || [];
   const selectedIndex = selected ? articleList.findIndex(a => a.id === selected) : -1;
   useEffect(() => {
@@ -1312,6 +1476,11 @@ function ReaderProfile({ ctx, owner }) {
           jsx("input", { type: "checkbox", checked: draft.markReadOnOpen, onChange: event => setDraft({ ...draft, markReadOnOpen: event.target.checked }) }),
           "Mark articles as read when opened"
         ] }),
+        jsxs("label", { className: "rss-setting", children: [
+          jsx("input", { type: "checkbox", checked: draft.fullCapture, onChange: event => setDraft({ ...draft, fullCapture: event.target.checked }) }),
+          "Capture full articles on refresh"
+        ] }),
+        jsx("p", { className: "rss-muted rss-small", children: "When on, every new article is fetched from its website and the feed excerpt is replaced with the full text (up to 10 per refresh). Paywalled and script-only pages keep the excerpt. You can always load the full text of the open article from its action row." }),
         jsxs("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
       jsxs("div", { className: "rss-settings-library", "aria-label": "Library", children: [
@@ -1537,6 +1706,7 @@ function ReaderProfile({ ctx, owner }) {
               "Could not open the original article."
             );
         }) : undefined, children: article.title }),
+        article.captured && jsx("span", { className: "rss-chip", style: { marginTop: 8, display: "inline-flex" }, children: "Full text" }),
         /* @__PURE__ */ jsxs("div", { className: "rss-tools rss-article-actions", children: [
           /* @__PURE__ */ jsxs("div", { className: "rss-icon-row", children: [
             /* @__PURE__ */ jsx(
@@ -1605,6 +1775,18 @@ function ReaderProfile({ ctx, owner }) {
                   })
                 ),
                 children: /* @__PURE__ */ jsx("i", { className: `codicon ${article.is_read ? "codicon-eye-closed" : "codicon-mail-read"}`, "aria-hidden": "true" })
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                type: "button",
+                className: "rss-icon-btn",
+                disabled: disabled || !article.url,
+                "aria-label": article.captured ? "Recapture full article" : "Load full article",
+                title: article.captured ? "Recapture full article" : "Load full article from the original page",
+                onClick: captureOpen,
+                children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-cloud-download", "aria-hidden": "true" })
               }
             ),
             /* @__PURE__ */ jsx(
