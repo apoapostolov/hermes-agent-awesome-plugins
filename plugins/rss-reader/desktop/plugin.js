@@ -162,7 +162,7 @@ function validateSummary(text, body) {
 }
 
 // src/library.mjs
-var EMPTY = () => ({ feeds: [], articles: [] });
+var EMPTY = () => ({ feeds: [], articles: [], articleCache: {} });
 var database;
 function openDatabase() {
   if (!database)
@@ -202,6 +202,33 @@ async function transact(owner, mutate) {
     );
   });
 }
+function rememberCapture(library, article, body) {
+  if (!library.articleCache) library.articleCache = {};
+  const entry = { body: String(body || "").slice(0, 6e4), image: article.image || "", at: Date.now() };
+  if (article.url) library.articleCache[article.url] = entry;
+  if (article.identity) library.articleCache[article.identity] = entry;
+}
+function applyCachedBody(library, article) {
+  if (!article || article.captured) return article;
+  const hit = article.url && library.articleCache?.[article.url] || article.identity && library.articleCache?.[article.identity];
+  if (hit?.body && hit.body.length > (article.body || "").length) {
+    article.body = hit.body;
+    article.captured = true;
+    if (hit.image && !article.image) article.image = hit.image;
+  }
+  return article;
+}
+function pruneArticleCache(library) {
+  if (!library.articleCache) return;
+  const live = new Set();
+  for (const article of library.articles) {
+    if (article.url) live.add(article.url);
+    if (article.identity) live.add(article.identity);
+  }
+  for (const key of Object.keys(library.articleCache)) {
+    if (!live.has(key)) delete library.articleCache[key];
+  }
+}
 function safeUrl(raw) {
   const url = new URL(raw);
   if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || url.port && !["80", "443"].includes(url.port))
@@ -228,7 +255,17 @@ function mergeFeed(library, feedId, parsed) {
     if (old) {
       if (old.body !== item.body || old.title !== item.title || old.url !== item.url)
         old.actions = old.actions.map((a) => ({ ...a, stale: true }));
-      Object.assign(old, item, { feed_title: feed.title }, old.captured ? { body: old.body, captured: true, image: old.image || item.image } : {});
+      const prevBody = old.body;
+      const prevCaptured = old.captured;
+      const prevImage = old.image;
+      Object.assign(old, item, { feed_title: feed.title });
+      if (prevCaptured || (prevBody && prevBody.length > (item.body || "").length)) {
+        old.body = prevBody;
+        old.captured = true;
+        old.image = prevImage || item.image;
+      }
+      applyCachedBody(library, old);
+      if (old.captured) rememberCapture(library, old, old.body);
     } else {
       const article = {
         ...item,
@@ -240,10 +277,11 @@ function mergeFeed(library, feedId, parsed) {
         actions: [],
         received_at: (/* @__PURE__ */ new Date()).toISOString()
       };
+      applyCachedBody(library, article);
       library.articles.push(article);
       byIdentity.set(item.identity, article);
       added++;
-      if (article.url) fresh.push(article);
+      if (article.url && !article.captured) fresh.push(article);
     }
   }
   const unsaved = library.articles.filter((a) => a.feed_id === feedId && !a.is_saved).sort(
@@ -253,6 +291,7 @@ function mergeFeed(library, feedId, parsed) {
   );
   const remove = new Set(unsaved.slice(300).map((a) => a.id));
   library.articles = library.articles.filter((a) => !remove.has(a.id));
+  pruneArticleCache(library);
   return { added, fresh: fresh.map((a) => ({ id: a.id, url: a.url })) };
 }
 function parseOpml(content) {
@@ -412,6 +451,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
               article3.body = body.body.slice(0, 6e4);
               article3.captured = true;
               article3.actions = article3.actions.map((a) => ({ ...a, stale: true }));
+              rememberCapture(library2, article3, article3.body);
             }
           });
         if (parts[2] === "actions" && method === "POST")
@@ -425,9 +465,10 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
             delete article2.actions[0].source_body;
             article2.actions = article2.actions.slice(0, 20);
           });
-        const article = (await read()).articles.find((a) => a.id === parts[1]);
+        const library = await read();
+        const article = library.articles.find((a) => a.id === parts[1]);
         if (!article) throw new Error("Article not found.");
-        return article;
+        return applyCachedBody(library, article);
       }
       const library = await read(), q = (url.searchParams.get("q") || "").trim().toLowerCase();
       const exclude = (url.searchParams.get("exclude") || "").trim().toLowerCase();
@@ -443,7 +484,10 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
         (a, b) => (b.published_at || b.received_at).localeCompare(
           a.published_at || a.received_at
         )
-      ).slice(0, Number(url.searchParams.get("limit")) || 100).map((a) => ({ ...a, excerpt: plainText(a.body).slice(0, 240) }));
+      ).slice(0, Number(url.searchParams.get("limit")) || 100).map((a) => {
+        applyCachedBody(library, a);
+        return { ...a, excerpt: plainText(a.body).slice(0, 240) };
+      });
     }
     if (path === "/opml/import") {
       const feeds = parseOpml(body.content);
@@ -1838,7 +1882,7 @@ function ReaderProfile({ ctx, owner }) {
             "Capture full articles in the background"
           ] }),
         ] }),
-        jsx("p", { className: "rss-muted rss-small", children: "When on, new articles are queued after refresh and captured two at a time in the background. Opening an article jumps it to the front of the queue. Paywalled and script-only pages keep the excerpt. You can always recapture the open article from its action row." }),
+        jsx("p", { className: "rss-muted rss-small", children: "When on, new articles are queued after refresh and captured two at a time in the background. Full text is kept in this library until the article drops out of the list, so a Hermes restart does not recapture it. Opening an article jumps it to the front of the queue. Paywalled and script-only pages keep the excerpt." }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
       jsxs("div", { className: "rss-settings-library", "aria-label": "Library", children: [
