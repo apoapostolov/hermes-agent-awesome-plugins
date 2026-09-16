@@ -3111,7 +3111,22 @@ function ReaderProfile({ ctx, owner }) {
     await libraryRequest(`/filters/${type}/${id}`, { method: "DELETE" });
     publishLibraryChange(owner);
   });
+  const markArticleRead = item => {
+    if (!item || item.is_read) return;
+    client.setQueriesData({ queryKey: [...key, "articles"] }, rows =>
+      rows?.map(row => row.id === item.id ? { ...row, is_read: true } : row));
+    client.setQueryData([...key, "article", item.id], old => old ? { ...old, is_read: true } : old);
+    void libraryRequest(`/articles/${item.id}`, {
+      method: "PATCH", body: { is_read: true }
+    }).then(refresh).catch(async () => {
+      await refresh();
+      setNotice("Could not save read state. Open the article again to retry.");
+    });
+  };
   const openArticle = (item) => {
+    if (view === "unread" && selected && selected !== item.id) {
+      markArticleRead(displayedFeeds.find(row => row.id === selected));
+    }
     setSelected(item.id);
     setTab("article");
     if (settings.fullCapture && articleNeedsCapture(item)) {
@@ -3131,16 +3146,8 @@ function ReaderProfile({ ctx, owner }) {
       }
     }
     if (!settings.markReadOnOpen || item.is_read) return;
-    // Update all cached views immediately, then persist through the same library.
-    client.setQueriesData({ queryKey: [...key, "articles"] }, rows =>
-      rows?.map(row => row.id === item.id ? { ...row, is_read: true } : row));
-    client.setQueryData([...key, "article", item.id], old => old ? { ...old, is_read: true } : old);
-    libraryRequest(`/articles/${item.id}`, {
-      method: "PATCH", body: { is_read: true }
-    }).then(refresh).catch(async () => {
-      await refresh();
-      setNotice("Could not save read state. Open the article again to retry.");
-    });
+    if (view === "unread") return;
+    markArticleRead(item);
   };
   const refreshFeeds = async () => {
     rssDebug("ui-refresh-start", { owner, feedId, feedCount: feeds.data?.length || 0 });
