@@ -2527,14 +2527,14 @@ function ReaderProfile({ ctx, owner }) {
           "Grade articles by importance"
         ] }),
         jsx("p", { className: "rss-muted rss-small", children: "After a refresh, every ungraded article goes to the auxiliary model in one batch and the list tints when the answer arrives. Nothing is sent while this is off." }),
-        jsxs("label", { className: "rss-setting rss-setting-inline", children: [
-          "Preference skill",
-          jsx(Input, { "aria-label": "Grading preference skill name", placeholder: DEFAULT_GRADING_SKILL, value: draft.gradingSkill, maxLength: 60, onChange: event => setDraft({ ...draft, gradingSkill: event.target.value }) })
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsxs("label", { className: "rss-setting rss-setting-inline", children: [
+            "Preference skill",
+            jsx(Input, { "aria-label": "Grading preference skill name", placeholder: DEFAULT_GRADING_SKILL, value: draft.gradingSkill, maxLength: 60, onChange: event => setDraft({ ...draft, gradingSkill: event.target.value }) })
+          ] }),
+          jsx(Button, { type: "button", disabled: disabled || !articles.data?.length, onClick: gradeNow, children: "Grade" })
         ] }),
         jsx("p", { className: "rss-muted rss-small", children: `Loaded while grading. If ${DEFAULT_GRADING_SKILL} is missing it is created with a starter rubric when the reader loads, for Hermes to maintain.` }),
-        jsx("div", { className: "rss-tools", children: [
-          jsx(Button, { type: "button", disabled: disabled || !articles.data?.length, onClick: gradeNow, children: "Grade now" })
-        ] }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
       jsxs("div", { className: "rss-settings-library", "aria-label": "Library", children: [
