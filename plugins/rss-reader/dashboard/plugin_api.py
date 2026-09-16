@@ -4,6 +4,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import re
 import socket
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -22,6 +23,17 @@ _USER_AGENT = "HermesRSS/0.2"
 
 class FeedRequest(BaseModel):
     url: str
+
+
+class GradingSkillRequest(BaseModel):
+    name: str
+    content: str = ""
+    create_if_missing: bool = False
+
+
+class PreferenceFileRequest(BaseModel):
+    filename: str
+    content: str
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -57,6 +69,48 @@ def _read_response(response) -> bytes:
     if len(body) > _MAX_BYTES:
         raise ValueError("Feed exceeds 2 MB.")
     return body
+
+
+def _hermes_home() -> Path:
+    return Path(os.environ.get("HERMES_HOME") or Path(os.environ.get("LOCALAPPDATA", Path.home())) / "hermes")
+
+
+def _skill_path(name: str) -> Path:
+    if not name or not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", name):
+        raise HTTPException(status_code=400, detail="Invalid skill name.")
+    return _hermes_home() / "skills" / name / "SKILL.md"
+
+
+@router.get("/grading-skill")
+def read_grading_skill(name: str) -> dict[str, str]:
+    path = _skill_path(name.lower())
+    return {"content": path.read_text(encoding="utf-8") if path.exists() else ""}
+
+
+@router.post("/grading-skill")
+def write_grading_skill(payload: GradingSkillRequest) -> dict[str, str]:
+    path = _skill_path(payload.name.lower())
+    if path.exists():
+        return {"status": "present"}
+    if not payload.create_if_missing:
+        raise HTTPException(status_code=404, detail="Skill not found.")
+    if len(payload.content.encode("utf-8")) > 100_000:
+        raise HTTPException(status_code=413, detail="Skill is too large.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(payload.content, encoding="utf-8")
+    return {"status": "created"}
+
+
+@router.post("/preference-file")
+def write_preference_file(payload: PreferenceFileRequest) -> dict[str, str]:
+    if payload.filename not in {"saved.json", "preference-report.md"}:
+        raise HTTPException(status_code=400, detail="Invalid preference filename.")
+    if len(payload.content.encode("utf-8")) > 2_000_000:
+        raise HTTPException(status_code=413, detail="Preference file is too large.")
+    path = _hermes_home() / "rss-reader" / payload.filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(payload.content, encoding="utf-8")
+    return {"path": str(path)}
 
 
 @router.get("/commands")

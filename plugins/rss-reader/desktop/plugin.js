@@ -358,63 +358,6 @@ function gradingScaffold(name) {
     ""
   ].join("\n");
 }
-function utf8Base64(text) {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-function gradingSkillCommand(family, name, action, payload) {
-  if (family === "windows") {
-    const script = [
-      "$h = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA 'hermes' }",
-      `$f = Join-Path (Join-Path (Join-Path $h 'skills') '${name}') 'SKILL.md'`,
-      action === "read" ? "if (Test-Path $f) { [IO.File]::ReadAllText($f) }" : `if (Test-Path $f) { 'present' } else { New-Item -ItemType Directory -Force -Path (Split-Path $f) | Out-Null; [IO.File]::WriteAllText($f, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${payload}'))); 'created' }`
-    ].join("; ");
-    return powershellEncoded(script);
-  }
-  const dir = '"${HERMES_HOME:-$HOME/.hermes}/skills/' + name + '"';
-  if (action === "read")
-    return 'd=' + dir + '; f="$d/SKILL.md"; [ -f "$f" ] && cat "$f" || true';
-  return 'd=' + dir + '; f="$d/SKILL.md"; if [ -f "$f" ]; then echo present; else mkdir -p "$d"; cat > "$f" <<\'SKILL_SCAFFOLD_EOF\'\n' + gradingScaffold(name) + '\nSKILL_SCAFFOLD_EOF\necho created; fi';
-}
-async function gradingShell(host2) {
-  const route = await currentRoute(host2);
-  const owner = JSON.stringify([route.connectionId, route.profile]);
-  const run = async (command) => {
-    assertOwner(host2, route);
-    const result = await host2.requestProfile(route, "shell.exec", { command });
-    assertOwner(host2, route);
-    return result.code === 0 ? String(result.stdout || "").trim() : "";
-  };
-  let family = families.get(owner);
-  if (!family) {
-    const windowsProbe = await run(powershellEncoded('$env:OS'), true);
-    family = windowsProbe === "Windows_NT" ? "windows" : "posix";
-    families.set(owner, family);
-  }
-  return { route, owner, family, run };
-}
-async function ensureGradingSkill(host2, name) {
-  const skill = gradingSkillName(name);
-  const { family, run } = await gradingShell(host2);
-  return run(gradingSkillCommand(family, skill, "write", utf8Base64(gradingScaffold(skill))));
-}
-// Scaffold the skill if missing, then cache whatever tag table it holds.
-async function syncGradingTags(host2, ctx, owner, name) {
-  try {
-    await ensureGradingSkill(host2, name);
-    const tags = parseGradingTags(await readGradingSkill(host2, name));
-    cacheGradingTags(ctx, owner, tags);
-    return tags;
-  } catch {
-    return null;
-  }
-}
-async function readGradingSkill(host2, name) {
-  const { family, run } = await gradingShell(host2);
-  return (await run(gradingSkillCommand(family, gradingSkillName(name), "read"))).slice(0, 8e3);
-}
 function gradingInstructions(skillText, tags) {
   const rubric = String(skillText || "").trim().slice(0, 6e3) || GRADING_RUBRIC;
   const keys = gradingKeys(tags);
@@ -1658,7 +1601,6 @@ function base64ToBytes(value) {
   }
   return bytes;
 }
-var families = /* @__PURE__ */ new Map();
 var caches = /* @__PURE__ */ new Map();
 var pendingFetches = /* @__PURE__ */ new Map();
 var pendingPacks = /* @__PURE__ */ new Map();
@@ -1671,19 +1613,6 @@ async function withPackLock(key, work) {
   } finally {
     if (pendingPacks.get(key) === next) pendingPacks.delete(key);
   }
-}
-function powershellSingle(value) {
-  if (/['\r\n]/.test(value))
-    throw new Error("Could not create a private RSS download cache.");
-  return `'${value}'`;
-}
-function powershellEncoded(script) {
-  let binary = "";
-  for (const char of String(script)) {
-    const code = char.charCodeAt(0);
-    binary += String.fromCharCode(code & 255, code >> 8);
-  }
-  return `powershell.exe -NoProfile -NonInteractive -EncodedCommand ${btoa(binary)}`;
 }
 function ipv4Tokens(text) {
   return text.split(/\s+/).filter((v) => /^\d+(\.\d+){3}$/.test(v));
@@ -1780,21 +1709,6 @@ function preferenceReportInstructions() {
     "Write a short markdown report: what they save, what they ignore, mute themes, and suggested rubric or tag-rank edits for rss-reader-plugin.",
     "Do not claim you edited the skill. End with a list of concrete suggestion lines Apo can apply by hand."
   ].join("\n\n");
-}
-function preferenceFileCommand(family, filename, payload) {
-  if (family === "windows") {
-    const script = [
-      "$h = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA 'hermes' }",
-      "$d = Join-Path $h 'rss-reader'",
-      "New-Item -ItemType Directory -Force -Path $d | Out-Null",
-      `$f = Join-Path $d '${filename}'`,
-      `[IO.File]::WriteAllText($f, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${payload}')))`,
-      "$f"
-    ].join("; ");
-    return powershellEncoded(script);
-  }
-  const dir = '"${HERMES_HOME:-$HOME/.hermes}/rss-reader"';
-  return "mkdir -p " + dir + "; echo " + payload + " | base64 -d > " + dir + "/" + filename + "; echo " + dir + "/" + filename;
 }
 function plainText(raw) {
   const template = document.createElement("template");
@@ -3239,8 +3153,9 @@ function ReaderProfile({ ctx, owner }) {
   const preferenceNow = () => act("Writing preference report\u2026", async () => {
     const snapshot = await libraryRequest("/preference");
     const json = JSON.stringify(snapshot);
-    const { family, run } = await gradingShell(host);
-    const jsonPath = await run(preferenceFileCommand(family, "saved.json", utf8Base64(json)));
+    const jsonResult = await rssRest("/preference-file", {
+      method: "POST", body: { filename: "saved.json", content: json }
+    });
     let report = "";
     try {
       const route = await currentRoute(host);
@@ -3254,9 +3169,11 @@ function ReaderProfile({ ctx, owner }) {
     } catch (error) {
       report = "Saved set exported. The review model failed: " + String(error?.message || error);
     }
-    if (report) await run(preferenceFileCommand(family, "preference-report.md", utf8Base64(report)));
+    if (report) await rssRest("/preference-file", {
+      method: "POST", body: { filename: "preference-report.md", content: report }
+    });
     setPreferenceReport(report);
-    setNotice(jsonPath ? "Preference files written for Hermes." : "Preference report is ready.");
+    setNotice(jsonResult?.path ? "Preference files written for Hermes." : "Preference report is ready.");
   });
   const captureOpen = () => {
     const target = article;
