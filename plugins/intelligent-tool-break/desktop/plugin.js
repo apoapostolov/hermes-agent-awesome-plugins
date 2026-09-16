@@ -593,6 +593,12 @@ function paintNativeStack(tools, newestId, onGear, grades) {
     hooked.add('header')
   })
   rows.forEach((row, index) => {
+    // Only cancellable rows (running background tool calls) get the pill + its
+    // Break / Message / Again buttons. Queued message rows render in the same
+    // stack without a close affordance, so they must stay untouched.
+    if (!row.querySelector('.codicon-close')) {
+      return
+    }
     const tool = matchSpawnTool(nativeRowTitle(row), spawn) || spawn[0] || null
     const key = (tool && toolKey(tool)) || `row-${index}`
     hooked.add(key)
