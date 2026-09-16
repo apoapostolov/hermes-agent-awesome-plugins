@@ -1566,8 +1566,7 @@ var styles = `
 .hermes-rss .rss-list-head .rss-filter-chips{margin-top:0}
 .hermes-rss .rss-detail{overflow:auto;padding:0;display:flex;flex-direction:column}
 .hermes-rss .rss-detail .rss-tools{margin:18px 0}
-.hermes-rss .rss-detail-inner{max-width:none;margin:0 auto;padding:32px 44px 56px;width:100%;box-sizing:border-box}
-.hermes-rss .rss-detail-inner > .rss-eyebrow,.hermes-rss .rss-detail-inner > h2,.hermes-rss .rss-detail-inner > .rss-body,.hermes-rss .rss-detail-inner > [role=tabpanel],.hermes-rss .rss-detail-inner > .rss-note{max-width:70ch;width:100%;margin-left:auto;margin-right:auto}
+.hermes-rss .rss-detail-inner{max-width:calc(70ch + 88px);margin:0 auto;padding:32px 44px 56px;width:100%;box-sizing:border-box}
 .hermes-rss .rss-detail h2{font-size:24px;letter-spacing:-.3px;line-height:1.3;margin:6px 0 22px;font-weight:700}
 .hermes-rss .rss-detail .rss-eyebrow{margin-bottom:0}
 .hermes-rss .rss-detail .rss-body strong,.hermes-rss .rss-detail .rss-body b{font-weight:650}
