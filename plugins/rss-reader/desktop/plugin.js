@@ -4017,7 +4017,8 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           !summary && pending && /* @__PURE__ */ jsx("div", { className: "rss-note", children: pending.status === "failed" ? pending.error : pending.status === "waiting" ? "Waiting for the action in Hermes. Continue its conversation if needed." : pending.status === "running" ? "Summary is running. If Hermes was restarted, start a new action." : "No current summary." })
         ] }),
-        tab === "evidence" && /* @__PURE__ */ jsx("div", { role: "tabpanel", children: evidence ? /* @__PURE__ */ jsxs(Fragment, { children: [
+        tab === "evidence" && /* @__PURE__ */ jsxs("div", { role: "tabpanel", children: [
+          evidence ? /* @__PURE__ */ jsxs(Fragment, { children: [
           /* @__PURE__ */ jsxs("div", { className: "rss-eyebrow", children: [
             "Checked ",
             date(evidence.updated_at)
@@ -4049,34 +4050,18 @@ function ReaderProfile({ ctx, owner }) {
           /* @__PURE__ */ jsx("div", { className: "rss-note", children: evidence.result.scope })
         ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
           /* @__PURE__ */ jsx("h2", { children: "What supports the claim?" }),
-          pending?.session_id && /* @__PURE__ */ jsx(
-            Button,
-            {
-              variant: "outline",
-              disabled,
-              onClick: () => act(
-                "Opening\u2026",
-                () => continueConversation(host, pending)
-              ),
-              children: "Open source investigation \u2197"
-            }
-          ),
           /* @__PURE__ */ jsx("p", { className: "rss-muted", children: "Ask Hermes to look for primary sources, contradictory evidence, and missing context. Repeated reporting is not independent confirmation." }),
-          /* @__PURE__ */ jsxs("div", { className: "rss-note", children: [
-            pending?.session_id ? "Investigation opened; read the assessment in its chat. " : "Not checked. ",
-            "Source checking opens a visible Hermes conversation and may use paid search/model calls. A missing report is never a verification verdict."
-          ] }),
-          pending?.status === "failed" && /* @__PURE__ */ jsx("p", { role: "status", children: pending.error }),
-          /* @__PURE__ */ jsx(
+          /* @__PURE__ */ jsx("div", { className: "rss-tools", children: /* @__PURE__ */ jsx(
             Button,
             {
-              variant: "outline",
               disabled,
               onClick: () => start("check"),
-              children: "Investigate sources \u2197"
+              children: "Investigate sources"
             }
-          )
-        ] }) })
+          ) })
+        ] }),
+          !evidence && pending && /* @__PURE__ */ jsx("div", { className: "rss-note", children: pending.status === "failed" ? pending.error : pending.status === "waiting" ? "Waiting for the action in Hermes. Continue its conversation if needed." : pending.status === "running" ? "Source check is running. If Hermes was restarted, start a new action." : "No current source check." })
+        ] })
       ] }) })
         })
       ] })
