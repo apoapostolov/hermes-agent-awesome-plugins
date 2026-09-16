@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
+  Codicon,
   Input,
   host,
   useValue,
@@ -1461,6 +1462,8 @@ var styles = `
 .hermes-rss .rss-top h1{font-size:15px;letter-spacing:-.2px;margin:0;line-height:1.3}
 .hermes-rss .rss-top .rss-tools{gap:6px}
 .hermes-rss .rss-top .rss-tools button{padding:4px 10px;font-size:12px;height:26px;min-height:0;line-height:1.2}
+.hermes-rss .rss-top .rss-source-link{display:inline-flex;align-items:center;color:var(--ui-text-quaternary,var(--ui-text-tertiary));line-height:1}
+.hermes-rss .rss-top .rss-source-link:hover{color:var(--ui-text-secondary)}
 .hermes-rss p{margin:0;line-height:1.7}.hermes-rss .rss-muted{color:var(--ui-text-secondary)}
 .hermes-rss .rss-eyebrow{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:650;color:var(--ui-text-tertiary);margin-bottom:10px}
 .hermes-rss .rss-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -1588,6 +1591,7 @@ var styles = `
 // src/plugin.jsx
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 var ID = "hermes-rss-reader";
+var SOURCE_URL = "https://github.com/apoapostolov/hermes-agent-awesome-plugins";
 var labels = {
   supported: "Supported by retrieved evidence",
   conflicting: "Conflicting evidence",
@@ -2039,7 +2043,20 @@ function ReaderProfile({ ctx, owner }) {
         ),
         jsx(Button, { variant: "ghost", "aria-expanded": filtersOpen, onClick: () => setFiltersOpen(!filtersOpen), children: "Filters" }),
         jsx(Button, { variant: "ghost", "aria-expanded": settingsOpen, onClick: () => { setDraft(readSettings(ctx, owner)); setSettingsOpen(!settingsOpen); }, children: "Settings" }),
-        /* @__PURE__ */ jsx(Button, { onClick: () => setAdding(!adding), disabled, children: "+ Subscribe" })
+        /* @__PURE__ */ jsx(Button, { onClick: () => setAdding(!adding), disabled, children: "+ Subscribe" }),
+        /* @__PURE__ */ jsx("a", {
+          href: SOURCE_URL,
+          title: "Source on GitHub",
+          "aria-label": "Source on GitHub",
+          target: "_blank",
+          rel: "noreferrer",
+          onClick: (event) => {
+            event.preventDefault();
+            ctx.os.openExternal(SOURCE_URL);
+          },
+          className: "rss-source-link",
+          children: /* @__PURE__ */ jsx(Codicon, { name: "github", size: "0.7rem" })
+        })
       ] })
     ] }),
     filtersOpen && jsxs("div", { className: "rss-filter-panel", "aria-label": "Filters and saved searches", children: [
