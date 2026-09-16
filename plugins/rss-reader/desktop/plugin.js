@@ -1940,6 +1940,8 @@ function ReaderProfile({ ctx, owner }) {
 var plugin_default = {
   id: ID,
   name: "RSS Reader",
+  description: "RSS reader with reader-mode capture, edit-mode subscriptions, and keyboard shortcuts.",
+  version: "1.0.0",
   defaultEnabled: true,
   register(ctx) {
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));

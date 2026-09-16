@@ -1,0 +1,12 @@
+name: rss-reader
+version: 1.0.0
+description: "Full-featured RSS reader page with reader-mode article capture, subscriptions edit mode with drag reorder, mute rules, saved searches, AI summaries and source checks, and Google Reader style keyboard shortcuts."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/rss-reader
+tags:
+  - desktop
+  - rss
+  - reader
