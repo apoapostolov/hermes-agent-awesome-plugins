@@ -1033,6 +1033,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
         children: [
           jsx('span', { children: 'Key rotation:' }),
           jsx('select', {
+            'data-ps-select': '',
             value: poolStrategy,
             onChange: e => {
               const value = e.target.value
@@ -1040,7 +1041,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
               persist(undefined, undefined, { pool_strategy: value })
             },
             className: 'h-5 rounded border px-1 text-[0.65rem] outline-none',
-            style: { color: 'var(--ui-text-secondary)', background: 'var(--ui-bg-secondary, transparent)', borderColor: 'var(--ui-stroke-secondary)' },
+            style: { color: 'var(--ui-text-secondary, var(--foreground))', background: 'var(--ui-bg-elevated, var(--background))', borderColor: 'var(--ui-stroke-secondary)', colorScheme: 'dark light' },
             children: [
               jsx('option', { value: 'fill_first', children: 'Use in Order' }),
               jsx('option', { value: 'round_robin', children: 'Round Robin' }),
