@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade")].join("\n");
 const fns = {};
 new Function("exports", `${bundle}
 exports.profileFromOwner = profileFromOwner;
@@ -35,6 +35,10 @@ exports.muteScope = muteScope;
 exports.compactMuteScope = compactMuteScope;
 exports.muteAppliesToArticle = muteAppliesToArticle;
 exports.muteHitCount = muteHitCount;
+exports.isDesignPreviewGrade = isDesignPreviewGrade;
+exports.articleHasGrade = articleHasGrade;
+exports.rememberGrade = rememberGrade;
+exports.applyCachedGrade = applyCachedGrade;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -84,4 +88,16 @@ assert.equal(fns.compactMuteScope(
   []
 ).folders.join(","), "AI");
 
-console.log("ok", 19);
+assert.equal(fns.isDesignPreviewGrade({ reason: "Design preview: tint sample" }), true);
+assert.equal(fns.articleHasGrade({ grade: { level: "important", reason: "Design preview: tint sample" } }), false);
+assert.equal(fns.articleHasGrade({ grade: { level: "spam", reason: "affiliate bait" } }), true);
+const gradeLib = { gradeCache: {} };
+fns.rememberGrade(gradeLib, { url: "https://x/a", identity: "g1", grade: { level: "spam", reason: "affiliate bait" } });
+const reused = { url: "https://x/a", identity: "g1" };
+assert.equal(fns.applyCachedGrade(gradeLib, reused), true);
+assert.equal(reused.grade.level, "spam");
+const fake = { grade: { level: "important", reason: "Design preview: gone" } };
+assert.equal(fns.applyCachedGrade(gradeLib, fake), true);
+assert.equal(fake.grade, undefined);
+
+console.log("ok", 21);
