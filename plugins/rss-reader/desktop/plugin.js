@@ -13,14 +13,35 @@ import {
   PALETTE_AREA
 } from "@hermes/plugin-sdk";
 
+var RSS_DEBUG_PREFIX = "[rss-reader-debug]";
+function rssDebug(event, details = {}) {
+  try {
+    const safe = {};
+    for (const [key, value] of Object.entries(details || {})) {
+      const text = typeof value === "string" ? value : JSON.stringify(value);
+      safe[key] = String(text || "").slice(0, 1200);
+    }
+    console.error(`${RSS_DEBUG_PREFIX} ${event}`, { at: new Date().toISOString(), ...safe });
+  } catch {
+    console.error(`${RSS_DEBUG_PREFIX} ${event}`);
+  }
+}
+
 // src/handoff.mjs
 async function currentRoute(host2) {
   const profile = host2.state.profile.get();
   const connectionId = host2.state.connectionId?.get() || "local";
-  const routes = await host2.profileRoutes();
+  let routes;
+  try {
+    routes = await host2.profileRoutes();
+  } catch (error) {
+    rssDebug("route-list-error", { message: error?.message || error, stack: error?.stack || "" });
+    throw error;
+  }
   const matches = routes.filter(
     (r) => r.profile === profile && r.connectionId === connectionId
   );
+  rssDebug("route", { profile, connectionId, routeCount: routes.length, matchCount: matches.length, matches });
   if (matches.length !== 1)
     throw new Error("Select one connected Hermes profile before continuing.");
   return { ...matches[0] };
@@ -1171,20 +1192,31 @@ function rssCommandReadCommand(family) {
 async function rssCommandQueue(host2, route) {
   const owner = JSON.stringify([route.connectionId, route.profile]);
   const run = async (command) => {
-    assertOwner(host2, route);
-    const result = await host2.requestProfile(route, "shell.exec", { command });
-    assertOwner(host2, route);
-    return result.code === 0 ? String(result.stdout || "") : "";
+    try {
+      assertOwner(host2, route);
+      const result = await host2.requestProfile(route, "shell.exec", { command });
+      assertOwner(host2, route);
+      rssDebug("queue-shell", { command, code: result?.code, stdout: result?.stdout || "", stderr: result?.stderr || "" });
+      return result.code === 0 ? String(result.stdout || "") : "";
+    } catch (error) {
+      rssDebug("queue-shell-error", { command, message: error?.message || error, stack: error?.stack || "" });
+      throw error;
+    }
   };
   let family = families.get(owner);
   if (!family) {
-    family = (await run("powershell.exe -NoProfile -NonInteractive '$env:OS'", true)).trim() === "Windows_NT" ? "windows" : "posix";
+    const probe = await run("powershell.exe -NoProfile -NonInteractive '$env:OS'");
+    family = probe.trim() === "Windows_NT" ? "windows" : "posix";
     families.set(owner, family);
+    rssDebug("queue-family", { owner, probe, family });
   }
-  const text = await run(rssCommandReadCommand(family));
-  return String(text).split(/\r?\n/).map(line => {
+  const readCommand = rssCommandReadCommand(family);
+  const text = await run(readCommand);
+  const commands = String(text).split(/\r?\n/).map(line => {
     try { return JSON.parse(line); } catch { return null; }
   }).filter(command => command && command.id && command.action && command.payload && typeof command.payload === "object");
+  rssDebug("queue-read", { owner, family, command: readCommand, outputLength: text.length, commandCount: commands.length, commandIds: commands.map(command => command.id) });
+  return commands;
 }
 function rssCommandSeen(ctx, owner) {
   const value = storageGet(ctx, "commandSeen", owner, []);
@@ -1303,9 +1335,11 @@ async function executeRssCommand(ctx, host2, owner, command) {
   const library = createLibrary(owner, url => fetchFeed(host2, url), transact, null);
   const payload = command.payload || {};
   if (command.action === "refresh") {
+    rssDebug("command-start", { action: command.action, id: command.id, owner });
     const result = await refreshSubscriptions(library);
     const at = Date.now();
     storageSet(ctx, "lastRefresh", owner, at);
+    rssDebug("command-refresh-result", { id: command.id, owner, added: result.added, failed: result.failed, fresh: result.fresh?.length || 0 });
     publishLibraryChange(owner, `${result.added} new articles${result.failed ? ` · ${result.failed} feeds could not refresh.` : " · Up to date."}`);
     return;
   }
@@ -1390,6 +1424,7 @@ async function executeRssCommand(ctx, host2, owner, command) {
   throw new Error("Unknown RSS command.");
 }
 function startRssCommandBridge(ctx, host2) {
+  rssDebug("bridge-start", { plugin: "hermes-rss-reader" });
   let stopped = false;
   const poll = async () => {
     if (stopped || rssCommandBusy) return;
@@ -1405,12 +1440,13 @@ function startRssCommandBridge(ctx, host2) {
           await executeRssCommand(ctx, host2, owner, command);
           rememberRssCommand(ctx, owner, seen, command.id);
         } catch (error) {
+          rssDebug("command-error", { id: command.id, action: command.action, message: error?.message || error, stack: error?.stack || "" });
           rememberRssCommand(ctx, owner, seen, command.id);
           publishLibraryChange(owner, `RSS command failed: ${String(error?.message || error).slice(0, 300)}`);
         }
       }
-    } catch {
-      // The reader may be mounted before a connected profile is available.
+    } catch (error) {
+      rssDebug("poll-error", { message: error?.message || error, stack: error?.stack || "" });
     } finally { rssCommandBusy = false; }
   };
   const timer = setInterval(() => { void poll(); }, 3000);
@@ -1426,11 +1462,16 @@ async function refreshSubscriptions(library, { feedId = null, shouldContinue = (
   await Promise.all(Array.from({ length: workers }, async () => {
     while (cursor < targets.length && shouldContinue()) {
       const feed = targets[cursor++];
+      rssDebug("feed-refresh-start", { id: feed.id, title: feed.title, url: feed.url });
       try {
         const result = await library(`/feeds/${feed.id}/refresh`, { method: "POST", body: {} });
         added += result.added || 0;
         if (Array.isArray(result.fresh)) fresh.push(...result.fresh);
-      } catch { failed++; }
+        rssDebug("feed-refresh-result", { id: feed.id, added: result.added || 0, fresh: result.fresh?.length || 0 });
+      } catch (error) {
+        failed++;
+        rssDebug("feed-refresh-error", { id: feed.id, title: feed.title, message: error?.message || error, stack: error?.stack || "" });
+      }
     }
   }));
   return { added, failed, fresh };
@@ -1769,16 +1810,22 @@ async function readPackedFeed(run, family, directory, feedPath) {
 }
 async function fetchFeedNow(host2, rawUrl, route) {
   const run = async (command, optional) => {
-    assertOwner(host2, route);
-    const result = await host2.requestProfile(route, "shell.exec", { command });
-    assertOwner(host2, route);
-    if (result.code !== 0) {
-      if (optional) return "";
-      throw new Error(
-        `Feed command failed: ${(result.stderr || "This gateway needs curl plus gzip and base64 tools. Windows uses curl.exe and PowerShell. Linux and macOS use POSIX utilities.").slice(0, 350)}`
-      );
+    try {
+      assertOwner(host2, route);
+      const result = await host2.requestProfile(route, "shell.exec", { command });
+      assertOwner(host2, route);
+      rssDebug("feed-shell", { command, optional: !!optional, code: result?.code, stdout: result?.stdout || "", stderr: result?.stderr || "" });
+      if (result.code !== 0) {
+        if (optional) return "";
+        throw new Error(
+          `Feed command failed: ${(result.stderr || "This gateway needs curl plus gzip and base64 tools. Windows uses curl.exe and PowerShell. Linux and macOS use POSIX utilities.").slice(0, 350)}`
+        );
+      }
+      return result.stdout.trim();
+    } catch (error) {
+      rssDebug("feed-shell-error", { command, optional: !!optional, message: error?.message || error, stack: error?.stack || "" });
+      throw error;
     }
-    return result.stdout.trim();
   };
   const owner = JSON.stringify([route.connectionId, route.profile]);
   let family = families.get(owner);
@@ -4448,6 +4495,7 @@ var plugin_default = {
   version: "1.0.1",
   defaultEnabled: true,
   register(ctx) {
+    rssDebug("register", { id: ID, version: "1.0.1" });
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
     if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
     ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);
