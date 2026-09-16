@@ -1,15 +1,31 @@
-# Scroll on Switch
-
-Keep the active Hermes Desktop transcript at the newest message when switching sessions.
+<div align="center">
+  <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
+  <h1>Scroll on Switch</h1>
+  <strong>Start each selected session at its newest message.</strong>
+  <p>Keep session switching predictable without interrupting manual scrolling or live work.</p>
+  [![Version](https://img.shields.io/badge/version-1.4.5-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+</div>
 
 ## What it does
 
 - Scrolls newly mounted sessions to the bottom.
-- Scrolls keep-alive sessions to the bottom when they become visible.
-- Does not react to new messages or AI streaming, so manual scrolling is never interrupted while a session is working.
-
-Desktop-only. The plugin hot-reloads in Hermes Desktop.
+- Scrolls keep-alive sessions to the bottom when they become visible again.
+- Ignores new messages and AI streaming, so it does not fight manual scrolling during a turn.
 
 ## Install
 
-Install the `hermes-agent-awesome-plugins` pack, or install this subdirectory from the repository with Hermes Agent's plugin installer.
+Install the pack and enable **Scroll on Switch** under **Capabilities → Plugins**:
+
+```bash
+hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
+```
+
+Reload desktop plugins from **Cmd+K** or **Ctrl+K** on Windows.
+
+## Compatibility and development
+
+Desktop-only. The implementation is in `desktop/plugin.js` and hot-reloads in Hermes Desktop. It depends on the transcript scroll surface exposed by the desktop app.
+
+## License
+
+[MIT](../../LICENSE).

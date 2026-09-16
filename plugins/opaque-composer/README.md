@@ -1,24 +1,32 @@
-# Opaque Composer
+<div align="center">
+  <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
+  <h1>Opaque Composer</h1>
+  <strong>Keep the message composer readable while you scroll.</strong>
+  <p>Replace the translucent input surface with the active theme's card color so transcript text does not show through it.</p>
+  [![Version](https://img.shields.io/badge/version-1.0.0-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+</div>
 
-Keep the Hermes Desktop composer solid while you scroll through a conversation.
-This prevents earlier message text from showing through the input area.
+## What it does
+
+- Applies an opaque theme-aware fill in normal and scrolled composer states.
+- Uses Hermes' `data-slot="composer-root"` surface.
+- Removes its namespaced stylesheet when disabled.
+- Changes only the desktop composer; it does not alter conversations or gateway behavior.
 
 ## Install
 
-Install the pack from:
+Install the pack and enable **Opaque Composer** under **Capabilities → Plugins**:
 
-```text
-https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
+```bash
+hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
 ```
 
-After installation, enable **Opaque Composer** under **Settings → Plugins**, then
-run **Ctrl+K → Reload desktop plugins**.
+Reload desktop plugins from **Cmd+K** or **Ctrl+K** on Windows.
 
-## How it works
+## Compatibility
 
-The plugin adds a small namespaced stylesheet to the desktop window. It replaces
-the composer's translucent fill in both its normal and scrolled states with the
-active theme's card color. It uses Hermes' stable `data-slot="composer-root"`
-hook and removes the stylesheet when the plugin is disabled.
+Desktop-only. No gateway or Python runtime is required. The plugin depends on the composer root slot remaining available in Hermes Desktop.
 
-Desktop-only. No gateway or Python runtime is required.
+## Development and license
+
+The implementation is in `desktop/plugin.js`. Metadata is in `plugin.yaml`. Licensed under [MIT](../../LICENSE).

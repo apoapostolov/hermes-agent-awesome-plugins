@@ -1,22 +1,31 @@
-# Iteration Budget Meter
+<div align="center">
+  <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
+  <h1>Iteration Budget Meter</h1>
+  <strong>See how hard the focused session is pushing.</strong>
+  <p>Watch per-turn tool-call usage live and inspect the session's longer-term budget pattern from the status bar.</p>
+  [![Version](https://img.shields.io/badge/version-1.2.1-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+</div>
 
-A status-bar meter that shows the focused session's per-turn iteration usage (N/60) live while a turn runs.
+## What it does
 
-## What you get
-
-- **Live chip during the turn**: current tool-call count against the session's iteration budget.
-- **Hover tooltip**: quick per-request stats.
-- **Click popover** with average tool calls per request, the max-hit ratio (how often the session pushed its ceiling), and a ceiling suggestion that reflects how hard the session actually pushes.
-- **Per-turn accuracy**: the counter resets per turn; the cumulative-counter leak was fixed in v1.1.0 and the popover redesigned in v1.2.0.
+- **Watch the current turn.** See tool-call usage against the session's iteration budget while work runs.
+- **Inspect the details.** Hover for request stats and click for averages, ceiling-hit ratio, and a data-based ceiling suggestion.
+- **Keep turns separate.** The counter resets for each turn, avoiding the cumulative-counter leak fixed in v1.1.0.
 
 ## Install
 
-Install the plugin pack (see the [repo README](../../README.md)) or copy this directory into your Hermes plugins folder and run:
+Install the pack and enable **Iteration Budget Meter** under **Capabilities → Plugins**:
 
 ```bash
-hermes plugins enable iteration-budget-meter --no-allow-tool-override
+hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
 ```
+
+The meter appears in the desktop status bar when a turn is active.
+
+## Compatibility and development
+
+Desktop-only. The implementation is in `desktop/plugin.js` and follows the focused session's tool-call and turn signals. Budget ceilings remain controlled by Hermes and the connected model configuration.
 
 ## License
 
-[MIT](../../LICENSE)
+[MIT](../../LICENSE).

@@ -1,23 +1,46 @@
-# Intelligent Tool Break
+<div align="center">
+  <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
+  <h1>Intelligent Tool Break</h1>
+  <strong>Recover a stuck tool call without losing the turn.</strong>
+  <p>Stop an in-flight spawn, send a correction, or retry the last action from Hermes Desktop.</p>
+  [![Version](https://img.shields.io/badge/version-1.3.2-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+</div>
 
-Never let a stalled tool call force you to cancel a long task. Abort an in-flight call with `/break`, instruct with `/break {message}`, or force it to repeat with `/again`.
+## What it does
 
-- **`/break`** kills the newest in-flight spawn tree and keeps the turn alive.
-- **`/break --id <id> <hint>`** kills that specific spawn; hint rides in the broken tool result.
-- **`/again`** same kill, then reissue the exact call (max 2 per fingerprint).
-- **`/again <hint>`** same with a tweak.
-- **`/break-status`** JSON payload for the desktop strip.
-- Desktop strip: name + time pill, Break / Message / Again / gear per spawn. Elapsed color grades, auto-break thresholds, per-tool hide list (all in `localStorage` under `intelligent-tool-break.*`). Background `terminal`/`process` spawns reuse the native composer status stack: Break / Message / Again land on those rows instead of a second strip.
+- **Break the newest task.** `/break` stops the newest in-flight spawn tree and keeps the turn alive.
+- **Send a correction.** `/break {message}` stops the call and gives the model your hint.
+- **Retry deliberately.** `/again` repeats the exact call; `/again {hint}` repeats it with a correction.
+- **See what can stop.** `/break-status` exposes the current killable list.
+- **Use the desktop strip.** Break, Message, Again, elapsed time, and per-tool controls appear beside active work.
 
-Previously published as `hermes-break`, then renamed to `intelligent-tool-break`. Same commands.
+Previously published as `hermes-break`. The commands remain compatible.
 
-## Files
+## Install
 
-- `plugin.yaml`: hooks `pre_tool_call`, `post_tool_call`, `transform_tool_result`, `on_session_start/end` plus slash commands
-- `__init__.py`: spawn tracking, descendant tree, `taskkill`/`kill -9`, Popen hook
-- `desktop/plugin.js`: composer strip (`COMPOSER_AREAS.top`), palette + keybind (`mod+shift+b`)
-- `tests_break.py`: local checks for rewrite helpers
+Install the pack and enable **Intelligent Tool Break** under **Capabilities → Plugins**:
+
+```bash
+hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
+```
+
+Use the shortcut `mod+shift+b` or the controls in the composer strip.
 
 ## How it works
 
-Tracks every `terminal`/`process` spawn via a Popen hook and a descendant sweep. `/break-status` exposes the killable list. `/break` and `/again` kill the tree (`taskkill /F /T` on Windows, `kill -9` on POSIX) and rewrite the tool result so the model can continue.
+The agent side tracks `terminal` and `process` spawns through a Popen hook and descendant sweep. Break and retry terminate the tree with the platform's process controls, then rewrite the tool result so Hermes can continue.
+
+## Files and development
+
+- `__init__.py`: spawn tracking, tree control, and slash commands
+- `desktop/plugin.js`: composer strip, palette, and keybind
+- `plugin.yaml`: hooks and command registration
+- `tests_break.py`: helper checks
+
+## Limits
+
+The plugin depends on Hermes' active spawn and composer surfaces. If a future Hermes release changes those contracts, controls may become unavailable until compatibility is updated.
+
+## License
+
+[MIT](../../LICENSE).

@@ -1,54 +1,36 @@
-# Drag to Pin Session
+<div align="center">
+  <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
+  <h1>Drag to Pin Session</h1>
+  <strong>Arrange pinned sessions with the gesture you already use.</strong>
+  <p>Drag a session into Pinned to place it, or drag it back to Sessions to unpin it.</p>
+  [![Version](https://img.shields.io/badge/version-1.1.0-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+</div>
 
-Make the **Pinned** section of the Sessions sidebar a drag container.
+## What it does
 
-- Drag a session row into **Pinned** → pins it at the drop slot
-- Drag a pinned row out into **Sessions** → unpins it
-
-No rebuild, no restart. The UI half hot-reloads.
+- **Pin by dragging.** Drag a session row into **Pinned** and drop at the visible slot.
+- **Unpin the same way.** Drag a pinned row back into **Sessions**.
+- **Keep the order.** The visual drop line follows the target position and the order survives reloads.
+- **Protect existing gestures.** The grabber, kebab menu, and normal row click keep their own behavior.
 
 ## Install
 
+Install the pack and enable **Drag to Pin Session** under **Capabilities → Plugins**:
+
+```bash
+hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
 ```
-Install the drag-to-pin-session plugin from
-https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
-```
 
-After install, run **Cmd+K → Reload desktop plugins**. If it does not appear on
-the first try, quit and reopen Hermes once — after that edits hot-reload.
-
-## Doors
-
-The pack installs the UI half at `plugins/drag-to-pin-session/desktop/plugin.js`.
-That is the opt-in door (Settings → Plugins).
-
-For auto-on, copy that same file to
-`$HERMES_HOME/desktop-plugins/drag-to-pin-session/plugin.js`, which activates
-without a Settings visit. Do not leave both live — two loaders, one id, double
-registration.
+Reload desktop plugins from **Cmd+K** or **Ctrl+K** on Windows. The UI half hot-reloads after installation.
 
 ## How it works
 
-The session row already runs two gestures off one press: dnd-kit's PointerSensor
-reorder, and the pane session-drag. This plugin adds a third on the same 6px
-threshold rather than native HTML5 DnD, which collided with both.
+The plugin uses the session row's own pin callbacks and a six-pixel pointer threshold. It coordinates with dnd-kit instead of adding a competing native HTML5 drag path, then suppresses the click that follows a real drag.
 
-- Dragging the row **body** pins/unpins. The grabber stays pure reorder, the
-  kebab keeps its own gestures.
-- The row's identity is read off React fiber props. Unpin still calls the
-  row's **own `onPin`**. Incoming pins walk the recents section for
-  `onTogglePin`, which is the store's `pinSession(id, index)`, and pass the
-  visual insert index from the pointer (midpoint of each pinned row). A drop
-  line follows the slot while dragging. The backend `pinned` flag still
-  PATCHes, and the order lives in the pinned-ids atom, so it survives reloads.
-- dnd-kit also reacts to the drag. Its cross-list reorder is visually a no-op
-  but flips the flat list into manual sort, so the plugin resets that after
-  dnd-kit's own pointerup.
-- The click that follows a real drag is suppressed, so it will not resume
-  the chat.
+## Compatibility
 
-## Caveats
+Desktop-only. The plugin reads compiled session-row labels and props. After a Hermes update, verify that Pinned, row callbacks, and the drop surface still exist.
 
-This reads the Pinned section label and row component props from the compiled
-app. If a future Hermes release renames that label or reshuffles the row props,
-the plugin goes quiet instead of breaking. Re-verify after app updates.
+## License
+
+[MIT](../../LICENSE).

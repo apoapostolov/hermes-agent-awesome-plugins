@@ -1,35 +1,47 @@
-# Provider Status
+<div align="center">
+  <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
+  <h1>Provider Status</h1>
+  <strong>See provider health and quota without leaving Hermes.</strong>
+  <p>Track enabled providers in the status bar, keep multiple credentials organized, and rotate keys when a pool is exhausted.</p>
+  [![Version](https://img.shields.io/badge/version-1.5.7-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+</div>
 
-Unified multi-provider status bar for Hermes.
+## What it does
 
-- Chips in the statusbar (`↑ used` / `↓ remaining`) per enabled provider, colored by quota.
-- Gear → dialog to paste keys, reorder rows (drag gripper), set poll interval, pick reset-day per key.
-- OAuth login for Grok (xAI) and Codex (OpenAI) inside the dialog — browser flow with local callback.
-- Library env (`library.env`) collects every key ever pasted so rotations never lose a previous subscription.
-- Rotation:
-  - **Pool rotation** — when displayed remaining ≤ 2%, switches to next healthy key in pool.
-  - **Reset-day rotation** — per-key renewal day; after it passes once/month, switches to that key.
+Provider Status turns provider setup and quota checks into one desktop surface:
 
-## Providers
+- **Read the status bar.** See used and remaining quota for each enabled provider, with color-coded thresholds.
+- **Keep keys in order.** Paste credentials, reorder rows, set polling intervals, and choose a reset day per key.
+- **Rotate safely.** Switch to the next healthy key when remaining quota reaches the configured threshold or a renewal day passes.
+- **Use OAuth where supported.** Start the Grok and Codex browser login flows from the setup dialog.
 
-`tavily`, `opencode` (OpenCode Go), `deepseek`, `glm` (Z.AI), `openrouter`, `grok`, `codex`
+Supported providers include `tavily`, `opencode`, `deepseek`, `glm`, `openrouter`, `grok`, and `codex`.
 
-## Files
+## Install
 
-- `plugin.yaml` — native plugin manifest
-- `__init__.py` — agent-side no-op (desktop handles UI)
-- `dashboard/plugin_api.py` — FastAPI backend (`/api/plugins/provider-status/*`)
-- `dashboard/manifest.json` — dashboard tab wiring
-- `desktop/plugin.js` — statusbar chips + setup dialog
+Install the pack and enable **Provider Status** under **Capabilities → Plugins**:
 
-## Config
+```bash
+hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
+```
 
-`plugins/provider-status/config.json` (created on first run) + `library.env` (key library).
-Copy `.example` files to start; never commit real keys.
+Open the status-bar gear to configure providers. Copy an example configuration when starting manually. Never commit real keys.
 
-## API
+## How it works
 
-- `GET /status?provider=grok` — single provider status
-- `GET /status/all` — all providers in parallel
-- `POST /config` — save providers/poll/reset-days
-- `POST /grok/browser/start`, `/grok/browser/poll`, `/codex/browser/*` — OAuth
+The desktop UI reads status from the dashboard API at `/api/plugins/provider-status/*`. Configuration is stored in the plugin data directory. `library.env` retains previously entered keys so a rotation does not discard an older subscription.
+
+## Files and development
+
+- `desktop/plugin.js`: status-bar chips and setup dialog
+- `dashboard/plugin_api.py`: status and configuration API
+- `dashboard/manifest.json`: dashboard registration
+- `__init__.py`: agent-side registration
+
+## Limits
+
+Quota values depend on each provider's API. OAuth availability, reset behavior, and account limits follow the provider. This plugin displays and manages configured credentials; it does not remove provider billing or usage limits.
+
+## License
+
+[MIT](../../LICENSE). This is an independent community plugin for Hermes Agent.
