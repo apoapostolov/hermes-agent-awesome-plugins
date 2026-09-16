@@ -3096,7 +3096,7 @@ function ReaderProfile({ ctx, owner }) {
                 "minutes"
               ] })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Fetches new posts on this interval while Hermes is open. Applies to this profile only." : "Background refresh is unavailable on this Hermes build. Use Refresh." })
+            jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Fetches new posts on this interval, only while the Hermes desktop client is open." : "Background refresh is unavailable on this Hermes build. Use Refresh." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "Capturing" }),
@@ -3106,14 +3106,14 @@ function ReaderProfile({ ctx, owner }) {
                 "Capture Full Articles"
               ] })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "After a refresh, new posts are fetched as full pages and kept while they remain in the list." }),
+            jsx("p", { className: "rss-muted rss-small", children: "After a refresh, the RSS Reader attempts to get the full article." }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
                 jsx("input", { type: "checkbox", checked: draft.paywallServices, onChange: event => setDraft({ ...draft, paywallServices: event.target.checked }) }),
                 "Use Paywall Removing Services (Experimental)"
               ] })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "When a capture is short or blocked, later public copies of the page are tried." })
+            jsx("p", { className: "rss-muted rss-small", children: "If on, paywall sites are passed through several removing services." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "Reading" }),
@@ -3121,15 +3121,15 @@ function ReaderProfile({ ctx, owner }) {
               jsx("input", { type: "checkbox", checked: draft.markReadOnOpen, onChange: event => setDraft({ ...draft, markReadOnOpen: event.target.checked }) }),
               "Mark Articles Read When Opened"
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "Opening an article marks it read in this list." })
+            jsx("p", { className: "rss-muted rss-small", children: "Navigating over an article marks it as read." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "AI Grading" }),
             jsx("label", { className: "rss-setting", children: [
               jsx("input", { type: "checkbox", checked: draft.aiGrading, onChange: event => setDraft({ ...draft, aiGrading: event.target.checked }) }),
-              "Grade Articles By Importance"
+              "Article Tagging by AI"
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "After a refresh, ungraded articles are scored and tinted in the list. Nothing is sent while this is off." }),
+            jsx("p", { className: "rss-muted rss-small", children: "After a refresh, articles are sent to AI to identify important, interesting, or spam articles." }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsxs("label", { className: "rss-skill-field", children: [
                 jsx("span", { children: "Preference Skill" }),
@@ -3137,7 +3137,7 @@ function ReaderProfile({ ctx, owner }) {
               ] }),
               jsx(Button, { type: "button", disabled: disabled || !articles.data?.length, onClick: gradeNow, children: "Grade" })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "This skill supplies the scoring rubric and the list colours. A missing skill is created with a starter rubric when the reader loads." })
+            jsx("p", { className: "rss-muted rss-small", children: "Use Hermes to improve the preference skill above with your interests, so AI Tagging reflects your needs." })
           ] })
         ] }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
