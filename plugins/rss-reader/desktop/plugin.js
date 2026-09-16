@@ -1160,8 +1160,11 @@ function startAutoRefresh(ctx, host2, options = {}) {
       await refreshSubscriptions(makeLibrary(owner), { shouldContinue: canContinue }).then((result) => {
         const settings = readSettings(ctx, owner);
         if (settings.fullCapture && result.fresh?.length) captureEnqueue(owner, result.fresh);
-        // Grading runs on its own; the refresh never waits for the model.
-        if (settings.aiGrading && result.fresh?.length) startGrading(host2, makeLibrary, owner, { skill: settings.gradingSkill, ctx });
+        if (settings.aiGrading && result.fresh?.length) {
+          const grade = () => startGrading(host2, makeLibrary, owner, { skill: settings.gradingSkill, ctx });
+          if (settings.fullCapture) waitCaptureIdleThen(owner, result.fresh, grade);
+          else grade();
+        }
       });
       storageSet(ctx, "lastRefresh", owner, now());
       if (!stopped) notify(owner);
@@ -1180,6 +1183,7 @@ function startAutoRefresh(ctx, host2, options = {}) {
 }
 
 var captureEnqueue = (owner, items, options) => 0;
+var waitCaptureIdleThen = (owner, ids, fn) => { if (typeof fn === "function") fn(); };
 var captureActive = 0;
 var captureWaiters = [];
 var urgentCaptureBusy = false;
@@ -1208,6 +1212,21 @@ function startCaptureWorker(ctx, host2) {
     return Array.isArray(raw) ? raw.filter((j) => j && j.id && j.url) : [];
   };
   const save = (owner, q) => storageSet(ctx, "captureQueue", owner, q.slice(0, MAX_QUEUE));
+  const idleHooks = [];
+  const idsBusy = (owner, wanted) => {
+    if (!wanted.size) return false;
+    if ([...active].some((id) => wanted.has(id))) return true;
+    return load(owner).some((job) => wanted.has(job.id));
+  };
+  const fireIdle = (owner) => {
+    if (stopped) return;
+    const keep = [];
+    for (const hook of idleHooks.splice(0, idleHooks.length)) {
+      if (hook.owner !== owner || idsBusy(owner, hook.wanted)) keep.push(hook);
+      else try { hook.fn(); } catch {}
+    }
+    idleHooks.push(...keep);
+  };
   const enqueue = (owner, items, { front = false } = {}) => {
     if (stopped || !items?.length) return 0;
     let q = load(owner);
@@ -1240,9 +1259,11 @@ function startCaptureWorker(ctx, host2) {
       active.add(job.id);
       void runJob(owner, job).finally(() => {
         active.delete(job.id);
+        fireIdle(owner);
         if (!stopped) void pump();
       });
     }
+    fireIdle(owner);
   }
   async function runJob(owner, job) {
     const library = createLibrary(owner, (url2) => fetchFeed(host2, url2), transact);
@@ -1281,9 +1302,15 @@ function startCaptureWorker(ctx, host2) {
     }
   }
   captureEnqueue = enqueue;
+  waitCaptureIdleThen = (owner, ids, fn) => {
+    if (typeof fn !== "function") return;
+    const wanted = new Set((ids || []).map((item) => item && (item.id || item)).filter(Boolean));
+    if (!idsBusy(owner, wanted)) { fn(); return; }
+    idleHooks.push({ owner, wanted, fn });
+  };
   void pump();
   const timer = setInterval(() => { if (!stopped) void pump(); }, 4000);
-  return () => { stopped = true; clearInterval(timer); captureEnqueue = () => 0; };
+  return () => { stopped = true; clearInterval(timer); captureEnqueue = () => 0; waitCaptureIdleThen = (owner, ids, fn) => { if (typeof fn === "function") fn(); }; };
 }
 
 // src/feed-transport.mjs
@@ -2944,13 +2971,16 @@ function ReaderProfile({ ctx, owner }) {
       setLastRefreshAt(at);
     }
     const queued = settings.fullCapture && result.fresh?.length ? captureEnqueue(owner, result.fresh) : 0;
-    // Grading is lazy: the refresh returns now and the tints land when it does.
-    if (settings.aiGrading && result.fresh?.length) startGrading(host, () => library, owner, {
-      skill: settings.gradingSkill,
-      ctx,
-      onDone: (report) => { if (report.graded) setNotice(`${report.graded} article${report.graded === 1 ? "" : "s"} graded.`); },
-      onError: (error) => setNotice(String(error?.message || error || "Grading failed."))
-    });
+    if (settings.aiGrading && result.fresh?.length) {
+      const grade = () => startGrading(host, () => library, owner, {
+        skill: settings.gradingSkill,
+        ctx,
+        onDone: (report) => { if (report.graded) setNotice(`${report.graded} article${report.graded === 1 ? "" : "s"} graded.`); },
+        onError: (error) => setNotice(String(error?.message || error || "Grading failed."))
+      });
+      if (queued) waitCaptureIdleThen(owner, result.fresh, grade);
+      else grade();
+    }
     setNotice(`${result.added} new articles${result.failed ? ` · ${result.failed} feeds could not refresh. Select a feed for details.` : " · Up to date."}${queued ? ` · Capturing ${queued} in the background.` : ""}`);
   };
   const markAllRead = () => act("Marking read…", async () => {
