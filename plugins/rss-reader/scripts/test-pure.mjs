@@ -18,9 +18,19 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds")].join("\n");
 const fns = {};
-new Function("exports", `${bundle}\nexports.profileFromOwner = profileFromOwner;\nexports.cheapExcerpt = cheapExcerpt;\nexports.firstBodyImage = firstBodyImage;\nexports.httpsSrc = httpsSrc;\nexports.imageKey = imageKey;`)(fns);
+new Function("exports", `${bundle}
+exports.profileFromOwner = profileFromOwner;
+exports.cheapExcerpt = cheapExcerpt;
+exports.firstBodyImage = firstBodyImage;
+exports.httpsSrc = httpsSrc;
+exports.imageKey = imageKey;
+exports.folderOf = folderOf;
+exports.folderTitle = folderTitle;
+exports.groupFeedsByFolder = groupFeedsByFolder;
+exports.previewNavFeeds = previewNavFeeds;
+`)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
 assert.equal(fns.profileFromOwner(JSON.stringify(["local", "apo"])), "apo");
@@ -30,5 +40,24 @@ assert.equal(fns.firstBodyImage('<img src="https://cdn.example.com/b.png">'), "h
 assert.equal(fns.httpsSrc("//cdn.example.com/x.jpg"), "https://cdn.example.com/x.jpg");
 assert.equal(fns.imageKey("https://www.Example.com/pic-640x480.jpg?w=8"), fns.imageKey("https://example.com/pic.jpg"));
 assert.notEqual(fns.imageKey("https://example.com/a.jpg"), fns.imageKey("https://example.com/b.jpg"));
+assert.equal(fns.folderTitle(""), "Ungrouped");
+assert.equal(fns.folderOf({ folder: "AI" }), "AI");
+const grouped = fns.groupFeedsByFolder([
+  { id: "1", folder: "AI", unread: 2 },
+  { id: "2", folder: "", unread: 1 },
+  { id: "3", folder: "AI", unread: 3 }
+]);
+assert.equal(grouped.length, 2);
+assert.equal(grouped[0].title, "AI");
+assert.equal(grouped[0].unread, 5);
+assert.equal(grouped[1].title, "Ungrouped");
+const moved = fns.previewNavFeeds(
+  [{ id: "1", folder: "AI" }, { id: "2", folder: "News" }],
+  "1",
+  0,
+  "News"
+);
+assert.equal(moved[0].id, "1");
+assert.equal(moved[0].folder, "News");
 
-console.log("ok", 8);
+console.log("ok", 16);

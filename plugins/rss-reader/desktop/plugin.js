@@ -750,6 +750,13 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
           if (order.length !== library.feeds.length || !order.every(id => typeof id === "string" && library.feeds.some(f => f.id === id)))
             throw new Error("Order does not match the subscriptions.");
           library.feeds.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+          const folders = body.folders && typeof body.folders === "object" ? body.folders : null;
+          if (folders) {
+            for (const feed of library.feeds) {
+              if (Object.prototype.hasOwnProperty.call(folders, feed.id))
+                feed.folder = String(folders[feed.id] || "").slice(0, 100);
+            }
+          }
         });
       if (parts[2] === "refresh") {
         const key = JSON.stringify([owner, parts[1]]);
@@ -1857,11 +1864,23 @@ var styles = `
 .hermes-rss p{margin:0;line-height:1.7}.hermes-rss .rss-muted{color:var(--ui-text-secondary)}
 .hermes-rss .rss-eyebrow{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:650;color:var(--ui-text-tertiary);margin-bottom:10px}
 .hermes-rss .rss-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.hermes-rss .rss-layout{display:grid;grid-template-columns:180px minmax(240px,.85fr) minmax(300px,1.15fr);flex:1;min-height:0;overflow:hidden}
-.hermes-rss .rss-nav{padding:22px 12px;border-right:1px solid var(--ui-stroke-secondary);overflow:auto}
+.hermes-rss .rss-layout{display:grid;grid-template-columns:200px minmax(240px,.85fr) minmax(300px,1.15fr);flex:1;min-height:0;overflow:hidden}
+.hermes-rss .rss-nav{padding:16px 10px;border-right:1px solid var(--ui-stroke-secondary);overflow:auto}
 .hermes-rss .rss-nav button{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;border-radius:6px;padding:9px 10px;background:transparent;color:var(--ui-text-secondary);text-align:left;margin-bottom:3px;gap:8px}
 .hermes-rss .rss-nav button[aria-current=true]{color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
-.hermes-rss .rss-nav .rss-eyebrow{padding:0 10px;margin-top:28px}.hermes-rss .rss-count{font-size:11px;font-variant-numeric:tabular-nums}
+.hermes-rss .rss-nav-views{display:grid;gap:6px;margin:0 0 12px}
+.hermes-rss .rss-nav .rss-nav-view{width:100%;box-sizing:border-box;margin:0;padding:11px 12px;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:color-mix(in srgb,var(--ui-text-secondary) 7%,transparent);color:var(--ui-text-primary,var(--foreground));font-weight:650;font-size:12px;letter-spacing:.1px}
+.hermes-rss .rss-nav .rss-nav-view:hover{background:color-mix(in srgb,var(--ui-text-secondary) 12%,transparent)}
+.hermes-rss .rss-nav .rss-nav-view[aria-current=true]{border-color:color-mix(in srgb,var(--ui-accent) 42%,transparent);background:color-mix(in srgb,var(--ui-accent) 14%,transparent);color:var(--ui-accent)}
+.hermes-rss .rss-nav .rss-eyebrow{padding:0 10px;margin-top:20px}.hermes-rss .rss-count{font-size:11px;font-variant-numeric:tabular-nums}
+.hermes-rss .rss-folder{margin:0 0 4px}
+.hermes-rss .rss-nav .rss-folder-header{width:100%;box-sizing:border-box;margin:0 0 2px;padding:7px 8px;border:0;border-radius:6px;background:transparent;color:var(--ui-text-secondary);font-size:11px;font-weight:650;letter-spacing:.3px;gap:6px}
+.hermes-rss .rss-nav .rss-folder-header:hover{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent);color:var(--ui-text-primary,var(--foreground))}
+.hermes-rss .rss-folder-drop .rss-folder-header,.hermes-rss .rss-nav .rss-folder-header[data-drop=true]{outline:1px dashed var(--ui-accent);outline-offset:-1px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
+.hermes-rss .rss-folder-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.hermes-rss .rss-folder-chevron{flex:0 0 12px;width:12px;font-size:10px;display:block;transition:transform .12s ease}
+.hermes-rss .rss-folder-chevron-open{transform:rotate(90deg)}
+.hermes-rss .rss-folder-body{display:grid;gap:0}
 .hermes-rss .rss-nav-heading{display:flex;align-items:center;padding:0 2px 0 10px;margin-top:28px;min-height:16px;width:100%;box-sizing:border-box}
 .hermes-rss .rss-nav-heading .rss-eyebrow{padding:0;margin:0;letter-spacing:.8px;white-space:nowrap;flex:1;min-width:0;line-height:1;display:flex;align-items:center}
 .hermes-rss .rss-nav .rss-edit-toggle,.hermes-rss .rss-nav-heading .rss-edit-toggle{width:16px;height:16px;padding:0;margin:0 0 0 auto;flex:0 0 16px;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);line-height:1}
@@ -2043,6 +2062,38 @@ function feedDropIndex(list, draggingId, feedId, isAfter) {
   const base = rest.findIndex((feed) => feed.id === feedId);
   return base < 0 ? null : base + (isAfter ? 1 : 0);
 }
+function folderOf(feed) {
+  return String(feed?.folder || "");
+}
+function folderTitle(key) {
+  return key || "Ungrouped";
+}
+function groupFeedsByFolder(list) {
+  const feeds = Array.isArray(list) ? list : [];
+  const groups = [];
+  const seen = new Map();
+  for (const feed of feeds) {
+    const key = folderOf(feed);
+    let group = seen.get(key);
+    if (!group) {
+      group = { key, title: folderTitle(key), feeds: [], unread: 0 };
+      seen.set(key, group);
+      groups.push(group);
+    }
+    group.feeds.push(feed);
+    group.unread += Number(feed.unread) || 0;
+  }
+  return groups;
+}
+function previewNavFeeds(list, draggingId, dropIndex, targetFolder) {
+  const feeds = Array.isArray(list) ? list : [];
+  if (!draggingId) return feeds;
+  const ordered = typeof dropIndex === "number" && Number.isFinite(dropIndex)
+    ? previewFeedOrder(feeds, draggingId, dropIndex)
+    : feeds;
+  if (typeof targetFolder !== "string") return ordered;
+  return ordered.map((feed) => feed.id === draggingId ? { ...feed, folder: targetFolder } : feed);
+}
 function Reader({ ctx }) {
   const profile = useValue(host.state.profile);
   const connection = useValue(host.state.connectionId || host.state.profile);
@@ -2102,6 +2153,11 @@ function ReaderProfile({ ctx, owner }) {
   const [dragOrder, setDragOrder] = useState(null);
   const [draggingId, setDraggingId] = useState(null);
   const [dragDropIndex, setDragDropIndex] = useState(null);
+  const [dragTargetFolder, setDragTargetFolder] = useState(null);
+  const [folderOpen, setFolderOpen] = useState(() => {
+    const stored = storageGet(ctx, "folderOpen", owner, null);
+    return stored && typeof stored === "object" ? stored : {};
+  });
   const dragOrderRef = useRef(null);
   const dragFeedId = useRef(null);
   const confirmation = useRef(null);
@@ -2338,13 +2394,21 @@ function ReaderProfile({ ctx, owner }) {
     feed,
     index: dragOrder ? dragOrder.indexOf(feed.id) : (feeds.data || []).indexOf(feed)
   })).sort((a, b) => a.index - b.index).map(entry => entry.feed);
-  const previewFeeds = previewFeedOrder(displayedFeeds, draggingId, dragDropIndex);
+  const previewFeeds = previewNavFeeds(displayedFeeds, draggingId, dragDropIndex, dragTargetFolder);
+  const groupedFeeds = groupFeedsByFolder(previewFeeds);
+  const folderIsOpen = (key) => folderOpen[key] !== false;
+  const toggleFolder = (key) => {
+    const next = { ...folderOpen, [key]: !folderIsOpen(key) };
+    setFolderOpen(next);
+    storageSet(ctx, "folderOpen", owner, next);
+  };
   // The landing spot drives the render, so the gap opens while the row is in
   // the air. startDrag/endDrag keep the refs and the state in step.
   const startDrag = feed => {
     dragFeedId.current = feed.id;
     dragOrderRef.current = displayedFeeds.map(f => f.id);
     setDraggingId(feed.id);
+    setDragTargetFolder(folderOf(feed));
     // Seed the landing spot where the row already sits: grabbing must not move
     // the list before the pointer does.
     const rest = displayedFeeds.filter(f => f.id !== feed.id).length;
@@ -2355,6 +2419,7 @@ function ReaderProfile({ ctx, owner }) {
     dragOrderRef.current = null;
     setDraggingId(null);
     setDragDropIndex(null);
+    setDragTargetFolder(null);
   };
   const handleDragStart = feed => event => {
     startDrag(feed);
@@ -2367,21 +2432,36 @@ function ReaderProfile({ ctx, owner }) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     if (feed.id === dragged) return;
+    setDragTargetFolder(folderOf(feed));
     const rect = event.currentTarget.getBoundingClientRect();
     const target = feedDropIndex(displayedFeeds, dragged, feed.id, event.clientY > rect.top + rect.height / 2);
     if (target !== null && target !== dragDropIndex) setDragDropIndex(target);
   };
+  const handleFolderDragOver = key => event => {
+    const dragged = dragFeedId.current;
+    if (!dragged) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragTargetFolder(key);
+    const rest = displayedFeeds.filter(f => f.id !== dragged);
+    const idx = rest.findIndex(f => folderOf(f) === key);
+    const target = idx < 0 ? rest.length : idx;
+    if (target !== dragDropIndex) setDragDropIndex(target);
+  };
   const handleDrop = () => event => {
     event.preventDefault();
     const dragged = dragFeedId.current;
-    const order = previewFeedOrder(displayedFeeds, dragged, dragDropIndex).map(f => f.id);
+    const next = previewFeeds;
     endDrag();
     if (!dragged) return;
-    // A grab that never moved is not a reorder: skip the round trip.
-    if (order.join("\n") === displayedFeeds.map(f => f.id).join("\n")) return;
+    const order = next.map(f => f.id);
+    const folders = Object.fromEntries(next.map(f => [f.id, folderOf(f)]));
+    const sameOrder = order.join("\n") === displayedFeeds.map(f => f.id).join("\n");
+    const sameFolders = displayedFeeds.every(f => folderOf(f) === folderOf(next.find(n => n.id === f.id) || {}));
+    if (sameOrder && sameFolders) return;
     setDragOrder(order);
-    act("Reordering\u2026", async () => {
-      await libraryRequest("/feeds/reorder", { method: "POST", body: { order } });
+    act("Reordering…", async () => {
+      await libraryRequest("/feeds/reorder", { method: "POST", body: { order, folders } });
       refresh();
       setDragOrder(null);
     });
@@ -2708,52 +2788,76 @@ function ReaderProfile({ ctx, owner }) {
     ),
     /* @__PURE__ */ jsxs("div", { className: `rss-layout ${selected ? "has-selection" : ""}`, children: [
       /* @__PURE__ */ jsxs("nav", { className: `rss-nav${draggingId ? " rss-nav-reordering" : ""}`, "aria-label": "Feed navigation", children: [
-        [
+        jsx("div", { className: "rss-nav-views", children: [
           ["all", "All articles"],
           ["unread", "Unread"],
           ["saved", "Saved"]
-        ].map(([id, label]) => /* @__PURE__ */ jsxs(
+        ].map(([id, label]) => jsxs(
           "button",
           {
+            type: "button",
+            className: "rss-nav-view",
             "aria-current": !feedId && view === id,
             onClick: () => selectView(id),
             children: [
-              /* @__PURE__ */ jsx("span", { children: label }),
-              id === "unread" && /* @__PURE__ */ jsx("span", { className: "rss-count", children: (feeds.data || []).reduce((sum, f) => sum + f.unread, 0) })
+              jsx("span", { children: label }),
+              id === "unread" && jsx("span", { className: "rss-count", children: (feeds.data || []).reduce((sum, f) => sum + f.unread, 0) || "" })
             ]
           },
           id
-        )),
+        )) }),
         searches.length > 0 && jsx("div", { className: "rss-eyebrow", children: "Saved searches" }),
         searches.map(search => jsx("button", { onClick: () => openSearch(search), title: search.name, children: jsx("span", { className: "rss-feed-name", children: search.name }) }, search.id)),
-        /* @__PURE__ */ jsxs("div", { className: "rss-nav-heading", children: [
-          /* @__PURE__ */ jsx("div", { className: "rss-eyebrow", children: "Subscriptions" }),
-          jsx("button", { className: "rss-edit-toggle", "aria-pressed": reorderMode, "aria-label": reorderMode ? "Exit edit mode" : "Edit subscriptions", title: reorderMode ? "Exit edit mode" : "Edit subscriptions", onClick: () => setReorderMode(!reorderMode), children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) })
+        jsxs("div", { className: "rss-nav-heading", children: [
+          jsx("div", { className: "rss-eyebrow", children: "Folders" }),
+          jsx("button", { type: "button", className: "rss-edit-toggle", "aria-pressed": reorderMode, "aria-label": reorderMode ? "Exit edit mode" : "Edit folders", title: reorderMode ? "Exit edit mode" : "Edit folders", onClick: () => setReorderMode(!reorderMode), children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) })
         ] }),
-        (previewFeeds || []).map((feed) => jsxs("div", {
-          className: `rss-feed-row${reorderMode ? " rss-feed-row-editing" : ""}${draggingId === feed.id ? " rss-feed-row-dragging" : ""}`,
-          "data-feed-id": feed.id,
-          draggable: reorderMode,
-          onDragStart: reorderMode ? handleDragStart(feed) : undefined,
-          onDragOver: reorderMode && draggingId ? handleDragOver(feed) : undefined,
-          onDrop: reorderMode && draggingId ? handleDrop() : undefined,
-          onDragEnd: endDrag,
-          children: [
-          reorderMode && jsx("span", { className: "rss-feed-edit", "aria-hidden": "true", title: "Drag to reorder", children:
-            jsx("span", { className: "rss-grip", children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-gripper", "aria-hidden": "true" }) })
-          }),
-          jsxs("button", { className: "rss-feed-open", "aria-current": feedId === feed.id,
-            title: `${feed.folder ? feed.folder + " / " : ""}${feed.title}`,
-            onClick: () => selectView("all", feed.id), children: [
-              jsxs("span", { className: "rss-feed-info", children: [
-                jsx("span", { className: "rss-feed-name", children: `${feed.error ? "! " : ""}${feed.title}` }),
-                jsx("span", { className: `rss-feed-status${feed.error ? " rss-feed-status-error" : ""}`, children: feed.error ? "Refresh failed" : refreshStatus(feed.refreshed_at) })
-              ] }),
-              jsx("span", { className: "rss-count", children: feed.unread || "" })
-            ] }),
-          reorderMode && jsx("button", { className: "rss-unsubscribe rss-unsubscribe-edit", disabled, title: "Unsubscribe", "aria-label": `Unsubscribe from ${feed.title}`, onClick: () => setFeedToRemove(feed), children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-trash", "aria-hidden": "true" }) })
-        ] }, feed.id)),
-        !feeds.data?.length && /* @__PURE__ */ jsx("p", { className: "rss-muted rss-small", style: { padding: "0 10px" }, children: "Your feeds will appear here." })
+        groupedFeeds.map((group) => {
+          const open = folderIsOpen(group.key) || !!(draggingId && dragTargetFolder === group.key);
+          return jsxs("div", {
+            className: `rss-folder${draggingId && dragTargetFolder === group.key ? " rss-folder-drop" : ""}`,
+            children: [
+              jsxs("button", {
+                type: "button",
+                className: "rss-folder-header",
+                "aria-expanded": open,
+                "data-drop": draggingId && dragTargetFolder === group.key ? "true" : undefined,
+                onClick: () => toggleFolder(group.key),
+                onDragOver: reorderMode && draggingId ? handleFolderDragOver(group.key) : undefined,
+                onDrop: reorderMode && draggingId ? handleDrop() : undefined,
+                children: [
+                  jsx("i", { className: `codicon codicon-chevron-right rss-folder-chevron${open ? " rss-folder-chevron-open" : ""}`, "aria-hidden": "true" }),
+                  jsx("span", { className: "rss-folder-name", children: group.title }),
+                  jsx("span", { className: "rss-count", children: group.unread || "" })
+                ]
+              }),
+              open && jsx("div", { className: "rss-folder-body", children: group.feeds.map((feed) => jsxs("div", {
+                className: `rss-feed-row${reorderMode ? " rss-feed-row-editing" : ""}${draggingId === feed.id ? " rss-feed-row-dragging" : ""}`,
+                "data-feed-id": feed.id,
+                draggable: reorderMode,
+                onDragStart: reorderMode ? handleDragStart(feed) : undefined,
+                onDragOver: reorderMode && draggingId ? handleDragOver(feed) : undefined,
+                onDrop: reorderMode && draggingId ? handleDrop() : undefined,
+                onDragEnd: endDrag,
+                children: [
+                reorderMode && jsx("span", { className: "rss-feed-edit", "aria-hidden": "true", title: "Drag to reorder", children:
+                  jsx("span", { className: "rss-grip", children: jsx("i", { className: "codicon codicon-gripper", "aria-hidden": "true" }) })
+                }),
+                jsxs("button", { className: "rss-feed-open", "aria-current": feedId === feed.id,
+                  title: `${feed.folder ? feed.folder + " / " : ""}${feed.title}`,
+                  onClick: () => selectView("all", feed.id), children: [
+                    jsxs("span", { className: "rss-feed-info", children: [
+                      jsx("span", { className: "rss-feed-name", children: `${feed.error ? "! " : ""}${feed.title}` }),
+                      jsx("span", { className: `rss-feed-status${feed.error ? " rss-feed-status-error" : ""}`, children: feed.error ? "Refresh failed" : refreshStatus(feed.refreshed_at) })
+                    ] }),
+                    jsx("span", { className: "rss-count", children: feed.unread || "" })
+                  ] }),
+                reorderMode && jsx("button", { className: "rss-unsubscribe rss-unsubscribe-edit", disabled, title: "Unsubscribe", "aria-label": `Unsubscribe from ${feed.title}`, onClick: () => setFeedToRemove(feed), children: jsx("i", { className: "codicon codicon-trash", "aria-hidden": "true" }) })
+              ] }, feed.id)) })
+            ]
+          }, group.key || "ungrouped");
+        }),
+        !feeds.data?.length && jsx("p", { className: "rss-muted rss-small", style: { padding: "0 10px" }, children: "Your feeds will appear here." })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "rss-list", children: [
         /* @__PURE__ */ jsxs("div", { className: "rss-list-head", children: [
