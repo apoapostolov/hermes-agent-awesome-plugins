@@ -1044,12 +1044,16 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
 }
 
 // Reader preferences and scheduled feed refresh (never starts an AI action).
+function normalizeDefaultView(value) {
+  return value === "unread" || value === "saved" ? value : "all";
+}
 function readSettings(ctx, owner) {
   const stored = storageGet(ctx, "settings", owner, {}) || {};
   return {
     autoRefresh: stored.autoRefresh === true,
     refreshMinutes: Number.isInteger(stored.refreshMinutes) && stored.refreshMinutes >= 1 && stored.refreshMinutes <= 1440 ? stored.refreshMinutes : 15,
     markReadOnOpen: stored.markReadOnOpen !== false,
+    defaultView: normalizeDefaultView(stored.defaultView),
     fullCapture: stored.fullCapture === true,
     paywallServices: stored.paywallServices === true,
     aiGrading: stored.aiGrading === true,
@@ -2214,6 +2218,7 @@ var styles = `
 .hermes-rss .rss-feed-info{display:grid;gap:2px;min-width:0}.hermes-rss .rss-feed-status{font-size:10px;color:var(--ui-text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hermes-rss .rss-feed-status-error{color:var(--ui-danger,var(--ui-text-secondary))}
 .hermes-rss .rss-feed-header-error{margin-top:8px;color:var(--ui-danger,var(--ui-text-secondary))}
 .hermes-rss .rss-settings{padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);display:grid;gap:10px}.hermes-rss .rss-settings h2{font-size:15px;margin:0}.hermes-rss .rss-setting{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.hermes-rss .rss-setting input[type=number]{width:90px}.hermes-rss .rss-setting input[type=checkbox]{accent-color:var(--ui-accent)}
+.hermes-rss .rss-setting select{min-width:148px;height:28px}
 .hermes-rss .rss-settings-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;grid-auto-flow:column;gap:10px 24px;align-items:stretch}
 .hermes-rss .rss-settings-block{display:flex;flex-direction:column;gap:8px;min-width:0;min-height:100%}
 .hermes-rss .rss-settings-block .rss-settings-header{margin-top:0;padding-top:0;border-top:0}
@@ -2618,7 +2623,7 @@ function ReaderProfile({ ctx, owner }) {
     return library(...args);
   };
   const client = useQueryClient();
-  const [view, setView] = useState("all");
+  const [view, setView] = useState(() => normalizeDefaultView(readSettings(ctx, owner).defaultView));
   const [feedId, setFeedId] = useState(null);
   const [selected, updateSelected] = useState(
     () => storageGet(ctx, "selected", owner, null) || null
@@ -3133,6 +3138,7 @@ function ReaderProfile({ ctx, owner }) {
     }
     const next = { ...draft, refreshMinutes: minutes };
     next.gradingSkill = gradingSkillName(next.gradingSkill);
+    next.defaultView = normalizeDefaultView(next.defaultView);
     // Tags are cached separately from settings; they come from the skill file.
     delete next.gradingTags;
     storageSet(ctx, "settings", owner, next);
@@ -3352,7 +3358,16 @@ function ReaderProfile({ ctx, owner }) {
               jsx("input", { type: "checkbox", checked: draft.markReadOnOpen, onChange: event => setDraft({ ...draft, markReadOnOpen: event.target.checked }) }),
               "Mark Articles Read When Opened"
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "Navigating over an article marks it as read." })
+            jsx("p", { className: "rss-muted rss-small", children: "Navigating over an article marks it as read." }),
+            jsxs("label", { className: "rss-setting", children: [
+              jsx("span", { children: "Default View" }),
+              jsxs("select", { "aria-label": "Default View", value: draft.defaultView || "all", onChange: event => setDraft({ ...draft, defaultView: event.target.value }), children: [
+                jsx("option", { value: "all", children: "All Articles" }),
+                jsx("option", { value: "unread", children: "Unread" }),
+                jsx("option", { value: "saved", children: "Saved" })
+              ] })
+            ] }),
+            jsx("p", { className: "rss-muted rss-small", children: "RSS Reader opens on this list." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "AI Grading" }),
@@ -3479,7 +3494,7 @@ function ReaderProfile({ ctx, owner }) {
     /* @__PURE__ */ jsxs("div", { className: `rss-layout ${selected ? "has-selection" : ""}`, children: [
       /* @__PURE__ */ jsxs("nav", { ref: navRef, className: `rss-nav${draggingId ? " rss-nav-reordering" : ""}`, "aria-label": "Feed navigation", children: [
         jsx("div", { className: "rss-nav-views", children: [
-          ["all", "All articles"],
+          ["all", "All Articles"],
           ["unread", "Unread"],
           ["saved", "Saved"]
         ].map(([id, label]) => jsxs(
