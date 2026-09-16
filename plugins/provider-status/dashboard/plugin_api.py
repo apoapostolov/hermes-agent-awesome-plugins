@@ -104,7 +104,8 @@ def _merge_pool_fields(fresh_cfg: dict, src_providers: dict, pids: list[str]) ->
     for pid in pids:
         src = src_providers.get(pid) or {}
         prev = dict(provs.get(pid) or {})
-        for f in ("pool", "pool_index", "reset_days", "reset_days_fired"):
+        for f in ("pool", "pool_index", "reset_days", "reset_days_fired",
+                  "pool_strategy", "pool_apply_env"):
             if f in src:
                 prev[f] = src[f]
         provs[pid] = prev
@@ -399,6 +400,56 @@ def classify_tone(pid: str, status: dict) -> dict:
     if code in _ERROR_CODES or any(m in low for m in ("unreachable", "econnrefused", "enotfound", "no key", "banned")):
         return {"tone": "error", "reason": err or "not working", "remaining": rem}
     return {"tone": "error", "reason": err or "not working", "remaining": rem}
+
+
+_HERMES_STRATEGY_SLUG = {
+    "opencode": "opencode-go",
+    "deepseek": "deepseek",
+    "glm": "zai",
+    "openrouter": "openrouter",
+}
+
+
+def _apply_hermes_pool(pid: str, pool: list) -> None:
+    """Seed the native credential pool: PRIMARY=pool[0], PRIMARY_2=pool[1], ...
+    in Hermes .env (contiguous numbering is required by discovery)."""
+    spec = ROTATABLE.get(pid)
+    if not spec:
+        return
+    primary = spec["primary"]
+    with _library_lock:
+        # stale numbered siblings beyond the current pool get dropped so
+        # discovery never stops at a missing number.
+        existing = _parse_env_map(HERMES_ENV)
+        stale = [n for n in existing
+                 if n != primary and n.startswith(primary + "_")
+                 and n[len(primary) + 1:].isdigit()]
+        for n in stale:
+            _remove_env_key(HERMES_ENV, n)
+        for i, key in enumerate(pool[:6]):
+            name = primary if i == 0 else f"{primary}_{i + 1}"
+            _upsert_env_key(HERMES_ENV, name, key)
+    os.environ[primary] = pool[0] if pool else ""
+    if pool:
+        _env_cache[primary] = pool[0]
+    log.info("provider-status %s: pool applied to Hermes .env (%d keys)", pid, len(pool))
+
+
+def _remove_env_key(path: Path, key: str) -> None:
+    """Delete KEY=... lines in place. Preserves comments and other keys."""
+    if not path.exists():
+        return
+    try:
+        raw = path.read_text("utf-8")
+    except Exception:
+        return
+    prefix = key + "="
+    out = [l for l in raw.splitlines()
+           if not (l.strip().startswith(prefix) and not l.strip().startswith("#"))]
+    text = "\n".join(out)
+    if text and not text.endswith("\n"):
+        text += "\n"
+    path.write_text(text, encoding="utf-8")
 
 
 def _apply_hermes_key(pid: str, key: str) -> None:
@@ -1563,11 +1614,14 @@ class ProviderConfig(BaseModel):
     client_id: str = ""
     email: str = ""
     reset_days: list = []   # per-key day-of-month (int 1-31 or None), index-aligned with pool
+    pool_strategy: str = "fill_first"  # native pool strategy: fill_first | round_robin | least_used | random
+    pool_apply_env: bool = False  # save the whole pool into Hermes .env as PRIMARY, PRIMARY_2, ...
 
 class ConfigUpdate(BaseModel):
     providers: dict[str, ProviderConfig] = {}
     order: list[str] = []
     poll_minutes: int | None = None
+    apply_hermes_env: bool | None = None
     remove: list[str] = []   # provider ids to delete entirely (rows + order)
 
 @router.get("/status")
@@ -1818,6 +1872,20 @@ def update_config(body: ConfigUpdate):
                 merged.pop("reset_days", None)
             if "reset_days_fired" in prev and "reset_days_fired" not in merged:
                 merged["reset_days_fired"] = prev["reset_days_fired"]
+            # Native credential-pool strategy (fill_first default). Persisted
+            # per-provider; the dialog footer writes it through /config.
+            if pid in ROTATABLE and "pool_strategy" in incoming:
+                valid = ("fill_first", "round_robin", "least_used", "random")
+                if incoming.get("pool_strategy") not in valid:
+                    merged["pool_strategy"] = "fill_first"
+            # "Apply Changes to Hermes .env": push the WHOLE pool into Hermes
+            # .env as PRIMARY, PRIMARY_2, PRIMARY_3 ... so the native credential
+            # pool seeds every key. Tavily stays manual (its rotation is skill-
+            # managed, not registry-native).
+            if pid in ROTATABLE and cfg.get("apply_hermes_env") and pid != "tavily":
+                _apply_hermes_pool(pid, [k for k in (merged.get("pool") or []) if k])
+            if "pool_apply_env" in incoming and pid == "tavily":
+                merged["pool_apply_env"] = False
             # Manual active-key switch (dialog radio): push the chosen key into
             # the Hermes env so the TUI/runtime picks it up immediately.
             if pid in ROTATABLE and "pool_index" in incoming:
@@ -1840,7 +1908,44 @@ def update_config(body: ConfigUpdate):
             cfg["order"] = [p for p in body.order if p in FETCHERS]
         if body.poll_minutes is not None:
             cfg["poll_minutes"] = max(1, int(body.poll_minutes))
+        if body.apply_hermes_env is not None:
+            cfg["apply_hermes_env"] = bool(body.apply_hermes_env)
     mutate_config(_m)
+    # Applying the switch also materializes every existing non-Tavily pool,
+    # including the provider that triggered this save.
+    try:
+        saved = load_config()
+        if saved.get("apply_hermes_env"):
+            for pid, spec in ROTATABLE.items():
+                if pid != "tavily":
+                    pool = [k for k in ((saved.get("providers") or {}).get(pid) or {}).get("pool") or [] if k]
+                    if pool:
+                        _apply_hermes_pool(pid, pool)
+    except Exception as e:
+        log.warning("provider-status env pool apply failed: %s", e)
+    # Mirror per-provider strategies into Hermes config.yaml
+    # (credential_pool_strategies) so the native credential pool picks them up.
+    try:
+        cfg = load_config()
+        provs = cfg.get("providers") or {}
+        strategies = {}
+        for pid, spec in ROTATABLE.items():
+            if pid == "tavily":
+                continue
+            st = (provs.get(pid) or {}).get("pool_strategy") or "fill_first"
+            slug = _HERMES_STRATEGY_SLUG.get(pid)
+            if slug and st:
+                strategies[slug] = st
+        with open(HERMES_HOME / "config.yaml", "r", encoding="utf-8") as f:
+            import yaml as _yaml
+            y = _yaml.safe_load(f) or {}
+        if strategies != (y.get("credential_pool_strategies") or {}):
+            y["credential_pool_strategies"] = strategies
+            tmp = HERMES_HOME / "config.yaml.tmp"
+            tmp.write_text(_yaml.safe_dump(y, sort_keys=False), "utf-8")
+            os.replace(tmp, HERMES_HOME / "config.yaml")
+    except Exception as e:
+        log.warning("provider-status strategies sync failed: %s", e)
     log.info("provider-status config saved: %s", sorted(load_config().get("providers", {})))
     with _cache_lock:
         _cache.clear()
