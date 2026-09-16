@@ -1741,6 +1741,8 @@ function ReaderProfile({ ctx, owner }) {
   const [url, setUrl] = useState("");
   const [folder, setFolder] = useState("");
   const [busy, setBusy] = useState("");
+  // Declared here: the keyboard-shortcut effect below reads it during render.
+  const disabled = !!busy;
   const [notice, setNotice] = useState("");
   const [limit, setLimit] = useState(100);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -2098,7 +2100,6 @@ function ReaderProfile({ ctx, owner }) {
     (a) => a.kind === (tab === "summary" ? "summarize" : "check") && !a.stale
   );
   const latestChat = article?.actions.find((a) => a.session_id);
-  const disabled = !!busy;
   return /* @__PURE__ */ jsxs("section", { className: "hermes-rss", "aria-label": "RSS reader", children: [
     /* @__PURE__ */ jsx("style", { children: styles }),
     /* @__PURE__ */ jsxs("header", { className: "rss-top", children: [
