@@ -824,6 +824,12 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
     return () => document.removeEventListener('mousedown', close, true)
   }, [dayMenuFor])
 
+  const dayLabel = d => {
+    // 1st..31st: 11-13 keep the 'th' ending (11th, 12th, 13th)
+    const suf = d % 10 === 1 && d !== 11 ? 'st' : d % 10 === 2 && d !== 12 ? 'nd' : d % 10 === 3 && d !== 13 ? 'rd' : 'th'
+    return d + suf
+  }
+
   const resetDaySelect = (i, extraCls) => {
     if (!isResetDay) return null
     const val = resetDays[i] || 0
@@ -876,7 +882,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
             onClick: () => pick(d),
             className: 'block w-full px-2 py-0.5 text-left text-[0.65rem] tabular-nums hover:bg-(--ui-control-hover-background)',
             style: { color: val === d ? 'var(--ui-accent)' : 'var(--ui-text-secondary, var(--foreground))' },
-            children: String(d),
+            children: dayLabel(d),
           }))),
         }) : null,
       ],
