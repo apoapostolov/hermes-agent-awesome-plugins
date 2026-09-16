@@ -11,6 +11,11 @@ Live file: `%LOCALAPPDATA%/hermes/plugins/rss-reader/desktop/plugin.js` (~2.6k l
 - Unsubscribing a feed left `articleCache` entries for deleted posts. DELETE now prunes the cache.
 - List excerpts ran `plainText()` (DOM parse) per row. `cheapExcerpt` strips tags with a regex.
 - Discuss / Check sources always labeled the payload as a feed excerpt. Captured posts now say captured text, still untrusted.
+- Library IDB and settings/queue keys are profile-stable (`profile:<name>`), with a one-time read of the old `[connectionId, profile]` key so a login no longer looks like an empty library.
+- `applyCachedBody` dirty writes back to IndexedDB on article GET and list.
+- `mergeFeed` copies only title/url/published_at/feed_title and keeps captured body/image without `Object.assign`.
+- Feed refresh runs up to 3 subscriptions in parallel (capture stays at 2 slots).
+- `scripts/test-pure.mjs` extracts `profileFromOwner`, `cheapExcerpt`, `firstBodyImage`, `httpsSrc`, `imageKey` from plugin.js and asserts them.
 
 ## Stale code (leave for a later removal pass)
 
@@ -25,14 +30,10 @@ Do not delete these in a drive-by. They are unused or leftover names, not load-b
 | `rss-tabs-pills` class name | Pill UI was rejected; the class only holds underline styles. |
 | Paywall mirror block (`PAYWALL_SERVICES`, cooldown map, settings checkbox) | Wired, testing-only. Keep or strip as a product decision, not a drive-by. Do not expand it. |
 
-## Remaining risks (not patched here)
+## Remaining risks
 
-- IndexedDB key is `JSON.stringify([connectionId, profile])`. A connection id that flips `undefined` vs a real id after login looks like an empty library.
-- `applyCachedBody` can set `image` in memory on GET/list without writing IndexedDB. Capture POST does persist the lead image.
-- `mergeFeed` `Object.assign` still copies feed fields onto captured articles; body/image are restored afterward, but other fields can churn.
-- Capture and feed download share the gateway `shell.exec` path (curl + gzip + base64). Fine for a few feeds; painful at 200 subscriptions.
-- No tests. `node --check` on a `.mjs` copy is the only automated gate.
-- One file holds library, fetch, capture, markdown, CSS, and React. Splitting is a later refactor, not a bugfix.
+- Capture and feed download still share gateway `shell.exec` (curl + gzip + base64). Parallel feed refresh (3) helps; a dedicated fetch worker would be a later cut.
+- The desktop loader only mounts `desktop/plugin.js`, so the React/CSS/capture bundle stays one file. Pure helpers are tested by slicing that file, not by importing a second module.
 
 ## Quality snapshot
 

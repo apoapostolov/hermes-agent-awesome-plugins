@@ -178,23 +178,75 @@ function openDatabase() {
     });
   return database;
 }
+function profileFromOwner(owner) {
+  try {
+    const parsed = JSON.parse(owner);
+    if (Array.isArray(parsed) && parsed.length >= 2) return String(parsed[1] || "default");
+  } catch {}
+  if (typeof owner === "string" && owner.startsWith("profile:")) return owner.slice(8);
+  return String(owner || "default");
+}
+function libraryStoreKey(owner) {
+  return `profile:${profileFromOwner(owner)}`;
+}
+function storageProfileKey(prefix, owner) {
+  return `${prefix}:profile:${profileFromOwner(owner)}`;
+}
+function storageGet(ctx, prefix, owner, fallback) {
+  if (!ctx?.storage) return fallback;
+  const next = storageProfileKey(prefix, owner);
+  const hit = ctx.storage.get(next);
+  if (hit !== undefined && hit !== null) return hit;
+  const old = ctx.storage.get(`${prefix}:${owner}`, fallback);
+  if (old !== undefined && old !== fallback && old !== null) {
+    ctx.storage.set(next, old);
+    return old;
+  }
+  return old;
+}
+function storageSet(ctx, prefix, owner, value) {
+  if (!ctx?.storage) return;
+  ctx.storage.set(storageProfileKey(prefix, owner), value);
+}
 async function transact(owner, mutate) {
   const db = await openDatabase();
+  const key = libraryStoreKey(owner);
+  const profile = profileFromOwner(owner);
+  const aliases = [owner, JSON.stringify(["local", profile])].filter((item, i, all) => item && item !== key && all.indexOf(item) === i);
   return new Promise((resolve, reject) => {
-    const tx = db.transaction("libraries", mutate ? "readwrite" : "readonly");
+    const tx = db.transaction("libraries", "readwrite");
     const store = tx.objectStore("libraries");
     let result, failure;
-    const request = store.get(owner);
-    request.onsuccess = () => {
+    const first = store.get(key);
+    first.onsuccess = () => {
       try {
-        const library = request.result || EMPTY();
-        result = mutate ? mutate(library) : library;
-        if (mutate) store.put(library, owner);
+        if (first.result) apply(first.result, false);
+        else nextAlias(0);
       } catch (error) {
         failure = error;
         tx.abort();
       }
     };
+    function nextAlias(i) {
+      if (i >= aliases.length) {
+        apply(EMPTY(), false);
+        return;
+      }
+      const req = store.get(aliases[i]);
+      req.onsuccess = () => {
+        try {
+          if (req.result) apply(req.result, true);
+          else nextAlias(i + 1);
+        } catch (error) {
+          failure = error;
+          tx.abort();
+        }
+      };
+    }
+    function apply(library, migrated) {
+      result = mutate ? mutate(library) : library;
+      if (mutate || migrated) store.put(library, key);
+    }
     tx.oncomplete = () => resolve(result);
     tx.onabort = tx.onerror = () => reject(
       failure || new Error(
@@ -217,20 +269,25 @@ function rememberCapture(library, article, body) {
   if (article.identity) library.articleCache[article.identity] = entry;
 }
 function applyCachedBody(library, article) {
-  if (!article) return article;
+  if (!article) return false;
+  let dirty = false;
   if (!article.captured) {
     const hit = article.url && library.articleCache?.[article.url] || article.identity && library.articleCache?.[article.identity];
     if (hit?.body && hit.body.length > (article.body || "").length) {
       article.body = hit.body;
       article.captured = true;
       if (hit.image && !article.image) article.image = hit.image;
+      dirty = true;
     }
   }
   if (article.captured && !article.image) {
     const lead = firstBodyImage(article.body);
-    if (lead) article.image = lead;
+    if (lead) {
+      article.image = lead;
+      dirty = true;
+    }
   }
-  return article;
+  return dirty;
 }
 function pruneArticleCache(library) {
   if (!library.articleCache) return;
@@ -268,15 +325,18 @@ function mergeFeed(library, feedId, parsed) {
     const old = byIdentity.get(item.identity);
     if (old) {
       if (old.body !== item.body || old.title !== item.title || old.url !== item.url)
-        old.actions = old.actions.map((a) => ({ ...a, stale: true }));
-      const prevBody = old.body;
-      const prevCaptured = old.captured;
-      const prevImage = old.image;
-      Object.assign(old, item, { feed_title: feed.title });
-      if (prevCaptured || (prevBody && prevBody.length > (item.body || "").length)) {
-        old.body = prevBody;
+        old.actions = (old.actions || []).map((a) => ({ ...a, stale: true }));
+      old.title = item.title;
+      old.url = item.url || old.url;
+      old.published_at = item.published_at || old.published_at;
+      old.feed_title = feed.title;
+      const keepBody = old.captured || ((old.body || "").length > (item.body || "").length);
+      if (!keepBody) {
+        old.body = item.body;
+        old.image = item.image || old.image;
+      } else {
         old.captured = true;
-        old.image = prevImage || item.image;
+        old.image = old.image || item.image;
       }
       applyCachedBody(library, old);
       if (old.captured) rememberCapture(library, old, old.body);
@@ -485,13 +545,20 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
         const library = await read();
         const article = library.articles.find((a) => a.id === parts[1]);
         if (!article) throw new Error("Article not found.");
-        return applyCachedBody(library, article);
+        if (applyCachedBody(library, article)) {
+          await write((lib) => {
+            const current = lib.articles.find((a) => a.id === parts[1]);
+            if (current) applyCachedBody(lib, current);
+          });
+        }
+        return article;
       }
       const library = await read(), q = (url.searchParams.get("q") || "").trim().toLowerCase();
       const exclude = (url.searchParams.get("exclude") || "").trim().toLowerCase();
       const view = url.searchParams.get("view"), feed = url.searchParams.get("feed_id");
       const rules = url.searchParams.get("show_hidden") === "true" ? [] : (library.filters?.mutes || []).map(rule => ({ ...rule, phrase: rule.phrase.toLowerCase() }));
-      return library.articles.filter((a) => {
+      let dirty = false;
+      const rows = library.articles.filter((a) => {
         if (feed && a.feed_id !== feed || view === "unread" && a.is_read || view === "saved" && !a.is_saved) return false;
         if (!q && !exclude && !rules.length) return true;
         const text = `${a.title}\n${a.body}`.toLowerCase();
@@ -502,9 +569,15 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
           a.published_at || a.received_at
         )
       ).slice(0, Number(url.searchParams.get("limit")) || 100).map((a) => {
-        applyCachedBody(library, a);
+        if (applyCachedBody(library, a)) dirty = true;
         return { ...a, excerpt: cheapExcerpt(a.body) };
       });
+      if (dirty) {
+        await write((lib) => {
+          for (const article of lib.articles) applyCachedBody(lib, article);
+        });
+      }
+      return rows;
     }
     if (path === "/opml/import") {
       const feeds = parseOpml(body.content);
@@ -522,7 +595,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
 
 // Reader preferences and scheduled feed refresh (never starts an AI action).
 function readSettings(ctx, owner) {
-  const stored = ctx.storage.get(`settings:${owner}`, {}) || {};
+  const stored = storageGet(ctx, "settings", owner, {}) || {};
   return {
     autoRefresh: stored.autoRefresh === true,
     refreshMinutes: Number.isInteger(stored.refreshMinutes) && stored.refreshMinutes >= 1 && stored.refreshMinutes <= 1440 ? stored.refreshMinutes : 15,
@@ -539,18 +612,20 @@ function publishLibraryChange(owner) {
 }
 async function refreshSubscriptions(library, { feedId = null, shouldContinue = () => true } = {}) {
   const feeds = await library("/feeds");
-  let added = 0, failed = 0;
+  const targets = feeds.filter((feed) => !feedId || feed.id === feedId);
+  let added = 0, failed = 0, cursor = 0;
   const fresh = [];
-  for (const feed of feeds) {
-    if (!shouldContinue()) break;
-    if (feedId && feed.id !== feedId) continue;
-    try {
-      const result = await library(`/feeds/${feed.id}/refresh`, { method: "POST", body: {} });
-      added += result.added || 0;
-      if (Array.isArray(result.fresh)) fresh.push(...result.fresh);
+  const workers = Math.min(3, Math.max(1, targets.length));
+  await Promise.all(Array.from({ length: workers }, async () => {
+    while (cursor < targets.length && shouldContinue()) {
+      const feed = targets[cursor++];
+      try {
+        const result = await library(`/feeds/${feed.id}/refresh`, { method: "POST", body: {} });
+        added += result.added || 0;
+        if (Array.isArray(result.fresh)) fresh.push(...result.fresh);
+      } catch { failed++; }
     }
-    catch { failed++; }
-  }
+  }));
   return { added, failed, fresh };
 }
 var rssVisited = false;
@@ -570,7 +645,7 @@ function startAutoRefresh(ctx, host2, options = {}) {
     if (!settings.autoRefresh) { clocks.delete(owner); return; }
     if (!rssVisited) return;
     const period = settings.refreshMinutes * 60000;
-    const saved = Number(ctx.storage.get(`lastRefresh:${owner}`, 0)) || 0;
+    const saved = Number(storageGet(ctx, "lastRefresh", owner, 0)) || 0;
     let clock = clocks.get(owner);
     if (!clock || clock.period !== period) {
       clock = { period, last: saved };
@@ -582,13 +657,13 @@ function startAutoRefresh(ctx, host2, options = {}) {
     const run = async () => {
       if (stopped || currentOwner(host2) !== owner) return;
       // Recheck after the cross-window lock; another window may have refreshed.
-      if (now() - Number(ctx.storage.get(`lastRefresh:${owner}`, 0)) < period) return;
+      if (now() - Number(storageGet(ctx, "lastRefresh", owner, 0)) < period) return;
       const canContinue = () => !stopped && currentOwner(host2) === owner && readSettings(ctx, owner).autoRefresh;
       if (!canContinue()) return;
       await refreshSubscriptions(makeLibrary(owner), { shouldContinue: canContinue }).then((result) => {
         if (readSettings(ctx, owner).fullCapture && result.fresh?.length) captureEnqueue(owner, result.fresh);
       });
-      ctx.storage.set(`lastRefresh:${owner}`, now());
+      storageSet(ctx, "lastRefresh", owner, now());
       if (!stopped) notify(owner);
     };
     try {
@@ -627,12 +702,11 @@ function startCaptureWorker(ctx, host2) {
   const CONCURRENCY = 2;
   const MAX_QUEUE = 80;
   const MAX_ATTEMPTS = 2;
-  const storeKey = (owner) => `captureQueue:${owner}`;
   const load = (owner) => {
-    const raw = ctx.storage.get(storeKey(owner), []) || [];
+    const raw = storageGet(ctx, "captureQueue", owner, []) || [];
     return Array.isArray(raw) ? raw.filter((j) => j && j.id && j.url) : [];
   };
-  const save = (owner, q) => ctx.storage.set(storeKey(owner), q.slice(0, MAX_QUEUE));
+  const save = (owner, q) => storageSet(ctx, "captureQueue", owner, q.slice(0, MAX_QUEUE));
   const enqueue = (owner, items, { front = false } = {}) => {
     if (stopped || !items?.length) return 0;
     let q = load(owner);
@@ -1649,11 +1723,11 @@ function ReaderProfile({ ctx, owner }) {
   const [view, setView] = useState("all");
   const [feedId, setFeedId] = useState(null);
   const [selected, updateSelected] = useState(
-    () => ctx.storage?.get(`selected:${owner}`, null) || null
+    () => storageGet(ctx, "selected", owner, null) || null
   );
   const setSelected = (value) => {
     updateSelected(value);
-    ctx.storage?.set(`selected:${owner}`, value);
+    storageSet(ctx, "selected", owner, value);
   };
   const [query, setQuery] = useState("");
   const [exclude, setExclude] = useState("");
@@ -1724,7 +1798,7 @@ function ReaderProfile({ ctx, owner }) {
     markRssVisited();
     const s = readSettings(ctx, owner);
     if (!s.autoRefresh) return undefined;
-    const saved = Number(ctx.storage.get(`lastRefresh:${owner}`, 0)) || 0;
+    const saved = Number(storageGet(ctx, "lastRefresh", owner, 0)) || 0;
     const period = s.refreshMinutes * 60000;
     if (saved && Date.now() - saved < period) return undefined;
     let cancelled = false;
@@ -1732,7 +1806,7 @@ function ReaderProfile({ ctx, owner }) {
       try {
         const result = await refreshSubscriptions(libraryRequest, { shouldContinue: () => !cancelled && currentOwner(host) === owner });
         if (cancelled) return;
-        ctx.storage.set(`lastRefresh:${owner}`, Date.now());
+        storageSet(ctx, "lastRefresh", owner, Date.now());
         if (s.fullCapture && result.fresh?.length) captureEnqueue(owner, result.fresh);
         client.invalidateQueries({ queryKey: key });
       } catch {
@@ -1810,7 +1884,7 @@ function ReaderProfile({ ctx, owner }) {
       feedId,
       shouldContinue: () => currentOwner(host) === owner
     });
-    if (!feedId) ctx.storage.set(`lastRefresh:${owner}`, Date.now());
+    if (!feedId) storageSet(ctx, "lastRefresh", owner, Date.now());
     const queued = settings.fullCapture && result.fresh?.length ? captureEnqueue(owner, result.fresh) : 0;
     setNotice(`${result.added} new articles${result.failed ? ` · ${result.failed} feeds could not refresh. Select a feed for details.` : " · Up to date."}${queued ? ` · Capturing ${queued} in the background.` : ""}`);
   };
@@ -1926,7 +2000,7 @@ function ReaderProfile({ ctx, owner }) {
       setNotice("Choose a refresh interval from 1 to 1440 minutes."); return;
     }
     const next = { ...draft, refreshMinutes: minutes };
-    ctx.storage.set(`settings:${owner}`, next);
+    storageSet(ctx, "settings", owner, next);
     setSettings(next);
     setDraft(next);
     if (next.fullCapture) {
