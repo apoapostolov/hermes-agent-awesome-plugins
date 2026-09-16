@@ -1804,7 +1804,7 @@ function ReaderProfile({ ctx, owner }) {
     /* @__PURE__ */ jsx("style", { children: styles }),
     /* @__PURE__ */ jsxs("header", { className: "rss-top", children: [
       /* @__PURE__ */ jsx("div", { children:
-        /* @__PURE__ */ jsx("h1", { children: "RSS" })
+        /* @__PURE__ */ jsx("h1", { children: "RSS Reader" })
       }),
       /* @__PURE__ */ jsxs("div", { className: "rss-tools", children: [
         /* @__PURE__ */ jsx(
@@ -2372,14 +2372,14 @@ var plugin_default = {
     ctx.register({
       id: "navigation",
       area: SIDEBAR_NAV_AREA,
-      data: { path: "/rss", label: "RSS", codicon: "rss" }
+      data: { path: "/rss", label: "RSS Reader", codicon: "rss" }
     });
     ctx.register({
       id: "open",
       area: PALETTE_AREA,
       data: {
         id: "hermes-rss.open",
-        label: "Open RSS reader",
+        label: "Open RSS Reader",
         keywords: ["feeds", "rss", "read"],
         run: () => host.navigate("/rss")
       }
