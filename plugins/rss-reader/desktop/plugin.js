@@ -2955,6 +2955,7 @@ function ReaderProfile({ ctx, owner }) {
     const stored = storageGet(ctx, "folderOpen", owner, null);
     return stored && typeof stored === "object" ? stored : {};
   });
+  const readTimerRef = useRef(null);
   const dragOrderRef = useRef(null);
   const dragFeedId = useRef(null);
   const dragFolderRef = useRef(null);
@@ -3111,21 +3112,34 @@ function ReaderProfile({ ctx, owner }) {
     await libraryRequest(`/filters/${type}/${id}`, { method: "DELETE" });
     publishLibraryChange(owner);
   });
-  const markArticleRead = item => {
+  const markArticleRead = (item, refreshList = true) => {
     if (!item || item.is_read) return;
     client.setQueriesData({ queryKey: [...key, "articles"] }, rows =>
       rows?.map(row => row.id === item.id ? { ...row, is_read: true } : row));
     client.setQueryData([...key, "article", item.id], old => old ? { ...old, is_read: true } : old);
     void libraryRequest(`/articles/${item.id}`, {
       method: "PATCH", body: { is_read: true }
-    }).then(refresh).catch(async () => {
-      await refresh();
+    }).then(() => refreshList ? refresh() : undefined).catch(async () => {
+      if (refreshList) await refresh();
       setNotice("Could not save read state. Open the article again to retry.");
     });
   };
+  const scheduleArticleRead = item => {
+    if (!settings.markReadOnOpen || !item || item.is_read) return;
+    if (readTimerRef.current) window.clearTimeout(readTimerRef.current);
+    readTimerRef.current = window.setTimeout(() => {
+      readTimerRef.current = null;
+      markArticleRead(item, false);
+    }, 1000);
+  };
   const openArticle = (item) => {
     if (view === "unread" && selected && selected !== item.id) {
-      markArticleRead(displayedFeeds.find(row => row.id === selected));
+      if (readTimerRef.current) {
+        window.clearTimeout(readTimerRef.current);
+        readTimerRef.current = null;
+      }
+      markArticleRead(displayedFeeds.find(row => row.id === selected), false);
+      void refresh();
     }
     setSelected(item.id);
     setTab("article");
@@ -3146,7 +3160,10 @@ function ReaderProfile({ ctx, owner }) {
       }
     }
     if (!settings.markReadOnOpen || item.is_read) return;
-    if (view === "unread") return;
+    if (view === "unread") {
+      scheduleArticleRead(item);
+      return;
+    }
     markArticleRead(item);
   };
   const refreshFeeds = async () => {
