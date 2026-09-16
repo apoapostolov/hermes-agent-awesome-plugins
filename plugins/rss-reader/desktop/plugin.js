@@ -202,6 +202,13 @@ async function transact(owner, mutate) {
     );
   });
 }
+function firstBodyImage(raw) {
+  const text = String(raw || "");
+  const md = /!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/.exec(text);
+  if (md) return md[1];
+  const html = /<img[^>]*\bsrc=["']?(https?:\/\/[^"'\s>]+)/i.exec(text);
+  return html?.[1] || "";
+}
 function rememberCapture(library, article, body) {
   if (!library.articleCache) library.articleCache = {};
   const entry = { body: String(body || "").slice(0, 6e4), image: article.image || "", at: Date.now() };
@@ -209,12 +216,18 @@ function rememberCapture(library, article, body) {
   if (article.identity) library.articleCache[article.identity] = entry;
 }
 function applyCachedBody(library, article) {
-  if (!article || article.captured) return article;
-  const hit = article.url && library.articleCache?.[article.url] || article.identity && library.articleCache?.[article.identity];
-  if (hit?.body && hit.body.length > (article.body || "").length) {
-    article.body = hit.body;
-    article.captured = true;
-    if (hit.image && !article.image) article.image = hit.image;
+  if (!article) return article;
+  if (!article.captured) {
+    const hit = article.url && library.articleCache?.[article.url] || article.identity && library.articleCache?.[article.identity];
+    if (hit?.body && hit.body.length > (article.body || "").length) {
+      article.body = hit.body;
+      article.captured = true;
+      if (hit.image && !article.image) article.image = hit.image;
+    }
+  }
+  if (article.captured && !article.image) {
+    const lead = firstBodyImage(article.body);
+    if (lead) article.image = lead;
   }
   return article;
 }
@@ -450,6 +463,8 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
             if (typeof body.body === "string" && body.body.length > article3.body.length) {
               article3.body = body.body.slice(0, 6e4);
               article3.captured = true;
+              const lead = firstBodyImage(article3.body);
+              if (lead) article3.image = lead;
               article3.actions = article3.actions.map((a) => ({ ...a, stale: true }));
               rememberCapture(library2, article3, article3.body);
             }
