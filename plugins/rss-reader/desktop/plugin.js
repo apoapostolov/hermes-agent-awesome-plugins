@@ -3321,7 +3321,15 @@ function ReaderProfile({ ctx, owner }) {
       jsxs("form", { className: "rss-stack", "aria-label": "Reader settings", onSubmit: saveSettings, children: [
         jsxs("div", { className: "rss-settings-grid", children: [
           jsxs("div", { className: "rss-settings-block", children: [
-            jsx("h2", { className: "rss-settings-header", children: "Refreshing" }),
+            jsx("h2", { className: "rss-settings-header", children: "General" }),
+            jsxs("label", { className: "rss-setting", children: [
+              jsx("span", { children: "Default View" }),
+              jsxs("select", { "aria-label": "Default View", value: draft.defaultView || "all", onChange: event => setDraft({ ...draft, defaultView: event.target.value }), children: [
+                jsx("option", { value: "all", children: "All Articles" }),
+                jsx("option", { value: "unread", children: "Unread" }),
+                jsx("option", { value: "saved", children: "Saved" })
+              ] })
+            ] }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
                 jsx("input", { type: "checkbox", checked: draft.autoRefresh, disabled: typeof ctx.onDispose !== "function", onChange: event => setDraft({ ...draft, autoRefresh: event.target.checked }) }),
@@ -3358,16 +3366,7 @@ function ReaderProfile({ ctx, owner }) {
               jsx("input", { type: "checkbox", checked: draft.markReadOnOpen, onChange: event => setDraft({ ...draft, markReadOnOpen: event.target.checked }) }),
               "Mark Articles Read When Opened"
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "Navigating over an article marks it as read." }),
-            jsxs("label", { className: "rss-setting", children: [
-              jsx("span", { children: "Default View" }),
-              jsxs("select", { "aria-label": "Default View", value: draft.defaultView || "all", onChange: event => setDraft({ ...draft, defaultView: event.target.value }), children: [
-                jsx("option", { value: "all", children: "All Articles" }),
-                jsx("option", { value: "unread", children: "Unread" }),
-                jsx("option", { value: "saved", children: "Saved" })
-              ] })
-            ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "RSS Reader opens on this list." })
+            jsx("p", { className: "rss-muted rss-small", children: "Navigating over an article marks it as read." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "AI Grading" }),
