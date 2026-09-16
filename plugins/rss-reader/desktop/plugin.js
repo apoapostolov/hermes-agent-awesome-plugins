@@ -2279,7 +2279,7 @@ function ReaderProfile({ ctx, owner }) {
           const rich = bodyToRichHtml(article.body || "", article.image);
           return /* @__PURE__ */ jsxs("div", { role: "tabpanel", children: [
             rich.html ? /* @__PURE__ */ jsx("div", { className: "rss-body rss-rich", dangerouslySetInnerHTML: { __html: rich.html } }) : /* @__PURE__ */ jsx("p", { className: "rss-body", children: "This feed contains only a headline. Open the original article to read more." }),
-            /* @__PURE__ */ jsx("div", { className: "rss-note", children: rich.isHtml ? "Rendered from the feed's own HTML. Scripts are stripped and only https links and images survive sanitizing." : "This is the text supplied by the feed. It may be an excerpt. Scripts are stripped; https images and tables are kept." })
+            !article.captured && /* @__PURE__ */ jsx("div", { className: "rss-note", children: rich.isHtml ? "Rendered from the feed's own HTML. Scripts are stripped and only https links and images survive sanitizing." : "This is the text supplied by the feed. It may be an excerpt. Scripts are stripped; https images and tables are kept." })
           ] });
         })(),
         tab === "summary" && /* @__PURE__ */ jsxs("div", { role: "tabpanel", children: [
