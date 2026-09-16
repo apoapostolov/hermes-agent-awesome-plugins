@@ -1,14 +1,22 @@
-![Hermes Agent](https://raw.githubusercontent.com/NousResearch/hermes-agent/main/assets/banner.png)
+<div align="center">
 
-# Hermes Agent Awesome Plugins
+  <a href="https://github.com/NousResearch/hermes-agent">
+    <img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" />
+  </a>
 
-**Small plugins for a more capable Hermes Desktop.**
+  <h1>Hermes Agent Awesome Plugins</h1>
 
-[Install the pack](#install) · [Explore the plugins](#the-pack) · [Understand how it works](#how-it-works)
+  **Small plugins for a more capable Hermes Desktop.**
 
-[![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-0.21.0%2B-6f42c1)](https://github.com/NousResearch/hermes-agent)
-[![Plugins](https://img.shields.io/badge/plugins-11-2ea44f)](#the-pack)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+  A focused community pack for provider visibility, session control, reading, memory review, and interface polish.
+
+  [![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-0.21.0%2B-6f42c1)](https://github.com/NousResearch/hermes-agent)
+  [![Plugins](https://img.shields.io/badge/plugins-11-2ea44f)](#the-pack)
+  [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+  [Install the pack](#install) &nbsp;·&nbsp; [Explore the plugins](#the-pack) &nbsp;·&nbsp; [Understand how it works](#how-it-works)
+
+</div>
 
 ## A better Hermes Desktop, one useful capability at a time
 
