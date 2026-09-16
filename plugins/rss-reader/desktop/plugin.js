@@ -2943,6 +2943,7 @@ function ReaderProfile({ ctx, owner }) {
   const [feedToRemove, setFeedToRemove] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
   const [folderCreate, setFolderCreate] = useState(null);
+  const [folderCreateParent, setFolderCreateParent] = useState("");
   const [folderRename, setFolderRename] = useState(null);
   const [folderToDelete, setFolderToDelete] = useState(null);
   const [folderDeleteDest, setFolderDeleteDest] = useState("");
@@ -3840,13 +3841,17 @@ function ReaderProfile({ ctx, owner }) {
         searches.map(search => jsx("button", { onClick: () => openSearch(search), title: search.name, children: jsx("span", { className: "rss-feed-name", children: search.name }) }, search.id)),
         jsxs("div", { className: "rss-nav-heading", children: [
           jsx("div", { className: "rss-folders-title", children: "Folders" }),
-          reorderMode && jsx("button", { type: "button", className: "rss-edit-toggle", "aria-label": "Create folder", title: "Create folder", onClick: () => { setFolderRename(null); setFolderCreate(""); }, children: jsx("i", { className: "codicon codicon-add", "aria-hidden": "true" }) }),
+          reorderMode && jsx("button", { type: "button", className: "rss-edit-toggle", "aria-label": "Create folder", title: "Create folder", onClick: () => { setFolderRename(null); setFolderCreateParent(""); setFolderCreate(""); }, children: jsx("i", { className: "codicon codicon-add", "aria-hidden": "true" }) }),
           jsx("button", { type: "button", className: "rss-edit-toggle", "aria-pressed": reorderMode, "aria-label": reorderMode ? "Exit edit mode" : "Edit folders", title: reorderMode ? "Exit edit mode" : "Edit folders", onClick: () => { setReorderMode(!reorderMode); setFolderCreate(null); setFolderRename(null); }, children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) })
         ] }),
         reorderMode && folderCreate !== null && jsxs("form", { className: "rss-folder-create", onSubmit: event => {
           event.preventDefault();
-          runFolderAction({ action: "create", name: folderCreate }, "Folder created.");
+          runFolderAction({ action: "create", name: folderCreateParent ? `${folderCreateParent}/${folderCreate}` : folderCreate }, "Folder created.");
         }, children: [
+          jsx("select", { "aria-label": "Parent folder", value: folderCreateParent, onChange: event => setFolderCreateParent(event.target.value), children: [
+            jsx("option", { value: "", children: "Top level" }),
+            groupedFeeds.filter(group => group.key).map(group => jsx("option", { value: group.key, children: group.key }, group.key))
+          ] }),
           jsx(Input, { "aria-label": "New folder name", placeholder: "Folder name", value: folderCreate, maxLength: 100, autoFocus: true, onChange: event => setFolderCreate(event.target.value) }),
           jsx("button", { type: "submit", disabled: disabled || !normalizeFolderName(folderCreate), title: "Add folder", "aria-label": "Add folder", children: jsx("i", { className: "codicon codicon-add", "aria-hidden": "true" }) }),
           jsx("button", { type: "button", disabled, title: "Cancel", "aria-label": "Cancel", onClick: () => setFolderCreate(null), children: jsx("i", { className: "codicon codicon-close", "aria-hidden": "true" }) })
@@ -3888,6 +3893,7 @@ function ReaderProfile({ ctx, owner }) {
                     : jsx("span", { className: "rss-folder-name", onClick: reorderMode && group.key ? event => { event.stopPropagation(); setFolderRename({ key: group.key, value: group.key }); } : undefined, children: group.title }),
                   !reorderMode && jsx("span", { className: "rss-count", children: group.unread || "" }),
                   reorderMode && group.key && jsxs("span", { className: "rss-folder-tools", onClick: event => event.stopPropagation(), children: [
+                    jsx("button", { type: "button", title: "Create subfolder", "aria-label": `Create subfolder in ${group.title}`, onClick: () => { setFolderRename(null); setFolderCreateParent(group.key); setFolderCreate(""); }, children: jsx("i", { className: "codicon codicon-add", "aria-hidden": "true" }) }),
                     jsx("button", { type: "button", title: "Rename folder", "aria-label": `Rename ${group.title}`, onClick: () => setFolderRename({ key: group.key, value: group.key }), children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) }),
                     jsx("button", { type: "button", title: "Delete folder", "aria-label": `Delete ${group.title}`, onClick: () => { setFolderDeleteDest(""); setFolderToDelete({ key: group.key, title: group.title, count: group.feeds.length }); }, children: jsx("i", { className: "codicon codicon-trash", "aria-hidden": "true" }) })
                   ] })
