@@ -388,7 +388,7 @@ async function gradingShell(host2) {
   };
   let family = families.get(owner);
   if (!family) {
-    const windowsProbe = await run("powershell.exe -NoProfile -NonInteractive '$env:OS'", true);
+    const windowsProbe = await run("powershell.exe -NoProfile -NonInteractive -Command '$env:OS'", true);
     family = windowsProbe === "Windows_NT" ? "windows" : "posix";
     families.set(owner, family);
   }
@@ -1185,7 +1185,7 @@ function publishLibraryChange(owner, notice = "") {
 var rssCommandBusy = false;
 function rssCommandReadCommand(family) {
   if (family === "windows") {
-    return `powershell.exe -NoProfile -NonInteractive '$p=Join-Path $env:HERMES_HOME "rss-reader\\commands.jsonl"; if (!(Test-Path -LiteralPath $p)) { $p=Join-Path $env:LOCALAPPDATA "hermes\\rss-reader\\commands.jsonl" }; if (Test-Path -LiteralPath $p) { Get-Content -Raw -LiteralPath $p }'`;
+    return `powershell.exe -NoProfile -NonInteractive -Command '$p=Join-Path $env:HERMES_HOME "rss-reader\\commands.jsonl"; if (!(Test-Path -LiteralPath $p)) { $p=Join-Path $env:LOCALAPPDATA "hermes\\rss-reader\\commands.jsonl" }; if (Test-Path -LiteralPath $p) { Get-Content -Raw -LiteralPath $p }'`;
   }
   return 'p="${HERMES_HOME:-$HOME/.hermes}/rss-reader/commands.jsonl"; [ -f "$p" ] && cat "$p" || true';
 }
@@ -1205,7 +1205,7 @@ async function rssCommandQueue(host2, route) {
   };
   let family = families.get(owner);
   if (!family) {
-    const probe = await run("powershell.exe -NoProfile -NonInteractive '$env:OS'");
+    const probe = await run("powershell.exe -NoProfile -NonInteractive -Command '$env:OS'");
     family = probe.trim() === "Windows_NT" ? "windows" : "posix";
     families.set(owner, family);
     rssDebug("queue-family", { owner, probe, family });
@@ -1830,14 +1830,14 @@ async function fetchFeedNow(host2, rawUrl, route) {
   const owner = JSON.stringify([route.connectionId, route.profile]);
   let family = families.get(owner);
   if (!family) {
-    const windowsProbe = await run("powershell.exe -NoProfile -NonInteractive '$env:OS'", true);
+    const windowsProbe = await run("powershell.exe -NoProfile -NonInteractive -Command '$env:OS'", true);
     family = windowsProbe === "Windows_NT" ? "windows" : "posix";
     families.set(owner, family);
   }
   let directory = caches.get(owner);
   if (!directory) {
     if (family === "windows") {
-      const temp = (await run("powershell.exe -NoProfile -NonInteractive '$env:TEMP'")).replace(/[\\/]+$/, "");
+      const temp = (await run("powershell.exe -NoProfile -NonInteractive -Command '$env:TEMP'")).replace(/[\\/]+$/, "");
       directory = `${temp}\\hermes-rss.${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
       if (!isWindowsCache(directory))
         throw new Error("Could not create a private RSS download cache.");
@@ -2225,14 +2225,14 @@ async function captureArticleNow(host2, rawUrl, route, owner, options = {}) {
   };
   let family = families.get(owner);
   if (!family) {
-    const windowsProbe = await run("powershell.exe -NoProfile -NonInteractive '$env:OS'", true);
+    const windowsProbe = await run("powershell.exe -NoProfile -NonInteractive -Command '$env:OS'", true);
     family = windowsProbe === "Windows_NT" ? "windows" : "posix";
     families.set(owner, family);
   }
   let directory = caches.get(owner);
   if (!directory) {
     if (family === "windows") {
-      const temp = (await run("powershell.exe -NoProfile -NonInteractive '$env:TEMP'")).replace(/[\\/]+$/, "");
+      const temp = (await run("powershell.exe -NoProfile -NonInteractive -Command '$env:TEMP'")).replace(/[\\/]+$/, "");
       directory = `${temp}\\hermes-rss.${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
       if (!isWindowsCache(directory))
         throw new Error("Could not create a private RSS download cache.");
