@@ -74,8 +74,10 @@ class RssCommandTests(unittest.TestCase):
     def test_refresh_transport_avoids_python_exec_flags(self):
         plugin = (_ENTRYPOINT.parent / "desktop" / "plugin.js").read_text(encoding="utf-8")
         self.assertIn("function rssCommandReadCommand", plugin)
-        self.assertIn("type", plugin)
-        self.assertIn("%HERMES_HOME%", plugin)
+        self.assertIn("Test-Path -LiteralPath", plugin)
+        self.assertIn("Get-Content -Raw -LiteralPath", plugin)
+        self.assertNotIn("if exist", plugin)
+        self.assertNotIn("%HERMES_HOME%", plugin)
         self.assertIn("Resolve-DnsName", plugin)
         self.assertIn("GzipStream", plugin)
         self.assertNotIn("python -c", plugin)

@@ -1164,7 +1164,7 @@ function publishLibraryChange(owner, notice = "") {
 var rssCommandBusy = false;
 function rssCommandReadCommand(family) {
   if (family === "windows") {
-    return `if exist "%HERMES_HOME%\\rss-reader\\commands.jsonl" type "%HERMES_HOME%\\rss-reader\\commands.jsonl" else if exist "%LOCALAPPDATA%\\hermes\\rss-reader\\commands.jsonl" type "%LOCALAPPDATA%\\hermes\\rss-reader\\commands.jsonl"`;
+    return `powershell.exe -NoProfile -NonInteractive '$p=Join-Path $env:HERMES_HOME "rss-reader\\commands.jsonl"; if (!(Test-Path -LiteralPath $p)) { $p=Join-Path $env:LOCALAPPDATA "hermes\\rss-reader\\commands.jsonl" }; if (Test-Path -LiteralPath $p) { Get-Content -Raw -LiteralPath $p }'`;
   }
   return 'p="${HERMES_HOME:-$HOME/.hermes}/rss-reader/commands.jsonl"; [ -f "$p" ] && cat "$p" || true';
 }
