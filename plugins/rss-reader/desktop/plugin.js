@@ -1267,6 +1267,17 @@ var cmdQuote = (value) => `"${String(value).replaceAll('"', '""')}"`;
 var families = /* @__PURE__ */ new Map();
 var caches = /* @__PURE__ */ new Map();
 var pendingFetches = /* @__PURE__ */ new Map();
+var pendingPacks = /* @__PURE__ */ new Map();
+async function withPackLock(key, work) {
+  const previous = pendingPacks.get(key) || Promise.resolve();
+  const next = previous.catch(() => {}).then(work);
+  pendingPacks.set(key, next);
+  try {
+    return await next;
+  } finally {
+    if (pendingPacks.get(key) === next) pendingPacks.delete(key);
+  }
+}
 function powershellSingle(value) {
   if (/['\r\n]/.test(value))
     throw new Error("Could not create a private RSS download cache.");
@@ -1347,26 +1358,33 @@ async function resolvePublicIPv4(run, family, hostname) {
 }
 async function readPackedFeed(run, family, directory, feedPath) {
   if (family === "windows") {
-    const gzPath = `${directory}\\feed.gz`;
-    const b64Path = `${directory}\\feed.b64`;
-    await run(
-      `powershell -NoProfile -NonInteractive "Add-Type -AssemblyName System.IO.Compression; $in=[IO.File]::OpenRead(${powershellSingle(feedPath)}); $out=[IO.File]::Create(${powershellSingle(gzPath)}); $gzs=New-Object IO.Compression.GZipStream($out,[IO.Compression.CompressionMode]::Compress); $in.CopyTo($gzs); $gzs.Dispose(); $in.Dispose(); [IO.File]::WriteAllText(${powershellSingle(b64Path)},[Convert]::ToBase64String([IO.File]::ReadAllBytes(${powershellSingle(gzPath)})))"`
-    );
-    const length = Number(
+    return withPackLock(directory, async () => {
+      const stamp = crypto.randomUUID().replaceAll("-", "").slice(0, 8);
+      const gzPath = `${directory}\pack.${stamp}.gz`;
+      const b64Path = `${directory}\pack.${stamp}.b64`;
       await run(
-        `powershell -NoProfile -NonInteractive "[IO.File]::ReadAllText(${powershellSingle(b64Path)}).Length"`
-      )
-    );
-    if (!Number.isInteger(length) || length < 1 || length > 6e5)
-      throw new Error("Feed exceeds the compressed transport limit.");
-    let packed = "";
-    for (let offset = 0; offset < length; offset += 3500) {
-      const count = Math.min(3500, length - offset);
-      packed += await run(
-        `powershell -NoProfile -NonInteractive "[IO.File]::ReadAllText(${powershellSingle(b64Path)}).Substring(${offset},${count})"`
+        `powershell -NoProfile -NonInteractive "Add-Type -AssemblyName System.IO.Compression; $in=[IO.File]::OpenRead(${powershellSingle(feedPath)}); $out=[IO.File]::Create(${powershellSingle(gzPath)}); $gzs=New-Object IO.Compression.GZipStream($out,[IO.Compression.CompressionMode]::Compress); $in.CopyTo($gzs); $gzs.Dispose(); $in.Dispose(); [IO.File]::WriteAllText(${powershellSingle(b64Path)},[Convert]::ToBase64String([IO.File]::ReadAllBytes(${powershellSingle(gzPath)})))"`
       );
-    }
-    return packed;
+      const length = Number(
+        await run(
+          `powershell -NoProfile -NonInteractive "$f=${powershellSingle(b64Path)}; if (-not (Test-Path -LiteralPath $f)) { 0 } else { [IO.File]::ReadAllText($f).Length }"`
+        )
+      );
+      if (!Number.isInteger(length) || length < 1 || length > 6e5)
+        throw new Error("Feed exceeds the compressed transport limit.");
+      let packed = "";
+      for (let offset = 0; offset < length; offset += 3500) {
+        const count = Math.min(3500, length - offset);
+        packed += await run(
+          `powershell -NoProfile -NonInteractive "$f=${powershellSingle(b64Path)}; if (-not (Test-Path -LiteralPath $f)) { '' } else { $t=[IO.File]::ReadAllText($f); $o=[Math]::Min(${offset}, $t.Length); $c=[Math]::Min(${count}, [Math]::Max(0, $t.Length - $o)); if ($c -le 0) { '' } else { $t.Substring($o,$c) } }"`
+        );
+      }
+      await run(
+        `powershell -NoProfile -NonInteractive "Remove-Item -LiteralPath ${powershellSingle(gzPath)},${powershellSingle(b64Path)} -ErrorAction SilentlyContinue"`,
+        true
+      );
+      return packed;
+    });
   }
   const file = posixQuote(feedPath);
   const encoded = `gzip -c ${file} | base64 | tr -d '\\n'`;
@@ -1784,7 +1802,7 @@ async function captureArticleNow(host2, rawUrl, route, owner, options = {}) {
     assertOwner(host2, route);
     if (result.code !== 0) {
       if (optional) return "";
-      throw new Error("Capture failed: the gateway needs curl plus gzip and base64 tools.");
+      throw new Error("Capture failed: " + String(result.stderr || "the gateway needs curl plus gzip and base64 tools.").slice(0, 350));
     }
     return result.stdout.trim();
   };
@@ -3703,7 +3721,7 @@ function ReaderProfile({ ctx, owner }) {
           chosenFeed?.error && /* @__PURE__ */ jsx("p", { role: "status", className: "rss-small rss-feed-header-error", children: chosenFeed.error })
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rss-list-items", ref: listRef, onScroll: onListScroll, children: [
-          (feeds.error || articles.error) && /* @__PURE__ */ jsxs(Empty, { title: "Could not open the library", children: [
+          (feeds.error || articles.error) && !articles.data?.length && /* @__PURE__ */ jsxs(Empty, { title: "Could not open the library", children: [
             /* @__PURE__ */ jsx("p", { children: feeds.error?.message || articles.error?.message }),
             /* @__PURE__ */ jsx(Button, { onClick: refresh, children: "Retry" })
           ] }),
