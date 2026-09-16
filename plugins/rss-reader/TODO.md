@@ -9,6 +9,19 @@ the code audit in `AUDIT.md`.
 
 ---
 
+## Done
+
+- **Drag reorder with a live gap.** The subscription list previews the landing
+  spot while a row is in the air, so the rows around it move aside instead of
+  the order only changing after the drop. Technique follows
+  `AI-Provider-Library-for-Foundry-VTT/scripts/ui/route-drag.mjs`: the source
+  slot closes and the destination slot opens. Here it rides the HTML5 drag
+  events the list already had. `previewFeedOrder` and `feedDropIndex` are
+  module-scope helpers; the dragged row is rendered styled at the insertion
+  index; a grab with no movement skips the round trip. Verified on the real
+  helpers (13 order cases) and by measuring the stack in a render: every shift
+  is a whole row, no overlap or hole, exact restore on abort.
+
 ## 1. Folders
 
 **Status:** the data exists, the UI does not.

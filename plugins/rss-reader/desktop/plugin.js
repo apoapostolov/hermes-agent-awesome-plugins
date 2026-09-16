@@ -165,9 +165,9 @@ function validateSummary(text, body) {
 // AI importance grading. One batched auxiliary-model call per pass, run off the
 // refresh path and never blocking the list: the grades land later and tint.
 var DEFAULT_GRADING_SKILL = "rss-importance-grading";
-// "normal" is stored too: it is what stops a later pass from re-grading the
-// same articles. Only important and interesting tint.
-var GRADING_LEVELS = ["important", "interesting", "normal"];
+// Every returned level is stored, "normal" included: it is what stops a later
+// pass from re-grading the same articles. The skill's tag table decides which
+// levels tint or carry a pill.
 var GRADING_BATCH = 60;
 var GRADING_SUMMARY_CHARS = 700;
 var GRADING_RUBRIC = [
@@ -1843,10 +1843,12 @@ var styles = `
 .hermes-rss .rss-edit-toggle .codicon{font-size:9px;line-height:1;display:block}
 .hermes-rss .rss-edit-toggle[aria-pressed=true]{color:var(--ui-accent)}
 .hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}
-.hermes-rss .rss-feed-row-editing{border-radius:6px}
-.hermes-rss .rss-feed-row-dragging{opacity:.45}
+.hermes-rss .rss-feed-row-editing{border-radius:6px;cursor:grab}
+.hermes-rss .rss-feed-row-editing:active{cursor:grabbing}
+.hermes-rss .rss-nav-reordering{user-select:none}
+.hermes-rss .rss-feed-row-dragging{opacity:.5;border-radius:6px;outline:1px dashed var(--ui-stroke-secondary);outline-offset:-1px;background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent)}
 .hermes-rss .rss-feed-edit{display:flex;align-items:center;flex-shrink:0}
-.hermes-rss .rss-feed-edit button{width:18px;height:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);font-size:12px}
+.hermes-rss .rss-feed-edit button,.hermes-rss .rss-feed-edit .rss-grip{width:18px;height:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);font-size:12px}
 .hermes-rss .rss-grip{cursor:grab}
 .hermes-rss .rss-feed-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hermes-rss .rss-list{border-right:1px solid var(--ui-stroke-secondary);display:flex;flex-direction:column;min-height:0}
@@ -1991,6 +1993,26 @@ function Empty({ title, children }) {
     children
   ] });
 }
+// Drag reorder. The list is rendered from the preview order while a row is in
+// the air, so the rows around the landing spot move aside and the gap opens
+// where the row will land instead of only on drop.
+function previewFeedOrder(list, draggingId, dropIndex) {
+  const feeds = Array.isArray(list) ? list : [];
+  if (!draggingId || typeof dropIndex !== "number" || !Number.isFinite(dropIndex))
+    return feeds;
+  const moved = feeds.find((feed) => feed.id === draggingId);
+  if (!moved) return feeds;
+  const rest = feeds.filter((feed) => feed.id !== draggingId);
+  const target = Math.min(Math.max(Math.trunc(dropIndex), 0), rest.length);
+  return [...rest.slice(0, target), moved, ...rest.slice(target)];
+}
+// Insertion index in that preview order: before or after the row under the
+// pointer, chosen by which half of it the pointer crossed.
+function feedDropIndex(list, draggingId, feedId, isAfter) {
+  const rest = (Array.isArray(list) ? list : []).filter((feed) => feed.id !== draggingId);
+  const base = rest.findIndex((feed) => feed.id === feedId);
+  return base < 0 ? null : base + (isAfter ? 1 : 0);
+}
 function Reader({ ctx }) {
   const profile = useValue(host.state.profile);
   const connection = useValue(host.state.connectionId || host.state.profile);
@@ -2049,6 +2071,7 @@ function ReaderProfile({ ctx, owner }) {
   const [reorderMode, setReorderMode] = useState(false);
   const [dragOrder, setDragOrder] = useState(null);
   const [draggingId, setDraggingId] = useState(null);
+  const [dragDropIndex, setDragDropIndex] = useState(null);
   const dragOrderRef = useRef(null);
   const dragFeedId = useRef(null);
   const confirmation = useRef(null);
@@ -2280,28 +2303,48 @@ function ReaderProfile({ ctx, owner }) {
     feed,
     index: dragOrder ? dragOrder.indexOf(feed.id) : (feeds.data || []).indexOf(feed)
   })).sort((a, b) => a.index - b.index).map(entry => entry.feed);
-  const handleDragStart = feed => event => {
+  const previewFeeds = previewFeedOrder(displayedFeeds, draggingId, dragDropIndex);
+  // The landing spot drives the render, so the gap opens while the row is in
+  // the air. startDrag/endDrag keep the refs and the state in step.
+  const startDrag = feed => {
     dragFeedId.current = feed.id;
-    setDraggingId(feed.id);
     dragOrderRef.current = displayedFeeds.map(f => f.id);
+    setDraggingId(feed.id);
+    // Seed the landing spot where the row already sits: grabbing must not move
+    // the list before the pointer does.
+    const rest = displayedFeeds.filter(f => f.id !== feed.id).length;
+    setDragDropIndex(Math.min(displayedFeeds.findIndex(f => f.id === feed.id), rest));
+  };
+  const endDrag = () => {
+    dragFeedId.current = null;
+    dragOrderRef.current = null;
+    setDraggingId(null);
+    setDragDropIndex(null);
+  };
+  const handleDragStart = feed => event => {
+    startDrag(feed);
     event.dataTransfer.effectAllowed = "move";
     try { event.dataTransfer.setData("text/plain", feed.id); } catch {}
   };
-  const handleDragOver = () => event => {
-    if (!dragFeedId.current) return;
+  const handleDragOver = feed => event => {
+    const dragged = dragFeedId.current;
+    if (!dragged) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+    if (feed.id === dragged) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const target = feedDropIndex(displayedFeeds, dragged, feed.id, event.clientY > rect.top + rect.height / 2);
+    if (target !== null && target !== dragDropIndex) setDragDropIndex(target);
   };
-  const handleDrop = feed => event => {
+  const handleDrop = () => event => {
     event.preventDefault();
     const dragged = dragFeedId.current;
-    if (!dragged || dragged === feed.id) { setDraggingId(null); dragFeedId.current = null; setDragOrder(null); dragOrderRef.current = null; return; }
-    const order = (dragOrderRef.current || displayedFeeds.map(f => f.id)).filter(id => id !== dragged);
-    order.splice(displayedFeeds.findIndex(f => f.id === feed.id), 0, dragged);
+    const order = previewFeedOrder(displayedFeeds, dragged, dragDropIndex).map(f => f.id);
+    endDrag();
+    if (!dragged) return;
+    // A grab that never moved is not a reorder: skip the round trip.
+    if (order.join("\n") === displayedFeeds.map(f => f.id).join("\n")) return;
     setDragOrder(order);
-    setDraggingId(null);
-    dragFeedId.current = null;
-    dragOrderRef.current = null;
     act("Reordering\u2026", async () => {
       await libraryRequest("/feeds/reorder", { method: "POST", body: { order } });
       refresh();
@@ -2614,7 +2657,7 @@ function ReaderProfile({ ctx, owner }) {
       }
     ),
     /* @__PURE__ */ jsxs("div", { className: `rss-layout ${selected ? "has-selection" : ""}`, children: [
-      /* @__PURE__ */ jsxs("nav", { className: "rss-nav", "aria-label": "Feed navigation", children: [
+      /* @__PURE__ */ jsxs("nav", { className: `rss-nav${draggingId ? " rss-nav-reordering" : ""}`, "aria-label": "Feed navigation", children: [
         [
           ["all", "All articles"],
           ["unread", "Unread"],
@@ -2637,16 +2680,17 @@ function ReaderProfile({ ctx, owner }) {
           /* @__PURE__ */ jsx("div", { className: "rss-eyebrow", children: "Subscriptions" }),
           jsx("button", { className: "rss-edit-toggle", "aria-pressed": reorderMode, "aria-label": reorderMode ? "Exit edit mode" : "Edit subscriptions", title: reorderMode ? "Exit edit mode" : "Edit subscriptions", onClick: () => setReorderMode(!reorderMode), children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) })
         ] }),
-        (displayedFeeds || []).map((feed) => jsxs("div", {
+        (previewFeeds || []).map((feed) => jsxs("div", {
           className: `rss-feed-row${reorderMode ? " rss-feed-row-editing" : ""}${draggingId === feed.id ? " rss-feed-row-dragging" : ""}`,
+          "data-feed-id": feed.id,
           draggable: reorderMode,
           onDragStart: reorderMode ? handleDragStart(feed) : undefined,
-          onDragOver: reorderMode && draggingId ? handleDragOver() : undefined,
-          onDrop: reorderMode && draggingId ? handleDrop(feed) : undefined,
-          onDragEnd: () => { setDraggingId(null); dragFeedId.current = null; },
+          onDragOver: reorderMode && draggingId ? handleDragOver(feed) : undefined,
+          onDrop: reorderMode && draggingId ? handleDrop() : undefined,
+          onDragEnd: endDrag,
           children: [
-          reorderMode && jsx("span", { className: "rss-feed-edit", children:
-            jsx("button", { className: "rss-grip", disabled: true, "aria-hidden": "true", tabIndex: -1, title: "Drag to reorder", children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-gripper", "aria-hidden": "true" }) })
+          reorderMode && jsx("span", { className: "rss-feed-edit", "aria-hidden": "true", title: "Drag to reorder", children:
+            jsx("span", { className: "rss-grip", children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-gripper", "aria-hidden": "true" }) })
           }),
           jsxs("button", { className: "rss-feed-open", "aria-current": feedId === feed.id,
             title: `${feed.folder ? feed.folder + " / " : ""}${feed.title}`,
