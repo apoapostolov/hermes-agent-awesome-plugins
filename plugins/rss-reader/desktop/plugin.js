@@ -510,7 +510,7 @@ function startGrading(host2, makeLibrary, owner, options = {}) {
 }
 
 // src/library.mjs
-var EMPTY = () => ({ feeds: [], articles: [], articleCache: {}, gradeCache: {} });
+var EMPTY = () => ({ feeds: [], articles: [], articleCache: {}, gradeCache: {}, folders: [] });
 var database;
 function openDatabase() {
   if (!database)
@@ -840,6 +840,15 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
         return entry;
       });
     }
+    if (parts[0] === "folders") {
+      if (method === "GET") {
+        const library = await read();
+        const named = new Set((library.folders || []).map((item) => String(item || "")).filter(Boolean));
+        return [...named];
+      }
+      if (method === "POST")
+        return write((library) => applyFolderAction(library, body));
+    }
     if (parts[0] === "feeds") {
       if (method === "POST" && !parts[1])
         return write((library) => add(library, body));
@@ -869,7 +878,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
           );
           pruneArticleCache(library);
         });
-      if (parts[2] === "reorder" && method === "POST")
+      if ((parts[1] === "reorder" || parts[2] === "reorder") && method === "POST")
         return write((library) => {
           const order = Array.isArray(body.order) ? body.order : [];
           if (order.length !== library.feeds.length || !order.every(id => typeof id === "string" && library.feeds.some(f => f.id === id)))
@@ -2014,7 +2023,15 @@ var styles = `
 .hermes-rss .rss-folder-body{display:grid;gap:0}
 .hermes-rss .rss-nav-heading{display:flex;align-items:center;width:calc(100% + 20px);margin:16px -10px 8px;padding:9px 12px;min-height:32px;box-sizing:border-box;background:color-mix(in srgb,var(--ui-accent) 14%,transparent);border-radius:0}
 .hermes-rss .rss-nav-heading .rss-folders-title{padding:0;margin:0;font-size:15px;font-weight:700;letter-spacing:-.2px;color:var(--ui-text-primary,var(--foreground));white-space:nowrap;flex:1;min-width:0;line-height:1;display:flex;align-items:center}
-.hermes-rss .rss-nav .rss-edit-toggle,.hermes-rss .rss-nav-heading .rss-edit-toggle{width:16px;height:16px;padding:0;margin:0 0 0 auto;flex:0 0 16px;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);line-height:1}
+.hermes-rss .rss-nav-heading .rss-edit-toggle{width:16px;height:16px;padding:0;margin:0 0 0 6px;flex:0 0 16px;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);line-height:1}
+.hermes-rss .rss-nav-heading .rss-edit-toggle:first-of-type{margin-left:auto}
+.hermes-rss .rss-folder-create{display:flex;align-items:center;gap:6px;padding:0 8px 8px}
+.hermes-rss .rss-nav .rss-folder-create input{flex:1;min-width:0;height:26px;padding:4px 8px;font-size:12px;width:auto}
+.hermes-rss .rss-nav .rss-folder-create button{width:auto;flex:0 0 auto;padding:4px 8px;height:26px}
+.hermes-rss .rss-folder-tools{display:flex;align-items:center;gap:0;flex-shrink:0}
+.hermes-rss .rss-nav .rss-folder-tools button{width:18px;height:22px;padding:0;margin:0;flex:0 0 18px;border:0;background:transparent;color:var(--ui-text-tertiary);display:inline-flex;align-items:center;justify-content:center}
+.hermes-rss .rss-nav .rss-folder-tools button:hover{color:var(--foreground)}
+.hermes-rss .rss-nav .rss-folder-header input{flex:1;min-width:0;height:22px;padding:2px 6px;font-size:11px;width:auto;text-transform:none;letter-spacing:0;font-weight:600}
 .hermes-rss .rss-edit-toggle .codicon{font-size:9px;line-height:1;display:block}
 .hermes-rss .rss-edit-toggle[aria-pressed=true]{color:var(--ui-accent)}
 .hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}
@@ -2404,7 +2421,7 @@ function folderOf(feed) {
 function folderTitle(key) {
   return key || "Ungrouped";
 }
-function groupFeedsByFolder(list) {
+function groupFeedsByFolder(list, extraFolders) {
   const feeds = Array.isArray(list) ? list : [];
   const groups = [];
   const seen = new Map();
@@ -2419,7 +2436,72 @@ function groupFeedsByFolder(list) {
     group.feeds.push(feed);
     group.unread += Number(feed.unread) || 0;
   }
+  for (const raw of Array.isArray(extraFolders) ? extraFolders : []) {
+    const key = String(raw || "");
+    if (!key || seen.has(key)) continue;
+    const group = { key, title: folderTitle(key), feeds: [], unread: 0 };
+    seen.set(key, group);
+    groups.push(group);
+  }
   return groups;
+}
+function normalizeFolderName(name) {
+  return String(name || "").trim().replace(/\s+/g, " ").slice(0, 100);
+}
+function folderNameTaken(library, name, except) {
+  const key = String(name || "");
+  if (!key) return false;
+  if (except && key === except) return false;
+  if ((library.folders || []).some((item) => item === key)) return true;
+  return (library.feeds || []).some((feed) => folderOf(feed) === key);
+}
+function remapMuteFolders(library, from, to) {
+  const mutes = library.filters?.mutes;
+  if (!Array.isArray(mutes)) return;
+  for (const rule of mutes) {
+    if (!Array.isArray(rule.folders) || !rule.folders.includes(from)) continue;
+    rule.folders = [...new Set(rule.folders.map((item) => item === from ? to : item).filter((item) => item !== ""))];
+  }
+}
+function applyFolderAction(library, body) {
+  const action = String(body?.action || "");
+  library.folders = Array.isArray(library.folders) ? library.folders.map((item) => String(item || "")).filter(Boolean) : [];
+  if (action === "create") {
+    const name = normalizeFolderName(body.name);
+    if (!name) throw new Error("Enter a folder name.");
+    if (name.toLowerCase() === "ungrouped") throw new Error("Ungrouped is reserved.");
+    if (folderNameTaken(library, name)) throw new Error("That folder already exists.");
+    library.folders.push(name);
+    return { name };
+  }
+  if (action === "rename") {
+    const from = String(body.from || "");
+    const to = normalizeFolderName(body.to);
+    if (!from) throw new Error("Cannot rename Ungrouped.");
+    if (!to) throw new Error("Enter a folder name.");
+    if (to.toLowerCase() === "ungrouped") throw new Error("Ungrouped is reserved.");
+    if (to === from) return { name: to };
+    if (folderNameTaken(library, to, from)) throw new Error("That folder already exists.");
+    for (const feed of library.feeds) if (folderOf(feed) === from) feed.folder = to;
+    library.folders = library.folders.map((item) => item === from ? to : item);
+    if (!library.folders.includes(to) && !library.feeds.some((feed) => folderOf(feed) === to)) library.folders.push(to);
+    remapMuteFolders(library, from, to);
+    return { name: to };
+  }
+  if (action === "delete") {
+    const from = String(body.from || "");
+    if (!from) throw new Error("Cannot delete Ungrouped.");
+    const dest = body.dest == null ? "" : String(body.dest);
+    if (dest === from) throw new Error("Pick a different folder for the feeds.");
+    if (dest && dest.toLowerCase() !== "ungrouped" && !folderNameTaken(library, dest, from) && dest !== "") {
+      // dest may be another named folder that only exists as extra
+    }
+    for (const feed of library.feeds) if (folderOf(feed) === from) feed.folder = dest;
+    library.folders = library.folders.filter((item) => item !== from);
+    remapMuteFolders(library, from, dest);
+    return { dest };
+  }
+  throw new Error("Unknown folder action.");
 }
 function previewNavFeeds(list, draggingId, dropIndex, targetFolder) {
   const feeds = Array.isArray(list) ? list : [];
@@ -2512,6 +2594,10 @@ function ReaderProfile({ ctx, owner }) {
   const [draft, setDraft] = useState(() => readSettings(ctx, owner));
   const [feedToRemove, setFeedToRemove] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
+  const [folderCreate, setFolderCreate] = useState(null);
+  const [folderRename, setFolderRename] = useState(null);
+  const [folderToDelete, setFolderToDelete] = useState(null);
+  const [folderDeleteDest, setFolderDeleteDest] = useState("");
   const [dragOrder, setDragOrder] = useState(null);
   const [draggingId, setDraggingId] = useState(null);
   const [dragDropIndex, setDragDropIndex] = useState(null);
@@ -2548,6 +2634,7 @@ function ReaderProfile({ ctx, owner }) {
     retry: false
   });
   const filters = useQuery({ queryKey: [...key, "filters"], queryFn: () => libraryRequest("/filters"), retry: false });
+  const extraFolders = useQuery({ queryKey: [...key, "folders"], queryFn: () => libraryRequest("/folders"), retry: false });
   const searches = filters.data?.searches || [];
   const mutes = filters.data?.mutes || [];
   const params = new URLSearchParams({ view, q: query, exclude, show_hidden: String(showHidden), limit: String(limit) });
@@ -2841,13 +2928,21 @@ function ReaderProfile({ ctx, owner }) {
     index: dragOrder ? dragOrder.indexOf(feed.id) : (feeds.data || []).indexOf(feed)
   })).sort((a, b) => a.index - b.index).map(entry => entry.feed);
   const previewFeeds = previewNavFeeds(displayedFeeds, draggingId, dragDropIndex, dragTargetFolder);
-  const groupedFeeds = groupFeedsByFolder(previewFeeds);
+  const groupedFeeds = groupFeedsByFolder(previewFeeds, extraFolders.data);
   const folderIsOpen = (key) => folderOpen[key] !== false;
   const toggleFolder = (key) => {
     const next = { ...folderOpen, [key]: !folderIsOpen(key) };
     setFolderOpen(next);
     storageSet(ctx, "folderOpen", owner, next);
   };
+  const runFolderAction = (body, ok) => act("Updating folders…", async () => {
+    await libraryRequest("/folders", { method: "POST", body });
+    await refresh();
+    setFolderCreate(null);
+    setFolderRename(null);
+    setFolderToDelete(null);
+    if (ok) setNotice(ok);
+  });
   // The landing spot drives the render, so the gap opens while the row is in
   // the air. startDrag/endDrag keep the refs and the state in step.
   const startDrag = feed => {
@@ -3215,6 +3310,21 @@ function ReaderProfile({ ctx, owner }) {
       jsx("p", { className: "rss-muted", children: "Unsaved articles from this feed will be removed. Your saved articles and existing Hermes chats will stay." }),
       jsxs("div", { className: "rss-tools", children: [jsx(Button, { disabled, onClick: unsubscribe, children: "Unsubscribe" }), jsx(Button, { variant: "ghost", disabled, onClick: () => setFeedToRemove(null), children: "Cancel" })] })
     ] }),
+    folderToDelete && jsxs("div", { className: "rss-confirm", role: "alertdialog", tabIndex: -1, "aria-labelledby": "rss-folder-delete-title", children: [
+      jsx("h2", { id: "rss-folder-delete-title", children: `Delete ${folderToDelete.title}?` }),
+      jsx("p", { className: "rss-muted", children: folderToDelete.count ? `${folderToDelete.count} feed${folderToDelete.count === 1 ? "" : "s"} will move to the folder you pick.` : "This empty folder will be removed." }),
+      folderToDelete.count > 0 && jsxs("label", { className: "rss-stack", children: [
+        "Move feeds to",
+        jsxs("select", { value: folderDeleteDest, onChange: event => setFolderDeleteDest(event.target.value), children: [
+          jsx("option", { value: "", children: "Ungrouped" }),
+          groupedFeeds.filter((group) => group.key && group.key !== folderToDelete.key).map((group) => jsx("option", { value: group.key, children: group.title }, group.key))
+        ] })
+      ] }),
+      jsxs("div", { className: "rss-tools", children: [
+        jsx(Button, { disabled, onClick: () => runFolderAction({ action: "delete", from: folderToDelete.key, dest: folderDeleteDest }, "Folder deleted."), children: "Delete folder" }),
+        jsx(Button, { variant: "ghost", disabled, onClick: () => setFolderToDelete(null), children: "Cancel" })
+      ] })
+    ] }),
     adding && /* @__PURE__ */ jsxs(
       "form",
       {
@@ -3301,7 +3411,16 @@ function ReaderProfile({ ctx, owner }) {
         searches.map(search => jsx("button", { onClick: () => openSearch(search), title: search.name, children: jsx("span", { className: "rss-feed-name", children: search.name }) }, search.id)),
         jsxs("div", { className: "rss-nav-heading", children: [
           jsx("div", { className: "rss-folders-title", children: "Folders" }),
-          jsx("button", { type: "button", className: "rss-edit-toggle", "aria-pressed": reorderMode, "aria-label": reorderMode ? "Exit edit mode" : "Edit folders", title: reorderMode ? "Exit edit mode" : "Edit folders", onClick: () => setReorderMode(!reorderMode), children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) })
+          reorderMode && jsx("button", { type: "button", className: "rss-edit-toggle", "aria-label": "Create folder", title: "Create folder", onClick: () => { setFolderRename(null); setFolderCreate(""); }, children: jsx("i", { className: "codicon codicon-add", "aria-hidden": "true" }) }),
+          jsx("button", { type: "button", className: "rss-edit-toggle", "aria-pressed": reorderMode, "aria-label": reorderMode ? "Exit edit mode" : "Edit folders", title: reorderMode ? "Exit edit mode" : "Edit folders", onClick: () => { setReorderMode(!reorderMode); setFolderCreate(null); setFolderRename(null); }, children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) })
+        ] }),
+        reorderMode && folderCreate !== null && jsxs("form", { className: "rss-folder-create", onSubmit: event => {
+          event.preventDefault();
+          runFolderAction({ action: "create", name: folderCreate }, "Folder created.");
+        }, children: [
+          jsx(Input, { "aria-label": "New folder name", placeholder: "Folder name", value: folderCreate, maxLength: 100, autoFocus: true, onChange: event => setFolderCreate(event.target.value) }),
+          jsx(Button, { type: "submit", disabled: disabled || !normalizeFolderName(folderCreate), children: "Add" }),
+          jsx(Button, { type: "button", variant: "ghost", disabled, onClick: () => setFolderCreate(null), children: "Cancel" })
         ] }),
         groupedFeeds.map((group) => {
           const open = folderIsOpen(group.key) || !!(draggingId && dragTargetFolder === group.key);
@@ -3329,8 +3448,20 @@ function ReaderProfile({ ctx, owner }) {
                 },
                 children: [
                   jsx("i", { className: `codicon codicon-chevron-right rss-folder-chevron${open ? " rss-folder-chevron-open" : ""}`, "aria-hidden": "true" }),
-                  jsx("span", { className: "rss-folder-name", children: group.title }),
-                  jsx("span", { className: "rss-count", children: group.unread || "" })
+                  reorderMode && group.key && folderRename?.key === group.key
+                    ? jsx("form", { style: { flex: 1, minWidth: 0, display: "flex" }, onClick: event => event.stopPropagation(), onSubmit: event => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      runFolderAction({ action: "rename", from: group.key, to: folderRename.value }, "Folder renamed.");
+                    }, children: jsx(Input, { "aria-label": "Folder name", value: folderRename.value, maxLength: 100, autoFocus: true, onChange: event => setFolderRename({ key: group.key, value: event.target.value }), onKeyDown: event => {
+                      if (event.key === "Escape") { event.preventDefault(); setFolderRename(null); }
+                    } }) })
+                    : jsx("span", { className: "rss-folder-name", onClick: reorderMode && group.key ? event => { event.stopPropagation(); setFolderRename({ key: group.key, value: group.key }); } : undefined, children: group.title }),
+                  jsx("span", { className: "rss-count", children: group.unread || "" }),
+                  reorderMode && group.key && jsxs("span", { className: "rss-folder-tools", onClick: event => event.stopPropagation(), children: [
+                    jsx("button", { type: "button", title: "Rename folder", "aria-label": `Rename ${group.title}`, onClick: () => setFolderRename({ key: group.key, value: group.key }), children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) }),
+                    jsx("button", { type: "button", title: "Delete folder", "aria-label": `Delete ${group.title}`, onClick: () => { setFolderDeleteDest(""); setFolderToDelete({ key: group.key, title: group.title, count: group.feeds.length }); }, children: jsx("i", { className: "codicon codicon-trash", "aria-hidden": "true" }) })
+                  ] })
                 ]
               }),
               open && jsx("div", { className: "rss-folder-body", children: group.feeds.map((feed) => jsxs("div", {

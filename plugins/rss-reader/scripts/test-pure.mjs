@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction")].join("\n");
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -49,6 +49,8 @@ exports.parseGradingTags = parseGradingTags;
 exports.tagRank = tagRank;
 exports.sortArticlesByImportance = sortArticlesByImportance;
 exports.refreshButtonLabel = refreshButtonLabel;
+exports.normalizeFolderName = normalizeFolderName;
+exports.applyFolderAction = applyFolderAction;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -124,5 +126,16 @@ assert.equal(ordered.map((a) => a.id).join(""), "cbad");
 assert.equal(fns.refreshButtonLabel(0, 1), "Refresh");
 assert.equal(fns.refreshButtonLabel(0, Date.now()), "Refresh");
 assert.equal(fns.refreshButtonLabel(1e12, 1e12 + 5 * 6e4), "Refresh \u00b7 5m");
+assert.equal(fns.normalizeFolderName("  News  "), "News");
+const lib = { feeds: [{ id: "1", folder: "AI" }], folders: [], filters: { mutes: [{ folders: ["AI"] }] } };
+fns.applyFolderAction(lib, { action: "create", name: "News" });
+assert.equal(lib.folders.join(","), "News");
+fns.applyFolderAction(lib, { action: "rename", from: "AI", to: "ML" });
+assert.equal(lib.feeds[0].folder, "ML");
+assert.equal(lib.filters.mutes[0].folders.join(","), "ML");
+fns.applyFolderAction(lib, { action: "delete", from: "ML", dest: "" });
+assert.equal(lib.feeds[0].folder, "");
+const extras = fns.groupFeedsByFolder(lib.feeds, ["Empty"]);
+assert.equal(extras.some((g) => g.key === "Empty" && g.feeds.length === 0), true);
 
-console.log("ok", 24);
+console.log("ok", 26);

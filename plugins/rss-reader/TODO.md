@@ -19,7 +19,9 @@ the code audit in `AUDIT.md`.
   feed between open folders and onto a closed header (lands at the top).
   `previewNavFeeds` keeps the source row mounted; `applyFeedMove` writes
   folder plus order through `POST /feeds/reorder`. OPML import/export already
-  nested outlines, so grouped nav round-trips the same nesting.
+  nested outlines, so grouped nav round-trips the same nesting. Pencil mode
+  also creates, renames, and deletes folders (delete moves feeds to Ungrouped
+  or another folder).
 - **Mute rules and list funnel.** Phrase plus folder/feed scope, hit counts,
   filter glyph in the list head.
 - **AI tagging.** Preference skill `rss-reader-grading` (old slug
@@ -36,22 +38,7 @@ the code audit in `AUDIT.md`.
 
 Audit against the live plugin. Only leftover items from this file.
 
-### 1. Folders leftover management
-
-Shipped: grouped nav, unread counts, collapse, cross-folder drag, OPML
-nesting.
-
-Still missing:
-
-- Rename a folder in pencil mode.
-- Create a folder in pencil mode.
-- Delete a folder in pencil mode (feeds need a destination: Ungrouped or
-  another folder).
-
-No regressions in filter/search, `.rss-nav button` width, or pencil
-alignment.
-
-### 2. Saved → Hermes preference analysis
+### 1. Saved → Hermes preference analysis
 
 **Status:** not started. Saved works in-app; Hermes cannot see it.
 
