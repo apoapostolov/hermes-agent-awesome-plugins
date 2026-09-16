@@ -370,7 +370,7 @@ function gradingSkillCommand(family, name, action, payload) {
       `$f = Join-Path (Join-Path (Join-Path $h 'skills') '${name}') 'SKILL.md'`,
       action === "read" ? "if (Test-Path $f) { [IO.File]::ReadAllText($f) }" : `if (Test-Path $f) { 'present' } else { New-Item -ItemType Directory -Force -Path (Split-Path $f) | Out-Null; [IO.File]::WriteAllText($f, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${payload}'))); 'created' }`
     ].join("; ");
-    return `powershell -NoProfile -NonInteractive "${script}"`;
+    return `powershell.exe -NoProfile -NonInteractive -Command "${script}"`;
   }
   const dir = '"${HERMES_HOME:-$HOME/.hermes}/skills/' + name + '"';
   if (action === "read")
@@ -1754,7 +1754,7 @@ async function resolvePublicIPv4(run, family, hostname) {
   if (family === "windows") {
     const addresses = publicAddresses(
       await run(
-        `powershell -NoProfile -NonInteractive "Resolve-DnsName -Type A -Name ${powershellSingle(hostname)} -ErrorAction Stop | Where-Object { $_.Type -eq 'A' } | Select-Object -ExpandProperty IPAddress"`
+        `powershell.exe -NoProfile -NonInteractive -Command "Resolve-DnsName -Type A -Name ${powershellSingle(hostname)} -ErrorAction Stop | Where-Object { $_.Type -eq 'A' } | Select-Object -ExpandProperty IPAddress"`
       )
     );
     if (!addresses)
@@ -1790,7 +1790,7 @@ async function readPackedFeed(run, family, directory, feedPath) {
         "if($s.Length -gt 600000){throw 'too-large'}",
         "$s"
       ].join("; ");
-      const packed = (await run(`powershell -NoProfile -NonInteractive "${script}"`)).replace(/\s+/g, "");
+      const packed = (await run(`powershell.exe -NoProfile -NonInteractive -Command "${script}"`)).replace(/\s+/g, "");
       if (!packed || packed.length > 6e5)
         throw new Error("Feed exceeds the compressed transport limit.");
       return packed;
@@ -1932,7 +1932,7 @@ function preferenceFileCommand(family, filename, payload) {
       `[IO.File]::WriteAllText($f, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${payload}')))`,
       "$f"
     ].join("; ");
-    return `powershell -NoProfile -NonInteractive "${script}"`;
+    return `powershell.exe -NoProfile -NonInteractive -Command "${script}"`;
   }
   const dir = '"${HERMES_HOME:-$HOME/.hermes}/rss-reader"';
   return "mkdir -p " + dir + "; echo " + payload + " | base64 -d > " + dir + "/" + filename + "; echo " + dir + "/" + filename;
