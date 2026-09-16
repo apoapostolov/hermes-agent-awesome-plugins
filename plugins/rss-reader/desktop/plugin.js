@@ -3496,7 +3496,6 @@ function ReaderProfile({ ctx, owner }) {
               jsx(Button, { type: "button", variant: "ghost", disabled, onClick: preferenceNow, children: "Preference Report" })
             ] }),
             jsx("p", { className: "rss-muted rss-small", children: "Use Hermes to improve the preference skill above with your interests, so AI Tagging reflects your needs." }),
-            jsx("p", { className: "rss-muted rss-small", children: "Preference Report writes saved and mute stats for Hermes, then a review of the rubric. It does not edit the skill." }),
             preferenceReport && jsx("pre", { className: "rss-preference-report", children: preferenceReport })
           ] })
         ] }),
