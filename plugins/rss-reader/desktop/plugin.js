@@ -411,6 +411,27 @@ async function gradingPass(host2, library, options) {
     throw new Error("The model answered but no grades matched the article ids. Try Grade again.");
   return { graded: grades.length, attempted: pending.length, tags, more: pending.length === GRADING_BATCH };
 }
+function designPreviewGrades(articles) {
+  const samples = [
+    { level: "important", reason: "Design preview: changes a decision or a risk." },
+    { level: "important", reason: "Design preview: money, law, or security." },
+    { level: "interesting", reason: "Design preview: a sharp idea worth keeping." },
+    { level: "interesting", reason: "Design preview: durable context." },
+    { level: "spam", reason: "Design preview: marketing or engagement bait." },
+    { level: "spam", reason: "Design preview: no substance behind the headline." },
+    { level: "normal", reason: "Design preview: ordinary coverage." },
+    { level: "normal", reason: "Design preview: neither flag nor hide." }
+  ];
+  const grades = [];
+  let i = 0;
+  for (const article of Array.isArray(articles) ? articles : []) {
+    if (!article?.id || article.grade) continue;
+    grades.push({ id: article.id, level: samples[i].level, reason: samples[i].reason });
+    i++;
+    if (i >= samples.length) break;
+  }
+  return grades;
+}
 function startGrading(host2, makeLibrary, owner, options = {}) {
   if (gradingRuns.has(owner)) return false;
   gradingRuns.add(owner);
@@ -694,7 +715,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
         const articles = library.articles || [];
         return {
           searches: filters.searches || [],
-          mutes: (filters.mutes || []).map((rule) => ({ ...rule, hits: muteHitCount(articles, rule) }))
+          mutes: (filters.mutes || []).map((rule) => ({ ...rule, hits: muteHitCount(articles, rule, library.feeds) }))
         };
       }
       if (!["searches", "mutes"].includes(parts[1])) throw new Error("Unknown filter operation.");
@@ -707,29 +728,39 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
         }
         const phrase = value => typeof value === "string" ? value.trim().slice(0, 200) : "";
         const feed_id = typeof body.feed_id === "string" ? body.feed_id : "";
-        if (feed_id && !library.feeds.some(feed => feed.id === feed_id)) throw new Error("Subscription not found.");
+        if (parts[1] !== "mutes" && feed_id && !library.feeds.some(feed => feed.id === feed_id)) throw new Error("Subscription not found.");
+        const muteBody = () => {
+          const parsed = compactMuteScope(
+            library.feeds,
+            Array.isArray(body.feed_ids) ? body.feed_ids : (feed_id ? [feed_id] : []),
+            Array.isArray(body.folders) ? body.folders : []
+          );
+          return { phrase: phrase(body.phrase), folders: parsed.folders, feed_ids: parsed.feed_ids, feed_id: parsed.feed_ids.length === 1 && !parsed.folders.length ? parsed.feed_ids[0] : "" };
+        };
         if (method === "PATCH") {
           const entry = entries.find(item => item.id === parts[2]);
           if (!entry) throw new Error("Filter not found.");
           if (parts[1] === "mutes") {
-            const nextPhrase = phrase(body.phrase);
-            if (!nextPhrase) throw new Error("Enter a name or phrase.");
-            if (entries.some(rule => rule.id !== entry.id && rule.phrase.toLowerCase() === nextPhrase.toLowerCase() && rule.feed_id === feed_id))
+            const next = muteBody();
+            if (!next.phrase) throw new Error("Enter a name or phrase.");
+            if (entries.some(rule => rule.id !== entry.id && rule.phrase.toLowerCase() === next.phrase.toLowerCase() && muteScopeKey(rule) === muteScopeKey(next)))
               throw new Error("That mute rule already exists.");
-            entry.phrase = nextPhrase;
-            entry.feed_id = feed_id;
+            entry.phrase = next.phrase;
+            entry.folders = next.folders;
+            entry.feed_ids = next.feed_ids;
+            entry.feed_id = next.feed_id;
           }
           return entry;
         }
         if (method !== "POST") throw new Error("Unknown filter operation.");
         if (entries.length >= 50) throw new Error("Keep at most 50 entries of each filter type.");
-        const entry = parts[1] === "mutes" ? { phrase: phrase(body.phrase), feed_id } : {
+        const entry = parts[1] === "mutes" ? muteBody() : {
           name: phrase(body.name), query: phrase(body.query), exclude: phrase(body.exclude), feed_id,
           view: ["all", "unread", "saved"].includes(body.view) ? body.view : "all",
           show_hidden: body.show_hidden === true
         };
         if (!(entry.phrase || entry.name)) throw new Error("Enter a name or phrase.");
-        if (parts[1] === "mutes" && entries.some(rule => rule.phrase.toLowerCase() === entry.phrase.toLowerCase() && rule.feed_id === feed_id))
+        if (parts[1] === "mutes" && entries.some(rule => rule.phrase.toLowerCase() === entry.phrase.toLowerCase() && muteScopeKey(rule) === muteScopeKey(entry)))
           throw new Error("That mute rule already exists.");
         entry.id = crypto.randomUUID();
         entries.push(entry);
@@ -891,7 +922,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
         if (!q && !exclude && !rules.length) return true;
         const text = `${a.title}\n${a.body}`.toLowerCase();
         return (!q || text.includes(q)) && (!exclude || !text.includes(exclude)) &&
-          !rules.some(rule => (!rule.feed_id || rule.feed_id === a.feed_id) && text.includes(rule.phrase));
+          !rules.some(rule => muteAppliesToArticle(rule, a, library.feeds) && text.includes(rule.phrase));
       }      ).sort(
         (a, b) => (b.published_at || b.received_at).localeCompare(
           a.published_at || a.received_at
@@ -1895,15 +1926,15 @@ var styles = `
 .hermes-rss .rss-nav .rss-nav-view[aria-current=true]{border-color:color-mix(in srgb,var(--ui-accent) 42%,transparent);background:color-mix(in srgb,var(--ui-accent) 14%,transparent);color:var(--ui-accent)}
 .hermes-rss .rss-nav .rss-eyebrow{padding:0 10px;margin-top:20px}.hermes-rss .rss-count{font-size:11px;font-variant-numeric:tabular-nums}
 .hermes-rss .rss-folder{margin:0 0 4px}
-.hermes-rss .rss-nav .rss-folder-header{width:100%;box-sizing:border-box;margin:0 0 2px;padding:7px 8px;border:0;border-radius:6px;background:transparent;color:var(--ui-text-secondary);font-size:11px;font-weight:650;letter-spacing:.3px;gap:6px}
-.hermes-rss .rss-nav .rss-folder-header:hover{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent);color:var(--ui-text-primary,var(--foreground))}
+.hermes-rss .rss-nav .rss-folder-header{width:100%;box-sizing:border-box;margin:0 0 4px;padding:6px 8px;border:0;border-radius:6px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent);color:var(--ui-text-tertiary);font-size:10px;font-weight:650;letter-spacing:1.5px;text-transform:uppercase;gap:6px}
+.hermes-rss .rss-nav .rss-folder-header:hover{background:color-mix(in srgb,var(--ui-accent) 16%,transparent);color:var(--ui-text-secondary)}
 .hermes-rss .rss-folder-drop .rss-folder-header,.hermes-rss .rss-nav .rss-folder-header[data-drop=true]{outline:1px dashed var(--ui-accent);outline-offset:-1px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
 .hermes-rss .rss-folder-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
 .hermes-rss .rss-folder-chevron{flex:0 0 12px;width:12px;font-size:10px;display:block;transition:transform .12s ease}
 .hermes-rss .rss-folder-chevron-open{transform:rotate(90deg)}
 .hermes-rss .rss-folder-body{display:grid;gap:0}
-.hermes-rss .rss-nav-heading{display:flex;align-items:center;padding:0 2px 0 10px;margin-top:28px;min-height:16px;width:100%;box-sizing:border-box}
-.hermes-rss .rss-nav-heading .rss-eyebrow{padding:0;margin:0;letter-spacing:.8px;white-space:nowrap;flex:1;min-width:0;line-height:1;display:flex;align-items:center}
+.hermes-rss .rss-nav-heading{display:flex;align-items:center;width:calc(100% + 20px);margin:16px -10px 8px;padding:9px 12px;min-height:32px;box-sizing:border-box;background:color-mix(in srgb,var(--ui-accent) 14%,transparent);border-radius:0}
+.hermes-rss .rss-nav-heading .rss-folders-title{padding:0;margin:0;font-size:15px;font-weight:700;letter-spacing:-.2px;color:var(--ui-text-primary,var(--foreground));white-space:nowrap;flex:1;min-width:0;line-height:1;display:flex;align-items:center}
 .hermes-rss .rss-nav .rss-edit-toggle,.hermes-rss .rss-nav-heading .rss-edit-toggle{width:16px;height:16px;padding:0;margin:0 0 0 auto;flex:0 0 16px;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);line-height:1}
 .hermes-rss .rss-edit-toggle .codicon{font-size:9px;line-height:1;display:block}
 .hermes-rss .rss-edit-toggle[aria-pressed=true]{color:var(--ui-accent)}
@@ -1968,8 +1999,12 @@ var styles = `
 .hermes-rss .rss-settings-header:not(:first-child){margin-top:14px;padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
 .hermes-rss .rss-setting-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 .hermes-rss .rss-setting-row .rss-setting{margin:0}
-.hermes-rss .rss-setting-inline{display:inline-flex;align-items:center;gap:8px}
+.hermes-rss .rss-setting-inline{display:inline-flex;align-items:center;gap:8px;flex-wrap:nowrap}
 .hermes-rss .rss-setting-inline input[type=number]{width:74px}
+.hermes-rss .rss-skill-field{display:flex;flex-direction:row;align-items:center;gap:8px;flex-wrap:nowrap;flex:1;min-width:0}
+.hermes-rss .rss-skill-field span{flex:0 0 auto;white-space:nowrap}
+.hermes-rss .rss-skill-field input{flex:1;min-width:0;width:auto}
+.hermes-rss .rss-settings input:not([type=checkbox]),.hermes-rss .rss-filter-panel input:not([type=checkbox]){border:1px solid var(--ui-stroke-secondary);border-radius:5px;background:transparent;color:inherit;box-shadow:none}
 .hermes-rss .rss-tabs-pills{display:inline-flex;gap:14px;margin:0;border:0;padding:0;justify-self:center}
 .hermes-rss .rss-tabs-pills button{border:0;background:transparent;border-radius:0;padding:2px 0;font-size:12px;line-height:1.4;color:var(--ui-text-secondary)}
 .hermes-rss .rss-tabs-pills button[aria-selected=true]{border-bottom:2px solid var(--ui-accent);background:transparent;color:var(--ui-text-primary,var(--foreground))}
@@ -2019,11 +2054,24 @@ var styles = `
 .hermes-rss .rss-settings-grid > .rss-settings-block:nth-child(2),.hermes-rss .rss-settings-grid > .rss-settings-block:nth-child(4){padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
 @media(max-width:760px){.hermes-rss .rss-settings-grid{grid-template-columns:1fr;grid-auto-flow:row;grid-template-rows:none}.hermes-rss .rss-settings-grid > .rss-settings-block:nth-child(n){padding-top:0;border-top:0}.hermes-rss .rss-settings-grid > .rss-settings-block:not(:first-child){padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}}
 .hermes-rss .rss-settings-library{display:grid;gap:12px;padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
-.hermes-rss .rss-filter-panel{padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);max-height:36vh;overflow:auto;flex-shrink:0}
+.hermes-rss .rss-filter-panel{padding:12px 20px;border-bottom:1px solid var(--ui-stroke-secondary);overflow:visible;flex-shrink:0}
 .hermes-rss .rss-mute-grid{display:grid;grid-template-columns:minmax(200px,.85fr) minmax(280px,1.25fr);gap:12px 18px;align-items:start}
 .hermes-rss .rss-mute-form{display:grid;gap:8px;align-content:start}
+.hermes-rss .rss-mute-create-row{display:flex;align-items:center;gap:8px;min-width:0}
+.hermes-rss .rss-mute-create-row input{flex:1;min-width:0}
+.hermes-rss .rss-picker{position:relative;flex:1;min-width:132px}
+.hermes-rss .rss-picker-toggle{width:100%;box-sizing:border-box;height:26px;margin:0;padding:4px 8px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;background:transparent;color:var(--ui-text-primary,var(--foreground));display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left}
+.hermes-rss .rss-picker-value{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hermes-rss .rss-picker-menu{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;max-height:240px;overflow:auto;padding:4px 0;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:var(--ui-bg-elevated,var(--ui-bg-primary,var(--background)));box-shadow:0 10px 24px color-mix(in srgb,#000 22%,transparent)}
+.hermes-rss .rss-picker-section{padding:2px 0}
+.hermes-rss .rss-filter-panel .rss-picker-toggle{height:26px;padding:4px 8px}
+.hermes-rss .rss-filter-panel .rss-picker-row{height:auto;min-height:0;padding:5px 10px;margin:0;width:100%;border:0;border-radius:0;background:transparent;color:inherit;display:flex;align-items:center;gap:8px;text-align:left;font-size:12px}
+.hermes-rss .rss-picker-row:hover{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent)}
+.hermes-rss .rss-picker-folder{font-weight:650}
+.hermes-rss .rss-picker-feed{padding-left:22px;font-weight:400}
+.hermes-rss .rss-picker-row input{accent-color:var(--ui-accent);margin:0}
 .hermes-rss .rss-mute-form .rss-tools{flex-wrap:wrap}
-.hermes-rss .rss-mute-table-wrap{overflow:auto;min-width:0;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:color-mix(in srgb,var(--ui-text-secondary) 4%,transparent)}
+.hermes-rss .rss-mute-table-wrap{overflow:auto;max-height:28vh;min-width:0;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:color-mix(in srgb,var(--ui-text-secondary) 4%,transparent)}
 .hermes-rss .rss-mute-table{width:100%;border-collapse:collapse;font-size:12px}
 .hermes-rss .rss-mute-table th{text-align:left;font-weight:650;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-text-tertiary);padding:7px 10px;background:color-mix(in srgb,var(--ui-text-secondary) 7%,transparent)}
 .hermes-rss .rss-mute-table td{padding:6px 10px;border-top:1px solid var(--ui-stroke-secondary);vertical-align:middle}
@@ -2108,17 +2156,142 @@ function feedDropIndex(list, draggingId, feedId, isAfter) {
   const base = rest.findIndex((feed) => feed.id === feedId);
   return base < 0 ? null : base + (isAfter ? 1 : 0);
 }
-function muteHitCount(articles, rule) {
+function muteScope(rule) {
+  const folders = Array.isArray(rule?.folders) ? rule.folders.map((key) => String(key)) : [];
+  const feedIds = Array.isArray(rule?.feed_ids)
+    ? rule.feed_ids.filter((id) => typeof id === "string" && id)
+    : (rule?.feed_id ? [rule.feed_id] : []);
+  return { folders, feedIds };
+}
+function compactMuteScope(feeds, feedIds, folders) {
+  const selectedFeeds = new Set(Array.isArray(feedIds) ? feedIds : []);
+  const selectedFolders = new Set(Array.isArray(folders) ? folders : []);
+  const nextFolders = [];
+  const nextFeeds = [];
+  for (const group of groupFeedsByFolder(feeds)) {
+    const every = group.feeds.length > 0 && group.feeds.every((feed) => selectedFeeds.has(feed.id));
+    if (selectedFolders.has(group.key) || every) nextFolders.push(group.key);
+    else {
+      for (const feed of group.feeds) if (selectedFeeds.has(feed.id)) nextFeeds.push(feed.id);
+    }
+  }
+  return { folders: nextFolders, feed_ids: nextFeeds };
+}
+function muteAppliesToArticle(rule, article, feeds) {
+  const { folders, feedIds } = muteScope(rule);
+  if (!folders.length && !feedIds.length) return true;
+  if (feedIds.includes(article.feed_id)) return true;
+  const feed = (Array.isArray(feeds) ? feeds : []).find((item) => item.id === article.feed_id);
+  return !!(feed && folders.includes(folderOf(feed)));
+}
+function muteScopeLabel(rule, feeds) {
+  const compact = compactMuteScope(feeds, muteScope(rule).feedIds, muteScope(rule).folders);
+  if (!compact.folders.length && !compact.feed_ids.length) return "All feeds";
+  const names = compact.folders.map((key) => folderTitle(key));
+  const byId = new Map((Array.isArray(feeds) ? feeds : []).map((feed) => [feed.id, feed]));
+  for (const id of compact.feed_ids) names.push(byId.get(id)?.title || "Removed feed");
+  if (names.length <= 2) return names.join(", ");
+  return `${names[0]} +${names.length - 1}`;
+}
+function muteScopeKey(rule) {
+  const { folders, feedIds } = muteScope(rule);
+  return `${[...folders].sort().join("\n")}|${[...feedIds].sort().join("\n")}`;
+}
+function muteHitCount(articles, rule, feeds) {
   const phrase = String(rule?.phrase || "").toLowerCase();
   if (!phrase) return 0;
-  const feedId = rule.feed_id || "";
   let hits = 0;
   for (const article of Array.isArray(articles) ? articles : []) {
-    if (feedId && article.feed_id !== feedId) continue;
+    if (!muteAppliesToArticle(rule, article, feeds)) continue;
     const text = `${article.title || ""}\n${article.body || ""}`.toLowerCase();
     if (text.includes(phrase)) hits++;
   }
   return hits;
+}
+function MuteFeedPicker({ feeds, feedIds, folders, onChange }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (event) => {
+      if (root.current && !root.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
+  }, [open]);
+  const selectedFeeds = new Set(feedIds || []);
+  const selectedFolders = new Set(folders || []);
+  const groups = groupFeedsByFolder(feeds);
+  const summary = muteScopeLabel({ feed_ids: feedIds, folders }, feeds);
+  const toggleFolder = (group) => {
+    const ids = group.feeds.map((feed) => feed.id);
+    const on = selectedFolders.has(group.key) || (ids.length > 0 && ids.every((id) => selectedFeeds.has(id)));
+    if (on) onChange({ feedIds: (feedIds || []).filter((id) => !ids.includes(id)), folders: (folders || []).filter((key) => key !== group.key) });
+    else onChange({ feedIds: [...new Set([...(feedIds || []), ...ids])], folders: [...new Set([...(folders || []), group.key])] });
+  };
+  const toggleFeed = (feed) => {
+    const nextFeeds = selectedFeeds.has(feed.id)
+      ? (feedIds || []).filter((id) => id !== feed.id)
+      : [...(feedIds || []), feed.id];
+    const group = groups.find((item) => item.key === folderOf(feed));
+    const ids = group ? group.feeds.map((item) => item.id) : [];
+    const allOn = ids.length > 0 && ids.every((id) => nextFeeds.includes(id));
+    const nextFolders = allOn
+      ? [...new Set([...(folders || []), folderOf(feed)])]
+      : (folders || []).filter((key) => key !== folderOf(feed));
+    onChange({ feedIds: nextFeeds, folders: nextFolders });
+  };
+  return jsxs("div", { className: "rss-picker", ref: root, children: [
+    jsxs("button", {
+      type: "button",
+      className: "rss-picker-toggle",
+      "aria-haspopup": "listbox",
+      "aria-expanded": open,
+      "aria-label": "Mute rule feeds",
+      title: summary,
+      onClick: () => setOpen(!open),
+      children: [
+        jsx("span", { className: "rss-picker-value", children: summary }),
+        jsx("i", { className: "codicon codicon-chevron-down", "aria-hidden": "true" })
+      ]
+    }),
+    open && jsx("div", { className: "rss-picker-menu", role: "listbox", children: [
+      jsxs("button", {
+        type: "button",
+        className: "rss-picker-row rss-picker-folder",
+        onClick: () => { onChange({ feedIds: [], folders: [] }); setOpen(false); },
+        children: [
+          jsx("input", { type: "checkbox", tabIndex: -1, readOnly: true, checked: !feedIds?.length && !folders?.length }),
+          jsx("span", { children: "All feeds" })
+        ]
+      }),
+      groups.map((group) => {
+        const ids = group.feeds.map((feed) => feed.id);
+        const allOn = selectedFolders.has(group.key) || (ids.length > 0 && ids.every((id) => selectedFeeds.has(id)));
+        const some = !allOn && ids.some((id) => selectedFeeds.has(id));
+        return jsxs("div", { className: "rss-picker-section", children: [
+          jsxs("button", {
+            type: "button",
+            className: "rss-picker-row rss-picker-folder",
+            onClick: () => toggleFolder(group),
+            children: [
+              jsx("input", { type: "checkbox", tabIndex: -1, readOnly: true, checked: allOn, ref: (node) => { if (node) node.indeterminate = some; } }),
+              jsx("span", { children: group.title })
+            ]
+          }),
+          group.feeds.map((feed) => jsxs("button", {
+            type: "button",
+            className: "rss-picker-row rss-picker-feed",
+            onClick: () => toggleFeed(feed),
+            children: [
+              jsx("input", { type: "checkbox", tabIndex: -1, readOnly: true, checked: selectedFeeds.has(feed.id) || selectedFolders.has(group.key) }),
+              jsx("span", { children: feed.title })
+            ]
+          }, feed.id))
+        ] }, group.key || "ungrouped");
+      })
+    ] })
+  ] });
 }
 function folderOf(feed) {
   return String(feed?.folder || "");
@@ -2194,7 +2367,8 @@ function ReaderProfile({ ctx, owner }) {
   const [searchDrawerOpen, setSearchDrawerOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [mutePhrase, setMutePhrase] = useState("");
-  const [muteFeed, setMuteFeed] = useState("");
+  const [muteFeeds, setMuteFeeds] = useState([]);
+  const [muteFolders, setMuteFolders] = useState([]);
   const [editingMute, setEditingMute] = useState(null);
   const [tab, setTab] = useState("article");
   const [adding, setAdding] = useState(false);
@@ -2252,6 +2426,20 @@ function ReaderProfile({ ctx, owner }) {
   });
   const article = detail.data;
   const refresh = () => client.invalidateQueries({ queryKey: key });
+  useEffect(() => {
+    if (!articles.data?.length || storageGet(ctx, "gradePreview", owner, false)) return undefined;
+    const grades = designPreviewGrades(articles.data);
+    if (!grades.length) return undefined;
+    storageSet(ctx, "gradePreview", owner, true);
+    void libraryRequest("/articles/grades", { method: "POST", body: { grades } }).then((result) => {
+      refresh();
+      setNotice(`Design preview: ${result?.applied || grades.length} posts tagged so you can judge the tints.`);
+    }).catch((error) => {
+      storageSet(ctx, "gradePreview", owner, false);
+      console.warn("[rss-reader] grade preview failed", error);
+    });
+    return undefined;
+  }, [articles.data]);
   useEffect(() => {
     const changed = event => {
       if (event.detail?.owner === owner) {
@@ -2322,18 +2510,22 @@ function ReaderProfile({ ctx, owner }) {
   const addMute = event => {
     event.preventDefault();
     void act(editingMute ? "Saving mute rule…" : "Adding mute rule…", async () => {
+      const scope = compactMuteScope(feeds.data || [], muteFeeds, muteFolders);
+      const body = { phrase: mutePhrase, folders: scope.folders, feed_ids: scope.feed_ids };
       if (editingMute)
-        await libraryRequest(`/filters/mutes/${editingMute}`, { method: "PATCH", body: { phrase: mutePhrase, feed_id: muteFeed } });
+        await libraryRequest(`/filters/mutes/${editingMute}`, { method: "PATCH", body });
       else
-        await libraryRequest("/filters/mutes", { method: "POST", body: { phrase: mutePhrase, feed_id: muteFeed } });
-      setMutePhrase(""); setMuteFeed(""); setEditingMute(null); setLimit(100); setSelected(null);
+        await libraryRequest("/filters/mutes", { method: "POST", body });
+      setMutePhrase(""); setMuteFeeds([]); setMuteFolders([]); setEditingMute(null); setLimit(100); setSelected(null);
       setNotice(editingMute ? "Mute rule updated." : "Mute rule added. Articles stay in your library."); publishLibraryChange(owner);
     });
   };
   const startEditMute = rule => {
+    const scope = muteScope(rule);
     setEditingMute(rule.id);
     setMutePhrase(rule.phrase);
-    setMuteFeed(rule.feed_id || "");
+    setMuteFeeds(scope.feedIds);
+    setMuteFolders(scope.folders);
     setFiltersOpen(true);
   };
   const removeFilter = (type, id) => act("Removing filter…", async () => {
@@ -2686,20 +2878,18 @@ function ReaderProfile({ ctx, owner }) {
         })
       ] })
     ] }),
-    filtersOpen && jsxs("div", { className: "rss-filter-panel", "aria-label": "Mute rules", children: [
+    filtersOpen && jsxs("div", { className: "rss-filter-panel", "aria-label": "Mute Rules", children: [
       jsxs("div", { className: "rss-mute-grid", children: [
         jsxs("div", { className: "rss-mute-form", children: [
-          jsx("h2", { className: "rss-settings-header", children: "Mute rules" }),
-          jsx("p", { className: "rss-muted rss-small", children: "Hides matches in every view. Unread counts still include them." }),
+          jsx("h2", { className: "rss-settings-header", children: "Mute Rules" }),
           jsxs("form", { className: "rss-stack", onSubmit: addMute, children: [
-            jsx(Input, { "aria-label": "Mute phrase", placeholder: "e.g. coupon", value: mutePhrase, maxLength: 200, required: true, onChange: event => setMutePhrase(event.target.value) }),
-            jsxs("select", { "aria-label": "Mute rule feed", value: muteFeed, onChange: event => setMuteFeed(event.target.value), children: [
-              jsx("option", { value: "", children: "All feeds" }),
-              (feeds.data || []).map(feed => jsx("option", { value: feed.id, children: feed.title }, feed.id))
+            jsxs("div", { className: "rss-mute-create-row", children: [
+              jsx(Input, { "aria-label": "Mute phrase", placeholder: "e.g. coupon", value: mutePhrase, maxLength: 200, required: true, onChange: event => setMutePhrase(event.target.value) }),
+              jsx(MuteFeedPicker, { feeds: feeds.data || [], feedIds: muteFeeds, folders: muteFolders, onChange: ({ feedIds, folders }) => { setMuteFeeds(feedIds); setMuteFolders(folders); } })
             ] }),
             jsxs("div", { className: "rss-tools", children: [
               jsx(Button, { type: "submit", disabled: disabled || !mutePhrase.trim() || filters.isPending || !!filters.error, children: editingMute ? "Save rule" : "Add mute" }),
-              editingMute && jsx(Button, { type: "button", variant: "ghost", onClick: () => { setEditingMute(null); setMutePhrase(""); setMuteFeed(""); }, children: "Cancel" })
+              editingMute && jsx(Button, { type: "button", variant: "ghost", onClick: () => { setEditingMute(null); setMutePhrase(""); setMuteFeeds([]); setMuteFolders([]); }, children: "Cancel" })
             ] })
           ] })
         ] }),
@@ -2707,12 +2897,12 @@ function ReaderProfile({ ctx, owner }) {
           mutes.length ? jsxs("table", { className: "rss-mute-table", children: [
             jsx("thead", { children: jsxs("tr", { children: [
               jsx("th", { children: "Phrase" }),
-              jsx("th", { children: "Feed" }),
+              jsx("th", { children: "Feeds" }),
               jsx("th", { children: "" })
             ] }) }),
             jsx("tbody", { children: mutes.map(rule => jsxs("tr", { children: [
               jsx("td", { className: "rss-mute-phrase", children: rule.phrase }),
-              jsx("td", { className: "rss-mute-feed", title: rule.feed_id ? ((feeds.data || []).find(feed => feed.id === rule.feed_id)?.title || "Removed feed") : "All feeds", children: rule.feed_id ? ((feeds.data || []).find(feed => feed.id === rule.feed_id)?.title || "Removed feed") : "All feeds" }),
+              jsx("td", { className: "rss-mute-feed", title: muteScopeLabel(rule, feeds.data || []), children: muteScopeLabel(rule, feeds.data || []) }),
               jsx("td", { children: jsxs("div", { className: "rss-mute-actions", children: [
                 jsx("button", { type: "button", className: "rss-mute-icon", disabled, title: "Edit rule", "aria-label": `Edit mute rule ${rule.phrase}`, onClick: () => startEditMute(rule), children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) }),
                 jsx("span", { className: "rss-mute-hits", title: `${rule.hits || 0} articles hidden right now`, children: rule.hits || 0 }),
@@ -2774,8 +2964,8 @@ function ReaderProfile({ ctx, owner }) {
             ] }),
             jsx("p", { className: "rss-muted rss-small", children: "After a refresh, every ungraded article goes to the auxiliary model in one batch and the list tints when the answer arrives. Nothing is sent while this is off." }),
             jsxs("div", { className: "rss-setting-row", children: [
-              jsxs("label", { className: "rss-setting rss-setting-inline", children: [
-                "Preference skill",
+              jsxs("label", { className: "rss-skill-field", children: [
+                jsx("span", { children: "Preference skill" }),
                 jsx(Input, { "aria-label": "Grading preference skill name", placeholder: DEFAULT_GRADING_SKILL, value: draft.gradingSkill, maxLength: 60, onChange: event => setDraft({ ...draft, gradingSkill: event.target.value }) })
               ] }),
               jsx(Button, { type: "button", disabled: disabled || !articles.data?.length, onClick: gradeNow, children: "Grade" })
@@ -2884,7 +3074,7 @@ function ReaderProfile({ ctx, owner }) {
         searches.length > 0 && jsx("div", { className: "rss-eyebrow", children: "Saved searches" }),
         searches.map(search => jsx("button", { onClick: () => openSearch(search), title: search.name, children: jsx("span", { className: "rss-feed-name", children: search.name }) }, search.id)),
         jsxs("div", { className: "rss-nav-heading", children: [
-          jsx("div", { className: "rss-eyebrow", children: "Folders" }),
+          jsx("div", { className: "rss-folders-title", children: "Folders" }),
           jsx("button", { type: "button", className: "rss-edit-toggle", "aria-pressed": reorderMode, "aria-label": reorderMode ? "Exit edit mode" : "Edit folders", title: reorderMode ? "Exit edit mode" : "Edit folders", onClick: () => setReorderMode(!reorderMode), children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) })
         ] }),
         groupedFeeds.map((group) => {

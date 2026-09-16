@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("muteHitCount")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount")].join("\n");
 const fns = {};
 new Function("exports", `${bundle}
 exports.profileFromOwner = profileFromOwner;
@@ -30,6 +30,9 @@ exports.folderOf = folderOf;
 exports.folderTitle = folderTitle;
 exports.groupFeedsByFolder = groupFeedsByFolder;
 exports.previewNavFeeds = previewNavFeeds;
+exports.muteScope = muteScope;
+exports.compactMuteScope = compactMuteScope;
+exports.muteAppliesToArticle = muteAppliesToArticle;
 exports.muteHitCount = muteHitCount;
 `)(fns);
 
@@ -65,5 +68,11 @@ assert.equal(fns.muteHitCount([
   { title: "News", body: "plain", feed_id: "a" },
   { title: "Coupon", body: "ok", feed_id: "b" }
 ], { phrase: "coupon", feed_id: "a" }), 1);
+assert.equal(fns.muteAppliesToArticle({ folders: ["AI"] }, { feed_id: "1" }, [{ id: "1", folder: "AI" }]), true);
+assert.equal(fns.compactMuteScope(
+  [{ id: "1", folder: "AI" }, { id: "2", folder: "AI" }],
+  ["1", "2"],
+  []
+).folders.join(","), "AI");
 
-console.log("ok", 17);
+console.log("ok", 19);
