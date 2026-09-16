@@ -1101,9 +1101,8 @@ var styles = `
 .hermes-rss .rss-tabs-pills button{border:0;background:transparent;border-radius:0;padding:2px 0;font-size:12px;line-height:1.4;color:var(--ui-text-secondary)}
 .hermes-rss .rss-tabs-pills button[aria-selected=true]{border-bottom:2px solid var(--ui-accent);background:transparent;color:var(--ui-text-primary,var(--foreground))}
 .hermes-rss .rss-list-items{overflow:auto;flex:1;padding:8px}
-.hermes-rss .rss-card{display:block;width:100%;border:1px solid transparent;background:transparent;color:inherit;text-align:left;padding:18px 14px;border-radius:8px;margin-bottom:3px;outline:none}
-.hermes-rss .rss-card:focus:not(:focus-visible){outline:none}
-.hermes-rss .rss-card:focus-visible{outline:2px solid var(--ui-accent);outline-offset:-2px}
+.hermes-rss .rss-card{display:block;width:100%;border:1px solid transparent;background:transparent;color:inherit;text-align:left;padding:18px 14px;border-radius:8px;margin-bottom:3px;outline:none;box-shadow:none}
+.hermes-rss .rss-list-items button.rss-card:focus,.hermes-rss .rss-list-items button.rss-card:focus-visible{outline:none;box-shadow:none;outline-offset:0}
 .hermes-rss .rss-card:hover{background:color-mix(in srgb,var(--ui-text-secondary) 5%,transparent)}
 .hermes-rss .rss-card[aria-selected=true]{background:color-mix(in srgb,var(--ui-accent) 7%,transparent);border-color:color-mix(in srgb,var(--ui-accent) 24%,transparent)}
 .hermes-rss .rss-card-read .rss-card-title{color:var(--ui-text-secondary);font-weight:500}
@@ -1378,6 +1377,8 @@ function ReaderProfile({ ctx, owner }) {
         const item = list[next];
         if (item) {
           event.preventDefault();
+          const focused = document.activeElement;
+          if (focused && focused.classList && focused.classList.contains("rss-card")) focused.blur();
           openArticle(item);
           requestAnimationFrame(() => {
             const scroller = document.querySelector(".hermes-rss .rss-list-items");
