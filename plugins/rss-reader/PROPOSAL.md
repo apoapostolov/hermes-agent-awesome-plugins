@@ -34,7 +34,14 @@ Discuss is one post at a time. Missing: a morning/interval digest (“what lande
 
 ### 3. Memory of taste
 
-Mute phrases are manual. Missing: “more like this / less like this” on a card that updates a taste profile (feeds, authors, topics) and reranks the list. Store the profile next to settings, not in chat history.
+First cut is shipped: Settings **Preference Report** exports saved vs
+read vs mute stats to `%LOCALAPPDATA%/hermes/rss-reader/saved.json` and a
+review markdown next to it. Hermes can read those files. The report does
+not edit `rss-reader-grading`.
+
+Still missing: “more like this / less like this” on a card. That later
+slice writes the same files and the same rubric suggestions. Do not add a
+second taste profile.
 
 ### 4. Capture that informs the model
 

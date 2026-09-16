@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot")].join("\n");
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -51,6 +51,7 @@ exports.sortArticlesByImportance = sortArticlesByImportance;
 exports.refreshButtonLabel = refreshButtonLabel;
 exports.normalizeFolderName = normalizeFolderName;
 exports.applyFolderAction = applyFolderAction;
+exports.buildPreferenceSnapshot = buildPreferenceSnapshot;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -137,5 +138,17 @@ fns.applyFolderAction(lib, { action: "delete", from: "ML", dest: "" });
 assert.equal(lib.feeds[0].folder, "");
 const extras = fns.groupFeedsByFolder(lib.feeds, ["Empty"]);
 assert.equal(extras.some((g) => g.key === "Empty" && g.feeds.length === 0), true);
+const snap = fns.buildPreferenceSnapshot({
+  feeds: [{ id: "1", title: "AI News", folder: "AI" }],
+  articles: [
+    { id: "a", feed_id: "1", title: "Keep", is_saved: true, is_read: true, body: "<p>Hello</p>", url: "https://example.com/a" },
+    { id: "b", feed_id: "1", title: "Skip", is_saved: false, is_read: false, body: "x" }
+  ],
+  filters: { mutes: [{ phrase: "crypto", folders: ["AI"], hits: 2 }] }
+});
+assert.equal(snap.saved_count, 1);
+assert.equal(snap.saved[0].title, "Keep");
+assert.equal(snap.feeds[0].unread, 1);
+assert.equal(snap.mutes[0].phrase, "crypto");
 
-console.log("ok", 26);
+console.log("ok", 27);

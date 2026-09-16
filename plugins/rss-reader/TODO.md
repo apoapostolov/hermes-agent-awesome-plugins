@@ -28,6 +28,12 @@ the code audit in `AUDIT.md`.
   `rss-importance-grading` still maps). Pills and card tints from the skill
   tag table. Grades cache by url/identity and are not sent again. Order by
   Importance sorts by tag rank 0-100, then date.
+- **Saved set for Hermes.** Settings **Preference Report** writes
+  `%LOCALAPPDATA%/hermes/rss-reader/saved.json` (saved titles, per-feed
+  saved/read/unread, mutes) and `preference-report.md`. The report suggests
+  rubric edits. It does not edit the skill. This is the first cut of taste
+  memory in `PROPOSAL.md` §3. Card "more like this" later writes the same
+  files. Do not add a second profile.
 - **Load More and list jump.** Load More stays centered and does not reset
   the middle column. Past the twentieth card, a square arrow jumps to the top
   and can return.
@@ -36,28 +42,7 @@ the code audit in `AUDIT.md`.
 
 ## Still open
 
-Audit against the live plugin. Only leftover items from this file.
-
-### 1. Saved → Hermes preference analysis
-
-**Status:** not started. Saved works in-app; Hermes cannot see it.
-
-`is_saved` is live: star on the card and article pane, `saved` view, saved
-posts survive unsubscribe and the 300-post trim. Nothing outside the plugin
-reads that set.
-
-Still missing:
-
-- Expose the saved set to Hermes. The library is one IndexedDB blob
-  (`hermes-rss-library`, store `libraries`, keyed per profile). A skill cannot
-  read it. Needs an export path (saved articles as JSON through the plugin
-  shell bridge) or a Hermes-side reader for that store.
-- Preference analysis: turn saved vs read vs ignored into a profile (feeds,
-  authors, topics, mute history) and feed it into grading. The rubric lives in
-  `rss-reader-grading`. First cut should be a review report, not an unattended
-  skill edit.
-- Decide whether this is the same system as “more like this / less like this”
-  in `PROPOSAL.md` §3, or two systems. Do not build both.
+Nothing left from this file. New AI-first slices go in `PROPOSAL.md` first.
 
 ---
 
