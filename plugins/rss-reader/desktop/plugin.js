@@ -21,7 +21,7 @@ function rssDebug(event, details = {}) {
       const text = typeof value === "string" ? value : JSON.stringify(value);
       safe[key] = String(text || "").slice(0, 1200);
     }
-    console.error(`${RSS_DEBUG_PREFIX} ${event}`, { at: new Date().toISOString(), ...safe });
+    console.error(`${RSS_DEBUG_PREFIX} ${event} ${JSON.stringify({ at: new Date().toISOString(), ...safe })}`);
   } catch {
     console.error(`${RSS_DEBUG_PREFIX} ${event}`);
   }
@@ -3079,11 +3079,19 @@ function ReaderProfile({ ctx, owner }) {
     [owner]
   );
   const libraryRequest = async (...args) => {
-    if (currentOwner(host) !== owner)
-      throw new Error(
-        "Profile changed. Return to the original profile to continue."
-      );
-    return library(...args);
+    const [path, options = {}] = args;
+    const method = options?.method || "GET";
+    rssDebug("library-request-start", { owner, path, method });
+    try {
+      if (currentOwner(host) !== owner)
+        throw new Error("Profile changed. Return to the original profile to continue.");
+      const result = await library(...args);
+      rssDebug("library-request-result", { owner, path, method, result });
+      return result;
+    } catch (error) {
+      rssDebug("library-request-error", { owner, path, method, message: error?.message || error, stack: error?.stack || "" });
+      throw error;
+    }
   };
   const client = useQueryClient();
   const [view, setView] = useState(() => normalizeDefaultView(readSettings(ctx, owner).defaultView));
@@ -3328,10 +3336,13 @@ function ReaderProfile({ ctx, owner }) {
     });
   };
   const refreshFeeds = async () => {
-    const result = await refreshSubscriptions(libraryRequest, {
-      feedId,
-      shouldContinue: () => currentOwner(host) === owner
-    });
+    rssDebug("ui-refresh-start", { owner, feedId, feedCount: feeds.data?.length || 0 });
+    try {
+      const result = await refreshSubscriptions(libraryRequest, {
+        feedId,
+        shouldContinue: () => currentOwner(host) === owner
+      });
+      rssDebug("ui-refresh-result", { owner, feedId, added: result.added, failed: result.failed, fresh: result.fresh?.length || 0 });
     if (!feedId) {
       const at = Date.now();
       storageSet(ctx, "lastRefresh", owner, at);
@@ -3349,6 +3360,10 @@ function ReaderProfile({ ctx, owner }) {
       else grade();
     }
     setNotice(`${result.added} new articles${result.failed ? ` · ${result.failed} feeds could not refresh. Select a feed for details.` : " · Up to date."}${queued ? ` · Capturing ${queued} in the background.` : ""}`);
+    } catch (error) {
+      rssDebug("ui-refresh-error", { owner, feedId, message: error?.message || error, stack: error?.stack || "" });
+      throw error;
+    }
   };
   const markAllRead = () => act("Marking read…", async () => {
     const result = await libraryRequest("/articles/read-all", { method: "POST", body: { feed_id: feedId } });
