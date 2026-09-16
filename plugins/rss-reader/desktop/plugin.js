@@ -2122,6 +2122,7 @@ var styles = `
 .hermes-rss .rss-top{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-bottom:1px solid var(--ui-stroke-secondary);gap:12px}
 .hermes-rss h1{font-size:24px;letter-spacing:-.8px;font-weight:650;margin:0 0 5px}.hermes-rss h2{font-size:20px;letter-spacing:-.4px;line-height:1.4;margin:0 0 12px}
 .hermes-rss .rss-top h1{font-size:15px;letter-spacing:-.2px;margin:0;line-height:1.3}
+.hermes-rss .rss-top-title{display:flex;align-items:center;gap:8px;min-width:0}
 .hermes-rss .rss-top .rss-tools{gap:6px}
 .hermes-rss .rss-top .rss-tools button{padding:4px 10px;font-size:12px;height:26px;min-height:0;line-height:1.2;display:inline-flex;align-items:center;gap:6px}
 .hermes-rss .rss-top .rss-source-link{display:inline-flex;align-items:center;color:var(--ui-text-quaternary,var(--ui-text-tertiary));line-height:1}
@@ -2359,6 +2360,7 @@ html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 var ID = "hermes-rss-reader";
 var SOURCE_URL = "https://github.com/apoapostolov/hermes-agent-awesome-plugins";
+// Personal GitHub promo for Apo's pack. Never include this logo or link in PRs to other projects.
 var labels = {
   supported: "Supported by retrieved evidence",
   conflicting: "Conflicting evidence",
@@ -3353,9 +3355,22 @@ function ReaderProfile({ ctx, owner }) {
   return /* @__PURE__ */ jsxs("section", { className: "hermes-rss", "aria-label": "RSS reader", children: [
     /* @__PURE__ */ jsx("style", { children: styles }),
     /* @__PURE__ */ jsxs("header", { className: "rss-top", children: [
-      /* @__PURE__ */ jsx("div", { children:
-        /* @__PURE__ */ jsx("h1", { children: "RSS Reader" })
-      }),
+      /* @__PURE__ */ jsxs("div", { className: "rss-top-title", children: [
+        /* @__PURE__ */ jsx("h1", { children: "RSS Reader" }),
+        /* @__PURE__ */ jsx("a", {
+          href: SOURCE_URL,
+          title: "Source on GitHub",
+          "aria-label": "Source on GitHub",
+          target: "_blank",
+          rel: "noreferrer",
+          onClick: (event) => {
+            event.preventDefault();
+            ctx.os.openExternal(SOURCE_URL);
+          },
+          className: "rss-source-link",
+          children: /* @__PURE__ */ jsx(Codicon, { name: "github", size: "0.7rem" })
+        })
+      ] }),
       /* @__PURE__ */ jsxs("div", { className: "rss-tools", children: [
         /* @__PURE__ */ jsxs(
           Button,
@@ -3371,20 +3386,7 @@ function ReaderProfile({ ctx, owner }) {
         ),
         jsxs(Button, { variant: "ghost", "aria-expanded": filtersOpen, onClick: () => setFiltersOpen(!filtersOpen), children: [jsx(Codicon, { name: "filter", size: "0.7rem" }), "Filters"] }),
         jsxs(Button, { variant: "ghost", "aria-expanded": settingsOpen, onClick: () => { setDraft(readSettings(ctx, owner)); setSettingsOpen(!settingsOpen); }, children: [jsx(Codicon, { name: "settings-gear", size: "0.7rem" }), "Settings"] }),
-        /* @__PURE__ */ jsx(Button, { onClick: () => setAdding(!adding), disabled, children: "+ Subscribe" }),
-        /* @__PURE__ */ jsx("a", {
-          href: SOURCE_URL,
-          title: "Source on GitHub",
-          "aria-label": "Source on GitHub",
-          target: "_blank",
-          rel: "noreferrer",
-          onClick: (event) => {
-            event.preventDefault();
-            ctx.os.openExternal(SOURCE_URL);
-          },
-          className: "rss-source-link",
-          children: /* @__PURE__ */ jsx(Codicon, { name: "github", size: "0.7rem" })
-        })
+        /* @__PURE__ */ jsx(Button, { onClick: () => setAdding(!adding), disabled, children: "+ Subscribe" })
       ] })
     ] }),
     filtersOpen && jsxs("div", { className: "rss-filter-panel", "aria-label": "Mute Rules", children: [
