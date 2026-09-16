@@ -1,80 +1,119 @@
+![Hermes Agent](https://raw.githubusercontent.com/NousResearch/hermes-agent/main/assets/banner.png)
+
 # Hermes Agent Awesome Plugins
 
-A Hermes Agent plugin pack. Eleven plugins live in this repo. Pack pins in `hermes-pack.yaml` are exact SHAs. Install the pack, not a GitHub Release.
+**Small plugins for a more capable Hermes Desktop.**
 
-Requires Hermes Agent **0.21.0** or newer (shareable plugin packs).
+[Install the pack](#install) · [Explore the plugins](#the-pack) · [Understand how it works](#how-it-works)
 
-## What's New in 1.10.3
+[![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-0.21.0%2B-6f42c1)](https://github.com/NousResearch/hermes-agent)
+[![Plugins](https://img.shields.io/badge/plugins-11-2ea44f)](#the-pack)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**RSS Reader** 1.0.1 adds `/rss` commands for refresh, refresh-period settings, feed-wide mutes, session-based grading refinement, and website/feed discovery when adding subscriptions.
+## A better Hermes Desktop, one useful capability at a time
 
-**Memory-Review** 1.2.1: over-budget rows can start a consolidation round. Meters read live store use when the dialog opens.
+This is a maintained community pack of Hermes Agent plugins. Each plugin solves one focused desktop problem: provider visibility, session control, reading, memory review, or interface polish.
 
-See [CHANGELOG.md](CHANGELOG.md) for the notes.
+The pack is pinned and reproducible. Every entry in `hermes-pack.yaml` identifies a repository, subdirectory, and exact commit. Install the pack when you want the collection, or open an individual plugin README when you want one capability.
 
-## Plugins
+## The pack
 
-| Plugin | What it does |
+| Plugin | What it gives you |
 | --- | --- |
-| [provider‑status](plugins/provider-status/README.md) | Unified multi-provider quota usage tracking in the status bar, with support for OAuth, color-based warnings, and multiple accounts per provider with Hermes key rotation on exhaust. |
-| [intelligent-tool-break](plugins/intelligent-tool-break/README.md) | Never let a stalled tool call force you to cancel a long task. Abort an in-flight call with `/break`, instruct with `/break {message}`, or force it to repeat with `/again`. |
-| [better-session-appearance](plugins/better-session-appearance/README.md) | Improve your session list with full name color, bolding, and a Codicon icon when a session is idle. |
-| [drag‑to‑pin‑session](plugins/drag-to-pin-session/README.md) | Reorganize your pinned sessions with drag-and-drop. Drag a session into the Pinned section to pin it, or drag it out to unpin it. |
-| [opaque‑composer](plugins/opaque-composer/README.md) | Keep the desktop composer solid while scrolling so conversation text stays readable. |
-| [scroll‑on‑switch](plugins/scroll-on-switch/README.md) | Keep the active session transcript at the bottom when switching sessions. |
-| [reasoning‑switch](plugins/reasoning-switch/README.md) | Rotate the focused session's reasoning effort from the status bar, with per-level colors, rotation checkboxes, and prompt limits that auto-demote. |
-| [iteration‑budget‑meter](plugins/iteration-budget-meter/README.md) | Watch the tool-call budget of the focused session live in the status bar. |
-| [memory‑review](plugins/memory-review/README.md) | Dialog to checkbox staged memory writes and approve or reject them. |
-| [rss-reader](plugins/rss-reader/) | Three-column RSS page with folders, mute rules, reader-mode capture, and Google Reader keys. |
+| [provider-status](plugins/provider-status/README.md) | Provider quota tracking, OAuth status, multiple accounts, and key rotation in the status bar. |
+| [intelligent-tool-break](plugins/intelligent-tool-break/README.md) | Stop a stalled tool call, send a correction, or make it try again with `/break`, `/break {message}`, and `/again`. |
+| [better-session-appearance](plugins/better-session-appearance/README.md) | More readable session names, colors, emphasis, and idle-state icons. |
+| [drag-to-pin-session](plugins/drag-to-pin-session/README.md) | Reorganize pinned sessions with drag-and-drop. |
+| [opaque-composer](plugins/opaque-composer/README.md) | Keep the desktop composer readable while the transcript scrolls behind it. |
+| [scroll-on-switch](plugins/scroll-on-switch/README.md) | Keep the active session transcript at the bottom when switching sessions. |
+| [reasoning-switch](plugins/reasoning-switch/README.md) | Rotate reasoning effort from the status bar with per-level controls and prompt limits. |
+| [iteration-budget-meter](plugins/iteration-budget-meter/README.md) | See the focused session's tool-call budget live in the status bar. |
+| [memory-review](plugins/memory-review/README.md) | Review staged memory writes and approve or reject them from a dialog. |
+| [rss-reader](plugins/rss-reader/README.md) | Read, organize, search, summarize, and grade RSS and Atom feeds in a three-column reader. |
+
+## Start with the problem in front of you
+
+### You want to see what your providers are doing
+
+Open **Provider Status** from the desktop status bar. See quota use, account health, and rotation state without opening provider dashboards.
+
+### A tool call is stuck
+
+Use **Intelligent Tool Break** to stop the call or send a correction. `/again` retries the last tool action when repetition is the right fix.
+
+### Your session list is hard to scan
+
+Use **Better Session Appearance**, then pin and arrange sessions with **Drag to Pin Session**. **Scroll on Switch** keeps the active transcript in a predictable place.
+
+### You want a quieter writing surface
+
+**Opaque Composer** keeps transcript text from bleeding through the composer. **Reasoning Switch** and **Iteration Budget Meter** expose the controls and limits that matter while you work.
+
+### You need to review memory before it lands
+
+**Memory Review** puts staged writes in a dialog so you can inspect and approve them deliberately.
+
+### Your reading list is becoming another job
+
+**RSS Reader** keeps feeds in a local library with folders, nested folders, saved stories, mute rules, reader-mode capture, unread handling, and explicit Hermes actions for summaries, discussions, evidence checks, and optional grading.
 
 ## Install
 
-Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) `>= 0.21.0`.
+Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) **0.21.0 or newer**.
+
+Install the pinned pack:
 
 ```bash
 hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
 ```
 
-Each plugin still gets its own capability consent. Packs do not bulk-grant. Secrets are `requires_env` at install, not in the pack.
+Each plugin keeps its own capability consent. Installing a pack does not bulk-grant capabilities, and secrets remain `requires_env` values rather than being embedded in the pack.
 
-Verify:
+Verify the installation:
 
 ```bash
 hermes plugins list
 hermes plugins pack show https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
 ```
 
-From a Hermes session that can see this repo, you can also ask it to read `hermes-pack.yaml` and run that pack install.
+To install one plugin, use its individual README and the normal Hermes plugin installer.
 
-## How It Works
+## How it works
 
-`hermes-pack.yaml` is the source of truth: `repo` + `subdir` + 40-char `ref` per plugin. `hermes plugins pack install` fans out to ordinary pinned installs.
+`hermes-pack.yaml` is the source of truth. It pins `repo`, `subdir`, and a full 40-character `ref` for every plugin. Hermes expands those entries into ordinary plugin installs.
 
-Each plugin lives under `plugins/<name>/` with its own `plugin.yaml` and desktop entry. `better-session-appearance`, `drag-to-pin-session`, `opaque-composer`, `scroll-on-switch`, `reasoning-switch`, `iteration-budget-meter`, and `memory-review` are desktop-only.
+Each plugin lives under `plugins/<name>/` and carries its own `plugin.yaml`, README, and implementation. Most plugins are desktop-only. RSS Reader also includes a Python dashboard API for its feed, article, grading, and preference operations.
+
+The pack is maintained independently from Hermes Agent. Plugin behavior and compatibility follow the version requirements documented in each plugin.
 
 ## Requirements
 
-- Hermes Agent `>= 0.21.0` (plugin packs)
-- Windows / macOS / Linux. `intelligent-tool-break` uses `taskkill /F /T` on Windows and `kill -9` on POSIX. `better-session-appearance`, `drag-to-pin-session`, `opaque-composer`, `scroll-on-switch`, `reasoning-switch`, `iteration-budget-meter`, and `memory-review` are desktop-only.
+- Hermes Agent **0.21.0 or newer** for shareable plugin packs.
+- Windows, macOS, or Linux for the pack itself.
+- Individual plugins may have narrower platform requirements. Check their README before installing.
 
 ## Documentation
 
-- [provider-status](plugins/provider-status/README.md)
-- [intelligent-tool-break](plugins/intelligent-tool-break/README.md)
-- [better-session-appearance](plugins/better-session-appearance/README.md)
-- [drag-to-pin-session](plugins/drag-to-pin-session/README.md)
-- [opaque-composer](plugins/opaque-composer/README.md)
-- [scroll-on-switch](plugins/scroll-on-switch/README.md)
-- [reasoning-switch](plugins/reasoning-switch/README.md)
-- [iteration-budget-meter](plugins/iteration-budget-meter/README.md)
-- [memory-review](plugins/memory-review/README.md)
-- [rss-reader](plugins/rss-reader/)
-- [hermes-awesome-plugins-sync](skills/hermes-awesome-plugins-sync/SKILL.md) — maintainer skill to mirror live plugin dirs into this repo and repin `hermes-pack.yaml`
+Every plugin has its own README:
 
-## Support
+- [Provider Status](plugins/provider-status/README.md)
+- [Intelligent Tool Break](plugins/intelligent-tool-break/README.md)
+- [Better Session Appearance](plugins/better-session-appearance/README.md)
+- [Drag to Pin Session](plugins/drag-to-pin-session/README.md)
+- [Opaque Composer](plugins/opaque-composer/README.md)
+- [Scroll on Switch](plugins/scroll-on-switch/README.md)
+- [Reasoning Switch](plugins/reasoning-switch/README.md)
+- [Iteration Budget Meter](plugins/iteration-budget-meter/README.md)
+- [Memory Review](plugins/memory-review/README.md)
+- [RSS Reader](plugins/rss-reader/README.md)
+- [Maintainer sync skill](skills/hermes-awesome-plugins-sync/SKILL.md)
 
-Support, feedback, and feature ideas: [@ApoMakesMods](https://x.com/ApoMakesMods) on X.
+## Support and contributions
+
+Report problems, suggest focused improvements, or follow releases through [@ApoMakesMods](https://x.com/ApoMakesMods) on X. Keep changes scoped to the plugin they improve and update that plugin's documentation with user-facing behavior.
 
 ## License
 
 [MIT](LICENSE) © Apostol Apostolov
+
+This is an independent community project. It is not affiliated with, endorsed by, sponsored by, or officially associated with Nous Research or Hermes Agent. Hermes, Hermes Agent, and Nous Research are names and marks belonging to their respective owners.
