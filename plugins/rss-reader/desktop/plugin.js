@@ -2410,6 +2410,8 @@ var styles = `
 .hermes-rss .rss-detail .rss-body pre{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent);border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap}
 .hermes-rss .rss-detail .rss-body pre code{background:transparent;padding:0}
 .hermes-rss .rss-detail .rss-body img{max-width:100%;height:auto;display:block;margin:1.1em 0;border-radius:8px}
+.hermes-rss .rss-detail .rss-body img.rss-small-image{float:right;width:min(42%,320px);max-width:320px;margin:0 0 12px 20px;image-rendering:auto}
+.hermes-rss .rss-detail .rss-body p:has(> img.rss-small-image){min-height:1px}
 .hermes-rss .rss-detail .rss-body hr{border:0;border-top:1px solid var(--ui-stroke-secondary);margin:1.6em 0}
 .hermes-rss .rss-lead,.hermes-rss .rss-figure{margin:0 0 1.25em}.hermes-rss .rss-lead img,.hermes-rss .rss-figure img{width:100%;margin:0}.hermes-rss .rss-table-wrap{overflow-x:auto;margin:1.1em 0;width:100%}.hermes-rss .rss-rich table{border-collapse:collapse;width:100%;margin:0;font-size:.92em}
 .hermes-rss .rss-rich th,.hermes-rss .rss-rich td{border:1px solid var(--ui-stroke-secondary);padding:6px 10px;text-align:left}
@@ -3008,6 +3010,26 @@ function ReaderProfile({ ctx, owner }) {
     setDiscussNote("");
   }, [selected]);
   const refresh = () => client.invalidateQueries({ queryKey: key });
+  useEffect(() => {
+    const root = document.querySelector(".hermes-rss .rss-rich");
+    if (!root) return undefined;
+    const classify = image => {
+      if (image.closest(".rss-lead")) return;
+      const width = image.naturalWidth || Number(image.getAttribute("width")) || 0;
+      const height = image.naturalHeight || Number(image.getAttribute("height")) || 0;
+      const small = Math.max(width, height) > 0 && Math.max(width, height) <= 480;
+      image.classList.toggle("rss-small-image", small);
+    };
+    const images = [...root.querySelectorAll("img")];
+    const handlers = images.map(image => {
+      const handler = () => classify(image);
+      classify(image);
+      image.addEventListener("load", handler);
+      return [image, handler];
+    });
+    return () => handlers.forEach(([image, handler]) => image.removeEventListener("load", handler));
+  }, [article?.id, article?.body, tab]);
+
   useEffect(() => {
     const changed = event => {
       if (event.detail?.owner === owner) {
