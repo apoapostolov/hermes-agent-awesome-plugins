@@ -1242,7 +1242,7 @@ function extractReadable(html, options = {}) {
   }
   return text.replace(/\n{3,}/g, "\n\n").trim();
 }
-async function captureArticleNow(host2, rawUrl, route, owner) {
+async function captureArticleNow(host2, rawUrl, route, owner, options = {}) {
   const run = async (command, optional) => {
     assertOwner(host2, route);
     const result = await host2.requestProfile(route, "shell.exec", { command });
