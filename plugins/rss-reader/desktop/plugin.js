@@ -2098,6 +2098,8 @@ var styles = `
 .hermes-rss .rss-list-filter-btn{width:26px;height:26px;padding:0;margin:0;border:0;background:transparent;color:var(--ui-text-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:5px;flex-shrink:0}
 .hermes-rss .rss-list-filter-btn:hover{color:var(--foreground);background:var(--chrome-action-hover)}
 .hermes-rss .rss-list-filter-btn[aria-expanded=true],.hermes-rss .rss-list-filter-btn[data-active=true]{color:var(--ui-accent)}
+.hermes-rss .rss-list-filter-btn[data-on=false]{opacity:.4;color:var(--ui-text-tertiary)}
+.hermes-rss .rss-list-filter-btn[data-on=false]:hover{opacity:.75;color:var(--ui-text-secondary)}
 .hermes-rss .rss-search-drawer{width:100%;display:grid;gap:8px;padding:8px 0 2px}
 .hermes-rss .rss-search-drawer .rss-tools{margin:0}
 .hermes-rss select{font:inherit;color:var(--ui-text-primary,var(--foreground));background:var(--ui-bg-elevated,var(--ui-bg-primary,var(--background)));border:1px solid var(--ui-stroke-secondary);border-radius:5px;padding:7px;max-width:100%}
@@ -3153,6 +3155,16 @@ function ReaderProfile({ ctx, owner }) {
               onClick: () => setSearchDrawerOpen(!searchDrawerOpen),
               children: jsx("i", { className: `codicon ${searchDrawerOpen ? "codicon-filter-filled" : "codicon-filter"}`, "aria-hidden": "true" })
             }),
+            jsx("button", {
+              type: "button",
+              className: "rss-list-filter-btn",
+              "aria-pressed": !showHidden,
+              "data-on": !showHidden,
+              "aria-label": showHidden ? "Mute filter off" : "Mute filter on",
+              title: showHidden ? "Mute filter off · muted articles are visible" : (mutes.length ? `Mute filter on · ${mutes.length} rules` : "Mute filter on"),
+              onClick: () => { setShowHidden(!showHidden); setLimit(100); },
+              children: jsx("i", { className: `codicon ${showHidden ? "codicon-filter" : "codicon-filter-filled"}`, "aria-hidden": "true" })
+            }),
             jsx("span", { className: "rss-list-meta", children:
               jsx("button", { type: "button", className: "rss-mark-read", disabled, onClick: markAllRead, "aria-label": feedId ? "Mark feed as read" : "Mark all as read", title: (feedId ? "Mark feed as read" : "Mark all as read") + " \u00b7 includes hidden articles and articles outside the current search.", children: jsx("i", { className: "codicon codicon-check-all", "aria-hidden": "true" }) })
             })
@@ -3169,16 +3181,12 @@ function ReaderProfile({ ctx, owner }) {
               jsx(Button, { variant: "ghost", disabled, "aria-label": `Remove saved search ${search.name}`, onClick: () => removeFilter("searches", search.id), children: "Remove" })
             ] }, search.id))
           ] }),
-          (query || exclude || feedId || view !== "all" || mutes.length > 0 || showHidden) && jsxs("div", { className: "rss-filter-chips", "aria-label": "Active filters", children: [
+          (query || exclude || feedId || view !== "all") && jsxs("div", { className: "rss-filter-chips", "aria-label": "Active filters", children: [
             query && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear search phrase", onClick: () => { setQuery(""); setLimit(100); }, children: `Search: ${query} ×` }),
             exclude && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear excluded phrase", onClick: () => { setExclude(""); setLimit(100); }, children: `Exclude: ${exclude} ×` }),
             feedId && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear feed filter", onClick: () => selectView(view), children: `${chosenFeed?.title || "Removed feed"} ×` }),
             view !== "all" && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear view filter", onClick: () => selectView("all", feedId), children: `${view === "saved" ? "Saved" : "Unread"} ×` }),
-            (mutes.length > 0 || showHidden) && jsxs("label", { className: "rss-setting rss-small", children: [
-              jsx("input", { type: "checkbox", checked: showHidden, onChange: event => { setShowHidden(event.target.checked); setLimit(100); } }),
-              `Show hidden articles${mutes.length ? ` (${mutes.length} mute rules)` : ""}`
-            ] }),
-            (query || exclude || feedId || view !== "all" || showHidden) && jsx(Button, { size: "sm", variant: "ghost", onClick: resetFilters, children: "Reset filters" })
+            jsx(Button, { size: "sm", variant: "ghost", onClick: resetFilters, children: "Reset filters" })
           ] }),
           chosenFeed?.error && /* @__PURE__ */ jsx("p", { role: "status", className: "rss-small rss-feed-header-error", children: chosenFeed.error })
         ] }),

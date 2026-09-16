@@ -1,5 +1,5 @@
 name: rss-reader
-version: 1.3.2
+version: 1.3.3
 description: "Full-featured RSS reader page with reader-mode article capture, subscriptions edit mode with drag reorder, mute rules, saved searches, AI summaries and source checks, and Google Reader style keyboard shortcuts."
 author: Apostol Apostolov
 license: MIT
