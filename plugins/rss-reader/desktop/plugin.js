@@ -36,7 +36,7 @@ function sourceData(article) {
     url: article.url,
     publisher: article.feed_title,
     text: article.body.slice(0, 16e3),
-    scope: "Feed excerpt; may be incomplete."
+    scope: article.captured ? "Captured article text; still untrusted and may be incomplete." : "Feed excerpt; may be incomplete."
   });
 }
 function actionPrompt({ kind, snapshot }) {
@@ -402,6 +402,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
           library.articles = library.articles.filter(
             (a) => a.feed_id !== parts[1] || a.is_saved
           );
+          pruneArticleCache(library);
         });
       if (parts[2] === "reorder" && method === "POST")
         return write((library) => {
@@ -501,7 +502,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
         )
       ).slice(0, Number(url.searchParams.get("limit")) || 100).map((a) => {
         applyCachedBody(library, a);
-        return { ...a, excerpt: plainText(a.body).slice(0, 240) };
+        return { ...a, excerpt: cheapExcerpt(a.body) };
       });
     }
     if (path === "/opml/import") {
@@ -551,6 +552,8 @@ async function refreshSubscriptions(library, { feedId = null, shouldContinue = (
   }
   return { added, failed, fresh };
 }
+var rssVisited = false;
+function markRssVisited() { rssVisited = true; }
 function startAutoRefresh(ctx, host2, options = {}) {
   const schedule = options.setInterval || setInterval;
   const unschedule = options.clearInterval || clearInterval;
@@ -564,11 +567,12 @@ function startAutoRefresh(ctx, host2, options = {}) {
     const owner = currentOwner(host2);
     const settings = readSettings(ctx, owner);
     if (!settings.autoRefresh) { clocks.delete(owner); return; }
+    if (!rssVisited) return;
     const period = settings.refreshMinutes * 60000;
     const saved = Number(ctx.storage.get(`lastRefresh:${owner}`, 0)) || 0;
     let clock = clocks.get(owner);
     if (!clock || clock.period !== period) {
-      clock = { period, last: saved || now() };
+      clock = { period, last: saved };
       clocks.set(owner, clock);
     }
     clock.last = Math.max(clock.last, saved);
@@ -886,6 +890,9 @@ async function fetchFeedNow(host2, rawUrl, route) {
   const declaration = new TextDecoder().decode(decoded.slice(0, 200));
   const encoding = /<\?xml[^>]+encoding=["']([^"']+)/i.exec(declaration)?.[1] || "utf-8";
   return parseFeed(new TextDecoder(encoding).decode(decoded), url.href);
+}
+function cheapExcerpt(body) {
+  return String(body || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim().slice(0, 240);
 }
 function plainText(raw) {
   const template = document.createElement("template");
@@ -1533,7 +1540,7 @@ var styles = `
 .hermes-rss .rss-tabs-pills button{border:0;background:transparent;border-radius:0;padding:2px 0;font-size:12px;line-height:1.4;color:var(--ui-text-secondary)}
 .hermes-rss .rss-tabs-pills button[aria-selected=true]{border-bottom:2px solid var(--ui-accent);background:transparent;color:var(--ui-text-primary,var(--foreground))}
 .hermes-rss .rss-list-items{overflow:auto;flex:1;padding:8px}
-.hermes-rss .rss-card{display:block;width:100%;border:1px solid transparent;background:transparent;color:inherit;text-align:left;padding:18px 14px;border-radius:8px;margin-bottom:3px;outline:none;box-shadow:none}
+.hermes-rss .rss-card{display:flex;flex-direction:row;align-items:center;width:100%;border:1px solid transparent;background:transparent;color:inherit;text-align:left;padding:18px 14px;border-radius:8px;margin-bottom:3px;outline:none;box-shadow:none}
 .hermes-rss .rss-list-items button.rss-card:focus,.hermes-rss .rss-list-items button.rss-card:focus-visible{outline:none;box-shadow:none;outline-offset:0}
 .hermes-rss .rss-list-items button.rss-card[aria-selected=true],.hermes-rss .rss-list-items button.rss-card[aria-selected=true]:focus,.hermes-rss .rss-list-items button.rss-card[aria-selected=true]:focus-visible{outline:2px solid var(--ui-accent);outline-offset:3px}
 .hermes-rss .rss-card:hover{background:color-mix(in srgb,var(--ui-text-secondary) 5%,transparent)}
@@ -1542,7 +1549,6 @@ var styles = `
 .hermes-rss .rss-card-read .rss-card-excerpt{color:var(--ui-text-tertiary)}
 .hermes-rss .rss-card-title{font-size:15px;font-weight:600;line-height:1.45;margin:8px 0}.hermes-rss .rss-card-meta{display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--ui-text-tertiary)}
 .hermes-rss .rss-card-excerpt{font-size:12px;color:var(--ui-text-secondary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.hermes-rss .rss-card{flex-direction:row}
 .hermes-rss .rss-card-main{min-width:0;flex:1}
 .hermes-rss .rss-card-thumb{flex-shrink:0;width:56px;height:56px;border-radius:6px;overflow:hidden;margin-left:10px;background:color-mix(in srgb,var(--ui-text-secondary) 10%,transparent)}
 .hermes-rss .rss-card-thumb img{width:100%;height:100%;object-fit:cover;display:block}
@@ -1695,7 +1701,7 @@ function ReaderProfile({ ctx, owner }) {
     queryKey: [...key, "article", selected],
     queryFn: () => libraryRequest(`/articles/${selected}`),
     enabled: !!selected,
-    refetchInterval: 5e3,
+    refetchInterval: (query) => query.state.data?.captured ? false : 5e3,
     retry: false
   });
   const article = detail.data;
@@ -1710,6 +1716,27 @@ function ReaderProfile({ ctx, owner }) {
     window.addEventListener("hermes-rss-library-changed", changed);
     return () => window.removeEventListener("hermes-rss-library-changed", changed);
   }, [ctx, owner, client]);
+  useEffect(() => {
+    markRssVisited();
+    const s = readSettings(ctx, owner);
+    if (!s.autoRefresh) return undefined;
+    const saved = Number(ctx.storage.get(`lastRefresh:${owner}`, 0)) || 0;
+    const period = s.refreshMinutes * 60000;
+    if (saved && Date.now() - saved < period) return undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await refreshSubscriptions(libraryRequest, { shouldContinue: () => !cancelled && currentOwner(host) === owner });
+        if (cancelled) return;
+        ctx.storage.set(`lastRefresh:${owner}`, Date.now());
+        if (s.fullCapture && result.fresh?.length) captureEnqueue(owner, result.fresh);
+        client.invalidateQueries({ queryKey: key });
+      } catch {
+        // Feed errors stay on the subscription rows.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [owner]);
   const act = async (label, work) => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -1847,7 +1874,7 @@ function ReaderProfile({ ctx, owner }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, [articleList, selectedIndex, article, disabled]);
   const unsubscribe = () => act("Unsubscribing…", async () => {
     const removed = feedToRemove;
     await libraryRequest(`/feeds/${removed.id}`, { method: "DELETE" });
@@ -2079,10 +2106,10 @@ function ReaderProfile({ ctx, owner }) {
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("label", { className: "rss-setting", children: [
             jsx("input", { type: "checkbox", checked: draft.paywallServices, onChange: event => setDraft({ ...draft, paywallServices: event.target.checked }) }),
-            "Use paywall removing services"
+            "Use paywall removing services (EXPERIMENTAL)"
           ] })
         ] }),
-        jsx("p", { className: "rss-muted rss-small", children: "Testing only. When a capture looks paywalled or short, tries archive.today, 12ft.io, PrintFriendly, then the Wayback Machine." }),
+        jsx("p", { className: "rss-muted rss-small", children: "When a capture looks paywalled or short, tries archive.today, 12ft.io, PrintFriendly, then the Wayback Machine." }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
       jsxs("div", { className: "rss-settings-library", "aria-label": "Library", children: [
