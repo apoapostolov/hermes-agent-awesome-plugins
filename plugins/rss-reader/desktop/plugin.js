@@ -367,7 +367,8 @@ async function gradingShell(host2) {
   };
   let family = families.get(owner);
   if (!family) {
-    family = (await run("echo %OS%")) === "Windows_NT" ? "windows" : "posix";
+    const windowsProbe = await run("powershell.exe -NoProfile -NonInteractive '$env:OS'", true);
+    family = windowsProbe === "Windows_NT" ? "windows" : "posix";
     families.set(owner, family);
   }
   return { route, owner, family, run };
@@ -1737,14 +1738,14 @@ async function readPackedFeed(run, family, directory, feedPath) {
     });
   }
   const file = posixQuote(feedPath);
-  const encoded = `gzip -c ${file} | base64 | tr -d '\\n'`;
-  const length = Number(await run(`${encoded} | wc -c`));
+  const encoded = `gzip < ${file} | base64 | tr -d '\\n'`;
+  const length = Number(await run(`${encoded} | wc --bytes`));
   if (!Number.isInteger(length) || length < 1 || length > 6e5)
     throw new Error("Feed exceeds the compressed transport limit.");
   let packed = "";
   for (let offset = 0; offset < length; offset += 3500)
     packed += await run(
-      `${encoded} | cut -c ${offset + 1}-${Math.min(offset + 3500, length)}`
+      `${encoded} | cut --characters ${offset + 1}-${Math.min(offset + 3500, length)}`
     );
   return packed;
 }
@@ -1756,7 +1757,7 @@ async function fetchFeedNow(host2, rawUrl, route) {
     if (result.code !== 0) {
       if (optional) return "";
       throw new Error(
-        `Feed command failed: ${(result.stderr || "This gateway needs curl plus gzip and base64 tools. Windows uses curl.exe and python. Linux and macOS use POSIX utilities.").slice(0, 350)}`
+        `Feed command failed: ${(result.stderr || "This gateway needs curl plus gzip and base64 tools. Windows uses curl.exe and PowerShell. Linux and macOS use POSIX utilities.").slice(0, 350)}`
       );
     }
     return result.stdout.trim();
@@ -1764,7 +1765,8 @@ async function fetchFeedNow(host2, rawUrl, route) {
   const owner = JSON.stringify([route.connectionId, route.profile]);
   let family = families.get(owner);
   if (!family) {
-    family = (await run("echo %OS%")) === "Windows_NT" ? "windows" : "posix";
+    const windowsProbe = await run("powershell.exe -NoProfile -NonInteractive '$env:OS'", true);
+    family = windowsProbe === "Windows_NT" ? "windows" : "posix";
     families.set(owner, family);
   }
   let directory = caches.get(owner);
@@ -2158,7 +2160,8 @@ async function captureArticleNow(host2, rawUrl, route, owner, options = {}) {
   };
   let family = families.get(owner);
   if (!family) {
-    family = (await run("echo %OS%")) === "Windows_NT" ? "windows" : "posix";
+    const windowsProbe = await run("powershell.exe -NoProfile -NonInteractive '$env:OS'", true);
+    family = windowsProbe === "Windows_NT" ? "windows" : "posix";
     families.set(owner, family);
   }
   let directory = caches.get(owner);

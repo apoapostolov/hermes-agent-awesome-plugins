@@ -80,6 +80,9 @@ class RssCommandTests(unittest.TestCase):
         self.assertIn("GzipStream", plugin)
         self.assertNotIn("python -c", plugin)
         self.assertNotIn("pythonLiteral", plugin)
+        self.assertNotIn("gzip -c", plugin)
+        self.assertNotIn("cut -c", plugin)
+        self.assertIn("powershell.exe -NoProfile -NonInteractive", plugin)
 
 
 if __name__ == "__main__":
