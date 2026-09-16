@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("normalizeDefaultView")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("normalizeDefaultView"), grab("articleNeedsCapture")].join("\n");
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -53,6 +53,7 @@ exports.normalizeFolderName = normalizeFolderName;
 exports.applyFolderAction = applyFolderAction;
 exports.buildPreferenceSnapshot = buildPreferenceSnapshot;
 exports.normalizeDefaultView = normalizeDefaultView;
+exports.articleNeedsCapture = articleNeedsCapture;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -153,5 +154,10 @@ assert.equal(snap.feeds[0].unread, 1);
 assert.equal(snap.mutes[0].phrase, "crypto");
 assert.equal(fns.normalizeDefaultView("saved"), "saved");
 assert.equal(fns.normalizeDefaultView("nope"), "all");
+assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: false, body: "short" }), true);
+assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: true, body: "x".repeat(900) }), false);
+assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: true, body: "short" }), true);
+assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: true, body: "short", captureGaveUp: true }), false);
+assert.equal(fns.articleNeedsCapture({}), false);
 
-console.log("ok", 28);
+console.log("ok", 29);

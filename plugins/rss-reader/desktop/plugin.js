@@ -660,6 +660,13 @@ function applyCachedBody(library, article) {
   }
   return dirty;
 }
+function articleNeedsCapture(article) {
+  if (!article?.url) return false;
+  if (article.captureGaveUp) return false;
+  const body = String(article.body || "");
+  if (article.captured && body.length >= 800) return false;
+  return true;
+}
 function pruneArticleCache(library) {
   if (!library.articleCache) return;
   const live = new Set();
@@ -706,7 +713,6 @@ function mergeFeed(library, feedId, parsed) {
         old.body = item.body;
         old.image = item.image || old.image;
       } else {
-        old.captured = true;
         old.image = old.image || item.image;
       }
       applyCachedBody(library, old);
@@ -728,7 +734,7 @@ function mergeFeed(library, feedId, parsed) {
       library.articles.push(article);
       byIdentity.set(item.identity, article);
       added++;
-      if (article.url && !article.captured) fresh.push(article);
+      if (article.url && articleNeedsCapture(article)) fresh.push(article);
     }
   }
   const unsaved = library.articles.filter((a) => a.feed_id === feedId && !a.is_saved).sort(
@@ -964,6 +970,10 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
           return write((library2) => {
             const article3 = library2.articles.find((a) => a.id === parts[1]);
             if (!article3) throw new Error("Article not found.");
+            if (body.gaveUp === true) {
+              article3.captureGaveUp = true;
+              return;
+            }
             if (typeof body.body === "string" && body.body.length > article3.body.length) {
               article3.body = body.body.slice(0, 6e4);
               article3.captured = true;
@@ -994,6 +1004,10 @@ function createLibrary(owner, fetchFeed2, transaction = transact, captureFn = nu
           });
         }
         return article;
+      }
+      if (!parts[1] && url.searchParams.get("uncaptured") === "1") {
+        const library = await read();
+        return library.articles.filter(articleNeedsCapture).slice(0, 200).map((a) => ({ id: a.id, url: a.url }));
       }
       const library = await read(), q = (url.searchParams.get("q") || "").trim().toLowerCase();
       const exclude = (url.searchParams.get("exclude") || "").trim().toLowerCase();
@@ -1143,6 +1157,7 @@ function startAutoRefresh(ctx, host2, options = {}) {
 var captureEnqueue = (owner, items, options) => 0;
 var captureActive = 0;
 var captureWaiters = [];
+var urgentCaptureBusy = false;
 function withCaptureSlot(work) {
   return new Promise((resolve, reject) => {
     const run = () => {
@@ -1161,8 +1176,8 @@ function startCaptureWorker(ctx, host2) {
   let stopped = false;
   const active = new Set();
   const CONCURRENCY = 2;
-  const MAX_QUEUE = 80;
-  const MAX_ATTEMPTS = 2;
+  const MAX_QUEUE = 200;
+  const MAX_ATTEMPTS = 4;
   const load = (owner) => {
     const raw = storageGet(ctx, "captureQueue", owner, []) || [];
     return Array.isArray(raw) ? raw.filter((j) => j && j.id && j.url) : [];
@@ -1208,7 +1223,7 @@ function startCaptureWorker(ctx, host2) {
     const library = createLibrary(owner, (url2) => fetchFeed(host2, url2), transact);
     try {
       const article = await library(`/articles/${job.id}`);
-      if (!article?.url || article.captured) {
+      if (!articleNeedsCapture(article)) {
         save(owner, load(owner).filter((j) => j.id !== job.id));
         return;
       }
@@ -1221,16 +1236,20 @@ function startCaptureWorker(ctx, host2) {
       if (fullBody && fullBody.length > (article.body || "").length) {
         await library(`/articles/${job.id}/capture`, { method: "POST", body: { body: fullBody } });
         publishLibraryChange(owner);
+        save(owner, load(owner).filter((j) => j.id !== job.id));
+        return;
       }
-      save(owner, load(owner).filter((j) => j.id !== job.id));
+      throw new Error("Capture did not enlarge the article.");
     } catch {
       if (stopped || currentOwner(host2) !== owner) return;
       const q = load(owner);
       const cur = q.find((j) => j.id === job.id);
       if (!cur) return;
       cur.attempts = (cur.attempts || 0) + 1;
-      if (cur.attempts >= MAX_ATTEMPTS) save(owner, q.filter((j) => j.id !== job.id));
-      else {
+      if (cur.attempts >= MAX_ATTEMPTS) {
+        save(owner, q.filter((j) => j.id !== job.id));
+        try { await library(`/articles/${job.id}/capture`, { method: "POST", body: { gaveUp: true } }); } catch {}
+      } else {
         save(owner, q.filter((j) => j.id !== job.id).concat([cur]));
         await new Promise((r) => setTimeout(r, 1200));
       }
@@ -1546,7 +1565,9 @@ function parseFeed(xml, base) {
 async function captureArticle(host2, rawUrl, options = {}) {
   const route = await currentRoute(host2);
   const owner = JSON.stringify([route.connectionId, route.profile]);
-  return withCaptureSlot(() => captureArticleNow(host2, rawUrl, route, owner, options));
+  const work = () => captureArticleNow(host2, rawUrl, route, owner, options);
+  if (options.urgent) return work();
+  return withCaptureSlot(work);
 }
 function httpsSrc(value) {
   const v = String(value || "").trim();
@@ -2718,7 +2739,7 @@ function ReaderProfile({ ctx, owner }) {
     queryKey: [...key, "article", selected],
     queryFn: () => libraryRequest(`/articles/${selected}`),
     enabled: !!selected,
-    refetchInterval: (query) => query.state.data?.captured ? false : 5e3,
+    refetchInterval: (query) => articleNeedsCapture(query.state.data) ? 5e3 : false,
     retry: false
   });
   const article = detail.data;
@@ -2733,6 +2754,15 @@ function ReaderProfile({ ctx, owner }) {
     window.addEventListener("hermes-rss-library-changed", changed);
     return () => window.removeEventListener("hermes-rss-library-changed", changed);
   }, [ctx, owner, client]);
+  useEffect(() => {
+    if (!settings.fullCapture) return undefined;
+    let cancelled = false;
+    void libraryRequest("/articles?uncaptured=1").then((rows) => {
+      if (cancelled || !Array.isArray(rows) || !rows.length) return;
+      captureEnqueue(owner, rows);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [owner, settings.fullCapture]);
   useEffect(() => {
     markRssVisited();
     const s = readSettings(ctx, owner);
@@ -2820,7 +2850,22 @@ function ReaderProfile({ ctx, owner }) {
   const openArticle = (item) => {
     setSelected(item.id);
     setTab("article");
-    if (settings.fullCapture && item.url && !item.captured) captureEnqueue(owner, [{ id: item.id, url: item.url }], { front: true });
+    if (settings.fullCapture && articleNeedsCapture(item)) {
+      captureEnqueue(owner, [{ id: item.id, url: item.url }], { front: true });
+      if (!urgentCaptureBusy) {
+        urgentCaptureBusy = true;
+        void captureArticle(host, item.url, {
+          paywallServices: settings.paywallServices,
+          knownLength: (item.body || "").length,
+          urgent: true
+        }).then(async (result) => {
+          const fullBody = result?.body;
+          if (!fullBody || fullBody.length <= (item.body || "").length) return;
+          await libraryRequest(`/articles/${item.id}/capture`, { method: "POST", body: { body: fullBody } });
+          if (result.source) setNotice(`The full text came from ${result.source}.`);
+        }).catch(() => {}).finally(() => { urgentCaptureBusy = false; });
+      }
+    }
     if (!settings.markReadOnOpen || item.is_read) return;
     // Update all cached views immediately, then persist through the same library.
     client.setQueriesData({ queryKey: [...key, "articles"] }, rows =>
@@ -3145,8 +3190,9 @@ function ReaderProfile({ ctx, owner }) {
     setSettings(next);
     setDraft(next);
     if (next.fullCapture) {
-      const backlog = (articles.data || []).filter((a) => a.url && !a.captured).slice(0, 40).map((a) => ({ id: a.id, url: a.url }));
-      captureEnqueue(owner, backlog);
+      void libraryRequest("/articles?uncaptured=1").then((rows) => {
+        if (Array.isArray(rows) && rows.length) captureEnqueue(owner, rows);
+      }).catch(() => {});
     }
     if (next.aiGrading) {
       void syncGradingTags(host, ctx, owner, next.gradingSkill);
