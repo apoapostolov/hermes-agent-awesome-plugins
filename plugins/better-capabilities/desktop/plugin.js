@@ -610,6 +610,47 @@ function switchInTitleRow(title) {
   return null
 }
 
+function currentProfileName() {
+  try {
+    const atom = host.state && host.state.profile
+    const value = atom && typeof atom.get === 'function' ? atom.get() : ''
+    return String(value || 'default').trim() || 'default'
+  } catch {
+    return 'default'
+  }
+}
+
+async function listProfileNames() {
+  const names = []
+  const seen = {}
+  function add(name) {
+    const n = String(name || '').trim()
+    if (!n || seen[n]) return
+    seen[n] = 1
+    names.push(n)
+  }
+  add('default')
+  add(currentProfileName())
+  try {
+    const res = await desktopApi({ path: '/api/profiles' })
+    for (const row of (res && res.profiles) || []) {
+      if (row && row.name) add(row.name)
+    }
+  } catch {
+    // profile list is optional
+  }
+  return names
+}
+
+async function snapshotAgentForProfile(profile) {
+  const agent = {}
+  const listed = await host.request('plugins.manage', { action: 'list', profile })
+  for (const row of listed && listed.plugins ? listed.plugins : []) {
+    if (row && row.key) agent[row.key] = row.status === 'enabled'
+  }
+  return agent
+}
+
 async function snapshotKind(kind) {
   if (kind === 'skills') {
     const rows = await desktopApi({ path: '/api/skills' })
@@ -628,7 +669,6 @@ async function snapshotKind(kind) {
     return { enabled }
   }
   const desktop = {}
-  const agent = {}
   try {
     const raw = window.localStorage.getItem('hermes.desktop.pluginDecisions.v2')
     const decisions = raw ? JSON.parse(raw) : {}
@@ -644,15 +684,18 @@ async function snapshotKind(kind) {
     const switches = [...row.querySelectorAll('[data-slot="switch"]')]
     if (key && switches[0]) desktop[key] = switchOn(switches[0])
   })
-  try {
-    const listed = await host.request('plugins.manage', { action: 'list' })
-    for (const row of listed && listed.plugins ? listed.plugins : []) {
-      if (row && row.key) agent[row.key] = row.status === 'enabled'
+  const agentByProfile = {}
+  const profiles = await listProfileNames()
+  for (const profile of profiles) {
+    try {
+      agentByProfile[profile] = await snapshotAgentForProfile(profile)
+    } catch {
+      // skip profiles the gateway cannot list
     }
-  } catch {
-    // agent list is optional when the gateway is down
   }
-  return { desktop, agent }
+  const current = currentProfileName()
+  const agent = agentByProfile[current] || agentByProfile.default || {}
+  return { desktop, agent, agentByProfile }
 }
 
 async function applyKind(kind, payload) {
@@ -675,6 +718,10 @@ async function applyKind(kind, payload) {
   }
   const desktop = (payload && payload.desktop) || {}
   const agent = (payload && payload.agent) || {}
+  const agentByProfile =
+    payload && payload.agentByProfile && typeof payload.agentByProfile === 'object'
+      ? payload.agentByProfile
+      : null
   for (const [id, on] of Object.entries(desktop)) {
     const row = document.querySelector('[data-testid="plugin-row-' + id + '"]')
     const sw = row && row.querySelector('[data-slot="switch"]')
@@ -688,11 +735,20 @@ async function applyKind(kind, payload) {
       // ignore
     }
   }
-  for (const [key, on] of Object.entries(agent)) {
-    try {
-      await host.request('plugins.manage', { action: 'toggle', key, enable: on })
-    } catch {
-      // skip keys the backend rejects
+  const current = currentProfileName()
+  const maps = agentByProfile || { [current]: agent }
+  for (const [profile, map] of Object.entries(maps)) {
+    if (!map || typeof map !== 'object') continue
+    for (const [key, on] of Object.entries(map)) {
+      const row = document.querySelector('[data-testid="plugin-row-' + key + '"]')
+      const switches = row ? [...row.querySelectorAll('[data-slot="switch"]')] : []
+      const agentSw = switches.length > 1 ? switches[1] : null
+      if (profile === current && clickSwitchTo(agentSw, on)) continue
+      try {
+        await host.request('plugins.manage', { action: 'toggle', key, enable: on, profile })
+      } catch {
+        // skip keys the backend rejects
+      }
     }
   }
 }
