@@ -2824,11 +2824,12 @@ function TickerPane() {
     queryKey: ["rss-reader", owner, "ticker-articles"],
     queryFn: async () => {
       const [rows, library] = await Promise.all([
-        libraryRequest("/articles?view=all&show_hidden=true&limit=100"),
+        libraryRequest("/articles?view=all&show_hidden=true&limit=100").catch(() => []),
         transact(owner)
       ]);
       const byFeed = new Map((library.feeds || []).map((f) => [f.id, f]));
-      const source = Array.isArray(rows) ? rows : (Array.isArray(rows?.articles) ? rows.articles : []);
+      const sourceRows = Array.isArray(rows) ? rows : (Array.isArray(rows?.articles) ? rows.articles : []);
+      const source = sourceRows.length ? sourceRows : (Array.isArray(library.articles) ? library.articles.slice(0, 100) : []);
       return source.map((a) => {
         const feed = byFeed.get(a.feed_id);
         const feedTitle = a.feed_title || feed?.title || feed?.name || "RSS";
