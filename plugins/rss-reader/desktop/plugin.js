@@ -2697,7 +2697,6 @@ function refreshButtonLabel(at, now) {
 }
 // Headline ticker components. buildTickerRows is a plain helper (no hooks) so
 // both marquee halves and the reduced-motion static row share one list.
-// Speed + grouping options mirror hermes-newswire's ticker settings.
 var TICKER_SPEED_DURATIONS = { barely: 2400, very_slow: 1800, slow: 1200, normal: 900, fast: 600 }; // seconds per loop at 50 headlines
 var TICKER_SPEED_REF_ITEMS = 50;
 function tickerLoopSeconds(speed, rowCount) {
@@ -2836,8 +2835,8 @@ function TickerItem({ row, onOpen, showFavicon, websiteName, showAge, tagStyle }
     ].filter(Boolean)
   });
 }
-// Ticker-end refresh control (newswire parity): module-level busy flag dedupes
-// rapid clicks across remounts; glyph flashes ok/error for 2s after a run.
+// Ticker-end refresh control: module-level busy flag dedupes rapid clicks
+// across remounts; glyph flashes ok/error for 2s after a run.
 var __tickerRefreshBusy = false;
 function TickerRefresh({ onRefresh }) {
   const [busy, setBusy] = useState(false);
@@ -2953,9 +2952,9 @@ function tickerRefreshMs(settings) {
   return n * 60000;
 }
 // Global ticker pane: rendered by the app shell on every screen (docked to
-// the workspace bottom edge), like hermes-newswire. Reads the profile
-// library straight from IndexedDB; headline clicks navigate to /rss and hand
-// the article id over via a window event.
+// the workspace bottom edge). Reads the profile library straight from
+// IndexedDB; headline clicks navigate to /rss and hand the article id over
+// via a window event.
 function RssBrowserFrame({ url }) {
   const hostRef = useRef(null);
   useEffect(() => {
@@ -5139,9 +5138,9 @@ var plugin_default = {
     // Layout presets stack unknown panes as center tabs (often the files rail).
     // Home is a single-pane column split on workspace bottom. If the saved tree
     // is not that shape, re-register under a new id so adoption uses the dock.
-    // Registration follows hermes-newswire: registered = the strip exists in
-    // the layout; unregistered = the row is gone. Returning null from TickerPane
-    // while the pane stays registered leaves a dead black strip.
+    // Registered = the strip exists in the layout; unregistered = the row is
+    // gone. Returning null from TickerPane while the pane stays registered
+    // leaves a dead black strip.
     let disposeTicker = null;
     let tickerMountGen = 0;
     let lastTickerMountAt = 0;

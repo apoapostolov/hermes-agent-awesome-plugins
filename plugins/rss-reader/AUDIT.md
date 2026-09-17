@@ -1,6 +1,6 @@
 # RSS Reader code audit (2026-09-16)
 
-Live file: `%LOCALAPPDATA%/hermes/plugins/rss-reader/desktop/plugin.js` (~2.6k lines, one bundled module). Fork of [Adolanium/hermes-rss](https://github.com/Adolanium/hermes-rss).
+Live file: `%LOCALAPPDATA%/hermes/plugins/rss-reader/desktop/plugin.js` (~2.6k lines, one bundled module).
 
 ## Fixed in this pass
 

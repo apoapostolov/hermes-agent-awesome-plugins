@@ -253,7 +253,7 @@ class PreviewRequest(BaseModel):
 def open_in_preview(payload: PreviewRequest) -> dict[str, str]:
     """Open an article in the desktop in-app preview pane.
 
-    Emits the same preview.open gateway event Newswire and open_preview use.
+    Emits the preview.open gateway event used by the in-app preview pane.
     """
     try:
         url = _validate_url(payload.url)

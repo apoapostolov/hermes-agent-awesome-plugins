@@ -6,7 +6,6 @@ license: MIT
 manifest_version: 2
 api_version: 1
 homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/rss-reader
-# Forked from Adolanium/hermes-rss (Hermes catalog plugin, pin 8053056094f8a232babe029e2336cb8118d8ba7a, subdir catalog). Upstream PRs go there.
 tags:
   - desktop
   - rss

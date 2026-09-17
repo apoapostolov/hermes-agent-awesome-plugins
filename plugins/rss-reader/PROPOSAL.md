@@ -1,10 +1,8 @@
 # Proposal: AI-first RSS Reader
 
-**Goal:** Turn this fork into a reader where the model is a first-class part of inbox, not a button you remember to press.
+**Goal:** Turn this plugin into a reader where the model is a first-class part of inbox, not a button you remember to press.
 
 **Now:** Three-column Hermes Desktop plugin. Local IndexedDB library. Feed refresh + optional background capture. Discuss / Summary / Evidence open Hermes chats. Keyboard j/k/s/d. OPML, mute, saved searches.
-
-Upstream for later PRs: [Adolanium/hermes-rss](https://github.com/Adolanium/hermes-rss) (catalog pin in `hermes-agent/plugin-catalog/hermes-rss.yaml`).
 
 ---
 
@@ -76,7 +74,7 @@ Cards are tall (18px padding, 56px thumbs). Missing: a compact density setting, 
 ## Out of scope (on purpose)
 
 - Paywall-bypass services as a product feature
-- Replacing the Adolanium fetch/SSRF hardening with a random proxy
+- Replacing the fetch/SSRF hardening with a random proxy
 - Splitting the 2.6k-line bundle until the inbox/triage slice forces a module cut
 
 ## Suggested order
