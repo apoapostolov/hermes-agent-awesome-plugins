@@ -35,6 +35,6 @@ plugins:
     ref: 946af32ad7ee9559298a2ffaf63a8289cd4aaafb
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/better-capabilities
-    ref: c4ba88440e6153802234e8b3b355c39d8b2d6c03
+    ref: 2bcd696312551ffe72bb031bd288fb34b6151e5b
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync
