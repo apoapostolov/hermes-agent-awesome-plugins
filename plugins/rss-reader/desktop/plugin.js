@@ -4748,8 +4748,7 @@ function ReaderProfile({ ctx, owner }) {
           !evidence && pending && /* @__PURE__ */ jsx("div", { className: "rss-note", children: pending.status === "failed" ? pending.error : pending.status === "waiting" ? "Waiting for the action in Hermes. Continue its conversation if needed." : pending.status === "running" ? "Source check is running. If Hermes was restarted, start a new action." : "No current source check." })
         ] })
       ] }) })
-        })
-      ] }),
+        }),
       browserOpen && browserUrl && jsxs("section", { className: "rss-browser-panel", children: [
         jsxs("div", { className: "rss-browser-strip", children: [
           jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Back to article", title: "Back to article", onClick: () => setBrowserOpen(false), children: jsx("i", { className: "codicon codicon-arrow-left", "aria-hidden": "true" }) }),
@@ -4761,6 +4760,7 @@ function ReaderProfile({ ctx, owner }) {
         ] }),
         jsx("iframe", { className: "rss-browser-frame", src: browserUrl, title: "Article browser", referrerPolicy: "no-referrer", sandbox: "allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts" })
       ] })
+    ] }),
     ] })
   ] });
 }
