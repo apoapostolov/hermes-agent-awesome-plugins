@@ -730,8 +730,14 @@ function pruneArticleCache(library) {
     if (!live.has(key)) delete library.articleCache[key];
   }
 }
+function expandSubscribeUrl(raw) {
+  const value = String(raw || "").trim();
+  const shortcut = value.match(/^\/?r\/([A-Za-z0-9_]{2,50})\/?$/i);
+  if (shortcut) return `https://www.reddit.com/r/${shortcut[1]}`;
+  return value;
+}
 function safeUrl(raw) {
-  const url = new URL(raw);
+  const url = new URL(expandSubscribeUrl(raw));
   if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || url.port && !["80", "443"].includes(url.port))
     throw new Error("Use a public HTTP(S) feed URL without credentials.");
   if (url.href.length > 2048) throw new Error("Feed URL is too long.");
@@ -1211,10 +1217,10 @@ function commandSourceParts(source) {
   return { input: raw.slice(0, comma).trim(), title: raw.slice(comma + 1).trim().slice(0, 300) };
 }
 function commandWebsiteUrl(input) {
-  const value = String(input || "").trim();
+  const value = expandSubscribeUrl(input);
   if (/^https?:\/\//i.test(value)) return value;
   if (/^[a-z0-9.-]+(?:\/.*)?$/i.test(value) && value.includes(".")) return `https://${value}`;
-  throw new Error("Give a website URL or a domain name so RSS Reader can discover its feed.");
+  throw new Error("Give a website URL, a domain name, or r/name so RSS Reader can discover its feed.");
 }
 async function discoverFeed(host2, input) {
   const website = new URL(commandWebsiteUrl(input));
@@ -1664,13 +1670,14 @@ function redditCommunityUrl(raw) {
   }
 }
 async function fetchFeedViaApi(rawUrl) {
-  const redditUrl = redditCommunityUrl(rawUrl);
+  const resolved = expandSubscribeUrl(rawUrl);
+  const redditUrl = redditCommunityUrl(resolved);
   const response = redditUrl
     ? await rssRest("/reddit", { method: "POST", body: { url: redditUrl } })
-    : await rssRest("/feed", { method: "POST", body: { url: publicUrl(rawUrl).href } });
+    : await rssRest("/feed", { method: "POST", body: { url: publicUrl(resolved).href } });
   if (!response || typeof response.text !== "string")
     throw new Error("RSS backend returned an invalid feed response.");
-  return parseFeed(response.text, response.url || redditUrl || publicUrl(rawUrl).href);
+  return parseFeed(response.text, response.url || redditUrl || publicUrl(resolved).href);
 }
 async function fetchFeed(host2, rawUrl) {
   const route = await currentRoute(host2);
@@ -4529,7 +4536,7 @@ function ReaderProfile({ ctx, owner }) {
           act("Subscribing\u2026", async () => {
             const feed = await libraryRequest("/feeds", {
               method: "POST",
-              body: { url, folder }
+              body: { url: expandSubscribeUrl(url), folder }
             });
             setAdding(false);
             setUrl("");
@@ -4545,15 +4552,16 @@ function ReaderProfile({ ctx, owner }) {
         },
         children: [
           /* @__PURE__ */ jsxs("label", { children: [
-            "RSS or Atom feed URL",
+            "RSS or Atom URL, or r/name of Reddit communities",
             /* @__PURE__ */ jsx(
               Input,
               {
-                type: "url",
+                type: "text",
                 required: true,
                 value: url,
                 onChange: (event) => setUrl(event.target.value),
-                placeholder: "https://example.com/feed.xml"
+                placeholder: "https://example.com/feed.xml or r/programming",
+                "aria-label": "RSS or Atom URL, or r/name of Reddit communities"
               }
             )
           ] }),
