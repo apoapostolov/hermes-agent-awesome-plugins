@@ -1163,7 +1163,8 @@ function readSettings(ctx, owner) {
     tickerGrouping: ["newest", "source", "unread_first"].includes(stored.tickerGrouping) ? stored.tickerGrouping : "newest",
     tickerFontSize: Number.isInteger(stored.tickerFontSize) && stored.tickerFontSize >= 9 && stored.tickerFontSize <= 18 ? stored.tickerFontSize : 11,
     tickerPauseOnHover: stored.tickerPauseOnHover !== false,
-    tickerShowSource: stored.tickerShowSource !== false,
+    tickerShowFavicon: stored.tickerShowFavicon !== false,
+    tickerWebsiteName: ["before", "after", "none"].includes(stored.tickerWebsiteName) ? stored.tickerWebsiteName : "after",
     tickerRelativeTime: stored.tickerRelativeTime !== false,
     tickerOnlyUnread: stored.tickerOnlyUnread === true,
     tickerAssetSize: ["small", "normal", "font"].includes(stored.tickerAssetSize) ? stored.tickerAssetSize : "normal",
@@ -2650,12 +2651,13 @@ function buildTickerRows(articles, tags) {
   }
   return rows;
 }
-function TickerItem({ row, onOpen, showSource, showAge, tagStyle }) {
+function TickerItem({ row, onOpen, showFavicon, websiteName, showAge, tagStyle }) {
   const { item, pill } = row;
   const showPill = pill && tagStyle === "pill";
   const titleStyle = pill && tagStyle === "article_color" ? { color: pill.color } : undefined;
+  const beforeWebsite = websiteName === "before" && item.feed_title ? jsx("span", { className: "rss-ticker-src", children: item.feed_title }) : null;
+  const afterWebsite = websiteName === "after" && item.feed_title ? jsx("span", { className: "rss-ticker-src", children: item.feed_title }) : null;
   const age = showAge ? date(item.published_at) : "";
-  const meta = showSource && item.feed_title ? item.feed_title : "";
   return jsx("button", {
     type: "button",
     className: "rss-ticker-item",
@@ -2663,11 +2665,12 @@ function TickerItem({ row, onOpen, showSource, showAge, tagStyle }) {
     title: `${item.feed_title ? item.feed_title + " — " : ""}${item.title}${age ? ` (${age})` : ""}`,
     onClick: () => onOpen(item),
     children: [
-      item.favicon && jsx("img", { src: item.favicon, className: "rss-ticker-favicon", alt: "", loading: "lazy", onError: (e) => { e.currentTarget.style.display = "none"; } }),
+      showFavicon && item.favicon && jsx("img", { src: item.favicon, className: "rss-ticker-favicon", alt: "", loading: "lazy", onError: (e) => { e.currentTarget.style.display = "none"; } }),
       !item.favicon && showPill && jsx("span", { "aria-hidden": "true", className: "rss-ticker-dot", style: { "--rss-tag": pill.color }, children: "\u25CF" }),
+      beforeWebsite,
       showPill && jsx("span", { className: "rss-card-pill", style: { "--rss-tag": pill.color }, children: pill.label }),
       jsx("span", { className: "rss-ticker-title", style: titleStyle, children: item.title || "(untitled)" }),
-      meta && jsx("span", { className: "rss-ticker-src", children: meta }),
+      afterWebsite,
       age && jsx("span", { className: "rss-ticker-src", children: `\u00b7 ${age}` })
     ].filter(Boolean)
   });
@@ -2719,7 +2722,7 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
   const duration = TICKER_SPEED_DURATIONS[settings.tickerSpeed] || 150;
   const renderRow = (row, i) => row.kind === "divider"
     ? jsx("span", { "aria-hidden": "true", className: "rss-ticker-divider", children: `${row.source} \u2014` }, `d${i}`)
-    : jsx(TickerItem, { row, onOpen, tagStyle: settings.tickerTagStyle || "pill", showSource: settings.tickerShowSource !== false, showAge: settings.tickerRelativeTime !== false }, row.item.id);
+    : jsx(TickerItem, { row, onOpen, showFavicon: settings.tickerShowFavicon !== false, websiteName: settings.tickerWebsiteName || "after", tagStyle: settings.tickerTagStyle || "pill", showAge: settings.tickerRelativeTime !== false }, row.item.id);
   return jsxs("div", {
     className: `rss-ticker${settings.tickerPauseOnHover === false ? " rss-ticker-no-hover" : ""}${settings.tickerAssetSize === "small" ? " rss-ticker-small-assets" : ""}${settings.tickerAssetSize === "font" ? " rss-ticker-font-assets" : ""}`,
     "data-paused": "false",
@@ -2747,6 +2750,11 @@ var TICKER_SPEEDS = [
   { id: "slow", label: "Slow" },
   { id: "normal", label: "Normal" },
   { id: "fast", label: "Fast" }
+];
+var TICKER_WEBSITE_NAMES = [
+  { id: "before", label: "Before Article" },
+  { id: "after", label: "After Article" },
+  { id: "none", label: "None" }
 ];
 var TICKER_TAG_STYLES = [
   { id: "pill", label: "Pill" },
@@ -2821,13 +2829,14 @@ function TickerPane() {
       ]);
       const byFeed = new Map((library.feeds || []).map((f) => [f.id, f]));
       const source = Array.isArray(rows) ? rows : (Array.isArray(rows?.articles) ? rows.articles : []);
-      return source.filter((a) => a.feed_title).map((a) => {
+      return source.map((a) => {
         const feed = byFeed.get(a.feed_id);
+        const feedTitle = a.feed_title || feed?.title || feed?.name || "RSS";
         let favicon = "";
         if (feed?.url) {
           try { favicon = `${new URL(feed.url).origin}/favicon.ico`; } catch { favicon = ""; }
         }
-        return { ...a, favicon };
+        return { ...a, feed_title: feedTitle, favicon };
       });
     },
     refetchInterval: TICKER_PANE_POLL_MS,
@@ -2857,7 +2866,8 @@ function TickerPane() {
     ? (unreadRows.length ? unreadRows : (articles.data || []).filter(isTickerUnread))
     : (articles.data || []);
   const faviconById = new Map((articles.data || []).map((article) => [article.id, article.favicon]));
-  const tickerArticlesWithFavicons = tickerArticles.map((article) => ({ ...article, favicon: article.favicon || faviconById.get(article.id) || "" }));
+  const feedTitleById = new Map((articles.data || []).map((article) => [article.id, article.feed_title || "RSS"]));
+  const tickerArticlesWithFavicons = tickerArticles.map((article) => ({ ...article, feed_title: article.feed_title || feedTitleById.get(article.id) || "RSS", favicon: article.favicon || faviconById.get(article.id) || "" }));
   if (!effectiveSettings || effectiveSettings.headlineTicker !== true) return null;
   // Ticker rules are `.hermes-rss .rss-ticker-*` descendants: the pane must
   // mount a .hermes-rss root. Inline styles neutralize the page-level root
@@ -4055,9 +4065,15 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           jsxs("div", { className: "rss-setting-row", children: [
             jsx("label", { className: "rss-setting", children: [
-              jsx("input", { type: "checkbox", checked: draft.tickerShowSource !== false, onChange: event => updateDraft({ ...draft, tickerShowSource: event.target.checked }) }),
-              "Show feed name"
-            ] }),
+              jsx("input", { type: "checkbox", checked: draft.tickerShowFavicon !== false, onChange: event => updateDraft({ ...draft, tickerShowFavicon: event.target.checked }) }),
+              "Website Favicon"
+            ] })
+          ] }),
+          jsxs("div", { className: "rss-setting-row", children: [
+            jsx("span", { className: "rss-setting-label", children: "Website Name" }),
+            jsx(Segmented, { value: draft.tickerWebsiteName || "after", onChange: v => updateDraft({ ...draft, tickerWebsiteName: v }), options: TICKER_WEBSITE_NAMES })
+          ] }),
+          jsxs("div", { className: "rss-setting-row", children: [
             jsx("label", { className: "rss-setting", children: [
               jsx("input", { type: "checkbox", checked: draft.tickerRelativeTime !== false, onChange: event => updateDraft({ ...draft, tickerRelativeTime: event.target.checked }) }),
               "Show age"
