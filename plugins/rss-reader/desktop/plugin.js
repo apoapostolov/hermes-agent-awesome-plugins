@@ -3281,6 +3281,16 @@ function ReaderProfile({ ctx, owner }) {
   const [editingMute, setEditingMute] = useState(null);
   const [tab, setTab] = useState("article");
   const [browserOpen, setBrowserOpen] = useState(false);
+  const [copiedFlash, setCopiedFlash] = useState(false);
+  const copiedTimer = useRef(null);
+  const copyArticleUrl = async (url) => {
+    const text = String(url || "").trim();
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setCopiedFlash(true);
+    if (copiedTimer.current) window.clearTimeout(copiedTimer.current);
+    copiedTimer.current = window.setTimeout(() => setCopiedFlash(false), 1000);
+  };
   const [browserUrl, setBrowserUrl] = useState("");
   const [discussOpen, setDiscussOpen] = useState(false);
   const [discussNote, setDiscussNote] = useState("");
@@ -4614,7 +4624,7 @@ function ReaderProfile({ ctx, owner }) {
             jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Back to article", title: "Back to article", onClick: () => setBrowserOpen(false), children: jsx("i", { className: "codicon codicon-arrow-left", "aria-hidden": "true" }) }),
             jsx("span", { className: "rss-browser-url", title: browserUrl, children: browserUrl }),
             jsxs("span", { className: "rss-browser-actions", children: [
-              jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Copy article URL", title: "Copy article URL", onClick: async () => { try { await navigator.clipboard.writeText(browserUrl); setNotice("Article URL copied."); } catch { setNotice("Could not copy the article URL."); } }, children: jsx("i", { className: "codicon codicon-copy", "aria-hidden": "true" }) }),
+              jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Copy article URL", title: "Copy article URL", onClick: async () => { try { await copyArticleUrl(browserUrl); } catch { setNotice("Could not copy the article URL."); } }, children: jsx("i", { className: `codicon ${copiedFlash ? "codicon-check" : "codicon-copy"}`, "aria-hidden": "true" }) }),
               jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Open in external browser", title: "Open in external browser", onClick: () => ctx.os.openExternal(browserUrl), children: jsx("i", { className: "codicon codicon-link-external", "aria-hidden": "true" }) })
             ] })
           ] }),
@@ -4672,11 +4682,8 @@ function ReaderProfile({ ctx, owner }) {
                 disabled: disabled || !article.url,
                 "aria-label": "Copy link",
                 title: "Copy link",
-                onClick: () => act("Copying\u2026", async () => {
-                  await navigator.clipboard.writeText(article.url);
-                  setNotice("Article link copied.");
-                }),
-                children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-copy", "aria-hidden": "true" })
+                onClick: () => void copyArticleUrl(article.url).catch(() => setNotice("Could not copy the article URL.")),
+                children: /* @__PURE__ */ jsx("i", { className: `codicon ${copiedFlash ? "codicon-check" : "codicon-copy"}`, "aria-hidden": "true" })
               }
             ),
             /* @__PURE__ */ jsx(
