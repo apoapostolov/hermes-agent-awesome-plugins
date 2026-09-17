@@ -2706,6 +2706,10 @@ function tickerLoopSeconds(speed, rowCount) {
   return Math.max(60, base * (n / TICKER_SPEED_REF_ITEMS));
 }
 var TICKER_FONT_TO_HEIGHT = (px) => Math.max(28, Math.round(px * 2.1) + 6);
+// Draft ticker settings from the Settings form. register() uses this to
+// mount or unmount the layout pane; TickerPane seeds from it so the first
+// render after a remount still has the unsaved draft.
+var tickerPanePreview = null;
 function groupTickerArticles(articles, mode) {
   if (!Array.isArray(articles) || articles.length === 0) return [];
   if (mode === "source") {
@@ -3021,7 +3025,7 @@ function isTickerUnread(article) {
 function TickerPane() {
   const owner = tickerPaneOwner();
   const [settings] = useSettingsPane(owner);
-  const [previewSettings, setPreviewSettings] = useState(null);
+  const [previewSettings, setPreviewSettings] = useState(() => tickerPanePreview);
   useEffect(() => {
     const onPreview = (event) => {
       if (event.detail?.owner === owner) setPreviewSettings(event.detail.settings || null);
@@ -3071,6 +3075,8 @@ function TickerPane() {
   };
   const tickerArticles = articles.data || [];
   const tickerArticlesWithFavicons = tickerArticles;
+  // Pane registration (not this return) removes the layout row. Returning
+  // null while the pane is still registered leaves a dead black strip.
   if (!effectiveSettings || effectiveSettings.headlineTicker !== true) return null;
   // Ticker rules are `.hermes-rss .rss-ticker-*` descendants: the pane must
   // mount a .hermes-rss root. Inline styles neutralize the page-level root
@@ -5133,11 +5139,15 @@ var plugin_default = {
     // Layout presets stack unknown panes as center tabs (often the files rail).
     // Home is a single-pane column split on workspace bottom. If the saved tree
     // is not that shape, re-register under a new id so adoption uses the dock.
+    // Registration follows hermes-newswire: registered = the strip exists in
+    // the layout; unregistered = the row is gone. Returning null from TickerPane
+    // while the pane stays registered leaves a dead black strip.
     let disposeTicker = null;
     let tickerMountGen = 0;
     let lastTickerMountAt = 0;
     let currentTickerId = "rssTicker";
-    const makeTickerPane = (id) => ({
+    let lastTickerPaneKey = null;
+    const makeTickerPane = (id, heightPx) => ({
       id,
       area: "panes",
       data: {
@@ -5145,45 +5155,77 @@ var plugin_default = {
         headerVeto: true,
         uncloseable: true,
         dock: { pane: "workspace", pos: "bottom", enforce: true },
-        height: `${TICKER_FONT_TO_HEIGHT(11)}px`
+        height: `${heightPx}px`
       },
       render: () => jsx(TickerPane, {})
     });
-    const mountTickerPane = () => {
-      if (disposeTicker) {
-        try { disposeTicker(); } catch { /* ignore */ }
-        disposeTicker = null;
-      }
-      tickerMountGen += 1;
-      lastTickerMountAt = Date.now();
-      currentTickerId = tickerMountGen === 1 ? "rssTicker" : `rssTicker-${tickerMountGen}`;
-      disposeTicker = ctx.register(makeTickerPane(currentTickerId));
-    };
-    const tickerIsOn = () => {
+    const tickerSettingsNow = () => {
+      if (tickerPanePreview) return tickerPanePreview;
       try {
-        return readSettings(ctx, tickerPaneOwner())?.headlineTicker === true;
+        return readSettings(ctx, tickerPaneOwner());
       } catch {
-        return false;
+        return null;
       }
     };
-    mountTickerPane();
+    const tickerHeightPx = (settings) => {
+      const fontPx = Math.min(18, Math.max(9, Number(settings?.tickerFontSize) || 11));
+      return TICKER_FONT_TO_HEIGHT(fontPx);
+    };
+    const unmountTickerPane = () => {
+      if (!disposeTicker) return;
+      try { disposeTicker(); } catch { /* ignore */ }
+      disposeTicker = null;
+    };
+    const applyTickerPane = ({ bumpId = false } = {}) => {
+      const settings = tickerSettingsNow();
+      const enabled = settings?.headlineTicker === true;
+      const heightPx = tickerHeightPx(settings);
+      if (!enabled) {
+        const key = `off|${heightPx}`;
+        if (key === lastTickerPaneKey && !bumpId) return;
+        lastTickerPaneKey = key;
+        unmountTickerPane();
+        return;
+      }
+      const nextGen = bumpId ? tickerMountGen + 1 : Math.max(tickerMountGen, 1);
+      const nextId = nextGen === 1 ? "rssTicker" : `rssTicker-${nextGen}`;
+      const key = `on|${heightPx}|${nextId}`;
+      if (key === lastTickerPaneKey) return;
+      lastTickerPaneKey = key;
+      unmountTickerPane();
+      tickerMountGen = nextGen;
+      lastTickerMountAt = Date.now();
+      currentTickerId = nextId;
+      disposeTicker = ctx.register(makeTickerPane(currentTickerId, heightPx));
+    };
+    const onTickerPreview = (event) => {
+      if (event.detail?.owner && event.detail.owner !== tickerPaneOwner()) return;
+      tickerPanePreview = event.detail?.settings || null;
+      applyTickerPane();
+    };
+    const onTickerLibrary = () => {
+      if (tickerPanePreview) return;
+      applyTickerPane();
+    };
+    applyTickerPane();
+    window.addEventListener("hermes-rss-ticker-preview", onTickerPreview);
+    window.addEventListener("hermes-rss-library-changed", onTickerLibrary);
     const tickerDockWatch = setInterval(() => {
       if (Date.now() - lastTickerMountAt < 1600) return;
-      if (!tickerIsOn()) return;
+      if (tickerSettingsNow()?.headlineTicker !== true) return;
       if (tickerMountGen >= 8) return;
       const tree = readLayoutTree();
       if (!tree) return;
       if (!tickerPaneInTree(tree, currentTickerId)) return;
       if (tickerIsWorkspaceBottom(tree, currentTickerId)) return;
-      mountTickerPane();
+      applyTickerPane({ bumpId: true });
     }, 700);
     if (typeof ctx.onDispose === "function") {
       ctx.onDispose(() => {
         clearInterval(tickerDockWatch);
-        if (disposeTicker) {
-          try { disposeTicker(); } catch { /* ignore */ }
-          disposeTicker = null;
-        }
+        window.removeEventListener("hermes-rss-ticker-preview", onTickerPreview);
+        window.removeEventListener("hermes-rss-library-changed", onTickerLibrary);
+        unmountTickerPane();
       });
     }
     ctx.register({
