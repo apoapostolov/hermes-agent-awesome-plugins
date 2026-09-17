@@ -1852,6 +1852,17 @@ function httpsSrc(value) {
   if (v.startsWith("//")) return "https:" + v;
   return "";
 }
+function safeHttpHref(value) {
+  const raw = httpsSrc(value);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
 function imgSrcFrom(el) {
   const srcset = (el.getAttribute("srcset") || el.getAttribute("data-srcset") || "").split(",")[0].trim().split(/\s+/)[0];
   for (const c of [el.getAttribute("src"), el.getAttribute("data-src"), el.getAttribute("data-original"), el.getAttribute("data-lazy-src"), srcset]) {
@@ -2408,6 +2419,7 @@ var styles = `
 .hermes-rss .rss-rich th{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent);font-weight:650}
 .hermes-rss .rss-rich h4{font-size:1em;margin:1.2em 0 .5em}
 .hermes-rss .rss-rich{white-space:normal}
+.hermes-rss .rss-rich a{cursor:pointer}
 .hermes-rss .rss-rich .rss-list-md{white-space:normal;list-style:disc outside;padding-left:1.5em;margin:0 0 1.05em}
 .hermes-rss .rss-rich .rss-list-md li{display:list-item;margin:0;padding:0;white-space:normal}
 .hermes-rss .rss-rich .rss-list-md li + li{margin-top:.15em}
@@ -3403,6 +3415,23 @@ function ReaderProfile({ ctx, owner }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("main");
   const [settings, setSettings] = useState(() => readSettings(ctx, owner));
+  const openHttpLink = (raw) => {
+    const href = safeHttpHref(raw);
+    if (!href) return;
+    if (settings.openInExternalBrowser === true) {
+      void ctx.os.openExternal(href);
+      return;
+    }
+    setBrowserUrl(href);
+    setBrowserOpen(true);
+  };
+  const onRichLinkClick = (event) => {
+    const a = event.target?.closest?.("a[href]");
+    if (!a || !event.currentTarget.contains(a)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openHttpLink(a.getAttribute("href"));
+  };
   const [draft, setDraft] = useState(() => readSettings(ctx, owner));
   const [feedToRemove, setFeedToRemove] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
@@ -4842,12 +4871,7 @@ function ReaderProfile({ ctx, owner }) {
                 onClick: () => {
                   const url = String(article.url || "").trim();
                   if (!url) return;
-                  if (settings.openInExternalBrowser === true) {
-                    void ctx.os.openExternal(url);
-                    return;
-                  }
-                  setBrowserUrl(url);
-                  setBrowserOpen(true);
+                  openHttpLink(url);
                 },
                 children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-globe", "aria-hidden": "true" })
               }
@@ -4898,7 +4922,7 @@ function ReaderProfile({ ctx, owner }) {
           const gradeTag = gradingTagFor(settings.gradingTags, article.grade?.level);
           const bodyHtml = gradeTag && gradeTag.label ? withGradeNote(rich.html, article.grade, gradeTag) : rich.html;
           return /* @__PURE__ */ jsxs("div", { role: "tabpanel", children: [
-            bodyHtml ? /* @__PURE__ */ jsx("div", { className: "rss-body rss-rich", dangerouslySetInnerHTML: { __html: bodyHtml } }) : /* @__PURE__ */ jsx("p", { className: "rss-body", children: "This feed contains only a headline. Open the original article to read more." }),
+            bodyHtml ? /* @__PURE__ */ jsx("div", { className: "rss-body rss-rich", onClick: onRichLinkClick, onAuxClick: onRichLinkClick, dangerouslySetInnerHTML: { __html: bodyHtml } }) : /* @__PURE__ */ jsx("p", { className: "rss-body", children: "This feed contains only a headline. Open the original article to read more." }),
             !article.captured && /* @__PURE__ */ jsx("div", { className: "rss-note", children: rich.isHtml ? "Rendered from the feed's own HTML. Scripts are stripped and only https links and images survive sanitizing." : "This is the text supplied by the feed. It may be an excerpt. Scripts are stripped; https images and tables are kept." })
           ] });
         })(),
