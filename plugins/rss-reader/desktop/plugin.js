@@ -1173,6 +1173,7 @@ function readSettings(ctx, owner) {
     tickerAssetSize: ["small", "normal", "font"].includes(stored.tickerAssetSize) ? stored.tickerAssetSize : "normal",
     tickerTagStyle: ["pill", "article_color", "none"].includes(stored.tickerTagStyle) ? stored.tickerTagStyle : "pill",
     tickerClickBehavior: stored.tickerClickBehavior === "browser" ? "browser" : "reader",
+    openInExternalBrowser: stored.openInExternalBrowser === true,
     gradingSkill: gradingSkillName(typeof stored.gradingSkill === "string" ? stored.gradingSkill : ""),
     gradingTags: readGradingTags(ctx, owner)
   };
@@ -2973,6 +2974,10 @@ function TickerPane() {
       return;
     }
     if (effectiveSettings.tickerClickBehavior === "browser") {
+      if (effectiveSettings.openInExternalBrowser === true && rssCtx?.os?.openExternal) {
+        void rssCtx.os.openExternal(item.url);
+        return;
+      }
       openHermesPreview(item.url, item.title || item.feed_title || "Article");
       return;
     }
@@ -4240,19 +4245,16 @@ function ReaderProfile({ ctx, owner }) {
             jsx("label", { className: "rss-setting", children: [
               jsx("input", { type: "checkbox", checked: draft.tickerShowFavicon !== false, onChange: event => updateDraft({ ...draft, tickerShowFavicon: event.target.checked }) }),
               "Website Favicon"
+            ] }),
+            jsx("label", { className: "rss-setting", children: [
+              jsx("input", { type: "checkbox", checked: draft.tickerRelativeTime !== false, onChange: event => updateDraft({ ...draft, tickerRelativeTime: event.target.checked }) }),
+              "Show age"
             ] })
           ] }),
           jsxs("div", { className: "rss-setting-row", children: [
             jsx("span", { className: "rss-setting-label", children: "Website Name" }),
             jsx(Segmented, { value: draft.tickerWebsiteName || "after", onChange: v => updateDraft({ ...draft, tickerWebsiteName: v }), options: TICKER_WEBSITE_NAMES })
           ] }),
-          jsxs("div", { className: "rss-setting-row", children: [
-            jsx("label", { className: "rss-setting", children: [
-              jsx("input", { type: "checkbox", checked: draft.tickerRelativeTime !== false, onChange: event => updateDraft({ ...draft, tickerRelativeTime: event.target.checked }) }),
-              "Show age"
-            ] })
-          ] }),
-          jsx("p", { className: "rss-muted rss-small", children: "The ticker runs along the bottom of the reader. Graded articles show their tag pill and grade color." })
         ] }),
         ] }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save Settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => { const saved = readSettings(ctx, owner); setSettingsOpen(false); restoreDraftPreview(saved); }, children: "Cancel" })] })
@@ -4305,7 +4307,12 @@ function ReaderProfile({ ctx, owner }) {
               jsx("input", { type: "checkbox", checked: draft.markReadOnOpen, onChange: event => updateDraft({ ...draft, markReadOnOpen: event.target.checked }) }),
               "Mark Articles Read When Opened"
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "Navigating over an article marks it as read." })
+            jsx("p", { className: "rss-muted rss-small", children: "Navigating over an article marks it as read." }),
+            jsx("label", { className: "rss-setting", children: [
+              jsx("input", { type: "checkbox", checked: draft.openInExternalBrowser === true, onChange: event => updateDraft({ ...draft, openInExternalBrowser: event.target.checked }) }),
+              "Open in External Browser"
+            ] }),
+            jsx("p", { className: "rss-muted rss-small", children: "Open in Browser uses the system default browser instead of the in-app browser." }),
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "Article Tagging" }),
@@ -4809,8 +4816,13 @@ function ReaderProfile({ ctx, owner }) {
                 title: "Open in Browser",
                 onClick: () => {
                   const url = String(article.url || "").trim();
+                  if (!url) return;
+                  if (settings.openInExternalBrowser === true) {
+                    void ctx.os.openExternal(url);
+                    return;
+                  }
                   setBrowserUrl(url);
-                  setBrowserOpen(!!url);
+                  setBrowserOpen(true);
                 },
                 children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-globe", "aria-hidden": "true" })
               }
