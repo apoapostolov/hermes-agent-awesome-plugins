@@ -1166,11 +1166,18 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
 function normalizeDefaultView(value) {
   return value === "unread" || value === "saved" ? value : "all";
 }
+var REFRESH_MINUTES = [5, 10, 15, 30, 60, 120, 180];
+function normalizeRefreshMinutes(value) {
+  const n = Number(value);
+  if (REFRESH_MINUTES.includes(n)) return n;
+  if (!Number.isFinite(n)) return 15;
+  return REFRESH_MINUTES.reduce((best, minutes) => Math.abs(n - minutes) < Math.abs(n - best) ? minutes : best, REFRESH_MINUTES[0]);
+}
 function readSettings(ctx, owner) {
   const stored = storageGet(ctx, "settings", owner, {}) || {};
   return {
     autoRefresh: stored.autoRefresh === true,
-    refreshMinutes: Number.isInteger(stored.refreshMinutes) && stored.refreshMinutes >= 1 && stored.refreshMinutes <= 1440 ? stored.refreshMinutes : 15,
+    refreshMinutes: normalizeRefreshMinutes(stored.refreshMinutes),
     markReadOnOpen: stored.markReadOnOpen !== false,
     defaultView: normalizeDefaultView(stored.defaultView),
     fullCapture: stored.fullCapture === true,
@@ -1335,7 +1342,7 @@ async function executeRssCommand(ctx, host2, owner, command) {
   }
   if (command.action === "refresh-period") {
     const next = readSettings(ctx, owner);
-    next.refreshMinutes = Math.max(1, Math.min(1440, Number(payload.minutes) || 15));
+    next.refreshMinutes = normalizeRefreshMinutes(payload.minutes);
     delete next.gradingTags;
     storageSet(ctx, "settings", owner, next);
     publishLibraryChange(owner, `Refresh period saved: every ${next.refreshMinutes} minutes.`);
@@ -2991,9 +2998,7 @@ function Segmented({ value, onChange, options }) {
   }, o.id)) });
 }
 function tickerRefreshMs(settings) {
-  const minutes = Number(settings?.refreshMinutes);
-  const n = Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440 ? minutes : 15;
-  return n * 60000;
+  return normalizeRefreshMinutes(settings?.refreshMinutes) * 60000;
 }
 // Global ticker pane: rendered by the app shell on every screen (docked to
 // the workspace bottom edge). Reads the profile library straight from
@@ -3547,6 +3552,7 @@ function ReaderProfile({ ctx, owner }) {
   const [limit, setLimit] = useState(100);
   const [listFab, setListFab] = useState(null);
   const listRef = useRef(null);
+  const detailRef = useRef(null);
   const richRef = useRef(null);
   const keepListScroll = useRef(null);
   const savedListY = useRef(null);
@@ -3648,6 +3654,8 @@ function ReaderProfile({ ctx, owner }) {
   useEffect(() => {
     setDiscussOpen(false);
     setDiscussNote("");
+    const pane = detailRef.current;
+    if (pane) pane.scrollTop = 0;
   }, [selected]);
   const refresh = () => client.invalidateQueries({ queryKey: key });
   useEffect(() => {
@@ -4195,10 +4203,7 @@ function ReaderProfile({ ctx, owner }) {
   };
   const saveSettings = event => {
     event.preventDefault();
-    const minutes = Number(draft.refreshMinutes);
-    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
-      setNotice("Choose a refresh interval from 1 to 1440 minutes."); return;
-    }
+    const minutes = normalizeRefreshMinutes(draft.refreshMinutes);
     const next = { ...draft, refreshMinutes: minutes };
     next.gradingSkill = gradingSkillName(next.gradingSkill);
     next.defaultView = normalizeDefaultView(next.defaultView);
@@ -4496,13 +4501,9 @@ function ReaderProfile({ ctx, owner }) {
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
                 jsx("input", { type: "checkbox", checked: draft.autoRefresh, disabled: typeof ctx.onDispose !== "function", onChange: event => updateDraft({ ...draft, autoRefresh: event.target.checked }) }),
-                "Automatically Refresh Feeds"
+                "Automatically Refresh"
               ] }),
-              jsxs("label", { className: "rss-setting rss-setting-inline", children: [
-                "Every",
-                jsx(Input, { type: "number", min: 1, max: 1440, step: 1, required: true, "aria-label": "Refresh interval in minutes", value: draft.refreshMinutes, onChange: event => updateDraft({ ...draft, refreshMinutes: event.target.value }) }),
-                "minutes"
-              ] })
+              jsx(Segmented, { value: String(normalizeRefreshMinutes(draft.refreshMinutes)), onChange: v => updateDraft({ ...draft, refreshMinutes: Number(v) }), options: REFRESH_MINUTES.map((n) => ({ id: String(n), label: n })) })
             ] }),
             jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Fetches new posts on this interval, including the headline ticker, only while the Hermes desktop client is open." : "Background refresh is unavailable on this Hermes build. Use Refresh." })
           ] }),
@@ -4918,7 +4919,7 @@ function ReaderProfile({ ctx, owner }) {
           children: jsx(Codicon, { name: listFab === "down" ? "arrow-down" : "arrow-up", size: "1rem" })
         })
       ] }),
-      /* @__PURE__ */ jsxs("main", { className: `rss-detail${browserOpen ? " rss-detail-browser" : ""}`, children: [
+      /* @__PURE__ */ jsxs("main", { ref: detailRef, className: `rss-detail${browserOpen ? " rss-detail-browser" : ""}`, children: [
         (busy || notice) && jsxs("div", { className: "rss-notice rss-notice-float", role: "status", children: [
           jsx("span", { children: busy || notice }),
           notice && jsx("button", { type: "button", className: "rss-notice-close", "aria-label": "Dismiss notification", onClick: () => setNotice(""), children: "×" })

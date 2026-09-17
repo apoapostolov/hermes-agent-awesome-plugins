@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice")].join("\n");
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -26,6 +26,7 @@ new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "normal", label: "", color: "", tint: 0, rank: 40 },
   { key: "spam", label: "SPAM", color: "#6b6b6b", tint: 10, rank: 10 }
 ];
+const REFRESH_MINUTES = [5, 10, 15, 30, 60, 120, 180];
 ${bundle}
 exports.profileFromOwner = profileFromOwner;
 exports.cheapExcerpt = cheapExcerpt;
@@ -54,6 +55,7 @@ exports.applyFolderAction = applyFolderAction;
 exports.buildPreferenceSnapshot = buildPreferenceSnapshot;
 exports.interestPayloadJson = interestPayloadJson;
 exports.normalizeDefaultView = normalizeDefaultView;
+exports.normalizeRefreshMinutes = normalizeRefreshMinutes;
 exports.articleNeedsCapture = articleNeedsCapture;
 exports.healthAgeLabel = healthAgeLabel;
 exports.healthNotice = healthNotice;
@@ -169,6 +171,11 @@ assert.equal(interestPayload.saved_count, 80);
 assert.ok(interestPayload.omitted.saved + interestPayload.omitted.feeds + interestPayload.omitted.mutes > 0);
 assert.equal(fns.normalizeDefaultView("saved"), "saved");
 assert.equal(fns.normalizeDefaultView("nope"), "all");
+assert.equal(fns.normalizeRefreshMinutes(15), 15);
+assert.equal(fns.normalizeRefreshMinutes(180), 180);
+assert.equal(fns.normalizeRefreshMinutes(7), 5);
+assert.equal(fns.normalizeRefreshMinutes(1440), 180);
+assert.equal(fns.normalizeRefreshMinutes("nope"), 15);
 assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: false, body: "short" }), true);
 assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: true, body: "x".repeat(900) }), false);
 assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: true, body: "short" }), true);
@@ -186,4 +193,4 @@ assert.match(health, /1 error/);
 assert.match(health, /1 stale refresh/);
 assert.match(health, /1 quiet for 7d\+?/);
 
-console.log("ok", 39);
+console.log("ok", 40);
