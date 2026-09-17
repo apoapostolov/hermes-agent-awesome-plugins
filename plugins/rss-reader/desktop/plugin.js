@@ -2868,11 +2868,7 @@ function useSettingsPane(owner) {
   return useMemo(() => [readSettings(rssCtx, owner)], [owner, version]);
 }
 function isTickerUnread(article) {
-  const readValue = article?.is_read ?? article?.isRead ?? article?.read;
-  const read = readValue === true || readValue === 1 || readValue === "1" || readValue === "true";
-  const unreadValue = article?.unread;
-  const unreadFlag = unreadValue === false || unreadValue === 0 || unreadValue === "0" || unreadValue === "false";
-  return !read && !unreadFlag && !article?.read_at && !article?.readAt;
+  return article?.is_read !== true;
 }
 function TickerPane() {
   const owner = tickerPaneOwner();
@@ -2886,12 +2882,16 @@ function TickerPane() {
     return () => window.removeEventListener("hermes-rss-ticker-preview", onPreview);
   }, [owner]);
   const effectiveSettings = previewSettings || settings;
+  const onlyUnread = effectiveSettings?.tickerOnlyUnread === true;
   const articles = useQuery({
-    queryKey: ["rss-reader", owner, "ticker-articles"],
+    queryKey: ["rss-reader", owner, "ticker-articles", onlyUnread],
     queryFn: async () => {
       const library = await transact(owner);
       const byFeed = new Map((library.feeds || []).map((f) => [f.id, f]));
-      return (library.articles || []).slice(0, 100).map((a) => {
+      const byTime = (a, b) => String(b.published_at || b.received_at || "").localeCompare(String(a.published_at || a.received_at || ""));
+      let rows = (library.articles || []).slice().sort(byTime);
+      if (onlyUnread) rows = rows.filter(isTickerUnread);
+      return rows.slice(0, 100).map((a) => {
         const feed = byFeed.get(a.feed_id);
         const feedTitle = a.feed_title || feed?.title || feed?.name || "RSS";
         let favicon = "";
@@ -2916,9 +2916,7 @@ function TickerPane() {
     host.navigate("/rss");
     setTimeout(() => window.dispatchEvent(new CustomEvent("hermes-rss-select-article", { detail: { owner, id: item.id } })), 120);
   };
-  const tickerArticles = effectiveSettings.tickerOnlyUnread === true
-    ? (articles.data || []).filter(isTickerUnread)
-    : (articles.data || []);
+  const tickerArticles = articles.data || [];
   const tickerArticlesWithFavicons = tickerArticles;
   if (!effectiveSettings || effectiveSettings.headlineTicker !== true) return null;
   // Ticker rules are `.hermes-rss .rss-ticker-*` descendants: the pane must
