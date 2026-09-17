@@ -1019,6 +1019,7 @@ function openPresetDialog(kind) {
   closeOverlay()
   const overlay = document.createElement('div')
   overlay.id = 'bc-overlay'
+  overlay.className = 'bc-overlay-center'
   overlay.innerHTML =
     '<div class="bc-dialog bc-dialog-wide" role="dialog" aria-modal="true">' +
     '<div class="bc-dialog-title">' +
@@ -1194,6 +1195,9 @@ function injectStyle() {
       justify-content: flex-start;
       padding: 2rem;
       background: color-mix(in srgb, black 22%, transparent);
+    }
+    #bc-overlay.bc-overlay-center {
+      justify-content: center;
     }
     .bc-dialog {
       min-width: 16rem;
