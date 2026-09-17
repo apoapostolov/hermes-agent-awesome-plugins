@@ -2629,7 +2629,13 @@ function refreshButtonLabel(at, now) {
 // Headline ticker components. buildTickerRows is a plain helper (no hooks) so
 // both marquee halves and the reduced-motion static row share one list.
 // Speed + grouping options mirror hermes-newswire's ticker settings.
-var TICKER_SPEED_DURATIONS = { barely: 2400, very_slow: 1800, slow: 1200, normal: 900, fast: 600 }; // seconds per loop; base is deliberately much slower than newswire
+var TICKER_SPEED_DURATIONS = { barely: 2400, very_slow: 1800, slow: 1200, normal: 900, fast: 600 }; // seconds per loop at 50 headlines
+var TICKER_SPEED_REF_ITEMS = 50;
+function tickerLoopSeconds(speed, rowCount) {
+  const base = TICKER_SPEED_DURATIONS[speed] || 900;
+  const n = Math.max(1, Number(rowCount) || 1);
+  return Math.max(60, base * (n / TICKER_SPEED_REF_ITEMS));
+}
 var TICKER_FONT_TO_HEIGHT = (px) => Math.max(28, Math.round(px * 2.1) + 6);
 function groupTickerArticles(articles, mode) {
   if (!Array.isArray(articles) || articles.length === 0) return [];
@@ -2801,7 +2807,7 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
     return () => mq.removeEventListener?.("change", onChange);
   }, []);
   const fontPx = Math.min(18, Math.max(9, Number(settings.tickerFontSize) || 11));
-  const duration = TICKER_SPEED_DURATIONS[settings.tickerSpeed] || 150;
+  const duration = tickerLoopSeconds(settings.tickerSpeed, rows.length);
   const renderRow = (row, i) => row.kind === "divider"
     ? jsx("span", { "aria-hidden": "true", className: "rss-ticker-divider", children: row.source }, `d${i}`)
     : jsx(TickerItem, { row, onOpen, showFavicon: settings.tickerShowFavicon !== false, websiteName: settings.tickerWebsiteName || "after", tagStyle: settings.tickerTagStyle || "pill", showAge: settings.tickerRelativeTime !== false }, row.item.id);
