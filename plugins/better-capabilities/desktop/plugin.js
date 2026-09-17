@@ -105,21 +105,21 @@ function closeOverlay() {
   document.getElementById('bc-overlay')?.remove()
 }
 
-function confirmRemove(kind, name, onYes) {
+function confirmDanger(title, body, onYes) {
   closeOverlay()
   const overlay = document.createElement('div')
   overlay.id = 'bc-overlay'
   overlay.innerHTML =
     '<div class="bc-dialog" role="dialog" aria-modal="true">' +
-    '<div class="bc-dialog-title">Remove ' +
-    escapeHtml(name) +
-    '?</div>' +
-    '<div class="bc-dialog-body">The ' +
-    (kind === 'plugin' ? 'plugin' : 'skill') +
-    ' folder goes to the Recycle Bin.</div>' +
+    '<div class="bc-dialog-title">' +
+    escapeHtml(title) +
+    '</div>' +
+    '<div class="bc-dialog-body">' +
+    escapeHtml(body) +
+    '</div>' +
     '<div class="bc-dialog-actions">' +
     '<button type="button" class="bc-text-btn" data-bc-cancel="1">Cancel</button>' +
-    '<button type="button" class="bc-text-btn bc-danger" data-bc-ok="1">Remove</button>' +
+    '<button type="button" class="bc-text-btn bc-danger" data-bc-ok="1">Delete</button>' +
     '</div></div>'
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeOverlay()
@@ -130,6 +130,31 @@ function confirmRemove(kind, name, onYes) {
     onYes()
   })
   document.body.appendChild(overlay)
+}
+
+function confirmRemoveFolder(kind, name, onYes) {
+  const noun = kind === 'plugin' ? 'plugin' : 'skill'
+  confirmDanger(
+    'Delete ' + name + '?',
+    'Are you sure you want to delete this ' +
+      noun +
+      '? This action cannot be undone and will permanently remove this ' +
+      noun +
+      ' from your collection.',
+    onYes,
+  )
+}
+
+function confirmRemovePreset(kind, name, onYes) {
+  const noun =
+    kind === 'plugins' ? 'plugin preset' : kind === 'tools' ? 'tool preset' : 'skill preset'
+  confirmDanger(
+    'Delete ' + name + '?',
+    'Are you sure you want to delete this ' +
+      noun +
+      '? This action cannot be undone and will permanently remove this preset from your collection.',
+    onYes,
+  )
 }
 
 function escapeHtml(value) {
@@ -222,7 +247,7 @@ function paintPluginRows() {
       e.stopPropagation()
       const liveName = pluginKeyFromButton(e.currentTarget) || name
       if (!liveName) return
-      confirmRemove('plugin', liveName, () => void doDelete('plugin', liveName))
+      confirmRemoveFolder('plugin', liveName, () => void doDelete('plugin', liveName))
     })
     const wrap = document.createElement('span')
     wrap.className = slot.className
@@ -522,7 +547,7 @@ function paintSkillRow() {
         e.stopPropagation()
         const liveName = liveSkillName(e.currentTarget)
         if (!liveName) return
-        confirmRemove('skill', liveName, () => void doDelete('skill', liveName))
+        confirmRemoveFolder('skill', liveName, () => void doDelete('skill', liveName))
       })
       row.appendChild(folder)
       row.appendChild(del)
@@ -868,9 +893,11 @@ function renderPresetList(kind, listEl, nameInput) {
     const del = iconButton('codicon-trash', 'Delete')
     del.classList.add('bc-danger')
     del.addEventListener('click', () => {
-      removePreset(kind, name)
-      renderPresetList(kind, listEl, nameInput)
-      notify('success', 'Deleted ' + name, 'The ' + kindLabel(kind).toLowerCase() + ' preset is gone.')
+      confirmRemovePreset(kind, name, () => {
+        removePreset(kind, name)
+        renderPresetList(kind, listEl, nameInput)
+        notify('success', 'Deleted ' + name, 'The ' + kindLabel(kind).toLowerCase() + ' preset is gone.')
+      })
     })
     actions.append(apply, overwrite, rename, del)
     row.append(grip, label, actions)
