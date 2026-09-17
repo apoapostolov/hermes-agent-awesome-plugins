@@ -2740,6 +2740,7 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
     : jsx(TickerItem, { row, onOpen, showFavicon: settings.tickerShowFavicon !== false, websiteName: settings.tickerWebsiteName || "after", tagStyle: settings.tickerTagStyle || "pill", showAge: settings.tickerRelativeTime !== false }, row.item.id);
   return jsxs("div", {
     className: `rss-ticker${settings.tickerPauseOnHover === false ? " rss-ticker-no-hover" : ""}${settings.tickerAssetSize === "small" ? " rss-ticker-small-assets" : ""}${settings.tickerAssetSize === "font" ? " rss-ticker-font-assets" : ""}`,
+    "data-rss-ticker": "1",
     "data-paused": "false",
     role: "region",
     "aria-label": "RSS headline ticker",
@@ -4896,17 +4897,58 @@ var plugin_default = {
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
     if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
     ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);
-    ctx.register({
-      id: "tickerPane",
+    // Focus/other layout presets keep unknown plugin panes by stacking them as
+    // center tabs. A headerVeto bottom strip then unmounts. Re-register under a
+    // fresh id so adoption uses dock: workspace/bottom again.
+    let disposeTicker = null;
+    let tickerMountGen = 0;
+    let lastTickerMountAt = 0;
+    const makeTickerPane = (id) => ({
+      id,
       area: "panes",
+      title: "RSS",
       data: {
         placement: "main",
         headerVeto: true,
-        dock: { pane: "workspace", pos: "bottom" },
-        height: "30px"
+        uncloseable: true,
+        dock: { pane: "workspace", pos: "bottom", enforce: true },
+        height: `${TICKER_FONT_TO_HEIGHT(11)}px`
       },
       render: () => jsx(TickerPane, {})
     });
+    const mountTickerPane = () => {
+      if (disposeTicker) {
+        try { disposeTicker(); } catch { /* ignore */ }
+        disposeTicker = null;
+      }
+      tickerMountGen += 1;
+      lastTickerMountAt = Date.now();
+      const id = tickerMountGen === 1 ? "tickerPane" : `tickerPane-${tickerMountGen}`;
+      disposeTicker = ctx.register(makeTickerPane(id));
+    };
+    const tickerIsOn = () => {
+      try {
+        return readSettings(ctx, tickerPaneOwner())?.headlineTicker === true;
+      } catch {
+        return false;
+      }
+    };
+    mountTickerPane();
+    const tickerDockWatch = setInterval(() => {
+      if (Date.now() - lastTickerMountAt < 1600) return;
+      if (!tickerIsOn()) return;
+      if (typeof document !== "undefined" && document.querySelector("[data-rss-ticker]")) return;
+      mountTickerPane();
+    }, 700);
+    if (typeof ctx.onDispose === "function") {
+      ctx.onDispose(() => {
+        clearInterval(tickerDockWatch);
+        if (disposeTicker) {
+          try { disposeTicker(); } catch { /* ignore */ }
+          disposeTicker = null;
+        }
+      });
+    }
     ctx.register({
       id: "page",
       area: ROUTES_AREA,
