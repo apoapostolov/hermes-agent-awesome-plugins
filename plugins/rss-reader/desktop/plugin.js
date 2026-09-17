@@ -1159,7 +1159,7 @@ function readSettings(ctx, owner) {
     aiGrading: stored.aiGrading === true,
     orderByImportance: stored.orderByImportance === true,
     headlineTicker: stored.headlineTicker === true,
-    tickerSpeed: ["slow", "normal", "fast"].includes(stored.tickerSpeed) ? stored.tickerSpeed : "normal",
+    tickerSpeed: ["barely", "very_slow", "slow", "normal", "fast"].includes(stored.tickerSpeed) ? stored.tickerSpeed : "normal",
     tickerGrouping: ["newest", "source", "unread_first"].includes(stored.tickerGrouping) ? stored.tickerGrouping : "newest",
     tickerFontSize: Number.isInteger(stored.tickerFontSize) && stored.tickerFontSize >= 9 && stored.tickerFontSize <= 18 ? stored.tickerFontSize : 11,
     tickerPauseOnHover: stored.tickerPauseOnHover !== false,
@@ -2600,7 +2600,7 @@ function refreshButtonLabel(at, now) {
 // Headline ticker components. buildTickerRows is a plain helper (no hooks) so
 // both marquee halves and the reduced-motion static row share one list.
 // Speed + grouping options mirror hermes-newswire's ticker settings.
-var TICKER_SPEED_DURATIONS = { slow: 240, normal: 150, fast: 80 }; // seconds per loop
+var TICKER_SPEED_DURATIONS = { barely: 1440, very_slow: 960, slow: 600, normal: 375, fast: 200 }; // seconds per loop (slowed ~2.5x vs newswire per Apo's read-speed feedback)
 var TICKER_FONT_TO_HEIGHT = (px) => Math.max(28, Math.round(px * 2.1) + 6);
 function groupTickerArticles(articles, mode) {
   if (!Array.isArray(articles) || articles.length === 0) return [];
@@ -2728,6 +2728,8 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
   });
 }
 var TICKER_SPEEDS = [
+  { id: "barely", label: "Barely Moving" },
+  { id: "very_slow", label: "Very Slow" },
   { id: "slow", label: "Slow" },
   { id: "normal", label: "Normal" },
   { id: "fast", label: "Fast" }
@@ -3931,7 +3933,8 @@ function ReaderProfile({ ctx, owner }) {
         jsx("button", { type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "main" ? "true" : "false", onClick: () => setSettingsTab("main"), children: "Main" }),
         jsx("button", { type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "ticker" ? "true" : "false", onClick: () => setSettingsTab("ticker"), children: "Ticker" })
       ] }),
-      settingsTab === "ticker" && jsxs("div", { className: "rss-settings-block", "aria-label": "Ticker settings", children: [
+      settingsTab === "ticker" && jsxs("form", { className: "rss-stack", "aria-label": "Ticker settings", onSubmit: saveSettings, children: [
+        jsxs("div", { className: "rss-settings-block", children: [
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("label", { className: "rss-setting", children: [
             jsx("input", { type: "checkbox", checked: draft.headlineTicker === true, onChange: event => setDraft({ ...draft, headlineTicker: event.target.checked }) }),
@@ -3968,7 +3971,9 @@ function ReaderProfile({ ctx, owner }) {
             "Show age"
           ] })
         ] }),
-        jsx("p", { className: "rss-muted rss-small", children: "The ticker runs along the bottom of the reader. Graded articles show their tag pill and grade color." })
+        jsx("p", { className: "rss-muted rss-small", children: "The ticker runs along the bottom of the reader. Graded articles show their tag pill and grade color." }),
+        ] }),
+        jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save Settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
       settingsTab === "main" && jsxs("form", { className: "rss-stack", "aria-label": "Reader settings", onSubmit: saveSettings, children: [
         jsxs("div", { className: "rss-settings-grid", children: [
@@ -4046,7 +4051,7 @@ function ReaderProfile({ ctx, owner }) {
             preferenceReport && jsx("pre", { className: "rss-preference-report", children: preferenceReport })
           ] })
         ] }),
-        jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
+        jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save Settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
       ] }),
       jsxs("div", { className: "rss-settings-library", "aria-label": "Import/Export", children: [
         jsxs("div", { className: "rss-settings-library-head", children: [
