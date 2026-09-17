@@ -3065,6 +3065,13 @@ function useSettingsPane(owner) {
 function isTickerUnread(article) {
   return article?.is_read !== true;
 }
+function markTickerArticleRead(owner, item) {
+  if (!item?.id || item.is_read === true) return Promise.resolve();
+  return transact(owner, (library) => {
+    const article = (library.articles || []).find((row) => row.id === item.id);
+    if (article && article.is_read !== true) article.is_read = true;
+  }).then(() => publishLibraryChange(owner));
+}
 function TickerPane() {
   const owner = tickerPaneOwner();
   const [settings] = useSettingsPane(owner);
@@ -3078,6 +3085,7 @@ function TickerPane() {
   }, [owner]);
   const effectiveSettings = previewSettings || settings;
   const onlyUnread = effectiveSettings?.tickerOnlyUnread === true;
+  const client = useQueryClient();
   const articles = useQuery({
     queryKey: ["rss-reader", owner, "ticker-articles", onlyUnread],
     queryFn: async () => {
@@ -3109,6 +3117,14 @@ function TickerPane() {
     if (!item) {
       host.navigate("/rss");
       return;
+    }
+    if (item.is_read !== true) {
+      client.setQueryData(["rss-reader", owner, "ticker-articles", onlyUnread], (rows) => {
+        if (!Array.isArray(rows)) return rows;
+        const next = rows.map((row) => row.id === item.id ? { ...row, is_read: true } : row);
+        return onlyUnread ? next.filter(isTickerUnread) : next;
+      });
+      void markTickerArticleRead(owner, item);
     }
     if (effectiveSettings.tickerClickBehavior === "external") {
       if (item.url && rssCtx?.os?.openExternal) void rssCtx.os.openExternal(item.url);
