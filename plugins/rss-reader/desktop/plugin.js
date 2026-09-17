@@ -417,7 +417,7 @@ async function ensureOneshotSession(host2, route) {
   if (cached) return cached;
   const created = await host2.requestProfile(route, "session.create", {
     profile: route.targetProfile,
-    title: "RSS grading",
+    title: "RSS article tagging",
     hidden: true
   });
   const sid = created?.session_id;
@@ -3147,8 +3147,8 @@ function ReaderProfile({ ctx, owner }) {
       const grade = () => startGrading(host, () => library, owner, {
         skill: settings.gradingSkill,
         ctx,
-        onDone: (report) => { if (report.graded) setNotice(`${report.graded} article${report.graded === 1 ? "" : "s"} graded.`); },
-        onError: (error) => setNotice(String(error?.message || error || "Grading failed."))
+        onDone: (report) => { if (report.graded) setNotice(`${report.graded} article${report.graded === 1 ? "" : "s"} tagged.`); },
+        onError: (error) => setNotice(String(error?.message || error || "Tagging failed."))
       });
       if (queued) waitCaptureIdleThen(owner, result.fresh, grade);
       else grade();
@@ -3163,7 +3163,7 @@ function ReaderProfile({ ctx, owner }) {
     const result = await libraryRequest("/articles/read-all", { method: "POST", body: { feed_id: feedId } });
     setNotice(`${result.count} article${result.count === 1 ? "" : "s"} marked as read.`);
   });
-  const gradeNow = () => act("Grading articles\u2026", async () => {
+  const gradeNow = () => act("Tagging articles\u2026", async () => {
     const report = await new Promise((resolve) => {
       const started = startGrading(host, () => library, owner, {
         skill: settings.gradingSkill,
@@ -3173,9 +3173,9 @@ function ReaderProfile({ ctx, owner }) {
       });
       if (!started) resolve({ graded: 0, running: true });
     });
-    if (report.running) setNotice("Grading is already running.");
-    else if (report.error) setNotice(String(report.error.message || report.error || "Grading failed."));
-    else setNotice(report.graded ? `${report.graded} article${report.graded === 1 ? "" : "s"} graded.` : "Nothing new to grade.");
+    if (report.running) setNotice("Tagging is already running.");
+    else if (report.error) setNotice(String(report.error.message || report.error || "Tagging failed."));
+    else setNotice(report.graded ? `${report.graded} article${report.graded === 1 ? "" : "s"} tagged.` : "Nothing new to tag.");
   });
   const preferenceNow = () => act("Writing preference report\u2026", async () => {
     const snapshot = await libraryRequest("/preference");
@@ -3463,8 +3463,8 @@ function ReaderProfile({ ctx, owner }) {
       startGrading(host, () => library, owner, {
         skill: next.gradingSkill,
         ctx,
-        onDone: (report) => { if (report.graded) setNotice(`${report.graded} article${report.graded === 1 ? "" : "s"} graded.`); },
-        onError: (error) => setNotice(String(error?.message || error || "Grading failed."))
+        onDone: (report) => { if (report.graded) setNotice(`${report.graded} article${report.graded === 1 ? "" : "s"} tagged.`); },
+        onError: (error) => setNotice(String(error?.message || error || "Tagging failed."))
       });
     }
     publishLibraryChange(owner);
@@ -3687,7 +3687,7 @@ function ReaderProfile({ ctx, owner }) {
             jsx("p", { className: "rss-muted rss-small", children: "Navigating over an article marks it as read." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
-            jsx("h2", { className: "rss-settings-header", children: "AI Grading" }),
+            jsx("h2", { className: "rss-settings-header", children: "Article Tagging" }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
                 jsx("input", { type: "checkbox", checked: draft.aiGrading, onChange: event => setDraft({ ...draft, aiGrading: event.target.checked }) }),
@@ -3703,9 +3703,9 @@ function ReaderProfile({ ctx, owner }) {
             jsxs("div", { className: "rss-setting-row", children: [
               jsxs("label", { className: "rss-skill-field", children: [
                 jsx("span", { children: "Preference Skill" }),
-                jsx(Input, { "aria-label": "Grading preference skill name", placeholder: DEFAULT_GRADING_SKILL, value: draft.gradingSkill, maxLength: 60, onChange: event => setDraft({ ...draft, gradingSkill: event.target.value }) })
+                jsx(Input, { "aria-label": "Tagging preference skill name", placeholder: DEFAULT_GRADING_SKILL, value: draft.gradingSkill, maxLength: 60, onChange: event => setDraft({ ...draft, gradingSkill: event.target.value }) })
               ] }),
-              jsx(Button, { type: "button", disabled: disabled || !articles.data?.length, onClick: gradeNow, children: "Grade" }),
+              jsx(Button, { type: "button", disabled: disabled || !articles.data?.length, onClick: gradeNow, children: "Tag" }),
               jsx(Button, { type: "button", variant: "ghost", disabled, onClick: preferenceNow, children: "Preference Report" })
             ] }),
             jsx("p", { className: "rss-muted rss-small", children: "Use Hermes to improve the preference skill above with your interests, so AI Tagging reflects your needs." }),
