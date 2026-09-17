@@ -11,7 +11,7 @@
   A maintained community pack for provider visibility, session control, reading, memory review, and interface polish.
 
   [![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-0.21.0%2B-6f42c1)](https://github.com/NousResearch/hermes-agent)
-  [![Plugins](https://img.shields.io/badge/plugins-12-2ea44f)](#the-pack)
+  [![Plugins](https://img.shields.io/badge/plugins-13-2ea44f)](#the-pack)
   [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
   [Install the pack](#install) &nbsp;·&nbsp; [Explore the plugins](#the-pack) &nbsp;·&nbsp; [Understand the pinning model](#how-it-works)
@@ -41,6 +41,7 @@ The pack is pinned and reproducible. Every entry in `hermes-pack.yaml` names a r
 | --- | --- |
 | [better-session-appearance](plugins/better-session-appearance/README.md) | Make session names easier to scan with colors, emphasis, and idle-state icons. |
 | [drag-to-pin-session](plugins/drag-to-pin-session/README.md) | Reorganize pinned sessions with drag-and-drop. |
+| [sidebar-manager](plugins/sidebar-manager/README.md) | Hide and reorder sidebar nav rows and session sections from a dim glyph next to New session. |
 | [opaque-composer](plugins/opaque-composer/README.md) | Keep the desktop composer readable while the transcript scrolls behind it. |
 | [compact-reasoning-label](plugins/compact-reasoning-label/README.md) | Show the model name only in the model pill and leave the thinking level to the reasoning pill beside it. |
 | [provider-status](plugins/provider-status/README.md) | Track provider quotas, OAuth status, multiple accounts, and key rotation in the status bar. |
@@ -69,6 +70,7 @@ The individual plugin manifests are the version authority. The current pack incl
 - **Memory Review 1.2.1:** staged-write review and approval controls.
 - **Compact Reasoning Label 1.0.0:** the composer's model pill shows only the model name; the effort word lives only in the reasoning pill.
 - **Better Capabilities 1.0.0:** delete plugins and skills from Capabilities, and zip a learned skill folder.
+- **Sidebar Manager 1.0.0:** hide and reorder sidebar nav rows and session sections from a dim gripper next to New session.
 
 See each plugin README for the complete behavior and the repository changelog for pack-level history.
 
@@ -130,6 +132,7 @@ Every plugin has a dedicated README:
 - [Memory Review](plugins/memory-review/README.md)
 - [RSS Reader](plugins/rss-reader/README.md)
 - [Better Capabilities](plugins/better-capabilities/README.md)
+- [Sidebar Manager](plugins/sidebar-manager/README.md)
 - [Maintainer sync skill](skills/hermes-awesome-plugins-sync/SKILL.md)
 
 ## Support and contributions
