@@ -70,7 +70,7 @@ The individual plugin manifests are the version authority. The current pack incl
 - **Memory Review 1.2.1:** staged-write review and approval controls.
 - **Compact Reasoning Label 1.0.0:** the composer's model pill shows only the model name; the effort word lives only in the reasoning pill.
 - **Better Capabilities 1.0.0:** delete plugins and skills from Capabilities, and zip a learned skill folder.
-- **Sidebar Manager 1.0.0:** hide and reorder sidebar nav rows and session sections from a dim gripper next to New session.
+- **Sidebar Manager 1.0.1:** hide and reorder sidebar nav rows and session sections from a dim list-ordered glyph next to New session.
 
 See each plugin README for the complete behavior and the repository changelog for pack-level history.
 
