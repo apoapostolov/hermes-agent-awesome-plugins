@@ -2651,16 +2651,16 @@ function groupTickerArticles(articles, mode) {
   }
   return articles;
 }
-function buildTickerRows(articles, tags) {
+function buildTickerRows(articles, tags, grouping) {
   if (!Array.isArray(articles)) return [];
   const rows = [];
   let lastSource = null;
   for (const item of articles) {
     const tag = gradingTagFor(tags, item.grade?.level);
     const pill = tag && tag.label && tag.color ? tag : null;
-    if (item.feed_title && item.feed_title !== lastSource) {
+    if (grouping === "source" && item.feed_title && item.feed_title !== lastSource) {
+      if (lastSource !== null) rows.push({ kind: "divider", source: item.feed_title });
       lastSource = item.feed_title;
-      rows.push({ kind: "divider", source: item.feed_title });
     }
     rows.push({ kind: "article", item, pill });
   }
@@ -2724,7 +2724,7 @@ function TickerRefresh({ onRefresh }) {
 function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
   const grouping = settings.tickerGrouping || "newest";
   const ordered = useMemo(() => groupTickerArticles(articles, grouping), [articles, grouping]);
-  const rows = useMemo(() => buildTickerRows(ordered, tags), [ordered, tags]);
+  const rows = useMemo(() => buildTickerRows(ordered, tags, grouping), [ordered, tags, grouping]);
   const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false);
   useEffect(() => {
     if (!window.matchMedia) return undefined;
