@@ -451,6 +451,7 @@ async function fillSkillFileMenu(wrap, row, skillName) {
     const item = document.createElement('button')
     item.type = 'button'
     item.className = 'bc-file-item'
+    if (folderKey) item.classList.add('bc-file-item-in')
     item.setAttribute(BTN, 'file-item')
     item.textContent = file.label
     item.addEventListener('click', (e) => {
@@ -1184,7 +1185,7 @@ function injectStyle() {
       background: var(--ui-bg-elevated, var(--card, var(--background)));
     }
     .bc-file-head {
-      padding: 0.28rem 0.55rem 0.1rem;
+      padding: 0.28rem 0.55rem 0.1rem 5px;
       font-size: 0.62rem;
       font-weight: 600;
       color: var(--ui-text-tertiary, inherit);
@@ -1200,9 +1201,10 @@ function injectStyle() {
       cursor: pointer;
       font: inherit;
       font-size: 0.72rem;
-      padding: 0.22rem 0.7rem;
+      padding: 0.22rem 0.7rem 0.22rem 5px;
       white-space: nowrap;
     }
+    .bc-file-item-in { padding-left: 10px; }
     .bc-file-item:hover { background: var(--chrome-action-hover, color-mix(in srgb, var(--foreground) 8%, transparent)); }
   `
   document.head.appendChild(style)
