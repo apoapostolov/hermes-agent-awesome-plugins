@@ -2821,7 +2821,7 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
           : [
               jsx("div", { className: "rss-ticker-half", children: rows.map(renderRow) }, "a"),
               jsx("div", { className: "rss-ticker-half", "aria-hidden": "true", children: rows.map(renderRow) }, "b")
-            ] })
+            ] }, "rss-ticker-track")
         : jsx("span", { className: "rss-ticker-empty", children: settings.tickerOnlyUnread === true ? "No unread headlines" : "No headlines" })
       })
     ]
@@ -5028,6 +5028,7 @@ var plugin_default = {
       if (tickerMountGen >= 8) return;
       const tree = readLayoutTree();
       if (!tree) return;
+      if (!tickerPaneInTree(tree, currentTickerId)) return;
       if (tickerIsWorkspaceBottom(tree, currentTickerId)) return;
       mountTickerPane();
     }, 700);
