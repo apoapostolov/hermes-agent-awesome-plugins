@@ -2704,7 +2704,7 @@ function refreshButtonLabel(at, now) {
 }
 // Headline ticker components. buildTickerRows is a plain helper (no hooks) so
 // both marquee halves and the reduced-motion static row share one list.
-var TICKER_SPEED_DURATIONS = { barely: 2400, very_slow: 1800, slow: 1200, normal: 900, fast: 600 }; // seconds per loop at 50 headlines
+var TICKER_SPEED_DURATIONS = { barely: 10800, very_slow: 3600, slow: 1350, normal: 900, fast: 600 }; // seconds per loop at 50 headlines. Fast→Slow ~1.5×. Then a harder jump to Very Slow, and Barely Moving is a crawl.
 var TICKER_SPEED_REF_ITEMS = 50;
 function tickerLoopSeconds(speed, rowCount) {
   const base = TICKER_SPEED_DURATIONS[speed] || 900;
