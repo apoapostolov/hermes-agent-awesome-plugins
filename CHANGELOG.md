@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.11.0] - 2026-09-17
+
+### Added
+
+- **compact-reasoning-label:** version `1.0.0`. The composer's model pill shows only the model name; the duplicated thinking-level word is stripped so it lives only in the reasoning pill beside it. Idempotent re-strip survives every React repaint without an observer loop.
+
 ## [1.10.3] - 2026-09-16
 
 ### Added

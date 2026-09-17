@@ -11,7 +11,7 @@
   A maintained community pack for provider visibility, session control, reading, memory review, and interface polish.
 
   [![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-0.21.0%2B-6f42c1)](https://github.com/NousResearch/hermes-agent)
-  [![Plugins](https://img.shields.io/badge/plugins-10-2ea44f)](#the-pack)
+  [![Plugins](https://img.shields.io/badge/plugins-11-2ea44f)](#the-pack)
   [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
   [Install the pack](#install) &nbsp;·&nbsp; [Explore the plugins](#the-pack) &nbsp;·&nbsp; [Understand the pinning model](#how-it-works)
@@ -42,6 +42,7 @@ The pack is pinned and reproducible. Every entry in `hermes-pack.yaml` names a r
 | [better-session-appearance](plugins/better-session-appearance/README.md) | Make session names easier to scan with colors, emphasis, and idle-state icons. |
 | [drag-to-pin-session](plugins/drag-to-pin-session/README.md) | Reorganize pinned sessions with drag-and-drop. |
 | [opaque-composer](plugins/opaque-composer/README.md) | Keep the desktop composer readable while the transcript scrolls behind it. |
+| [compact-reasoning-label](plugins/compact-reasoning-label/README.md) | Show the model name only in the model pill and leave the thinking level to the reasoning pill beside it. |
 | [provider-status](plugins/provider-status/README.md) | Track provider quotas, OAuth status, multiple accounts, and key rotation in the status bar. |
 
 ### Review and read
@@ -65,6 +66,7 @@ The individual plugin manifests are the version authority. The current pack incl
 - **Intelligent Tool Break 1.3.2:** `/break`, correction messages, and `/again` retry handling.
 - **RSS Reader 1.0.1:** local Python API transport, nested folders, improved unread behavior, and compact handling for small full-article images.
 - **Memory Review 1.2.1:** staged-write review and approval controls.
+- **Compact Reasoning Label 1.0.0:** the composer's model pill shows only the model name; the effort word lives only in the reasoning pill.
 
 See each plugin README for the complete behavior and the repository changelog for pack-level history.
 
@@ -119,6 +121,7 @@ Every plugin has a dedicated README:
 - [Better Session Appearance](plugins/better-session-appearance/README.md)
 - [Drag to Pin Session](plugins/drag-to-pin-session/README.md)
 - [Opaque Composer](plugins/opaque-composer/README.md)
+- [Compact Reasoning Label](plugins/compact-reasoning-label/README.md)
 - [Scroll on Switch](plugins/scroll-on-switch/README.md)
 - [Reasoning Switch](plugins/reasoning-switch/README.md)
 - [Iteration Budget Meter](plugins/iteration-budget-meter/README.md)
