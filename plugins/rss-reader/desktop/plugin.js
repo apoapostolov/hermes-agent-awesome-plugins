@@ -2638,7 +2638,22 @@ var styles = `
 .hermes-rss .rss-list-filter-btn[data-on=false]{opacity:.4;color:var(--ui-text-tertiary)}
 .hermes-rss .rss-list-filter-btn[data-on=false]:hover{opacity:.75;color:var(--ui-text-secondary)}
 .hermes-rss .rss-search-drawer{width:100%;display:grid;gap:8px;padding:8px 0 2px}
-.hermes-rss .rss-search-drawer .rss-tools{margin:0}
+.hermes-rss .rss-search-save-row{display:flex;align-items:flex-end;gap:6px;width:100%;min-width:0}
+.hermes-rss .rss-search-save-field{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.hermes-rss .rss-search-save-field>span{font-size:10px;letter-spacing:.5px;text-transform:uppercase;font-weight:650;color:var(--ui-text-tertiary)}
+.hermes-rss .rss-search-save-field input{width:100%;min-width:0;height:26px;padding:4px 8px;font-size:12px;box-sizing:border-box}
+.hermes-rss .rss-search-save-btn{width:26px;height:26px;padding:0;margin:0 0 0 2px;flex:0 0 26px;border:0;background:transparent;color:var(--ui-text-secondary);display:inline-flex;align-items:center;justify-content:center;border-radius:5px}
+.hermes-rss .rss-search-save-btn:hover:not(:disabled){color:var(--foreground);background:var(--chrome-action-hover)}
+.hermes-rss .rss-search-save-btn:disabled{opacity:.4;cursor:default}
+.hermes-rss .rss-search-save-btn .codicon{font-size:14px;line-height:1;display:block}
+.hermes-rss .rss-saved-filters{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%;margin-top:6px}
+.hermes-rss .rss-saved-filter{display:inline-flex;align-items:center;gap:0;height:22px;padding:0 2px 0 8px;border:1px solid var(--ui-stroke-secondary);border-radius:6px;background:color-mix(in srgb,var(--ui-text-secondary) 7%,transparent);max-width:100%}
+.hermes-rss .rss-saved-filter-name{border:0;background:transparent;color:var(--ui-text-primary,var(--foreground));font:inherit;font-size:11px;font-weight:650;padding:0 4px 0 0;margin:0;max-width:12rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.hermes-rss .rss-saved-filter-name:hover{color:var(--ui-accent)}
+.hermes-rss .rss-saved-filter-remove{width:18px;height:18px;padding:0;margin:0;border:0;border-radius:4px;background:transparent;color:var(--ui-text-tertiary);display:inline-flex;align-items:center;justify-content:center;flex:0 0 18px}
+.hermes-rss .rss-saved-filter-remove:hover:not(:disabled){color:var(--foreground);background:var(--chrome-action-hover)}
+.hermes-rss .rss-saved-filter-remove:disabled{opacity:.4}
+.hermes-rss .rss-saved-filter-remove .codicon{font-size:10px;line-height:1;display:block}
 .hermes-rss select{font:inherit;color:var(--ui-text-primary,var(--foreground));background:var(--ui-bg-elevated,var(--ui-bg-primary,var(--background)));border:1px solid var(--ui-stroke-secondary);border-radius:5px;padding:7px;max-width:100%}
 html[data-hermes-mode="dark"] .hermes-rss select,html.dark .hermes-rss select{color-scheme:dark}
 html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
@@ -4752,7 +4767,7 @@ function ReaderProfile({ ctx, owner }) {
               title: "Search filters",
               "data-active": !!(exclude || searchName || searches.length),
               onClick: () => setSearchDrawerOpen(!searchDrawerOpen),
-              children: jsx("i", { className: `codicon ${searchDrawerOpen ? "codicon-filter-filled" : "codicon-filter"}`, "aria-hidden": "true" })
+              children: jsx("i", { className: "codicon codicon-list-filter", "aria-hidden": "true" })
             }),
             jsx("button", {
               type: "button",
@@ -4769,17 +4784,22 @@ function ReaderProfile({ ctx, owner }) {
             })
           ] }),
           searchDrawerOpen && jsxs("div", { className: "rss-search-drawer", "aria-label": "Current search", children: [
-            jsxs("label", { className: "rss-stack", children: ["Exclude phrase", jsx(Input, { value: exclude, maxLength: 200, placeholder: "e.g. promo code", onChange: event => { setExclude(event.target.value); setLimit(100); } })] }),
-            jsx("p", { className: "rss-muted rss-small", children: "Matches these phrases in titles and feed text, ignoring case." }),
-            jsxs("form", { className: "rss-tools", onSubmit: saveSearch, children: [
-              jsx(Input, { "aria-label": "Saved search name", placeholder: "Name this search", value: searchName, maxLength: 200, required: true, onChange: event => setSearchName(event.target.value) }),
-              jsx(Button, { type: "submit", disabled: disabled || !searchName.trim() || filters.isPending || !!filters.error, children: "Save search" })
-            ] }),
-            searches.map(search => jsxs("div", { className: "rss-tools", children: [
-              jsx(Button, { variant: "ghost", onClick: () => openSearch(search), children: search.name }),
-              jsx(Button, { variant: "ghost", disabled, "aria-label": `Remove saved search ${search.name}`, onClick: () => removeFilter("searches", search.id), children: "Remove" })
-            ] }, search.id))
+            jsxs("form", { className: "rss-search-save-row", onSubmit: saveSearch, children: [
+              jsxs("label", { className: "rss-search-save-field", children: [
+                jsx("span", { children: "Exclude phrase" }),
+                jsx(Input, { value: exclude, maxLength: 200, placeholder: "e.g. promo code", onChange: event => { setExclude(event.target.value); setLimit(100); } })
+              ] }),
+              jsxs("label", { className: "rss-search-save-field", children: [
+                jsx("span", { children: "Name of Filter" }),
+                jsx(Input, { "aria-label": "Name of Filter", placeholder: "Name this search", value: searchName, maxLength: 200, required: true, onChange: event => setSearchName(event.target.value) })
+              ] }),
+              jsx("button", { type: "submit", className: "rss-search-save-btn", disabled: disabled || !searchName.trim() || filters.isPending || !!filters.error, "aria-label": "Save search", title: "Save search", children: jsx("i", { className: "codicon codicon-save", "aria-hidden": "true" }) })
+            ] })
           ] }),
+          searches.length > 0 && jsx("div", { className: "rss-saved-filters", "aria-label": "Saved filters", children: searches.map(search => jsxs("div", { className: "rss-saved-filter", children: [
+            jsx("button", { type: "button", className: "rss-saved-filter-name", onClick: () => openSearch(search), children: search.name }),
+            jsx("button", { type: "button", className: "rss-saved-filter-remove", disabled, "aria-label": `Remove saved search ${search.name}`, title: "Remove", onClick: () => removeFilter("searches", search.id), children: jsx("i", { className: "codicon codicon-close", "aria-hidden": "true" }) })
+          ] }, search.id)) }),
           (query || exclude || feedId || view !== "all") && jsxs("div", { className: "rss-filter-chips", "aria-label": "Active filters", children: [
             query && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear search phrase", onClick: () => { setQuery(""); setLimit(100); }, children: `Search: ${query} ×` }),
             exclude && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear excluded phrase", onClick: () => { setExclude(""); setLimit(100); }, children: `Exclude: ${exclude} ×` }),
