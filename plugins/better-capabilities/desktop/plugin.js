@@ -362,6 +362,25 @@ function closeFileMenus() {
   })
 }
 
+function placeFileMenu(trigger, menu) {
+  const rect = trigger.getBoundingClientRect()
+  const pad = 8
+  menu.style.position = 'fixed'
+  menu.style.top = rect.bottom + 4 + 'px'
+  menu.style.left = rect.left + 'px'
+  menu.style.right = 'auto'
+  menu.style.width = 'max-content'
+  menu.style.maxWidth = Math.max(160, window.innerWidth - pad * 2) + 'px'
+  menu.style.maxHeight = Math.max(120, window.innerHeight - rect.bottom - pad) + 'px'
+  requestAnimationFrame(() => {
+    const box = menu.getBoundingClientRect()
+    if (box.right > window.innerWidth - pad) {
+      menu.style.left = Math.max(pad, window.innerWidth - pad - box.width) + 'px'
+    }
+    if (box.left < pad) menu.style.left = pad + 'px'
+  })
+}
+
 function paintSkillFilePicker(row, editBtn, skillName) {
   let wrap = row.querySelector('[data-bc-files]')
   if (!wrap) {
@@ -383,7 +402,10 @@ function paintSkillFilePicker(row, editBtn, skillName) {
       e.stopPropagation()
       const open = menu.style.display !== 'none'
       closeFileMenus()
-      menu.style.display = open ? 'none' : 'block'
+      if (!open) {
+        menu.style.display = 'block'
+        placeFileMenu(trigger, menu)
+      }
     })
     wrap.append(trigger, menu)
     editBtn.insertAdjacentElement('afterend', wrap)
@@ -1152,12 +1174,9 @@ function injectStyle() {
     }
     .bc-file-trigger:hover { color: var(--foreground, inherit); }
     .bc-file-menu {
-      position: absolute;
-      top: calc(100% + 0.2rem);
-      left: 0;
       z-index: 40;
       min-width: 12rem;
-      max-height: 16rem;
+      width: max-content;
       overflow: auto;
       padding: 0.25rem 0;
       border: 1px solid var(--ui-stroke-tertiary, var(--border));
@@ -1169,6 +1188,7 @@ function injectStyle() {
       font-size: 0.62rem;
       font-weight: 600;
       color: var(--ui-text-tertiary, inherit);
+      white-space: nowrap;
     }
     .bc-file-item {
       display: block;
@@ -1181,6 +1201,7 @@ function injectStyle() {
       font: inherit;
       font-size: 0.72rem;
       padding: 0.22rem 0.7rem;
+      white-space: nowrap;
     }
     .bc-file-item:hover { background: var(--chrome-action-hover, color-mix(in srgb, var(--foreground) 8%, transparent)); }
   `
