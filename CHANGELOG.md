@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.12.0] - 2026-09-17
+
+### Added
+
+- **better-capabilities:** version `1.0.0`. Adds a delete control next to the Capabilities folder icon, a Package (zip) button between Edit and Archive on a learned skill, Recycle Bin delete, and a zip of the skill folder including references.
+
 ## [1.11.0] - 2026-09-17
 
 ### Added
