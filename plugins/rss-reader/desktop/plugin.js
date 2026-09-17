@@ -1163,6 +1163,7 @@ function readSettings(ctx, owner) {
     headlineTicker: stored.headlineTicker === true,
     tickerSpeed: ["barely", "very_slow", "slow", "normal", "fast"].includes(stored.tickerSpeed) ? stored.tickerSpeed : "normal",
     tickerGrouping: ["newest", "source", "unread_first"].includes(stored.tickerGrouping) ? stored.tickerGrouping : "newest",
+    tickerShowGroupingHeading: stored.tickerShowGroupingHeading === true,
     tickerFontSize: Number.isInteger(stored.tickerFontSize) && stored.tickerFontSize >= 9 && stored.tickerFontSize <= 18 ? stored.tickerFontSize : 11,
     tickerPauseOnHover: stored.tickerPauseOnHover !== false,
     tickerShowFavicon: stored.tickerShowFavicon !== false,
@@ -2651,14 +2652,15 @@ function groupTickerArticles(articles, mode) {
   }
   return articles;
 }
-function buildTickerRows(articles, tags, grouping) {
+function buildTickerRows(articles, tags, grouping, showHeading) {
   if (!Array.isArray(articles)) return [];
   const rows = [];
   let lastSource = null;
+  const headingsOn = grouping === "source" && showHeading === true;
   for (const item of articles) {
     const tag = gradingTagFor(tags, item.grade?.level);
     const pill = tag && tag.label && tag.color ? tag : null;
-    if (grouping === "source" && item.feed_title && item.feed_title !== lastSource) {
+    if (headingsOn && item.feed_title && item.feed_title !== lastSource) {
       if (lastSource !== null) rows.push({ kind: "divider", source: item.feed_title });
       lastSource = item.feed_title;
     }
@@ -2724,7 +2726,7 @@ function TickerRefresh({ onRefresh }) {
 function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
   const grouping = settings.tickerGrouping || "newest";
   const ordered = useMemo(() => groupTickerArticles(articles, grouping), [articles, grouping]);
-  const rows = useMemo(() => buildTickerRows(ordered, tags, grouping), [ordered, tags, grouping]);
+  const rows = useMemo(() => buildTickerRows(ordered, tags, grouping, settings.tickerShowGroupingHeading === true), [ordered, tags, grouping, settings.tickerShowGroupingHeading]);
   const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false);
   useEffect(() => {
     if (!window.matchMedia) return undefined;
@@ -2736,7 +2738,7 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
   const fontPx = Math.min(18, Math.max(9, Number(settings.tickerFontSize) || 11));
   const duration = TICKER_SPEED_DURATIONS[settings.tickerSpeed] || 150;
   const renderRow = (row, i) => row.kind === "divider"
-    ? jsx("span", { "aria-hidden": "true", className: "rss-ticker-divider", children: `${row.source} \u2014` }, `d${i}`)
+    ? jsx("span", { "aria-hidden": "true", className: "rss-ticker-divider", children: row.source }, `d${i}`)
     : jsx(TickerItem, { row, onOpen, showFavicon: settings.tickerShowFavicon !== false, websiteName: settings.tickerWebsiteName || "after", tagStyle: settings.tickerTagStyle || "pill", showAge: settings.tickerRelativeTime !== false }, row.item.id);
   return jsxs("div", {
     className: `rss-ticker${settings.tickerPauseOnHover === false ? " rss-ticker-no-hover" : ""}${settings.tickerAssetSize === "small" ? " rss-ticker-small-assets" : ""}${settings.tickerAssetSize === "font" ? " rss-ticker-font-assets" : ""}`,
@@ -4150,6 +4152,10 @@ function ReaderProfile({ ctx, owner }) {
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("span", { className: "rss-setting-label", children: "Group headlines" }),
           jsx(Segmented, { value: draft.tickerGrouping || "newest", onChange: v => updateDraft({ ...draft, tickerGrouping: v }), options: TICKER_GROUPINGS })
+        ] }),
+        jsx("label", { className: "rss-setting", children: [
+          jsx("input", { type: "checkbox", checked: draft.tickerShowGroupingHeading === true, onChange: event => updateDraft({ ...draft, tickerShowGroupingHeading: event.target.checked }) }),
+          "Show Grouping Heading"
         ] }),
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("span", { className: "rss-setting-label", children: "Behavior on Click" }),
