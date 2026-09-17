@@ -1,0 +1,12 @@
+name: compact-reasoning-label
+version: 1.0.0
+description: "Keeps the composer's model pill to just the model name; the thinking level lives only in the reasoning dropdown beside it."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/compact-reasoning-label
+tags:
+  - desktop
+  - composer
+  - ui
