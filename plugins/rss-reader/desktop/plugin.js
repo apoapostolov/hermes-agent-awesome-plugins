@@ -2548,11 +2548,11 @@ html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
 .hermes-rss .rss-ticker-item{display:inline-flex;align-items:center;gap:.375rem;padding:0 1rem;height:100%;background:none;border:0;font:inherit;font-size:var(--rss-ticker-font,11px);line-height:1;color:var(--ui-text-tertiary);cursor:pointer;text-decoration:none;white-space:nowrap}
 .hermes-rss .rss-ticker-item:hover{background:var(--chrome-action-hover);color:var(--ui-text-primary)}
 .hermes-rss .rss-ticker-item:focus-visible{outline:1px solid var(--ui-accent);outline-offset:-1px}
-.hermes-rss .rss-ticker-item .rss-card-pill{flex:none}
+.hermes-rss .rss-ticker-item .rss-card-pill{flex:none;font-size:8px;padding:0 5px;line-height:1.6}
 .hermes-rss .rss-ticker-item[data-read=true] .rss-ticker-title{color:var(--ui-text-quaternary)}
 .hermes-rss .rss-ticker-src{color:var(--ui-text-quaternary)}
 .hermes-rss .rss-ticker-dot{color:var(--rss-tag,var(--ui-accent));flex:none}
-.hermes-rss .rss-ticker-favicon{flex:none;width:14px;height:14px;border-radius:3px;object-fit:contain;background:none}
+.hermes-rss .rss-ticker-favicon{flex:none;width:11px;height:11px;border-radius:2px;object-fit:contain;background:none}
 .hermes-rss .rss-ticker-divider{flex:none;padding:0 .75rem 0 .25rem;font-size:.625rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ui-accent);white-space:nowrap}
 .hermes-rss .rss-settings-tabs{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--ui-stroke-secondary);padding-bottom:8px}
 .hermes-rss .rss-settings-tab{background:none;border:0;padding:4px 10px;font:inherit;font-size:12px;font-weight:600;color:var(--ui-text-secondary);cursor:pointer;border-radius:6px}
