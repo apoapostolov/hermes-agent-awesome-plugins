@@ -2362,6 +2362,8 @@ var styles = `
 .hermes-rss .rss-browser-url{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ui-text-secondary);font-size:11px}
 .hermes-rss .rss-browser-actions{display:inline-flex;align-items:center;gap:2px;margin-left:auto}
 .hermes-rss .rss-browser-frame{display:block;border:0;flex:1 1 auto;width:100%;min-height:0;height:100%;background:#fff}
+.hermes-rss .rss-browser-frame-host{display:flex;flex:1 1 auto;min-height:0;height:100%;width:100%}
+.hermes-rss .rss-browser-frame-host webview{flex:1 1 auto;width:100%;height:100%;min-height:0;border:0}
 .hermes-rss .rss-detail .rss-tools{margin:18px 0}
 .hermes-rss .rss-detail-inner{max-width:calc(70ch + 88px);margin:0 auto;padding:32px 44px 56px;width:100%;box-sizing:border-box}
 .hermes-rss .rss-detail h2{font-size:24px;letter-spacing:-.3px;line-height:1.3;margin:6px 0 22px;font-weight:700}
@@ -2796,6 +2798,27 @@ var TICKER_PANE_POLL_MS = 30_000;
 // the workspace bottom edge), like hermes-newswire. Reads the profile
 // library straight from IndexedDB; headline clicks navigate to /rss and hand
 // the article id over via a window event.
+function RssBrowserFrame({ url }) {
+  const hostRef = useRef(null);
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return undefined;
+    host.replaceChildren();
+    if (!url) return undefined;
+    const webview = document.createElement("webview");
+    webview.className = "rss-browser-frame";
+    webview.setAttribute("partition", "persist:hermes-preview");
+    webview.setAttribute("src", url);
+    webview.setAttribute("webpreferences", "contextIsolation=yes,nodeIntegration=no,sandbox=yes");
+    webview.style.cssText = "display:flex;flex:1 1 auto;width:100%;height:100%;min-height:0;border:0;background:#fff";
+    host.appendChild(webview);
+    return () => {
+      webview.remove();
+      host.replaceChildren();
+    };
+  }, [url]);
+  return jsx("div", { ref: hostRef, className: "rss-browser-frame-host", "data-url": url || "", style: { display: "flex", flex: "1 1 auto", minHeight: 0, height: "100%", width: "100%" } });
+}
 function openHermesPreview(url, label) {
   if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
   const title = String(label || url);
@@ -2804,13 +2827,7 @@ function openHermesPreview(url, label) {
     host.openWorkspace("rss-browser", {
       title,
       dock: { pane: "workspace", pos: "right" },
-      render: () => jsx("iframe", {
-        src: url,
-        title,
-        style: { width: "100%", height: "100%", border: 0, background: "#fff" },
-        referrerPolicy: "no-referrer",
-        sandbox: "allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
-      })
+      render: () => jsx(RssBrowserFrame, { url })
     });
     return true;
   };
@@ -4549,7 +4566,7 @@ function ReaderProfile({ ctx, owner }) {
               jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Open in external browser", title: "Open in external browser", onClick: () => ctx.os.openExternal(browserUrl), children: jsx("i", { className: "codicon codicon-link-external", "aria-hidden": "true" }) })
             ] })
           ] }),
-          jsx("iframe", { key: browserUrl, className: "rss-browser-frame", src: browserUrl, title: "Article browser", sandbox: "allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts" })
+          jsx(RssBrowserFrame, { url: browserUrl })
         ] }) : /* @__PURE__ */ jsx(Fragment, { children:
         !selected ? /* @__PURE__ */ jsx("div", { className: "rss-detail-inner", children: /* @__PURE__ */ jsxs(Empty, { title: "Choose An Article", children: [
           /* @__PURE__ */ jsx("p", { children: "Select a post in the list. These tools act on that article." }),
