@@ -530,16 +530,45 @@ function presetsFor(kind) {
   return map
 }
 
+function presetOrder(kind) {
+  const map = presetsFor(kind)
+  const raw = Array.isArray(map._order) ? map._order : []
+  const order = []
+  for (const name of raw) {
+    if (name && name !== '_order' && map[name] && !order.includes(name)) order.push(name)
+  }
+  for (const name of Object.keys(map)) {
+    if (name === '_order') continue
+    if (!order.includes(name)) order.push(name)
+  }
+  return order
+}
+
+function setPresetOrder(kind, order) {
+  const store = loadPresetStore()
+  if (!store[kind] || typeof store[kind] !== 'object') store[kind] = {}
+  store[kind]._order = order.filter((name) => name && name !== '_order')
+  savePresetStore(store)
+}
+
 function writePreset(kind, name, payload) {
   const store = loadPresetStore()
   if (!store[kind] || typeof store[kind] !== 'object') store[kind] = {}
   store[kind][name] = payload
+  const order = Array.isArray(store[kind]._order) ? store[kind]._order.slice() : []
+  if (!order.includes(name)) order.push(name)
+  store[kind]._order = order
   savePresetStore(store)
 }
 
 function removePreset(kind, name) {
   const store = loadPresetStore()
-  if (store[kind] && typeof store[kind] === 'object') delete store[kind][name]
+  if (store[kind] && typeof store[kind] === 'object') {
+    delete store[kind][name]
+    if (Array.isArray(store[kind]._order)) {
+      store[kind]._order = store[kind]._order.filter((item) => item !== name)
+    }
+  }
   savePresetStore(store)
 }
 
@@ -550,6 +579,10 @@ function renamePreset(kind, from, to) {
   if (map[to] && to !== from) throw new Error('A preset named ' + to + ' already exists.')
   map[to] = map[from]
   if (to !== from) delete map[from]
+  if (Array.isArray(map._order)) {
+    map._order = map._order.map((item) => (item === from ? to : item))
+    if (!map._order.includes(to)) map._order.push(to)
+  }
   store[kind] = map
   savePresetStore(store)
 }
@@ -665,7 +698,57 @@ async function applyKind(kind, payload) {
 }
 
 function presetNames(kind) {
-  return Object.keys(presetsFor(kind)).sort((a, b) => a.localeCompare(b))
+  return presetOrder(kind)
+}
+
+function persistPresetListOrder(kind, listEl) {
+  const order = []
+  listEl.querySelectorAll('.bc-preset-row[data-bc-preset]').forEach((row) => {
+    const name = row.getAttribute('data-bc-preset')
+    if (name) order.push(name)
+  })
+  setPresetOrder(kind, order)
+}
+
+function bindPresetReorder(listEl, kind) {
+  if (listEl.getAttribute('data-bc-drag') === '1') return
+  listEl.setAttribute('data-bc-drag', '1')
+  let dragName = ''
+  listEl.addEventListener('dragstart', (e) => {
+    const grip = e.target.closest('[data-bc-grip]')
+    if (!grip) {
+      e.preventDefault()
+      return
+    }
+    const row = grip.closest('.bc-preset-row')
+    dragName = row ? row.getAttribute('data-bc-preset') || '' : ''
+    if (!dragName) {
+      e.preventDefault()
+      return
+    }
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', dragName)
+    row.classList.add('bc-preset-dragging')
+  })
+  listEl.addEventListener('dragend', () => {
+    listEl.querySelectorAll('.bc-preset-dragging').forEach((row) => row.classList.remove('bc-preset-dragging'))
+    if (dragName) persistPresetListOrder(kind, listEl)
+    dragName = ''
+  })
+  listEl.addEventListener('dragover', (e) => {
+    e.preventDefault()
+    if (!dragName) return
+    const over = e.target.closest('.bc-preset-row')
+    if (!over) return
+    let dragging = null
+    listEl.querySelectorAll('.bc-preset-row').forEach((row) => {
+      if (row.getAttribute('data-bc-preset') === dragName) dragging = row
+    })
+    if (!dragging || dragging === over) return
+    const rect = over.getBoundingClientRect()
+    const before = e.clientY < rect.top + rect.height / 2
+    listEl.insertBefore(dragging, before ? over : over.nextSibling)
+  })
 }
 
 function renderPresetList(kind, listEl, nameInput) {
@@ -681,18 +764,29 @@ function renderPresetList(kind, listEl, nameInput) {
   for (const name of names) {
     const row = document.createElement('div')
     row.className = 'bc-preset-row'
+    row.setAttribute('data-bc-preset', name)
+    const grip = document.createElement('span')
+    grip.className = 'bc-grip'
+    grip.setAttribute('data-bc-grip', '1')
+    grip.setAttribute('title', 'Reorder')
+    grip.setAttribute('aria-label', 'Reorder')
+    grip.draggable = true
+    const gripIcon = document.createElement('i')
+    gripIcon.className = 'codicon codicon-gripper'
+    gripIcon.setAttribute('aria-hidden', 'true')
+    grip.appendChild(gripIcon)
     const label = document.createElement('div')
     label.className = 'bc-preset-name'
     label.textContent = name
     const actions = document.createElement('div')
     actions.className = 'bc-preset-actions'
-    const apply = textButton('Apply')
+    const apply = iconButton('codicon-play', 'Apply')
     apply.addEventListener('click', () => void onApplyPreset(kind, name))
-    const overwrite = textButton('Overwrite')
+    const overwrite = iconButton('codicon-replace', 'Overwrite')
     overwrite.addEventListener('click', () => void onSavePreset(kind, name, true, nameInput))
-    const rename = textButton('Rename')
+    const rename = iconButton('codicon-edit', 'Rename')
     rename.addEventListener('click', () => void onRenamePreset(kind, name, nameInput, listEl))
-    const del = textButton('Delete')
+    const del = iconButton('codicon-trash', 'Delete')
     del.classList.add('bc-danger')
     del.addEventListener('click', () => {
       removePreset(kind, name)
@@ -700,7 +794,7 @@ function renderPresetList(kind, listEl, nameInput) {
       notify('success', 'Deleted ' + name, 'The ' + kindLabel(kind).toLowerCase() + ' preset is gone.')
     })
     actions.append(apply, overwrite, rename, del)
-    row.append(label, actions)
+    row.append(grip, label, actions)
     listEl.appendChild(row)
   }
 }
@@ -775,7 +869,6 @@ function openPresetDialog(kind) {
     '<div class="bc-dialog-body">Save the current on/off set, or apply one you already stored.</div>' +
     '<div class="bc-preset-save">' +
     '<input class="bc-input" data-bc-name="1" maxlength="60" placeholder="Name" />' +
-    '<button type="button" class="bc-text-btn" data-bc-save="1">Save</button>' +
     '</div>' +
     '<div id="bc-preset-list" class="bc-preset-list"></div>' +
     '<div class="bc-dialog-actions"><button type="button" class="bc-text-btn" data-bc-cancel="1">Close</button></div>' +
@@ -786,15 +879,20 @@ function openPresetDialog(kind) {
   overlay.querySelector('[data-bc-cancel]').addEventListener('click', closeOverlay)
   const nameInput = overlay.querySelector('[data-bc-name]')
   const listEl = overlay.querySelector('#bc-preset-list')
-  overlay.querySelector('[data-bc-save]').addEventListener('click', () => {
+  const saveRow = overlay.querySelector('.bc-preset-save')
+  const saveBtn = iconButton('codicon-save', 'Save')
+  saveBtn.setAttribute('data-bc-save', '1')
+  saveBtn.addEventListener('click', () => {
     void onSavePreset(kind, nameInput.value, false, nameInput)
   })
+  saveRow.appendChild(saveBtn)
   nameInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       void onSavePreset(kind, nameInput.value, false, nameInput)
     }
   })
+  bindPresetReorder(listEl, kind)
   renderPresetList(kind, listEl, nameInput)
   document.body.appendChild(overlay)
   nameInput.focus()
@@ -965,10 +1063,22 @@ function injectStyle() {
       font: inherit;
       font-size: 0.75rem;
     }
-    .bc-preset-list { margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.35rem; max-height: 14rem; overflow: auto; }
-    .bc-preset-row { display: flex; align-items: center; gap: 0.4rem; }
+    .bc-preset-list { margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.2rem; max-height: 14rem; overflow: auto; }
+    .bc-preset-row { display: flex; align-items: center; gap: 0.15rem; }
+    .bc-preset-row.bc-preset-dragging { opacity: 0.45; }
+    .bc-grip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.15rem;
+      height: 1.5rem;
+      color: var(--ui-text-tertiary, inherit);
+      cursor: grab;
+    }
+    .bc-grip:active { cursor: grabbing; }
+    .bc-grip .codicon { font-size: 0.85rem; }
     .bc-preset-name { flex: 1; min-width: 0; font-size: 0.78rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .bc-preset-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; }
+    .bc-preset-actions { display: flex; flex-wrap: nowrap; justify-content: flex-end; }
     .bc-file-wrap { position: relative; display: inline-flex; }
     .bc-file-trigger {
       border: 1px solid var(--ui-stroke-tertiary, var(--border));
