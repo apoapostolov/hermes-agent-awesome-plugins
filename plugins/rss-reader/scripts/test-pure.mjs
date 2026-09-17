@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("base64ToBytes"), grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("normalizeDefaultView"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice")].join("\n");
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -52,11 +52,11 @@ exports.refreshButtonLabel = refreshButtonLabel;
 exports.normalizeFolderName = normalizeFolderName;
 exports.applyFolderAction = applyFolderAction;
 exports.buildPreferenceSnapshot = buildPreferenceSnapshot;
+exports.interestPayloadJson = interestPayloadJson;
 exports.normalizeDefaultView = normalizeDefaultView;
 exports.articleNeedsCapture = articleNeedsCapture;
 exports.healthAgeLabel = healthAgeLabel;
 exports.healthNotice = healthNotice;
-exports.base64ToBytes = base64ToBytes;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -155,6 +155,18 @@ assert.equal(snap.saved_count, 1);
 assert.equal(snap.saved[0].title, "Keep");
 assert.equal(snap.feeds[0].unread, 1);
 assert.equal(snap.mutes[0].phrase, "crypto");
+const interestJson = fns.interestPayloadJson({
+  skill: "rss-reader-plugin",
+  saved_count: 80,
+  saved: Array.from({ length: 80 }, (_, i) => ({ title: `Article ${i} ${"x".repeat(180)}`, excerpt: "y".repeat(220), url: `https://example.com/${i}/${"z".repeat(280)}` })),
+  feeds: Array.from({ length: 100 }, (_, i) => ({ title: `Feed ${i}`, folder: "News", total: 100, saved: 1, read: 50, unread: 50 })),
+  mutes: Array.from({ length: 50 }, (_, i) => ({ phrase: `mute-${i}`, folders: ["News"], hits: i })),
+  tags: [{ key: "important", label: "IMPORTANT", rank: 100 }]
+});
+assert.ok(interestJson.length <= 16000);
+const interestPayload = JSON.parse(interestJson);
+assert.equal(interestPayload.saved_count, 80);
+assert.ok(interestPayload.omitted.saved + interestPayload.omitted.feeds + interestPayload.omitted.mutes > 0);
 assert.equal(fns.normalizeDefaultView("saved"), "saved");
 assert.equal(fns.normalizeDefaultView("nope"), "all");
 assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: false, body: "short" }), true);
@@ -174,7 +186,4 @@ assert.match(health, /1 error/);
 assert.match(health, /1 stale refresh/);
 assert.match(health, /1 quiet for 7d\+?/);
 
-assert.equal(new TextDecoder().decode(fns.base64ToBytes("SGVsbG8=")), "Hello");
-assert.deepEqual([...fns.base64ToBytes("AP8B")], [0, 255, 1]);
-
-console.log("ok", 36);
+console.log("ok", 39);
