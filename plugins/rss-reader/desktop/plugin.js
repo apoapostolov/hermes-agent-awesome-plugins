@@ -1167,6 +1167,8 @@ function readSettings(ctx, owner) {
     tickerRelativeTime: stored.tickerRelativeTime !== false,
     tickerOnlyUnread: stored.tickerOnlyUnread === true,
     tickerAssetSize: ["small", "normal", "font"].includes(stored.tickerAssetSize) ? stored.tickerAssetSize : "normal",
+    tickerTagStyle: ["pill", "article_color", "none"].includes(stored.tickerTagStyle) ? stored.tickerTagStyle : "pill",
+    tickerClickBehavior: stored.tickerClickBehavior === "browser" ? "browser" : "reader",
     gradingSkill: gradingSkillName(typeof stored.gradingSkill === "string" ? stored.gradingSkill : ""),
     gradingTags: readGradingTags(ctx, owner)
   };
@@ -2605,7 +2607,7 @@ function refreshButtonLabel(at, now) {
 // Headline ticker components. buildTickerRows is a plain helper (no hooks) so
 // both marquee halves and the reduced-motion static row share one list.
 // Speed + grouping options mirror hermes-newswire's ticker settings.
-var TICKER_SPEED_DURATIONS = { barely: 1920, very_slow: 960, slow: 480, normal: 300, fast: 160 }; // seconds per loop; 2x newswire's numbers (our pane track carries up to 100 articles vs their 50, so equal durations would scroll ~2x faster in px/s)
+var TICKER_SPEED_DURATIONS = { barely: 2400, very_slow: 1800, slow: 1200, normal: 900, fast: 600 }; // seconds per loop; base is deliberately much slower than newswire
 var TICKER_FONT_TO_HEIGHT = (px) => Math.max(28, Math.round(px * 2.1) + 6);
 function groupTickerArticles(articles, mode) {
   if (!Array.isArray(articles) || articles.length === 0) return [];
@@ -2644,8 +2646,10 @@ function buildTickerRows(articles, tags) {
   }
   return rows;
 }
-function TickerItem({ row, onOpen, showSource, showAge }) {
+function TickerItem({ row, onOpen, showSource, showAge, tagStyle }) {
   const { item, pill } = row;
+  const showPill = pill && tagStyle === "pill";
+  const titleStyle = pill && tagStyle === "article_color" ? { color: pill.color } : undefined;
   const age = showAge ? date(item.published_at) : "";
   const meta = showSource && item.feed_title ? item.feed_title : "";
   return jsx("button", {
@@ -2656,9 +2660,9 @@ function TickerItem({ row, onOpen, showSource, showAge }) {
     onClick: () => onOpen(item),
     children: [
       item.favicon && jsx("img", { src: item.favicon, className: "rss-ticker-favicon", alt: "", loading: "lazy", onError: (e) => { e.currentTarget.style.display = "none"; } }),
-      !item.favicon && pill && jsx("span", { "aria-hidden": "true", className: "rss-ticker-dot", style: { "--rss-tag": pill.color }, children: "\u25CF" }),
-      pill && jsx("span", { className: "rss-card-pill", style: { "--rss-tag": pill.color }, children: pill.label }),
-      jsx("span", { className: "rss-ticker-title", children: item.title || "(untitled)" }),
+      !item.favicon && showPill && jsx("span", { "aria-hidden": "true", className: "rss-ticker-dot", style: { "--rss-tag": pill.color }, children: "\u25CF" }),
+      showPill && jsx("span", { className: "rss-card-pill", style: { "--rss-tag": pill.color }, children: pill.label }),
+      jsx("span", { className: "rss-ticker-title", style: titleStyle, children: item.title || "(untitled)" }),
       meta && jsx("span", { className: "rss-ticker-src", children: meta }),
       age && jsx("span", { className: "rss-ticker-src", children: `\u00b7 ${age}` })
     ].filter(Boolean)
@@ -2711,7 +2715,7 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
   const duration = TICKER_SPEED_DURATIONS[settings.tickerSpeed] || 150;
   const renderRow = (row, i) => row.kind === "divider"
     ? jsx("span", { "aria-hidden": "true", className: "rss-ticker-divider", children: `${row.source} \u2014` }, `d${i}`)
-    : jsx(TickerItem, { row, onOpen, showSource: settings.tickerShowSource !== false, showAge: settings.tickerRelativeTime !== false }, row.item.id);
+    : jsx(TickerItem, { row, onOpen, tagStyle: settings.tickerTagStyle || "pill", showSource: settings.tickerShowSource !== false, showAge: settings.tickerRelativeTime !== false }, row.item.id);
   return jsxs("div", {
     className: `rss-ticker${settings.tickerPauseOnHover === false ? " rss-ticker-no-hover" : ""}${settings.tickerAssetSize === "small" ? " rss-ticker-small-assets" : ""}${settings.tickerAssetSize === "font" ? " rss-ticker-font-assets" : ""}`,
     "data-paused": "false",
@@ -2738,6 +2742,15 @@ var TICKER_SPEEDS = [
   { id: "slow", label: "Slow" },
   { id: "normal", label: "Normal" },
   { id: "fast", label: "Fast" }
+];
+var TICKER_TAG_STYLES = [
+  { id: "pill", label: "Pill" },
+  { id: "article_color", label: "Article Color" },
+  { id: "none", label: "None" }
+];
+var TICKER_CLICK_BEHAVIORS = [
+  { id: "reader", label: "Open RSS Reader" },
+  { id: "browser", label: "Open Browser" }
 ];
 var TICKER_ASSET_SIZES = [
   { id: "small", label: "Small" },
@@ -2811,13 +2824,32 @@ function TickerPane() {
     refetchInterval: TICKER_PANE_POLL_MS,
     retry: false
   });
+  const unreadArticles = useQuery({
+    queryKey: ["rss-reader", owner, "ticker-unread"],
+    queryFn: () => libraryRequest("/articles?view=unread&limit=100"),
+    enabled: effectiveSettings?.tickerOnlyUnread === true,
+    refetchInterval: TICKER_PANE_POLL_MS,
+    retry: false
+  });
   const onOpen = (item) => {
-    host.navigate("/rss");
-    if (item) {
-      setTimeout(() => window.dispatchEvent(new CustomEvent("hermes-rss-select-article", { detail: { owner, id: item.id } })), 120);
+    if (!item) {
+      host.navigate("/rss");
+      return;
     }
+    if (effectiveSettings.tickerClickBehavior === "browser") {
+      void rssCtx?.os?.openExternal?.(item.url);
+      return;
+    }
+    host.navigate("/rss");
+    setTimeout(() => window.dispatchEvent(new CustomEvent("hermes-rss-select-article", { detail: { owner, id: item.id } })), 120);
   };
-  if (!effectiveSettings || effectiveSettings.headlineTicker !== true || !articles.data?.length) return null;
+  const unreadRows = Array.isArray(unreadArticles.data) ? unreadArticles.data : (Array.isArray(unreadArticles.data?.articles) ? unreadArticles.data.articles : (Array.isArray(unreadArticles.data?.data) ? unreadArticles.data.data : []));
+  const tickerArticles = effectiveSettings.tickerOnlyUnread === true
+    ? (unreadRows.length ? unreadRows : (articles.data || []).filter(isTickerUnread))
+    : (articles.data || []);
+  const faviconById = new Map((articles.data || []).map((article) => [article.id, article.favicon]));
+  const tickerArticlesWithFavicons = tickerArticles.map((article) => ({ ...article, favicon: article.favicon || faviconById.get(article.id) || "" }));
+  if (!effectiveSettings || effectiveSettings.headlineTicker !== true || !tickerArticlesWithFavicons.length) return null;
   // Ticker rules are `.hermes-rss .rss-ticker-*` descendants: the pane must
   // mount a .hermes-rss root. Inline styles neutralize the page-level root
   // sizing (height/min-height/flex) for the strip context.
@@ -2825,7 +2857,7 @@ function TickerPane() {
   return jsxs("div", { className: "hermes-rss", style: { height: "auto", minHeight: 0, display: "block", fontSize: `${fontPx}px` }, children: [
     jsx("style", { children: styles }),
     jsx(HeadlineTicker, {
-      articles: effectiveSettings.tickerOnlyUnread === true ? articles.data.filter(isTickerUnread) : articles.data,
+      articles: tickerArticlesWithFavicons,
       tags: effectiveSettings.gradingTags,
       settings: effectiveSettings,
       onOpen
@@ -3998,6 +4030,14 @@ function ReaderProfile({ ctx, owner }) {
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("span", { className: "rss-setting-label", children: "Favicon and AI pill" }),
           jsx(Segmented, { value: draft.tickerAssetSize || "normal", onChange: v => updateDraft({ ...draft, tickerAssetSize: v }), options: TICKER_ASSET_SIZES })
+        ] }),
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsx("span", { className: "rss-setting-label", children: "Tag style" }),
+          jsx(Segmented, { value: draft.tickerTagStyle || "pill", onChange: v => updateDraft({ ...draft, tickerTagStyle: v }), options: TICKER_TAG_STYLES })
+        ] }),
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsx("span", { className: "rss-setting-label", children: "Behavior on Click" }),
+          jsx(Segmented, { value: draft.tickerClickBehavior || "reader", onChange: v => updateDraft({ ...draft, tickerClickBehavior: v }), options: TICKER_CLICK_BEHAVIORS })
         ] }),
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("label", { className: "rss-setting", children: [
