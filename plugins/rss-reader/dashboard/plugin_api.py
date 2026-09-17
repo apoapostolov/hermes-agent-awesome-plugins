@@ -6,6 +6,9 @@ import json
 import os
 import re
 import socket
+from datetime import datetime, timezone
+from email.utils import format_datetime
+from html import escape
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
@@ -130,6 +133,74 @@ def read_commands() -> list[dict]:
     return commands
 
 
+def _reddit_api_url(raw: str) -> str | None:
+    parsed = urlparse(raw)
+    if parsed.scheme not in {"http", "https"} or parsed.username or parsed.password:
+        return None
+    if (parsed.hostname or "").lower() not in {"reddit.com", "www.reddit.com", "old.reddit.com", "new.reddit.com"}:
+        return None
+    match = re.fullmatch(r"/r/([A-Za-z0-9_]{2,50})(?:/.*)?", parsed.path.rstrip("/") or "/")
+    if not match:
+        return None
+    subreddit = match.group(1)
+    return f"https://www.reddit.com/r/{subreddit}/new.json?raw_json=1&limit=50"
+
+
+def _reddit_feed_xml(payload: dict, source_url: str) -> str:
+    children = payload.get("data", {}).get("children", []) if isinstance(payload, dict) else []
+    items: list[str] = []
+    for child in children:
+        data = child.get("data", {}) if isinstance(child, dict) else {}
+        if not isinstance(data, dict) or not data.get("id") or not data.get("title"):
+            continue
+        permalink = str(data.get("permalink") or "")
+        link = urljoin("https://www.reddit.com", permalink) if permalink.startswith("/") else str(data.get("url") or source_url)
+        created = data.get("created_utc")
+        try:
+            published = format_datetime(datetime.fromtimestamp(float(created), tz=timezone.utc), usegmt=True)
+        except (TypeError, ValueError, OSError, OverflowError):
+            published = ""
+        title = escape(str(data.get("title") or ""))
+        body = escape(str(data.get("selftext") or ""))
+        author = escape(str(data.get("author") or "deleted"))
+        items.append(
+            "<item>"
+            f"<guid isPermaLink=\"true\">{escape(link)}</guid>"
+            f"<title>{title}</title>"
+            f"<link>{escape(link)}</link>"
+            f"<description>{body}</description>"
+            f"<author>{author}</author>"
+            f"<pubDate>{published}</pubDate>"
+            "</item>"
+        )
+    match = re.search(r"/r/([A-Za-z0-9_]{2,50})", source_url)
+    subreddit = escape(match.group(1) if match else "Reddit")
+    return f"<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Reddit r/{subreddit}</title><link>{escape(source_url)}</link><description>Reddit community feed</description>{''.join(items)}</channel></rss>"
+
+
+def _fetch_reddit(payload: FeedRequest) -> dict[str, str | int]:
+    api_url = _reddit_api_url(payload.url)
+    if not api_url:
+        raise ValueError("Use a Reddit community URL such as https://www.reddit.com/r/python.")
+    _public_addresses(urlparse(api_url).hostname or "")
+    request = Request(api_url, headers={"Accept": "application/json", "User-Agent": _USER_AGENT})
+    response = build_opener(_NoRedirect()).open(request, timeout=_TIMEOUT)
+    body = _read_response(response)
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Reddit returned invalid JSON.") from exc
+    return {"text": _reddit_feed_xml(data, payload.url), "url": payload.url, "status": response.status}
+
+
+@router.post("/reddit")
+def fetch_reddit(payload: FeedRequest) -> dict[str, str | int]:
+    try:
+        return _fetch_reddit(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        raise HTTPException(status_code=502, detail=f"Reddit download failed: {exc}") from exc
 @router.post("/article")
 def fetch_article(payload: FeedRequest) -> dict[str, str | int]:
     return fetch_feed(payload)
@@ -137,6 +208,8 @@ def fetch_article(payload: FeedRequest) -> dict[str, str | int]:
 
 @router.post("/feed")
 def fetch_feed(payload: FeedRequest) -> dict[str, str | int]:
+    if _reddit_api_url(payload.url):
+        return fetch_reddit(payload)
     try:
         url = _validate_url(payload.url)
         opener = build_opener(_NoRedirect())

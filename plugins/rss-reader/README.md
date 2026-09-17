@@ -12,7 +12,8 @@
 
 RSS Reader gives Hermes a focused three-column reading space:
 
-- **Read.** Subscribe to RSS 2.0 and Atom feeds, search your library, and open original articles.
+- **Read.** Subscribe to RSS 2.0 and Atom feeds, Reddit `r/...` communities, search your library, and open original articles.
+- **Start quickly.** Use the Subscribe starter pills for Newswire sources and popular Reddit communities.
 - **Organize.** Create folders and nested folders, move feeds between them, and remember open or closed state.
 - **Protect attention.** Use unread, saved, feed, folder, mute, and search views without losing the article you are reading.
 - **Capture articles.** Fetch full articles through the Python API and keep useful images and tables in reader mode.
@@ -30,10 +31,11 @@ Enable **RSS Reader** under **Capabilities → Plugins**, add a feed URL, and pr
 
 ## First use
 
-1. Add a direct RSS or Atom feed URL.
-2. Refresh the library.
-3. Select a story and choose Open, Save, Capture, Summary, Evidence, or Discuss.
-4. Enable subscription edit mode to create folders, subfolders, and feed moves.
+1. Add a direct RSS or Atom feed URL, or paste a Reddit community URL such as `https://www.reddit.com/r/programming`.
+2. Use a starter pill to fill a Newswire or Reddit source quickly, then add it like any other subscription.
+3. Refresh the library.
+4. Select a story and choose Open, Save, Capture, Summary, Evidence, or Discuss.
+5. Enable subscription edit mode to create folders, subfolders, and feed moves.
 
 In Unread view, a selected story is marked read after one second but remains visible until focus moves to another story. Normal views keep immediate marking behavior.
 

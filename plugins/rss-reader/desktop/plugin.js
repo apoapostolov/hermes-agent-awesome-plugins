@@ -212,6 +212,20 @@ function validateSummary(text, body) {
 // AI importance grading. One batched auxiliary-model call per pass, run off the
 // refresh path and never blocking the list: the grades land later and tint.
 var DEFAULT_GRADING_SKILL = "rss-reader-plugin";
+var SUBSCRIBE_STARTERS = [
+  { group: "Newswire starters", name: "Hacker News", url: "https://hnrss.org/frontpage" },
+  { group: "Newswire starters", name: "Ars Technica", url: "https://feeds.arstechnica.com/arstechnica/index" },
+  { group: "Newswire starters", name: "The Verge", url: "https://www.theverge.com/rss/index.xml" },
+  { group: "Newswire starters", name: "NASA News", url: "https://www.nasa.gov/news-release/feed/" },
+  { group: "Newswire starters", name: "TechCrunch", url: "https://techcrunch.com/feed/" },
+  { group: "Newswire starters", name: "VentureBeat AI", url: "https://venturebeat.com/category/ai/feed/" },
+  { group: "Popular Reddit", name: "r/technology", url: "https://www.reddit.com/r/technology" },
+  { group: "Popular Reddit", name: "r/programming", url: "https://www.reddit.com/r/programming" },
+  { group: "Popular Reddit", name: "r/science", url: "https://www.reddit.com/r/science" },
+  { group: "Popular Reddit", name: "r/worldnews", url: "https://www.reddit.com/r/worldnews" },
+  { group: "Popular Reddit", name: "r/gaming", url: "https://www.reddit.com/r/gaming" },
+  { group: "Popular Reddit", name: "r/LocalLLaMA", url: "https://www.reddit.com/r/LocalLLaMA" }
+];
 // Every returned level is stored, "normal" included: it is what stops a later
 // pass from re-grading the same articles. The skill's tag table decides which
 // levels tint or carry a pill.
@@ -1674,14 +1688,24 @@ function publicIPv4(value) {
   if ([a, b, c, d].some((n) => n > 255)) return false;
   return !(a === 0 || a === 10 || a === 127 || a >= 224 || a === 100 && b >= 64 && b <= 127 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && (b === 0 || b === 168 || b === 88 && c === 99) || a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113);
 }
+function redditCommunityUrl(raw) {
+  try {
+    const parsed = new URL(String(raw || "").trim());
+    if (!["reddit.com", "www.reddit.com", "old.reddit.com", "new.reddit.com"].includes(parsed.hostname.toLowerCase())) return null;
+    const match = parsed.pathname.match(/^\/r\/([A-Za-z0-9_]{2,50})(?:\/|$)/i);
+    return match ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
 async function fetchFeedViaApi(rawUrl) {
-  const response = await rssRest("/feed", {
-    method: "POST",
-    body: { url: publicUrl(rawUrl).href }
-  });
+  const redditUrl = redditCommunityUrl(rawUrl);
+  const response = redditUrl
+    ? await rssRest("/reddit", { method: "POST", body: { url: redditUrl } })
+    : await rssRest("/feed", { method: "POST", body: { url: publicUrl(rawUrl).href } });
   if (!response || typeof response.text !== "string")
     throw new Error("RSS backend returned an invalid feed response.");
-  return parseFeed(response.text, response.url || publicUrl(rawUrl).href);
+  return parseFeed(response.text, response.url || redditUrl || publicUrl(rawUrl).href);
 }
 async function fetchFeed(host2, rawUrl) {
   const route = await currentRoute(host2);
@@ -2422,7 +2446,7 @@ var styles = `
 .hermes-rss details{font-size:12px;color:var(--ui-text-secondary);margin-top:8px}.hermes-rss summary{cursor:pointer;color:var(--ui-accent)}
 .hermes-rss blockquote{margin:10px 0;padding-left:14px;border-left:2px solid var(--ui-stroke-secondary);white-space:pre-wrap}
 .hermes-rss .rss-form{padding:20px 28px;border-bottom:1px solid var(--ui-stroke-secondary);display:flex;gap:10px;align-items:end;flex-wrap:wrap}.hermes-rss .rss-form label{display:grid;gap:7px;flex:1;min-width:150px}
-.hermes-rss .rss-form input{width:100%}.hermes-rss .rss-small{font-size:11px}.hermes-rss .rss-stack{display:grid;gap:12px}
+.hermes-rss .rss-form input{width:100%}.hermes-rss .rss-subscribe-starters{flex:1 1 100%;display:grid;gap:6px;padding-top:4px}.hermes-rss .rss-subscribe-starter-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hermes-rss .rss-subscribe-starter-group>.rss-small{min-width:112px}.hermes-rss .rss-subscribe-pills{display:flex;gap:6px;flex-wrap:wrap}.hermes-rss .rss-subscribe-pill{border:1px solid var(--ui-stroke-secondary);border-radius:999px;background:transparent;color:var(--ui-text-secondary);padding:3px 9px;font:inherit;font-size:11px;cursor:pointer}.hermes-rss .rss-subscribe-pill:hover{border-color:var(--ui-accent);color:var(--ui-text-primary)}.hermes-rss .rss-subscribe-pill:focus-visible{outline:1px solid var(--ui-accent);outline-offset:1px}.hermes-rss .rss-small{font-size:11px}.hermes-rss .rss-stack{display:grid;gap:12px}
 .hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}.hermes-rss .rss-nav .rss-feed-open{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:9px 10px;cursor:pointer}.hermes-rss .rss-nav .rss-unsubscribe{width:26px;flex-shrink:0;padding:7px;justify-content:center;color:var(--ui-text-tertiary)}
 .hermes-rss .rss-nav .rss-unsubscribe-edit{width:14px;height:18px;flex:0 0 14px;padding:0;margin:0 4px 0 6px;display:inline-flex;align-items:center;justify-content:center}
 .hermes-rss .rss-nav .rss-unsubscribe-edit .codicon{font-size:10px;line-height:1;display:block}
@@ -3793,6 +3817,17 @@ function ReaderProfile({ ctx, owner }) {
                 placeholder: "Research"
               }
             )
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "rss-subscribe-starters", children: [
+            jsx("span", { className: "rss-muted rss-small", children: "Starter packs" }),
+            ["Newswire starters", "Popular Reddit"].map(group => jsxs("div", { className: "rss-subscribe-starter-group", children: [
+              jsx("span", { className: "rss-muted rss-small", children: group }),
+              jsx("div", { className: "rss-subscribe-pills", children: SUBSCRIBE_STARTERS.filter(item => item.group === group).map(item => jsx(
+                "button",
+                { type: "button", className: "rss-subscribe-pill", onClick: () => setUrl(item.url), children: item.name },
+                item.url
+              )) })
+            ] }, group))
           ] }),
           /* @__PURE__ */ jsx(Button, { type: "submit", disabled, children: "Add feed" }),
           /* @__PURE__ */ jsx(
