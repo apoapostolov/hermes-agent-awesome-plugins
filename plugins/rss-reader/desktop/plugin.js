@@ -3063,10 +3063,15 @@ function TickerPane() {
     queryKey: ["rss-reader", owner, "ticker-articles", onlyUnread],
     queryFn: async () => {
       const library = await transact(owner);
-      const byFeed = new Map((library.feeds || []).map((f) => [f.id, f]));
+      const feeds = library.feeds || [];
+      const byFeed = new Map(feeds.map((f) => [f.id, f]));
       const byTime = (a, b) => String(b.published_at || b.received_at || "").localeCompare(String(a.published_at || a.received_at || ""));
-      let rows = (library.articles || []).slice().sort(byTime);
+      const rules = library.filters?.mutes || [];
+      let rows = (library.articles || []).slice();
+      for (const article of rows) applyCachedGrade(library, article);
       if (onlyUnread) rows = rows.filter(isTickerUnread);
+      if (rules.length) rows = rows.filter((article) => !rules.some((rule) => muteHidesArticle(rule, article, feeds)));
+      rows.sort(byTime);
       return rows.slice(0, 100).map((a) => {
         const feed = byFeed.get(a.feed_id);
         const feedTitle = a.feed_title || feed?.title || feed?.name || "RSS";
