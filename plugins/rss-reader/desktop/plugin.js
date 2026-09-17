@@ -2804,9 +2804,11 @@ function useSettingsPane(owner) {
   return useMemo(() => [readSettings(rssCtx, owner)], [owner, version]);
 }
 function isTickerUnread(article) {
-  const read = article?.is_read === true || article?.is_read === 1 || article?.is_read === "1" || article?.read === true || article?.read === 1 || article?.read === "1";
-  const unreadFlag = article?.unread === false || article?.unread === 0 || article?.unread === "0";
-  return !read && !unreadFlag && !article?.read_at;
+  const readValue = article?.is_read ?? article?.isRead ?? article?.read;
+  const read = readValue === true || readValue === 1 || readValue === "1" || readValue === "true";
+  const unreadValue = article?.unread;
+  const unreadFlag = unreadValue === false || unreadValue === 0 || unreadValue === "0" || unreadValue === "false";
+  return !read && !unreadFlag && !article?.read_at && !article?.readAt;
 }
 function TickerPane() {
   const owner = tickerPaneOwner();
@@ -2828,7 +2830,7 @@ function TickerPane() {
         transact(owner)
       ]);
       const byFeed = new Map((library.feeds || []).map((f) => [f.id, f]));
-      const sourceRows = Array.isArray(rows) ? rows : (Array.isArray(rows?.articles) ? rows.articles : []);
+      const sourceRows = Array.isArray(rows) ? rows : (Array.isArray(rows?.articles) ? rows.articles : (Array.isArray(rows?.data) ? rows.data : []));
       const source = sourceRows.length ? sourceRows : (Array.isArray(library.articles) ? library.articles.slice(0, 100) : []);
       return source.map((a) => {
         const feed = byFeed.get(a.feed_id);
