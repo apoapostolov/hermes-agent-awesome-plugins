@@ -45,7 +45,7 @@ The pack is pinned and reproducible. Every entry in `hermes-pack.yaml` names a r
 | [opaque-composer](plugins/opaque-composer/README.md) | Keep the desktop composer readable while the transcript scrolls behind it. |
 | [compact-reasoning-label](plugins/compact-reasoning-label/README.md) | Show the model name only in the model pill and leave the thinking level to the reasoning pill beside it. |
 | [provider-status](plugins/provider-status/README.md) | Track provider quotas, OAuth status, multiple accounts, and key rotation in the status bar. |
-| [better-capabilities](plugins/better-capabilities/README.md) | Delete a plugin or skill from Capabilities, and zip a learned skill folder from the Edit / Archive row. |
+| [better-capabilities](plugins/better-capabilities/README.md) | Delete a plugin or skill from Capabilities, zip a learned skill, save on/off presets, and apply them with /preset. |
 
 ### Review and read
 
