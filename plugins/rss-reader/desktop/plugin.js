@@ -4151,10 +4151,14 @@ function ReaderProfile({ ctx, owner }) {
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("span", { className: "rss-setting-label", children: "Group headlines" }),
           jsx(Segmented, { value: draft.tickerGrouping || "newest", onChange: v => updateDraft({ ...draft, tickerGrouping: v }), options: TICKER_GROUPINGS })
+        ] }),
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsx("span", { className: "rss-setting-label", children: "Behavior on Click" }),
+          jsx(Segmented, { value: draft.tickerClickBehavior || "reader", onChange: v => updateDraft({ ...draft, tickerClickBehavior: v }), options: TICKER_CLICK_BEHAVIORS })
         ] })
         ] }),
         jsxs("div", { className: "rss-settings-block", children: [
-          jsx("h2", { className: "rss-settings-header", children: "Appearance and output" }),
+          jsx("h2", { className: "rss-settings-header", children: "Appearance" }),
           jsxs("div", { className: "rss-setting-row", children: [
             jsx("span", { className: "rss-setting-label", children: "Text size (px)" }),
             jsx(Segmented, { value: String(draft.tickerFontSize || 11), onChange: v => updateDraft({ ...draft, tickerFontSize: Number(v) }), options: TICKER_FONT_SIZES.map((n) => ({ id: n, label: n })) })
@@ -4166,10 +4170,6 @@ function ReaderProfile({ ctx, owner }) {
           jsxs("div", { className: "rss-setting-row", children: [
             jsx("span", { className: "rss-setting-label", children: "Tag style" }),
             jsx(Segmented, { value: draft.tickerTagStyle || "pill", onChange: v => updateDraft({ ...draft, tickerTagStyle: v }), options: TICKER_TAG_STYLES })
-          ] }),
-          jsxs("div", { className: "rss-setting-row", children: [
-            jsx("span", { className: "rss-setting-label", children: "Behavior on Click" }),
-            jsx(Segmented, { value: draft.tickerClickBehavior || "reader", onChange: v => updateDraft({ ...draft, tickerClickBehavior: v }), options: TICKER_CLICK_BEHAVIORS })
           ] }),
           jsxs("div", { className: "rss-setting-row", children: [
             jsx("label", { className: "rss-setting", children: [
