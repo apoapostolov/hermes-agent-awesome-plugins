@@ -2997,7 +2997,16 @@ function TickerPane() {
       articles: tickerArticlesWithFavicons,
       tags: effectiveSettings.gradingTags,
       settings: effectiveSettings,
-      onOpen
+      onOpen,
+      onRefresh: async () => {
+        const library = createLibrary(owner, (url) => fetchFeed(host, url), transact, null);
+        const result = await refreshSubscriptions(library, { shouldContinue: () => tickerPaneOwner() === owner });
+        const saved = readSettings(rssCtx, owner);
+        if (saved.fullCapture && result.fresh?.length) captureEnqueue(owner, result.fresh);
+        storageSet(rssCtx, "lastRefresh", owner, Date.now());
+        publishLibraryChange(owner);
+        await articles.refetch();
+      }
     })
   ] });
 }
