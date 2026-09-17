@@ -1172,7 +1172,7 @@ function readSettings(ctx, owner) {
     tickerOnlyUnread: stored.tickerOnlyUnread === true,
     tickerAssetSize: ["small", "normal", "font"].includes(stored.tickerAssetSize) ? stored.tickerAssetSize : "normal",
     tickerTagStyle: ["pill", "article_color", "none"].includes(stored.tickerTagStyle) ? stored.tickerTagStyle : "pill",
-    tickerClickBehavior: stored.tickerClickBehavior === "browser" ? "browser" : "reader",
+    tickerClickBehavior: ["reader", "browser", "external"].includes(stored.tickerClickBehavior) ? stored.tickerClickBehavior : "reader",
     openInExternalBrowser: stored.openInExternalBrowser === true,
     gradingSkill: gradingSkillName(typeof stored.gradingSkill === "string" ? stored.gradingSkill : ""),
     gradingTags: readGradingTags(ctx, owner)
@@ -2846,7 +2846,8 @@ var TICKER_TAG_STYLES = [
 ];
 var TICKER_CLICK_BEHAVIORS = [
   { id: "reader", label: "Open RSS Reader" },
-  { id: "browser", label: "Open Browser" }
+  { id: "browser", label: "Internal Browser" },
+  { id: "external", label: "External Browser" }
 ];
 var TICKER_ASSET_SIZES = [
   { id: "small", label: "Small" },
@@ -2973,11 +2974,11 @@ function TickerPane() {
       host.navigate("/rss");
       return;
     }
+    if (effectiveSettings.tickerClickBehavior === "external") {
+      if (item.url && rssCtx?.os?.openExternal) void rssCtx.os.openExternal(item.url);
+      return;
+    }
     if (effectiveSettings.tickerClickBehavior === "browser") {
-      if (effectiveSettings.openInExternalBrowser === true && rssCtx?.os?.openExternal) {
-        void rssCtx.os.openExternal(item.url);
-        return;
-      }
       openHermesPreview(item.url, item.title || item.feed_title || "Article");
       return;
     }
