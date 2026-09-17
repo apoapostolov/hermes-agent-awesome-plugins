@@ -2351,8 +2351,7 @@ var styles = `
 .hermes-rss .rss-list-head .rss-list-meta{display:flex;align-items:center;gap:6px;white-space:nowrap}
 .hermes-rss .rss-list-head .rss-mark-read{padding:4px 8px;font-size:11px;height:26px;min-height:0;line-height:1.2}
 .hermes-rss .rss-list-head .rss-filter-chips{margin-top:0}
-.hermes-rss .rss-detail{overflow:auto;padding:0;display:flex;flex-direction:column}
-.hermes-rss .rss-detail .rss-tools{margin:18px 0}
+.hermes-rss .rss-detail{overflow:auto;padding:0;display:flex;flex-direction:column;position:relative}.hermes-rss .rss-browser-panel{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;background:var(--ui-bg-primary,var(--background));min-height:0}.hermes-rss .rss-browser-strip{display:flex;align-items:center;gap:8px;min-height:34px;padding:4px 10px;border-bottom:1px solid var(--ui-stroke-secondary);background:var(--ui-bg-secondary,var(--card));flex-shrink:0}.hermes-rss .rss-browser-url{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ui-text-secondary);font-size:11px}.hermes-rss .rss-browser-actions{display:inline-flex;align-items:center;gap:2px;margin-left:auto}.hermes-rss .rss-browser-frame{display:block;border:0;flex:1;width:100%;min-height:0;background:#fff}.hermes-rss .rss-detail .rss-tools{margin:18px 0}
 .hermes-rss .rss-detail-inner{max-width:calc(70ch + 88px);margin:0 auto;padding:32px 44px 56px;width:100%;box-sizing:border-box}
 .hermes-rss .rss-detail h2{font-size:24px;letter-spacing:-.3px;line-height:1.3;margin:6px 0 22px;font-weight:700}
 .hermes-rss .rss-detail .rss-eyebrow{margin-bottom:0}
@@ -2531,32 +2530,30 @@ html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
 .hermes-rss .rss-confirm{padding:16px 28px;border-bottom:1px solid var(--ui-stroke-secondary)}.hermes-rss .rss-confirm h2{font-size:16px}.hermes-rss .rss-confirm .rss-tools{margin-top:12px}
 @media(max-width:1000px){.hermes-rss .rss-layout{grid-template-columns:145px minmax(210px,.85fr) minmax(260px,1fr)}.hermes-rss .rss-detail-inner{padding:22px 20px}.hermes-rss .rss-top{padding:20px}}
 @media(max-width:760px){.hermes-rss .rss-layout{grid-template-columns:125px 1fr}.hermes-rss .rss-detail{display:none}.hermes-rss .rss-layout.has-selection .rss-list{display:none}.hermes-rss .rss-layout.has-selection .rss-detail{display:block}.hermes-rss .rss-top{align-items:flex-start}.hermes-rss .rss-top p{display:none}}
-.hermes-rss .rss-ticker{display:flex;align-items:center;height:30px;flex:none;grid-column:1 / -1;border-top:1px solid var(--ui-stroke-secondary);background:color-mix(in srgb,var(--ui-text-secondary) 4%,transparent);overflow:hidden}
-.hermes-rss .rss-ticker-brand{display:inline-flex;align-items:center;gap:4px;flex:none;height:100%;padding:0 10px;font-size:10px;font-weight:650;letter-spacing:1.2px;color:var(--ui-accent);cursor:pointer;user-select:none;background:none;border:0}
+.hermes-rss .rss-ticker{display:flex;align-items:center;width:100%;height:100%;min-width:0;overflow:hidden;background:var(--ui-bg-sidebar,var(--ui-bg-secondary));border-top:1px solid var(--ui-stroke-secondary);grid-column:1 / -1;font-family:inherit}
+.hermes-rss .rss-ticker-brand{display:inline-flex;align-items:center;gap:.25rem;flex:none;height:100%;padding:0 .5rem;font-size:.625rem;font-weight:700;letter-spacing:.08em;color:var(--ui-accent);cursor:pointer;user-select:none;background:none;border:0;font-family:inherit}
 .hermes-rss .rss-ticker-brand:hover{background:var(--chrome-action-hover)}
-.hermes-rss .rss-ticker-refresh{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:100%;background:none;border:0;padding:0;font-size:12px;color:var(--ui-text-quaternary);cursor:pointer}
-.hermes-rss .rss-ticker-refresh:hover{background:var(--chrome-action-hover);color:var(--foreground)}
+.hermes-rss .rss-ticker-refresh{display:inline-flex;align-items:center;justify-content:center;flex:none;width:1.25rem;height:100%;background:none;border:0;padding:0;font-size:.6875rem;color:var(--ui-text-quaternary);cursor:pointer}
+.hermes-rss .rss-ticker-refresh:hover{background:var(--chrome-action-hover);color:var(--ui-text-primary)}
 .hermes-rss .rss-ticker-refresh:focus-visible{outline:1px solid var(--ui-accent);outline-offset:-1px}
 .hermes-rss .rss-ticker-refresh[data-busy=true]{color:var(--ui-accent)}
 @keyframes rss-ticker-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .hermes-rss .rss-ticker-refresh[data-busy=true]{animation:rss-ticker-spin 1s linear infinite}
 .hermes-rss .rss-ticker-viewport{flex:1 1 0%;min-width:0;height:100%;overflow:hidden}
-.hermes-rss .rss-ticker-track{display:flex;width:max-content;height:100%;align-items:center;animation:rss-ticker-scroll var(--rss-ticker-duration,150s) linear infinite}
-.hermes-rss .rss-ticker:not([data-static=true]):hover .rss-ticker-track{animation-play-state:paused}
-.hermes-rss .rss-ticker[data-static=true] .rss-ticker-track{animation:none;width:100%;overflow:hidden}
+.hermes-rss .rss-ticker-track{display:flex;width:max-content;height:100%;align-items:center}
+.hermes-rss .rss-ticker-marquee{animation:rss-ticker-scroll var(--rss-ticker-duration,150s) linear infinite}
+.hermes-rss .rss-ticker:not(.rss-ticker-no-hover):hover .rss-ticker-marquee,.hermes-rss .rss-ticker[data-paused=true] .rss-ticker-marquee{animation-play-state:paused}
 .hermes-rss .rss-ticker-half{display:inline-flex;align-items:center;height:100%;white-space:nowrap}
 @keyframes rss-ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@media (prefers-reduced-motion: reduce){.hermes-rss .rss-ticker-track{animation:none;overflow:hidden}}
-.hermes-rss .rss-ticker-item{display:inline-flex;align-items:center;gap:6px;padding:0 14px;height:100%;background:none;border:0;font:inherit;line-height:1;color:var(--ui-text-secondary);cursor:pointer;text-decoration:none;white-space:nowrap}
-.hermes-rss .rss-ticker-item:hover{background:var(--chrome-action-hover);color:var(--foreground)}
+.hermes-rss .rss-ticker-item{display:inline-flex;align-items:center;gap:.375rem;padding:0 1rem;height:100%;background:none;border:0;font:inherit;font-size:var(--rss-ticker-font,11px);line-height:1;color:var(--ui-text-tertiary);cursor:pointer;text-decoration:none;white-space:nowrap}
+.hermes-rss .rss-ticker-item:hover{background:var(--chrome-action-hover);color:var(--ui-text-primary)}
 .hermes-rss .rss-ticker-item:focus-visible{outline:1px solid var(--ui-accent);outline-offset:-1px}
-.hermes-rss .rss-ticker-no-hover:hover .rss-ticker-track{animation-play-state:running}
-.hermes-rss .rss-ticker-item .rss-card-pill{flex:none;font-size:.75em;line-height:1.7}
-.hermes-rss .rss-ticker-item[data-read=true]{color:var(--ui-text-tertiary)}
-.hermes-rss .rss-ticker-item[data-read=true]:hover{color:var(--ui-text-secondary)}
-.hermes-rss .rss-ticker-src{color:var(--ui-text-tertiary);font-weight:600}
-.hermes-rss .rss-ticker-dot{color:var(--rss-tag,var(--ui-accent));font-size:8px;flex:none}
-.hermes-rss .rss-ticker-empty{padding:0 14px;font-size:11px;color:var(--ui-text-tertiary);cursor:default}
+.hermes-rss .rss-ticker-item .rss-card-pill{flex:none}
+.hermes-rss .rss-ticker-item[data-read=true] .rss-ticker-title{color:var(--ui-text-quaternary)}
+.hermes-rss .rss-ticker-src{color:var(--ui-text-quaternary)}
+.hermes-rss .rss-ticker-dot{color:var(--rss-tag,var(--ui-accent));flex:none}
+.hermes-rss .rss-ticker-favicon{flex:none;width:14px;height:14px;border-radius:3px;object-fit:contain;background:none}
+.hermes-rss .rss-ticker-divider{flex:none;padding:0 .75rem 0 .25rem;font-size:.625rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ui-accent);white-space:nowrap}
 .hermes-rss .rss-settings-tabs{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--ui-stroke-secondary);padding-bottom:8px}
 .hermes-rss .rss-settings-tab{background:none;border:0;padding:4px 10px;font:inherit;font-size:12px;font-weight:600;color:var(--ui-text-secondary);cursor:pointer;border-radius:6px}
 .hermes-rss .rss-settings-tab:hover{color:var(--foreground);background:var(--chrome-action-hover)}
@@ -2651,12 +2648,12 @@ function TickerItem({ row, onOpen, showSource, showAge }) {
     className: "rss-ticker-item",
     "data-read": item.is_read ? "true" : "false",
     title: `${item.feed_title ? item.feed_title + " — " : ""}${item.title}${age ? ` (${age})` : ""}`,
-    style: { fontSize: "inherit" },
     onClick: () => onOpen(item),
     children: [
-      pill && jsx("span", { "aria-hidden": "true", className: "rss-ticker-dot", style: { "--rss-tag": pill.color }, children: "\u25CF" }),
+      item.favicon && jsx("img", { src: item.favicon, className: "rss-ticker-favicon", alt: "", loading: "lazy", onError: (e) => { e.currentTarget.style.display = "none"; } }),
+      !item.favicon && pill && jsx("span", { "aria-hidden": "true", className: "rss-ticker-dot", style: { "--rss-tag": pill.color }, children: "\u25CF" }),
       pill && jsx("span", { className: "rss-card-pill", style: { "--rss-tag": pill.color }, children: pill.label }),
-      jsx("span", { children: item.title || "(untitled)" }),
+      jsx("span", { className: "rss-ticker-title", children: item.title || "(untitled)" }),
       meta && jsx("span", { className: "rss-ticker-src", children: meta }),
       age && jsx("span", { className: "rss-ticker-src", children: `\u00b7 ${age}` })
     ].filter(Boolean)
@@ -2708,19 +2705,19 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
   const fontPx = Math.min(18, Math.max(9, Number(settings.tickerFontSize) || 11));
   const duration = TICKER_SPEED_DURATIONS[settings.tickerSpeed] || 150;
   const renderRow = (row, i) => row.kind === "divider"
-    ? jsx("span", { "aria-hidden": "true", className: "rss-ticker-src", style: { padding: "0 4px", flex: "none" }, children: `${row.source} \u2014` }, `d${i}`)
+    ? jsx("span", { "aria-hidden": "true", className: "rss-ticker-divider", children: `${row.source} \u2014` }, `d${i}`)
     : jsx(TickerItem, { row, onOpen, showSource: settings.tickerShowSource !== false, showAge: settings.tickerRelativeTime !== false }, row.item.id);
   return jsxs("div", {
     className: `rss-ticker${settings.tickerPauseOnHover === false ? " rss-ticker-no-hover" : ""}`,
-    "data-static": reduced ? "true" : "false",
+    "data-paused": "false",
     role: "region",
     "aria-label": "RSS headline ticker",
-    style: { "--rss-ticker-duration": `${duration}s`, fontSize: `${fontPx}px`, height: `${TICKER_FONT_TO_HEIGHT(fontPx)}px` },
+    style: { "--rss-ticker-duration": `${duration}s`, "--rss-ticker-font": `${fontPx}px`, height: `${TICKER_FONT_TO_HEIGHT(fontPx)}px` },
     children: [
       jsx("button", { type: "button", className: "rss-ticker-brand", title: "RSS Reader headlines", onClick: () => onOpen(null), children: "RSS" }),
       jsx(TickerRefresh, { onRefresh }),
       jsx("div", { className: "rss-ticker-viewport", children:
-        jsx("div", { className: "rss-ticker-track", children: reduced
+        jsx("div", { className: `rss-ticker-track${reduced ? "" : " rss-ticker-marquee"}`, children: reduced
           ? rows.slice(0, 1).map(renderRow)
           : [
               jsx("div", { className: "rss-ticker-half", children: rows.map(renderRow) }, "a"),
@@ -2775,7 +2772,15 @@ function TickerPane() {
     queryKey: ["rss-reader", owner, "ticker-articles"],
     queryFn: async () => {
       const library = await transact(owner);
-      return (library.articles || []).filter((a) => a.feed_title).slice(0, 100);
+      const byFeed = new Map((library.feeds || []).map((f) => [f.id, f]));
+      return (library.articles || []).filter((a) => a.feed_title).slice(0, 100).map((a) => {
+        const feed = byFeed.get(a.feed_id);
+        let favicon = "";
+        if (feed?.url) {
+          try { favicon = `${new URL(feed.url).origin}/favicon.ico`; } catch { favicon = ""; }
+        }
+        return { ...a, favicon };
+      });
     },
     refetchInterval: TICKER_PANE_POLL_MS,
     retry: false
@@ -2787,7 +2792,11 @@ function TickerPane() {
     }
   };
   if (!settings || settings.headlineTicker !== true || !articles.data?.length) return null;
-  return jsxs("div", { style: { display: "contents" }, children: [
+  // Ticker rules are `.hermes-rss .rss-ticker-*` descendants: the pane must
+  // mount a .hermes-rss root. Inline styles neutralize the page-level root
+  // sizing (height/min-height/flex) for the strip context.
+  const fontPx = Math.min(18, Math.max(9, Number(settings.tickerFontSize) || 11));
+  return jsxs("div", { className: "hermes-rss", style: { height: "auto", minHeight: 0, display: "block", fontSize: `${fontPx}px` }, children: [
     jsx("style", { children: styles }),
     jsx(HeadlineTicker, {
       articles: settings.tickerOnlyUnread === true ? (articles.data.filter((a) => !a.is_read)) : articles.data,
@@ -3129,6 +3138,8 @@ function ReaderProfile({ ctx, owner }) {
   const [muteFolders, setMuteFolders] = useState([]);
   const [editingMute, setEditingMute] = useState(null);
   const [tab, setTab] = useState("article");
+  const [browserOpen, setBrowserOpen] = useState(false);
+  const [browserUrl, setBrowserUrl] = useState("");
   const [discussOpen, setDiscussOpen] = useState(false);
   const [discussNote, setDiscussNote] = useState("");
   const [adding, setAdding] = useState(false);
@@ -3383,6 +3394,8 @@ function ReaderProfile({ ctx, owner }) {
       void refresh();
     }
     setSelected(item.id);
+    setBrowserUrl(item.url || "");
+    setBrowserOpen(false);
     setTab("article");
     if (settings.fullCapture && articleNeedsCapture(item)) {
       captureEnqueue(owner, [{ id: item.id, url: item.url }], { front: true });
@@ -4497,11 +4510,11 @@ function ReaderProfile({ ctx, owner }) {
               {
                 type: "button",
                 className: "rss-icon-btn",
-                disabled,
-                "aria-label": "Check sources",
-                title: "Check sources",
-                onClick: () => start("check"),
-                children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-shield", "aria-hidden": "true" })
+                disabled: disabled || !article.url,
+                "aria-label": "Open in Browser",
+                title: "Open in Browser",
+                onClick: () => setBrowserOpen(true),
+                children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-globe", "aria-hidden": "true" })
               }
             )
           ] }),
@@ -4530,6 +4543,7 @@ function ReaderProfile({ ctx, owner }) {
           /* @__PURE__ */ jsx(Button, { disabled, "aria-expanded": discussOpen, onClick: () => setDiscussOpen(open => !open), children: "Discuss \u2197" })
         ] }),
         discussOpen && jsxs("form", { className: "rss-discuss-row", onSubmit: event => { event.preventDefault(); start("discuss", discussNote); }, children: [
+          jsx(Button, { type: "button", variant: "ghost", disabled, onClick: () => start("check"), children: "Check Sources" }),
           jsx(Input, { "aria-label": "Ask a Question, or Personalize the Discussion", placeholder: "Ask a Question, or Personalize the Discussion", value: discussNote, maxLength: 2000, autoFocus: true, onChange: event => setDiscussNote(event.target.value) }),
           jsx(Button, { type: "submit", disabled, children: "Start" })
         ] }),
@@ -4634,6 +4648,17 @@ function ReaderProfile({ ctx, owner }) {
       ] }) })
         })
       ] }),
+      browserOpen && browserUrl && jsxs("section", { className: "rss-browser-panel", children: [
+        jsxs("div", { className: "rss-browser-strip", children: [
+          jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Back to article", title: "Back to article", onClick: () => setBrowserOpen(false), children: jsx("i", { className: "codicon codicon-arrow-left", "aria-hidden": "true" }) }),
+          jsx("span", { className: "rss-browser-url", title: browserUrl, children: browserUrl }),
+          jsxs("span", { className: "rss-browser-actions", children: [
+            jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Copy article URL", title: "Copy article URL", onClick: async () => { try { await navigator.clipboard.writeText(browserUrl); setNotice("Article URL copied."); } catch { setNotice("Could not copy the article URL."); } }, children: jsx("i", { className: "codicon codicon-copy", "aria-hidden": "true" }) }),
+            jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Open in external browser", title: "Open in external browser", onClick: () => ctx.os.openExternal(browserUrl), children: jsx("i", { className: "codicon codicon-link-external", "aria-hidden": "true" }) })
+          ] })
+        ] }),
+        jsx("iframe", { className: "rss-browser-frame", src: browserUrl, title: "Article browser", referrerPolicy: "no-referrer", sandbox: "allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts" })
+      ] })
     ] })
   ] });
 }
