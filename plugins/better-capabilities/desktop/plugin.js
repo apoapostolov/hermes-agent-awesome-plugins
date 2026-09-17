@@ -570,6 +570,58 @@ function loadPresetStore() {
 
 function savePresetStore(store) {
   window.localStorage.setItem(PRESET_STORE, JSON.stringify(store))
+  void persistPresetStore(store)
+}
+
+async function persistPresetStore(store) {
+  try {
+    if (typeof rest === 'function') await rest('/presets', { method: 'PUT', body: store })
+  } catch {
+    // disk copy is optional until Python remounts
+  }
+}
+
+async function hydratePresetStore() {
+  try {
+    if (typeof rest !== 'function') return
+    const res = await rest('/presets')
+    const remote = res && res.store
+    if (!remote || typeof remote !== 'object') return
+    const local = loadPresetStore()
+    const merged = { skills: {}, tools: {}, plugins: {} }
+    for (const kind of ['skills', 'tools', 'plugins']) {
+      const a = remote[kind] && typeof remote[kind] === 'object' ? remote[kind] : {}
+      const b = local[kind] && typeof local[kind] === 'object' ? local[kind] : {}
+      const bucket = { ...a, ...b }
+      const order = []
+      for (const name of [].concat(a._order || [], b._order || [])) {
+        if (name && name !== '_order' && bucket[name] && !order.includes(name)) order.push(name)
+      }
+      for (const name of Object.keys(bucket)) {
+        if (name !== '_order' && !order.includes(name)) order.push(name)
+      }
+      bucket._order = order
+      merged[kind] = bucket
+    }
+    window.localStorage.setItem(PRESET_STORE, JSON.stringify(merged))
+    void persistPresetStore(merged)
+  } catch {
+    // keep localStorage
+  }
+}
+
+async function consumePendingPreset() {
+  try {
+    if (typeof rest !== 'function') return
+    const res = await rest('/presets/pending')
+    const pending = res && res.pending
+    if (!pending || !pending.kind || !pending.name) return
+    await rest('/presets/pending', { method: 'DELETE' })
+    const payload = presetsFor(pending.kind)[pending.name]
+    if (payload) await applyKind(pending.kind, payload)
+  } catch {
+    // slash apply still changed agent/skills even if desktop lags
+  }
 }
 
 function presetsFor(kind) {
@@ -1246,6 +1298,11 @@ export default {
   register(ctx) {
     rest = typeof ctx.rest === 'function' ? ctx.rest : null
     injectStyle()
+    void hydratePresetStore()
+    void consumePendingPreset()
+    const pendingTimer = window.setInterval(() => {
+      void consumePendingPreset()
+    }, 2000)
     sweep()
     let scheduled = false
     const observer = new MutationObserver(() => {
@@ -1266,6 +1323,7 @@ export default {
     document.addEventListener('mousedown', onDocDown, true)
     ctx.onDispose(() => {
       observer.disconnect()
+      window.clearInterval(pendingTimer)
       window.removeEventListener('hashchange', onHash)
       document.removeEventListener('mousedown', onDocDown, true)
       document.getElementById(STYLE_ID)?.remove()

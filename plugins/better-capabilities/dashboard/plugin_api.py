@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+import importlib.util
 
 router = APIRouter()
 
@@ -35,6 +36,14 @@ def hermes_home() -> Path:
 
 
 HOME = hermes_home()
+
+_PRESETS_SPEC = importlib.util.spec_from_file_location(
+    "better_capabilities_presets",
+    Path(__file__).resolve().parents[1] / "presets.py",
+)
+bc_presets = importlib.util.module_from_spec(_PRESETS_SPEC)
+assert _PRESETS_SPEC is not None and _PRESETS_SPEC.loader is not None
+_PRESETS_SPEC.loader.exec_module(bc_presets)
 
 
 class TargetBody(BaseModel):
@@ -211,3 +220,54 @@ def delete_target(body: TargetBody):
     path = _resolve(body.kind, body.name)
     result = _recycle_dir(path)
     return {"ok": True, "name": body.name, "kind": body.kind, "result": result}
+
+
+class PresetBody(BaseModel):
+    kind: str
+    name: str = Field(min_length=1, max_length=60)
+
+
+@router.get("/presets")
+def get_presets():
+    return {"ok": True, "store": bc_presets.load_store()}
+
+
+@router.put("/presets")
+def put_presets(body: dict):
+    store = bc_presets.empty_store()
+    src = body.get("store") if isinstance(body.get("store"), dict) else body
+    if not isinstance(src, dict):
+        raise HTTPException(status_code=400, detail="Preset store must be an object.")
+    for kind in ("skills", "tools", "plugins"):
+        value = src.get(kind)
+        store[kind] = value if isinstance(value, dict) else {}
+    bc_presets.save_store(store)
+    return {"ok": True}
+
+
+@router.post("/presets/save")
+def save_named_preset(body: PresetBody):
+    parsed = bc_presets.parse_command(f"save {body.kind} {body.name}")
+    if parsed.get("error"):
+        raise HTTPException(status_code=400, detail=parsed["error"])
+    return {"ok": True, "message": bc_presets.handle_preset_command(f"save {body.kind} {body.name}")}
+
+
+@router.post("/presets/apply")
+def apply_named_preset(body: PresetBody):
+    parsed = bc_presets.parse_command(f"{body.kind} {body.name}")
+    if parsed.get("error"):
+        raise HTTPException(status_code=400, detail=parsed["error"])
+    return {"ok": True, "message": bc_presets.handle_preset_command(f"{body.kind} {body.name}")}
+
+
+@router.get("/presets/pending")
+def get_pending():
+    pending = bc_presets.read_pending()
+    return {"ok": True, "pending": pending}
+
+
+@router.delete("/presets/pending")
+def delete_pending():
+    bc_presets.clear_pending()
+    return {"ok": True}
