@@ -4841,7 +4841,7 @@ function ReaderProfile({ ctx, owner }) {
           /* @__PURE__ */ jsx(Button, { disabled, "aria-expanded": discussOpen, onClick: () => setDiscussOpen(open => !open), children: "Discuss \u2197" })
         ] }),
         discussOpen && jsxs("form", { className: "rss-discuss-row", onSubmit: event => { event.preventDefault(); start("discuss", discussNote); }, children: [
-          jsx(Button, { type: "button", variant: "ghost", disabled, onClick: () => start("check"), children: "Check Sources" }),
+          jsx(Button, { type: "button", disabled, onClick: () => start("check"), children: "Sources" }),
           jsx(Input, { "aria-label": "Ask a Question, or Personalize the Discussion", placeholder: "Ask a Question, or Personalize the Discussion", value: discussNote, maxLength: 2000, autoFocus: true, onChange: event => setDiscussNote(event.target.value) }),
           jsx(Button, { type: "submit", disabled, children: "Start" })
         ] }),
