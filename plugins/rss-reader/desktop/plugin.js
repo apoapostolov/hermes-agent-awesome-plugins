@@ -2546,6 +2546,7 @@ html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
 @keyframes rss-ticker-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .hermes-rss .rss-ticker-refresh[data-busy=true]{animation:rss-ticker-spin 1s linear infinite}
 .hermes-rss .rss-ticker-viewport{flex:1 1 0%;min-width:0;height:100%;overflow:hidden}
+.hermes-rss .rss-ticker-empty{display:inline-flex;align-items:center;height:100%;padding:0 1rem;color:var(--ui-text-quaternary);font:inherit;font-size:var(--rss-ticker-font,11px)}
 .hermes-rss .rss-ticker-track{display:flex;width:max-content;height:100%;align-items:center}
 .hermes-rss .rss-ticker-marquee{animation:rss-ticker-scroll var(--rss-ticker-duration,150s) linear infinite}
 .hermes-rss .rss-ticker:not(.rss-ticker-no-hover):hover .rss-ticker-marquee,.hermes-rss .rss-ticker[data-paused=true] .rss-ticker-marquee{animation-play-state:paused}
@@ -2728,13 +2729,14 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
     children: [
       jsx("button", { type: "button", className: "rss-ticker-brand", title: "RSS Reader headlines", onClick: () => onOpen(null), children: "RSS" }),
       jsx(TickerRefresh, { onRefresh }),
-      jsx("div", { className: "rss-ticker-viewport", children:
+      jsx("div", { className: "rss-ticker-viewport", children: rows.length ?
         jsx("div", { className: `rss-ticker-track${reduced ? "" : " rss-ticker-marquee"}`, children: reduced
           ? rows.slice(0, 1).map(renderRow)
           : [
               jsx("div", { className: "rss-ticker-half", children: rows.map(renderRow) }, "a"),
               jsx("div", { className: "rss-ticker-half", "aria-hidden": "true", children: rows.map(renderRow) }, "b")
             ] })
+        : jsx("span", { className: "rss-ticker-empty", children: settings.tickerOnlyUnread === true ? "No unread headlines" : "No headlines" })
       })
     ]
   });
@@ -2813,9 +2815,13 @@ function TickerPane() {
   const articles = useQuery({
     queryKey: ["rss-reader", owner, "ticker-articles"],
     queryFn: async () => {
-      const library = await transact(owner);
+      const [rows, library] = await Promise.all([
+        libraryRequest("/articles?view=all&show_hidden=true&limit=100"),
+        transact(owner)
+      ]);
       const byFeed = new Map((library.feeds || []).map((f) => [f.id, f]));
-      return (library.articles || []).filter((a) => a.feed_title).slice(0, 100).map((a) => {
+      const source = Array.isArray(rows) ? rows : (Array.isArray(rows?.articles) ? rows.articles : []);
+      return source.filter((a) => a.feed_title).map((a) => {
         const feed = byFeed.get(a.feed_id);
         let favicon = "";
         if (feed?.url) {
@@ -2852,7 +2858,7 @@ function TickerPane() {
     : (articles.data || []);
   const faviconById = new Map((articles.data || []).map((article) => [article.id, article.favicon]));
   const tickerArticlesWithFavicons = tickerArticles.map((article) => ({ ...article, favicon: article.favicon || faviconById.get(article.id) || "" }));
-  if (!effectiveSettings || effectiveSettings.headlineTicker !== true || !tickerArticlesWithFavicons.length) return null;
+  if (!effectiveSettings || effectiveSettings.headlineTicker !== true) return null;
   // Ticker rules are `.hermes-rss .rss-ticker-*` descendants: the pane must
   // mount a .hermes-rss root. Inline styles neutralize the page-level root
   // sizing (height/min-height/flex) for the strip context.
