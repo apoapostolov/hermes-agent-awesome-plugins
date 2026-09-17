@@ -21,6 +21,8 @@ class RssCommandTests(unittest.TestCase):
     def test_refine_defaults_and_bounds(self):
         self.assertEqual(rss._parse("refine"), ("refine", {"days": 30}))
         self.assertEqual(rss._parse("refine 14d"), ("refine", {"days": 14}))
+        self.assertEqual(rss._parse("refine starred"), ("refine-starred", {}))
+        self.assertEqual(rss._parse("refine stars"), ("refine-starred", {}))
         with self.assertRaises(ValueError):
             rss._parse("refine 366d")
 
@@ -82,6 +84,7 @@ class RssCommandTests(unittest.TestCase):
         self.assertIn("Popular Reddit", plugin)
         self.assertIn("className: \"rss-subscribe-pill\"", plugin)
         self.assertIn("function expandSubscribeUrl", plugin)
+        self.assertIn("async function runLearnInterests", plugin)
         self.assertIn("RSS or Atom URL, or r/name of Reddit communities", plugin)
         self.assertIn("https://www.reddit.com/r/", plugin)
         self.assertNotIn("Test-Path -LiteralPath", plugin)

@@ -337,6 +337,7 @@ function gradingScaffold(name) {
     "- `/rss refresh XXm` saves the automatic refresh interval.",
     "- `/rss mute <keyword>` applies a mute rule across all feeds.",
     "- `/rss refine [XXd]` opens a Hermes session to review recent sessions, refine `rss-reader-plugin` from evidence, and explain the changes.",
+    "- `/rss refine starred` writes the starred set and opens Learn Interests so Hermes curates the preference skill from stars.",
     "- `/rss add <URL or website>[, name] [to <folder>]` discovers a common RSS or Atom endpoint, adds it, and refreshes it.",
     "- `/rss mark-read all` marks all unread articles as read; use `feed <name>` or `folder <name>` for a narrower scope.",
     "- `/rss digest unread [XXd]` or `/rss digest saved` opens a Hermes session with a grouped reading digest.",
@@ -1397,6 +1398,11 @@ async function executeRssCommand(ctx, host2, owner, command) {
     publishLibraryChange(owner, `Refinement session opened for the last ${days} days.`);
     return;
   }
+  if (command.action === "refine-starred") {
+    await runLearnInterests(ctx, host2, owner);
+    publishLibraryChange(owner, "Learn Interests session opened from starred articles.");
+    return;
+  }
   if (command.action === "add") {
     const parts = commandSourceParts(payload.source);
     const discovered = await discoverFeed(host2, parts.input);
@@ -1837,6 +1843,18 @@ async function startInterestConversation(host2, snapshot, skill, tags) {
   }
   assertOwner(host2, route);
   await host2.openSession(created.stored_session_id, { profile: route.profile, route, intent: "main" });
+}
+async function runLearnInterests(ctx, host2, owner) {
+  const library = createLibrary(owner, (url) => fetchFeed(host2, url), transact);
+  const snapshot = await library("/preference");
+  const starred = Number(snapshot?.saved_count) || 0;
+  if (starred < 1) throw new Error("Star at least one article first.");
+  await rssRest("/preference-file", {
+    method: "POST",
+    body: { filename: "saved.json", content: JSON.stringify(snapshot) }
+  });
+  const settings = readSettings(ctx, owner);
+  await startInterestConversation(host2, snapshot, settings.gradingSkill, settings.gradingTags);
 }
 function plainText(raw) {
   const template = document.createElement("template");
@@ -3872,11 +3890,7 @@ function ReaderProfile({ ctx, owner }) {
     setNotice(jsonResult?.path ? "Preference files written for Hermes." : "Preference report is ready.");
   });
   const learnInterestsNow = () => act("Opening Learn Interests…", async () => {
-    const snapshot = await libraryRequest("/preference");
-    await rssRest("/preference-file", {
-      method: "POST", body: { filename: "saved.json", content: JSON.stringify(snapshot) }
-    });
-    await startInterestConversation(host, snapshot, settings.gradingSkill, settings.gradingTags);
+    await runLearnInterests(ctx, host, owner);
     setLearnOpen(false);
   });
   const captureOpen = () => {

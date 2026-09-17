@@ -34,7 +34,7 @@ def _queue_path() -> Path:
 
 def _usage() -> str:
     return (
-        "Usage: /rss refresh [XXm] | /rss mute <keyword> | /rss refine [XXd] | "
+        "Usage: /rss refresh [XXm] | /rss mute <keyword> | /rss refine [starred|XXd] | "
         "/rss add <url or website>[, name] [to <folder>] | "
         "/rss mark-read {all|feed <name>|folder <name>} | "
         "/rss digest {unread [XXd]|saved} | /rss health"
@@ -65,11 +65,13 @@ def _parse(raw_args: str) -> tuple[str, dict[str, Any]] | None:
         return "mute", {"phrase": phrase}
 
     if action == "refine":
+        if rest.lower() in {"starred", "stars"}:
+            return "refine-starred", {}
         if not rest:
             return "refine", {"days": 30}
         match = _REFINE_RE.fullmatch(rest)
         if not match or int(match.group("days")) > _MAX_DAYS:
-            raise ValueError("Refinement period must be 1d to 365d, for example 30d.")
+            raise ValueError("Refinement period must be 1d to 365d, for example 30d. Use /rss refine starred for starred articles.")
         return "refine", {"days": int(match.group("days"))}
 
     if action == "mark-read":
@@ -145,6 +147,8 @@ def _handle(raw_args: str) -> str:
         return f"RSS Reader mute queued for: {payload['phrase']}"
     if action == "refine":
         return f"RSS Reader refinement queued for the last {payload['days']} days."
+    if action == "refine-starred":
+        return "RSS Reader starred-interest refinement queued."
     if action == "mark-read":
         scope = payload["scope"] if payload["scope"] == "all" else f"{payload['scope']} {payload['target']}"
         return f"RSS Reader mark-read queued for {scope}."
@@ -162,7 +166,7 @@ def register(ctx=None):
             "rss",
             handler=_handle,
             description="Control RSS Reader feeds, refresh, mutes, grading, triage, and health.",
-            args_hint="refresh [XXm] | mute <keyword> | refine [XXd] | add <website> [to <folder>] | mark-read {all|feed <name>|folder <name>} | digest {unread [XXd]|saved} | health",
+            args_hint="refresh [XXm] | mute <keyword> | refine [starred|XXd] | add <website> [to <folder>] | mark-read {all|feed <name>|folder <name>} | digest {unread [XXd]|saved} | health",
             argument_mode="mixed",
         )
     return None

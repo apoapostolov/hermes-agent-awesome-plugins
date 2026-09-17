@@ -43,8 +43,12 @@ In Unread view, a selected story is marked read after one second but remains vis
 
 ```text
 /rss refresh
-/rss add https://example.com, Example feed
+/rss refresh 30m
 /rss mute phrase
+/rss refine starred
+/rss refine 30d
+/rss add https://example.com, Example feed
+/rss add r/programming
 /rss mark-read all
 /rss digest unread 7d
 /rss health
