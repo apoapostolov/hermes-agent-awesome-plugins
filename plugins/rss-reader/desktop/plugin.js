@@ -1465,7 +1465,7 @@ function startAutoRefresh(ctx, host2, options = {}) {
     const owner = currentOwner(host2);
     const settings = readSettings(ctx, owner);
     if (!settings.autoRefresh) { clocks.delete(owner); return; }
-    if (!rssVisited) return;
+    if (!rssVisited && settings.headlineTicker !== true) return;
     const period = settings.refreshMinutes * 60000;
     const saved = Number(storageGet(ctx, "lastRefresh", owner, 0)) || 0;
     let clock = clocks.get(owner);
@@ -2874,7 +2874,11 @@ function Segmented({ value, onChange, options }) {
     children: o.label
   }, o.id)) });
 }
-var TICKER_PANE_POLL_MS = 30_000;
+function tickerRefreshMs(settings) {
+  const minutes = Number(settings?.refreshMinutes);
+  const n = Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440 ? minutes : 15;
+  return n * 60000;
+}
 // Global ticker pane: rendered by the app shell on every screen (docked to
 // the workspace bottom edge), like hermes-newswire. Reads the profile
 // library straight from IndexedDB; headline clicks navigate to /rss and hand
@@ -2972,9 +2976,14 @@ function TickerPane() {
         return { ...a, feed_title: feedTitle, faviconUrls: tickerIconCandidates(a, feed) };
       });
     },
-    refetchInterval: TICKER_PANE_POLL_MS,
+    refetchInterval: tickerRefreshMs(effectiveSettings),
     retry: false
   });
+  useEffect(() => {
+    const changed = () => { void articles.refetch(); };
+    window.addEventListener("hermes-rss-library-changed", changed);
+    return () => window.removeEventListener("hermes-rss-library-changed", changed);
+  }, [articles.refetch]);
   const onOpen = (item) => {
     if (!item) {
       host.navigate("/rss");
@@ -4298,7 +4307,7 @@ function ReaderProfile({ ctx, owner }) {
                 "minutes"
               ] })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Fetches new posts on this interval, only while the Hermes desktop client is open." : "Background refresh is unavailable on this Hermes build. Use Refresh." })
+            jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Fetches new posts on this interval, including the headline ticker, only while the Hermes desktop client is open." : "Background refresh is unavailable on this Hermes build. Use Refresh." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "Capturing" }),
