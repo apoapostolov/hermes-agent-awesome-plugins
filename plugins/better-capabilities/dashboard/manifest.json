@@ -2,7 +2,7 @@
   "name": "better-capabilities",
   "label": "Better Capabilities",
   "description": "Delete and zip controls for the Capabilities page",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "api": "plugin_api.py",
   "tab": {
     "path": "/better-capabilities",

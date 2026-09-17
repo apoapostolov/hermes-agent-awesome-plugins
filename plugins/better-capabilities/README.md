@@ -10,6 +10,7 @@
 
 - Puts a delete control immediately to the right of the folder icon on a Capabilities plugin row.
 - Puts Package (zip) between Edit and Archive on a learned skill, and adds a folder reveal plus delete on that same row.
+- Adds a Presets tab between Installed and Browse on Skills and Plugins (and on Tools). Save the current on/off set with a name. Apply, Overwrite, Rename, or Delete each preset.
 - Delete sends the on-disk folder to the Recycle Bin. If the Recycle Bin call cannot finish, the folder is moved aside under `plugins-disabled/`.
 - Package downloads a zip of the skill folder, including `references/` and other supporting files. `__pycache__` and `.git` stay out of the archive.
 

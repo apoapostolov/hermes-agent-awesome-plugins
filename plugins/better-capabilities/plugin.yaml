@@ -1,6 +1,6 @@
 name: better-capabilities
-version: 1.0.1
-description: "Delete a plugin or skill from Capabilities, and zip a skill folder from the Edit / Archive row."
+version: 1.0.0
+description: "Delete plugins and skills, zip a skill folder, and save on/off presets on Capabilities."
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2
