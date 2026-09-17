@@ -251,6 +251,201 @@ function liveSkillName(btn) {
   return skillNameFromActionRow(row)
 }
 
+function skillMdDir(skillMdPath) {
+  return String(skillMdPath || '').replace(/[\\/]+SKILL\.md$/i, '')
+}
+
+function isSkillMdRel(rel) {
+  return !rel || /^SKILL\.md$/i.test(rel)
+}
+
+async function listSkillMarkdown(skillName) {
+  const info = await desktopApi({ path: '/api/skills/content?name=' + encodeURIComponent(skillName) })
+  const skillMd = info && info.path
+  if (!skillMd) throw new Error('No SKILL.md path')
+  const root = skillMdDir(skillMd)
+  const files = [{ rel: 'SKILL.md', folder: '', label: 'SKILL.md', abs: skillMd }]
+  const skip = { '.git': 1, __pycache__: 1, node_modules: 1 }
+  const readDir = window.hermesDesktop && window.hermesDesktop.readDir
+  if (typeof readDir !== 'function') return files
+  async function walk(dir, prefix) {
+    const res = await readDir(dir)
+    const entries = (res && res.entries) || []
+    const dirs = []
+    const mds = []
+    for (const ent of entries) {
+      if (!ent || skip[ent.name]) continue
+      if (ent.isDirectory) dirs.push(ent)
+      else if (/\.md$/i.test(ent.name) && !(prefix === '' && /^SKILL\.md$/i.test(ent.name))) mds.push(ent)
+    }
+    mds.sort((a, b) => a.name.localeCompare(b.name))
+    for (const file of mds) {
+      const rel = prefix ? prefix + '/' + file.name : file.name
+      files.push({
+        rel,
+        folder: prefix,
+        label: prefix.includes('/') ? rel.slice(rel.indexOf('/') + 1) : file.name,
+        abs: file.path,
+      })
+    }
+    dirs.sort((a, b) => a.name.localeCompare(b.name))
+    for (const dirEnt of dirs) {
+      await walk(dirEnt.path, prefix ? prefix + '/' + dirEnt.name : dirEnt.name)
+    }
+  }
+  await walk(root, '')
+  return files
+}
+
+function nativeSkillBlocks(row) {
+  const box = []
+  let el = row.nextElementSibling
+  while (el) {
+    if (el.getAttribute && el.getAttribute('data-bc-preview')) {
+      el = el.nextElementSibling
+      continue
+    }
+    box.push(el)
+    el = el.nextElementSibling
+  }
+  return box
+}
+
+function setNativeSkillVisible(row, visible) {
+  for (const el of nativeSkillBlocks(row)) {
+    if (visible) {
+      if (el.getAttribute('data-bc-hid') === '1') {
+        el.style.display = ''
+        el.removeAttribute('data-bc-hid')
+      }
+    } else if (el.getAttribute('data-bc-hid') !== '1') {
+      el.setAttribute('data-bc-hid', '1')
+      el.style.display = 'none'
+    }
+  }
+}
+
+function previewEl(row) {
+  let pre = row.parentElement && row.parentElement.querySelector('pre[data-bc-preview="1"]')
+  if (pre) return pre
+  pre = document.createElement('pre')
+  pre.setAttribute('data-bc-preview', '1')
+  pre.setAttribute(BTN, 'preview')
+  pre.setAttribute('data-selectable-text', 'true')
+  pre.className = 'overflow-auto whitespace-pre-wrap wrap-break-word rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3 font-mono text-[0.68rem] leading-relaxed'
+  pre.style.display = 'none'
+  const pane = row.parentElement
+  if (pane) pane.appendChild(pre)
+  return pre
+}
+
+function showSkillMd(row) {
+  setNativeSkillVisible(row, true)
+  const pre = row.parentElement && row.parentElement.querySelector('pre[data-bc-preview="1"]')
+  if (pre) pre.style.display = 'none'
+}
+
+async function showOtherMd(row, absPath) {
+  const readText = window.hermesDesktop && window.hermesDesktop.readFileText
+  if (typeof readText !== 'function') throw new Error('Cannot read skill files in this desktop build.')
+  const res = await readText(absPath)
+  const text = res && res.text != null ? res.text : ''
+  setNativeSkillVisible(row, false)
+  const pre = previewEl(row)
+  pre.textContent = text
+  pre.style.display = ''
+}
+
+function closeFileMenus() {
+  document.querySelectorAll('[data-bc-file-menu]').forEach((menu) => {
+    menu.style.display = 'none'
+  })
+}
+
+function paintSkillFilePicker(row, editBtn, skillName) {
+  let wrap = row.querySelector('[data-bc-files]')
+  if (!wrap) {
+    wrap = document.createElement('span')
+    wrap.setAttribute('data-bc-files', '1')
+    wrap.setAttribute(BTN, 'files')
+    wrap.className = 'bc-file-wrap'
+    const trigger = document.createElement('button')
+    trigger.type = 'button'
+    trigger.className = 'bc-file-trigger'
+    trigger.setAttribute(BTN, 'files-trigger')
+    trigger.textContent = 'SKILL.md'
+    const menu = document.createElement('div')
+    menu.className = 'bc-file-menu'
+    menu.setAttribute('data-bc-file-menu', '1')
+    menu.style.display = 'none'
+    trigger.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const open = menu.style.display !== 'none'
+      closeFileMenus()
+      menu.style.display = open ? 'none' : 'block'
+    })
+    wrap.append(trigger, menu)
+    editBtn.insertAdjacentElement('afterend', wrap)
+  }
+  if (wrap.getAttribute('data-bc-skill') !== skillName) {
+    wrap.setAttribute('data-bc-skill', skillName)
+    wrap.setAttribute('data-bc-rel', 'SKILL.md')
+    const trigger = wrap.querySelector('.bc-file-trigger')
+    if (trigger) trigger.textContent = 'SKILL.md'
+    showSkillMd(row)
+    void fillSkillFileMenu(wrap, row, skillName)
+  } else if (!isSkillMdRel(wrap.getAttribute('data-bc-rel'))) {
+    setNativeSkillVisible(row, false)
+  }
+}
+
+async function fillSkillFileMenu(wrap, row, skillName) {
+  const menu = wrap.querySelector('[data-bc-file-menu]')
+  const trigger = wrap.querySelector('.bc-file-trigger')
+  if (!menu || !trigger) return
+  menu.replaceChildren()
+  let files
+  try {
+    files = await listSkillMarkdown(skillName)
+  } catch (err) {
+    const empty = document.createElement('div')
+    empty.className = 'bc-file-head'
+    empty.textContent = 'Could not list markdown files'
+    menu.appendChild(empty)
+    return
+  }
+  if (wrap.getAttribute('data-bc-skill') !== skillName) return
+  let lastFolder = null
+  for (const file of files) {
+    const folderKey = file.folder || (isSkillMdRel(file.rel) ? '' : '/')
+    if (folderKey && folderKey !== lastFolder) {
+      lastFolder = folderKey
+      const head = document.createElement('div')
+      head.className = 'bc-file-head'
+      head.textContent = folderKey === '/' ? '/' : '/' + file.folder
+      menu.appendChild(head)
+    }
+    const item = document.createElement('button')
+    item.type = 'button'
+    item.className = 'bc-file-item'
+    item.setAttribute(BTN, 'file-item')
+    item.textContent = file.label
+    item.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      menu.style.display = 'none'
+      wrap.setAttribute('data-bc-rel', file.rel)
+      trigger.textContent = isSkillMdRel(file.rel) ? 'SKILL.md' : file.label
+      if (isSkillMdRel(file.rel)) showSkillMd(row)
+      else void showOtherMd(row, file.abs).catch((err) => {
+        notify('error', 'Could not preview', String(err && err.message ? err.message : err))
+      })
+    })
+    menu.appendChild(item)
+  }
+}
+
 function paintSkillRow() {
   const buttons = document.querySelectorAll('button')
   for (const btn of buttons) {
@@ -269,6 +464,7 @@ function paintSkillRow() {
     const name = skillNameFromActionRow(row)
     if (!name) continue
     if (row.getAttribute('data-bc-skill') !== name) row.setAttribute('data-bc-skill', name)
+    paintSkillFilePicker(row, btn, name)
 
     if (!row.querySelector('[' + BTN + '="zip"]')) {
       const zip = textButton('Package (zip)')
@@ -773,6 +969,54 @@ function injectStyle() {
     .bc-preset-row { display: flex; align-items: center; gap: 0.4rem; }
     .bc-preset-name { flex: 1; min-width: 0; font-size: 0.78rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .bc-preset-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; }
+    .bc-file-wrap { position: relative; display: inline-flex; }
+    .bc-file-trigger {
+      border: 1px solid var(--ui-stroke-tertiary, var(--border));
+      background: transparent;
+      color: var(--ui-text-secondary, inherit);
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.72rem;
+      padding: 0.12rem 0.45rem;
+      border-radius: 0.375rem;
+      max-width: 10rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bc-file-trigger:hover { color: var(--foreground, inherit); }
+    .bc-file-menu {
+      position: absolute;
+      top: calc(100% + 0.2rem);
+      left: 0;
+      z-index: 40;
+      min-width: 12rem;
+      max-height: 16rem;
+      overflow: auto;
+      padding: 0.25rem 0;
+      border: 1px solid var(--ui-stroke-tertiary, var(--border));
+      border-radius: 0.45rem;
+      background: var(--ui-bg-elevated, var(--card, var(--background)));
+    }
+    .bc-file-head {
+      padding: 0.28rem 0.55rem 0.1rem;
+      font-size: 0.62rem;
+      font-weight: 600;
+      color: var(--ui-text-tertiary, inherit);
+    }
+    .bc-file-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: none;
+      background: transparent;
+      color: var(--foreground);
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.72rem;
+      padding: 0.22rem 0.7rem;
+    }
+    .bc-file-item:hover { background: var(--chrome-action-hover, color-mix(in srgb, var(--foreground) 8%, transparent)); }
   `
   document.head.appendChild(style)
 }
@@ -798,10 +1042,16 @@ export default {
     })
     observer.observe(document.body, { childList: true, subtree: true })
     const onHash = () => sweep()
+    const onDocDown = (e) => {
+      if (e.target && e.target.closest && e.target.closest('[data-bc-files]')) return
+      closeFileMenus()
+    }
     window.addEventListener('hashchange', onHash)
+    document.addEventListener('mousedown', onDocDown, true)
     ctx.onDispose(() => {
       observer.disconnect()
       window.removeEventListener('hashchange', onHash)
+      document.removeEventListener('mousedown', onDocDown, true)
       document.getElementById(STYLE_ID)?.remove()
       closeOverlay()
       document.querySelectorAll('[' + BTN + ']').forEach((el) => el.remove())
