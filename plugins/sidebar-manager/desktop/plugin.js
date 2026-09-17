@@ -257,7 +257,16 @@ function navGripHost(li) {
 }
 
 function secGripHost(group) {
-  return group.firstElementChild
+  const header = group.firstElementChild
+  if (!header) return null
+  return header.querySelector(':scope > button') || header.querySelector(':scope > div') || header
+}
+
+function placeGrip(row, host) {
+  for (const grip of [...row.el.querySelectorAll('[data-sbm-grip]')]) {
+    if (!host || grip.parentNode !== host) grip.remove()
+  }
+  if (edit && host) ensureGrip(host)
 }
 
 function markRow(row) {
@@ -362,8 +371,7 @@ function paintNav() {
     markRow(row)
     applyHidden(row, hidden.has(row.id))
     const host = navGripHost(row.el)
-    if (edit && host) ensureGrip(host)
-    else host && host.querySelector(':scope > [data-sbm-grip]')?.remove()
+    placeGrip(row, host)
     setFlag(row.el, 'data-sbm-dragging', Boolean(drag && drag.kind === 'nav' && drag.id === row.id))
   }
   const newLi = newSessionButton()?.closest('[data-slot="sidebar-menu-item"]') || null
@@ -375,7 +383,7 @@ function paintSections() {
   if (!parent || search) {
     if (parent) {
       for (const group of parent.querySelectorAll(':scope > [data-slot="sidebar-group"]')) {
-        group.querySelector(':scope > div > [data-sbm-grip]')?.remove()
+        group.querySelectorAll('[data-sbm-grip]').forEach(el => el.remove())
       }
     }
     return
@@ -393,8 +401,7 @@ function paintSections() {
     markRow(row)
     applyHidden(row, hidden.has(row.id))
     const host = secGripHost(row.el)
-    if (edit && host) ensureGrip(host)
-    else host && host.querySelector(':scope > [data-sbm-grip]')?.remove()
+    placeGrip(row, host)
     setFlag(row.el, 'data-sbm-dragging', Boolean(drag && drag.kind === 'sec' && drag.id === row.id))
   }
   applyOrder(parent, orderedEls(rows, ids), null)
