@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.12.1] - 2026-09-17
+
+### Fixed
+
+- **better-capabilities:** version `1.0.1`. Package (zip) uses the skill title currently shown in the detail pane, so switching from one learned skill to another no longer downloads the first skill the row was painted with.
+
 ## [1.12.0] - 2026-09-17
 
 ### Added
