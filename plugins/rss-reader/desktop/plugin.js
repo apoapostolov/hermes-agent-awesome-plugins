@@ -2355,7 +2355,14 @@ var styles = `
 .hermes-rss .rss-list-head .rss-list-meta{display:flex;align-items:center;gap:6px;white-space:nowrap}
 .hermes-rss .rss-list-head .rss-mark-read{padding:4px 8px;font-size:11px;height:26px;min-height:0;line-height:1.2}
 .hermes-rss .rss-list-head .rss-filter-chips{margin-top:0}
-.hermes-rss .rss-detail{overflow:auto;padding:0;display:flex;flex-direction:column;position:relative}.hermes-rss .rss-browser-panel{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;background:var(--ui-bg-primary,var(--background));min-height:0}.hermes-rss .rss-browser-strip{display:flex;align-items:center;gap:8px;min-height:34px;padding:4px 10px;border-bottom:1px solid var(--ui-stroke-secondary);background:var(--ui-bg-secondary,var(--card));flex-shrink:0}.hermes-rss .rss-browser-url{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ui-text-secondary);font-size:11px}.hermes-rss .rss-browser-actions{display:inline-flex;align-items:center;gap:2px;margin-left:auto}.hermes-rss .rss-browser-frame{display:block;border:0;flex:1;width:100%;min-height:0;background:#fff}.hermes-rss .rss-detail .rss-tools{margin:18px 0}
+.hermes-rss .rss-detail{overflow:auto;padding:0;display:flex;flex-direction:column;position:relative;min-height:0}
+.hermes-rss .rss-detail.rss-detail-browser{overflow:hidden}
+.hermes-rss .rss-browser-panel{position:relative;inset:auto;z-index:auto;display:flex;flex-direction:column;flex:1 1 auto;height:100%;min-height:0;background:var(--ui-bg-primary,var(--background))}
+.hermes-rss .rss-browser-strip{display:flex;align-items:center;gap:8px;min-height:34px;padding:4px 10px;border-bottom:1px solid var(--ui-stroke-secondary);background:var(--ui-bg-secondary,var(--card));flex-shrink:0}
+.hermes-rss .rss-browser-url{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ui-text-secondary);font-size:11px}
+.hermes-rss .rss-browser-actions{display:inline-flex;align-items:center;gap:2px;margin-left:auto}
+.hermes-rss .rss-browser-frame{display:block;border:0;flex:1 1 auto;width:100%;min-height:0;height:100%;background:#fff}
+.hermes-rss .rss-detail .rss-tools{margin:18px 0}
 .hermes-rss .rss-detail-inner{max-width:calc(70ch + 88px);margin:0 auto;padding:32px 44px 56px;width:100%;box-sizing:border-box}
 .hermes-rss .rss-detail h2{font-size:24px;letter-spacing:-.3px;line-height:1.3;margin:6px 0 22px;font-weight:700}
 .hermes-rss .rss-detail .rss-eyebrow{margin-bottom:0}
@@ -4528,12 +4535,22 @@ function ReaderProfile({ ctx, owner }) {
           children: jsx(Codicon, { name: listFab === "down" ? "arrow-down" : "arrow-up", size: "1rem" })
         })
       ] }),
-      /* @__PURE__ */ jsxs("main", { className: "rss-detail", children: [
+      /* @__PURE__ */ jsxs("main", { className: `rss-detail${browserOpen ? " rss-detail-browser" : ""}`, children: [
         (busy || notice) && jsxs("div", { className: "rss-notice rss-notice-float", role: "status", children: [
           jsx("span", { children: busy || notice }),
           notice && jsx("button", { type: "button", className: "rss-notice-close", "aria-label": "Dismiss notification", onClick: () => setNotice(""), children: "×" })
         ] }),
-        /* @__PURE__ */ jsx(Fragment, { children:
+        browserOpen && browserUrl ? jsxs("section", { className: "rss-browser-panel", children: [
+          jsxs("div", { className: "rss-browser-strip", children: [
+            jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Back to article", title: "Back to article", onClick: () => setBrowserOpen(false), children: jsx("i", { className: "codicon codicon-arrow-left", "aria-hidden": "true" }) }),
+            jsx("span", { className: "rss-browser-url", title: browserUrl, children: browserUrl }),
+            jsxs("span", { className: "rss-browser-actions", children: [
+              jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Copy article URL", title: "Copy article URL", onClick: async () => { try { await navigator.clipboard.writeText(browserUrl); setNotice("Article URL copied."); } catch { setNotice("Could not copy the article URL."); } }, children: jsx("i", { className: "codicon codicon-copy", "aria-hidden": "true" }) }),
+              jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Open in external browser", title: "Open in external browser", onClick: () => ctx.os.openExternal(browserUrl), children: jsx("i", { className: "codicon codicon-link-external", "aria-hidden": "true" }) })
+            ] })
+          ] }),
+          jsx("iframe", { key: browserUrl, className: "rss-browser-frame", src: browserUrl, title: "Article browser", sandbox: "allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts" })
+        ] }) : /* @__PURE__ */ jsx(Fragment, { children:
         !selected ? /* @__PURE__ */ jsx("div", { className: "rss-detail-inner", children: /* @__PURE__ */ jsxs(Empty, { title: "Choose An Article", children: [
           /* @__PURE__ */ jsx("p", { children: "Select a post in the list. These tools act on that article." }),
           /* @__PURE__ */ jsxs("ul", { className: "rss-empty-features", children: [
@@ -4649,7 +4666,11 @@ function ReaderProfile({ ctx, owner }) {
                 disabled: disabled || !article.url,
                 "aria-label": "Open in Browser",
                 title: "Open in Browser",
-                onClick: () => setBrowserOpen(true),
+                onClick: () => {
+                  const url = String(article.url || "").trim();
+                  setBrowserUrl(url);
+                  setBrowserOpen(!!url);
+                },
                 children: /* @__PURE__ */ jsx("i", { className: "codicon codicon-globe", "aria-hidden": "true" })
               }
             )
@@ -4783,17 +4804,6 @@ function ReaderProfile({ ctx, owner }) {
         ] })
       ] }) })
         }),
-      browserOpen && browserUrl && jsxs("section", { className: "rss-browser-panel", children: [
-        jsxs("div", { className: "rss-browser-strip", children: [
-          jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Back to article", title: "Back to article", onClick: () => setBrowserOpen(false), children: jsx("i", { className: "codicon codicon-arrow-left", "aria-hidden": "true" }) }),
-          jsx("span", { className: "rss-browser-url", title: browserUrl, children: browserUrl }),
-          jsxs("span", { className: "rss-browser-actions", children: [
-            jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Copy article URL", title: "Copy article URL", onClick: async () => { try { await navigator.clipboard.writeText(browserUrl); setNotice("Article URL copied."); } catch { setNotice("Could not copy the article URL."); } }, children: jsx("i", { className: "codicon codicon-copy", "aria-hidden": "true" }) }),
-            jsx("button", { type: "button", className: "rss-icon-btn", "aria-label": "Open in external browser", title: "Open in external browser", onClick: () => ctx.os.openExternal(browserUrl), children: jsx("i", { className: "codicon codicon-link-external", "aria-hidden": "true" }) })
-          ] })
-        ] }),
-        jsx("iframe", { className: "rss-browser-frame", src: browserUrl, title: "Article browser", referrerPolicy: "no-referrer", sandbox: "allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts" })
-      ] })
     ] }),
     ] })
   ] });
