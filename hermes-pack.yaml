@@ -35,7 +35,7 @@ plugins:
     ref: 946af32ad7ee9559298a2ffaf63a8289cd4aaafb
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/better-capabilities
-    ref: 5a8f2a404c2c462d7596a8e190057baefc7cb4f9
+    ref: d6fba927956c891cf06e38b4e47d0029885aea3b
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/sidebar-manager
     ref: c7e84597ecc12d3dff9fde4984033fc912b9aa87
