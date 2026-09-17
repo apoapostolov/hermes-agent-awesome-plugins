@@ -15,6 +15,7 @@ import {
 
 var RSS_DEBUG_PREFIX = "[rss-reader-debug]";
 var rssRest = null;
+var rssCtx = null;
 function rssDebug(event, details = {}) {
   try {
     const safe = {};
@@ -1157,6 +1158,14 @@ function readSettings(ctx, owner) {
     paywallServices: stored.paywallServices === true,
     aiGrading: stored.aiGrading === true,
     orderByImportance: stored.orderByImportance === true,
+    headlineTicker: stored.headlineTicker === true,
+    tickerSpeed: ["slow", "normal", "fast"].includes(stored.tickerSpeed) ? stored.tickerSpeed : "normal",
+    tickerGrouping: ["newest", "source", "unread_first"].includes(stored.tickerGrouping) ? stored.tickerGrouping : "newest",
+    tickerFontSize: Number.isInteger(stored.tickerFontSize) && stored.tickerFontSize >= 9 && stored.tickerFontSize <= 18 ? stored.tickerFontSize : 11,
+    tickerPauseOnHover: stored.tickerPauseOnHover !== false,
+    tickerShowSource: stored.tickerShowSource !== false,
+    tickerRelativeTime: stored.tickerRelativeTime !== false,
+    tickerOnlyUnread: stored.tickerOnlyUnread === true,
     gradingSkill: gradingSkillName(typeof stored.gradingSkill === "string" ? stored.gradingSkill : ""),
     gradingTags: readGradingTags(ctx, owner)
   };
@@ -2522,6 +2531,42 @@ html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
 .hermes-rss .rss-confirm{padding:16px 28px;border-bottom:1px solid var(--ui-stroke-secondary)}.hermes-rss .rss-confirm h2{font-size:16px}.hermes-rss .rss-confirm .rss-tools{margin-top:12px}
 @media(max-width:1000px){.hermes-rss .rss-layout{grid-template-columns:145px minmax(210px,.85fr) minmax(260px,1fr)}.hermes-rss .rss-detail-inner{padding:22px 20px}.hermes-rss .rss-top{padding:20px}}
 @media(max-width:760px){.hermes-rss .rss-layout{grid-template-columns:125px 1fr}.hermes-rss .rss-detail{display:none}.hermes-rss .rss-layout.has-selection .rss-list{display:none}.hermes-rss .rss-layout.has-selection .rss-detail{display:block}.hermes-rss .rss-top{align-items:flex-start}.hermes-rss .rss-top p{display:none}}
+.hermes-rss .rss-ticker{display:flex;align-items:center;height:30px;flex:none;grid-column:1 / -1;border-top:1px solid var(--ui-stroke-secondary);background:color-mix(in srgb,var(--ui-text-secondary) 4%,transparent);overflow:hidden}
+.hermes-rss .rss-ticker-brand{display:inline-flex;align-items:center;gap:4px;flex:none;height:100%;padding:0 10px;font-size:10px;font-weight:650;letter-spacing:1.2px;color:var(--ui-accent);cursor:pointer;user-select:none;background:none;border:0}
+.hermes-rss .rss-ticker-brand:hover{background:var(--chrome-action-hover)}
+.hermes-rss .rss-ticker-refresh{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:100%;background:none;border:0;padding:0;font-size:12px;color:var(--ui-text-quaternary);cursor:pointer}
+.hermes-rss .rss-ticker-refresh:hover{background:var(--chrome-action-hover);color:var(--foreground)}
+.hermes-rss .rss-ticker-refresh:focus-visible{outline:1px solid var(--ui-accent);outline-offset:-1px}
+.hermes-rss .rss-ticker-refresh[data-busy=true]{color:var(--ui-accent)}
+@keyframes rss-ticker-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.hermes-rss .rss-ticker-refresh[data-busy=true]{animation:rss-ticker-spin 1s linear infinite}
+.hermes-rss .rss-ticker-viewport{flex:1 1 0%;min-width:0;height:100%;overflow:hidden}
+.hermes-rss .rss-ticker-track{display:flex;width:max-content;height:100%;align-items:center;animation:rss-ticker-scroll var(--rss-ticker-duration,150s) linear infinite}
+.hermes-rss .rss-ticker:not([data-static=true]):hover .rss-ticker-track{animation-play-state:paused}
+.hermes-rss .rss-ticker[data-static=true] .rss-ticker-track{animation:none;width:100%;overflow:hidden}
+.hermes-rss .rss-ticker-half{display:inline-flex;align-items:center;height:100%;white-space:nowrap}
+@keyframes rss-ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion: reduce){.hermes-rss .rss-ticker-track{animation:none;overflow:hidden}}
+.hermes-rss .rss-ticker-item{display:inline-flex;align-items:center;gap:6px;padding:0 14px;height:100%;background:none;border:0;font:inherit;line-height:1;color:var(--ui-text-secondary);cursor:pointer;text-decoration:none;white-space:nowrap}
+.hermes-rss .rss-ticker-item:hover{background:var(--chrome-action-hover);color:var(--foreground)}
+.hermes-rss .rss-ticker-item:focus-visible{outline:1px solid var(--ui-accent);outline-offset:-1px}
+.hermes-rss .rss-ticker-no-hover:hover .rss-ticker-track{animation-play-state:running}
+.hermes-rss .rss-ticker-item .rss-card-pill{flex:none;font-size:.75em;line-height:1.7}
+.hermes-rss .rss-ticker-item[data-read=true]{color:var(--ui-text-tertiary)}
+.hermes-rss .rss-ticker-item[data-read=true]:hover{color:var(--ui-text-secondary)}
+.hermes-rss .rss-ticker-src{color:var(--ui-text-tertiary);font-weight:600}
+.hermes-rss .rss-ticker-dot{color:var(--rss-tag,var(--ui-accent));font-size:8px;flex:none}
+.hermes-rss .rss-ticker-empty{padding:0 14px;font-size:11px;color:var(--ui-text-tertiary);cursor:default}
+.hermes-rss .rss-settings-tabs{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--ui-stroke-secondary);padding-bottom:8px}
+.hermes-rss .rss-settings-tab{background:none;border:0;padding:4px 10px;font:inherit;font-size:12px;font-weight:600;color:var(--ui-text-secondary);cursor:pointer;border-radius:6px}
+.hermes-rss .rss-settings-tab:hover{color:var(--foreground);background:var(--chrome-action-hover)}
+.hermes-rss .rss-settings-tab[aria-selected=true]{color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 12%,transparent)}
+.hermes-rss .rss-segmented{display:inline-flex;gap:2px;border:1px solid var(--ui-stroke-secondary);border-radius:7px;padding:2px}
+.hermes-rss .rss-segmented button{background:none;border:0;padding:3px 9px;font:inherit;font-size:11px;color:var(--ui-text-secondary);cursor:pointer;border-radius:5px}
+.hermes-rss .rss-segmented button[aria-pressed=true]{background:color-mix(in srgb,var(--ui-accent) 16%,transparent);color:var(--ui-accent);font-weight:650}
+.hermes-rss .rss-segmented button:hover{color:var(--foreground)}
+.hermes-rss .rss-segmented button[aria-pressed=true]:hover{color:var(--ui-accent)}
+.hermes-rss .rss-setting-label{font-size:12px;color:var(--ui-text-secondary);min-width:110px}
 `;
 
 // src/plugin.jsx
@@ -2554,6 +2599,203 @@ function refreshButtonLabel(at, now) {
   if (!at) return "Refresh";
   const minutes = Math.max(0, Math.floor((Number(now) - Number(at)) / 6e4));
   return "Refresh \u00b7 " + minutes + "m";
+}
+// Headline ticker components. buildTickerRows is a plain helper (no hooks) so
+// both marquee halves and the reduced-motion static row share one list.
+// Speed + grouping options mirror hermes-newswire's ticker settings.
+var TICKER_SPEED_DURATIONS = { slow: 240, normal: 150, fast: 80 }; // seconds per loop
+var TICKER_FONT_TO_HEIGHT = (px) => Math.max(28, Math.round(px * 2.1) + 6);
+function groupTickerArticles(articles, mode) {
+  if (!Array.isArray(articles) || articles.length === 0) return [];
+  if (mode === "source") {
+    const bySrc = new Map();
+    for (const a of articles) {
+      const k = a.feed_title || "";
+      if (!bySrc.has(k)) bySrc.set(k, []);
+      bySrc.get(k).push(a);
+    }
+    const blocks = [...bySrc.values()].map((list) => {
+      list.sort((x, y) => String(y.published_at || y.received_at || "").localeCompare(String(x.published_at || x.received_at || "")));
+      return { name: list[0].feed_title || "", newest: String(list[0].published_at || list[0].received_at || ""), list };
+    });
+    blocks.sort((x, y) => y.newest.localeCompare(x.newest));
+    return blocks.flatMap((b) => b.list);
+  }
+  if (mode === "unread_first") {
+    const byTime = (x, y) => String(y.published_at || y.received_at || "").localeCompare(String(x.published_at || x.received_at || ""));
+    return [...articles.filter((a) => !a.is_read).sort(byTime), ...articles.filter((a) => a.is_read).sort(byTime)];
+  }
+  return articles;
+}
+function buildTickerRows(articles, tags) {
+  if (!Array.isArray(articles)) return [];
+  const rows = [];
+  let lastSource = null;
+  for (const item of articles) {
+    const tag = gradingTagFor(tags, item.grade?.level);
+    const pill = tag && tag.label && tag.color ? tag : null;
+    if (item.feed_title && item.feed_title !== lastSource) {
+      lastSource = item.feed_title;
+      rows.push({ kind: "divider", source: item.feed_title });
+    }
+    rows.push({ kind: "article", item, pill });
+  }
+  return rows;
+}
+function TickerItem({ row, onOpen, showSource, showAge }) {
+  const { item, pill } = row;
+  const age = showAge ? date(item.published_at) : "";
+  const meta = showSource && item.feed_title ? item.feed_title : "";
+  return jsx("button", {
+    type: "button",
+    className: "rss-ticker-item",
+    "data-read": item.is_read ? "true" : "false",
+    title: `${item.feed_title ? item.feed_title + " — " : ""}${item.title}${age ? ` (${age})` : ""}`,
+    style: { fontSize: "inherit" },
+    onClick: () => onOpen(item),
+    children: [
+      pill && jsx("span", { "aria-hidden": "true", className: "rss-ticker-dot", style: { "--rss-tag": pill.color }, children: "\u25CF" }),
+      pill && jsx("span", { className: "rss-card-pill", style: { "--rss-tag": pill.color }, children: pill.label }),
+      jsx("span", { children: item.title || "(untitled)" }),
+      meta && jsx("span", { className: "rss-ticker-src", children: meta }),
+      age && jsx("span", { className: "rss-ticker-src", children: `\u00b7 ${age}` })
+    ].filter(Boolean)
+  });
+}
+// Ticker-end refresh control (newswire parity): module-level busy flag dedupes
+// rapid clicks across remounts; glyph flashes ok/error for 2s after a run.
+var __tickerRefreshBusy = false;
+function TickerRefresh({ onRefresh }) {
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState(null); // 'ok' | 'err' | null
+  const onClick = async () => {
+    if (__tickerRefreshBusy || !onRefresh) return;
+    __tickerRefreshBusy = true;
+    setBusy(true); setFlash(null);
+    try {
+      await onRefresh();
+      setFlash("ok");
+    } catch {
+      setFlash("err");
+    } finally {
+      __tickerRefreshBusy = false;
+      setBusy(false);
+      setTimeout(() => setFlash(null), 2000);
+    }
+  };
+  return jsx("button", {
+    type: "button",
+    className: "rss-ticker-refresh",
+    "data-busy": busy ? "true" : "false",
+    title: busy ? "Fetching feeds…" : "Refresh all feeds now",
+    "aria-label": "Refresh all feeds now",
+    onClick: () => void onClick(),
+    children: busy ? "⟳" : flash === "ok" ? "✓" : flash === "err" ? "!" : "⟳"
+  });
+}
+function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
+  const grouping = settings.tickerGrouping || "newest";
+  const ordered = useMemo(() => groupTickerArticles(articles, grouping), [articles, grouping]);
+  const rows = useMemo(() => buildTickerRows(ordered, tags), [ordered, tags]);
+  const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false);
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (e) => setReduced(e.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+  const fontPx = Math.min(18, Math.max(9, Number(settings.tickerFontSize) || 11));
+  const duration = TICKER_SPEED_DURATIONS[settings.tickerSpeed] || 150;
+  const renderRow = (row, i) => row.kind === "divider"
+    ? jsx("span", { "aria-hidden": "true", className: "rss-ticker-src", style: { padding: "0 4px", flex: "none" }, children: `${row.source} \u2014` }, `d${i}`)
+    : jsx(TickerItem, { row, onOpen, showSource: settings.tickerShowSource !== false, showAge: settings.tickerRelativeTime !== false }, row.item.id);
+  return jsxs("div", {
+    className: `rss-ticker${settings.tickerPauseOnHover === false ? " rss-ticker-no-hover" : ""}`,
+    "data-static": reduced ? "true" : "false",
+    role: "region",
+    "aria-label": "RSS headline ticker",
+    style: { "--rss-ticker-duration": `${duration}s`, fontSize: `${fontPx}px`, height: `${TICKER_FONT_TO_HEIGHT(fontPx)}px` },
+    children: [
+      jsx("button", { type: "button", className: "rss-ticker-brand", title: "RSS Reader headlines", onClick: () => onOpen(null), children: "RSS" }),
+      jsx(TickerRefresh, { onRefresh }),
+      jsx("div", { className: "rss-ticker-viewport", children:
+        jsx("div", { className: "rss-ticker-track", children: reduced
+          ? rows.slice(0, 1).map(renderRow)
+          : [
+              jsx("div", { className: "rss-ticker-half", children: rows.map(renderRow) }, "a"),
+              jsx("div", { className: "rss-ticker-half", "aria-hidden": "true", children: rows.map(renderRow) }, "b")
+            ] })
+      })
+    ]
+  });
+}
+var TICKER_SPEEDS = [
+  { id: "slow", label: "Slow" },
+  { id: "normal", label: "Normal" },
+  { id: "fast", label: "Fast" }
+];
+var TICKER_GROUPINGS = [
+  { id: "newest", label: "Newest" },
+  { id: "source", label: "By source" },
+  { id: "unread_first", label: "Unread first" }
+];
+var TICKER_FONT_SIZES = ["9", "10", "11", "12", "13", "14", "16", "18"];
+function Segmented({ value, onChange, options }) {
+  return jsx("span", { className: "rss-segmented", role: "group", children: options.map((o) => jsx("button", {
+    type: "button",
+    "aria-pressed": String(o.id) === String(value),
+    onClick: () => onChange(o.id),
+    children: o.label
+  }, o.id)) });
+}
+var TICKER_PANE_POLL_MS = 30_000;
+// Global ticker pane: rendered by the app shell on every screen (docked to
+// the workspace bottom edge), like hermes-newswire. Reads the profile
+// library straight from IndexedDB; headline clicks navigate to /rss and hand
+// the article id over via a window event.
+function tickerPaneOwner() {
+  return JSON.stringify([host.state.connectionId?.get() || "local", host.state.profile?.get?.() || "default"]);
+}
+// Settings for the global pane: plain storage read keyed by profile, re-read
+// whenever the library publishes a change (settings save, refresh, grading).
+function useSettingsPane(owner) {
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const changed = () => setVersion((v) => v + 1);
+    window.addEventListener("hermes-rss-library-changed", changed);
+    return () => window.removeEventListener("hermes-rss-library-changed", changed);
+  }, []);
+  return useMemo(() => [readSettings(rssCtx, owner)], [owner, version]);
+}
+function TickerPane() {
+  const owner = tickerPaneOwner();
+  const [settings] = useSettingsPane(owner);
+  const articles = useQuery({
+    queryKey: ["rss-reader", owner, "ticker-articles"],
+    queryFn: async () => {
+      const library = await transact(owner);
+      return (library.articles || []).filter((a) => a.feed_title).slice(0, 100);
+    },
+    refetchInterval: TICKER_PANE_POLL_MS,
+    retry: false
+  });
+  const onOpen = (item) => {
+    host.navigate("/rss");
+    if (item) {
+      setTimeout(() => window.dispatchEvent(new CustomEvent("hermes-rss-select-article", { detail: { owner, id: item.id } })), 120);
+    }
+  };
+  if (!settings || settings.headlineTicker !== true || !articles.data?.length) return null;
+  return jsxs("div", { style: { display: "contents" }, children: [
+    jsx("style", { children: styles }),
+    jsx(HeadlineTicker, {
+      articles: settings.tickerOnlyUnread === true ? (articles.data.filter((a) => !a.is_read)) : articles.data,
+      tags: settings.gradingTags,
+      settings,
+      onOpen
+    })
+  ] });
 }
 function Empty({ title, children }) {
   return /* @__PURE__ */ jsxs("div", { className: "rss-empty", children: [
@@ -2905,6 +3147,7 @@ function ReaderProfile({ ctx, owner }) {
   const keepListScroll = useRef(null);
   const savedListY = useRef(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("main");
   const [settings, setSettings] = useState(() => readSettings(ctx, owner));
   const [draft, setDraft] = useState(() => readSettings(ctx, owner));
   const [feedToRemove, setFeedToRemove] = useState(null);
@@ -3006,6 +3249,17 @@ function ReaderProfile({ ctx, owner }) {
     window.addEventListener("hermes-rss-library-changed", changed);
     return () => window.removeEventListener("hermes-rss-library-changed", changed);
   }, [ctx, owner, client]);
+  useEffect(() => {
+    // Ticker pane (registered at the app shell) hands a headline click over:
+    // select that article in the reader and land on it.
+    const onSelect = (event) => {
+      if (event.detail?.owner !== owner || !event.detail?.id) return;
+      setSelected(event.detail.id);
+      setTab("article");
+    };
+    window.addEventListener("hermes-rss-select-article", onSelect);
+    return () => window.removeEventListener("hermes-rss-select-article", onSelect);
+  }, [owner]);
   useEffect(() => {
     if (!settings.fullCapture) return undefined;
     let cancelled = false;
@@ -3660,7 +3914,50 @@ function ReaderProfile({ ctx, owner }) {
       filters.error && jsx("p", { role: "alert", children: filters.error.message })
     ] }),
     settingsOpen && jsxs("div", { className: "rss-settings", children: [
-      jsxs("form", { className: "rss-stack", "aria-label": "Reader settings", onSubmit: saveSettings, children: [
+      jsxs("div", { className: "rss-settings-tabs", role: "tablist", "aria-label": "Settings sections", children: [
+        jsx("button", { type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "main" ? "true" : "false", onClick: () => setSettingsTab("main"), children: "Main" }),
+        jsx("button", { type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "ticker" ? "true" : "false", onClick: () => setSettingsTab("ticker"), children: "Ticker" })
+      ] }),
+      settingsTab === "ticker" && jsxs("div", { className: "rss-settings-block", "aria-label": "Ticker settings", children: [
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsx("label", { className: "rss-setting", children: [
+            jsx("input", { type: "checkbox", checked: draft.headlineTicker === true, onChange: event => setDraft({ ...draft, headlineTicker: event.target.checked }) }),
+            "Headline Ticker"
+          ] }),
+          jsx("label", { className: "rss-setting", children: [
+            jsx("input", { type: "checkbox", checked: draft.tickerPauseOnHover !== false, onChange: event => setDraft({ ...draft, tickerPauseOnHover: event.target.checked }) }),
+            "Pause on hover"
+          ] }),
+          jsx("label", { className: "rss-setting", children: [
+            jsx("input", { type: "checkbox", checked: draft.tickerOnlyUnread === true, onChange: event => setDraft({ ...draft, tickerOnlyUnread: event.target.checked }) }),
+            "Only unread"
+          ] })
+        ] }),
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsx("span", { className: "rss-setting-label", children: "Scroll speed" }),
+          jsx(Segmented, { value: draft.tickerSpeed || "normal", onChange: v => setDraft({ ...draft, tickerSpeed: v }), options: TICKER_SPEEDS })
+        ] }),
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsx("span", { className: "rss-setting-label", children: "Group headlines" }),
+          jsx(Segmented, { value: draft.tickerGrouping || "newest", onChange: v => setDraft({ ...draft, tickerGrouping: v }), options: TICKER_GROUPINGS })
+        ] }),
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsx("span", { className: "rss-setting-label", children: "Text size (px)" }),
+          jsx(Segmented, { value: String(draft.tickerFontSize || 11), onChange: v => setDraft({ ...draft, tickerFontSize: Number(v) }), options: TICKER_FONT_SIZES.map((n) => ({ id: n, label: n })) })
+        ] }),
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsx("label", { className: "rss-setting", children: [
+            jsx("input", { type: "checkbox", checked: draft.tickerShowSource !== false, onChange: event => setDraft({ ...draft, tickerShowSource: event.target.checked }) }),
+            "Show feed name"
+          ] }),
+          jsx("label", { className: "rss-setting", children: [
+            jsx("input", { type: "checkbox", checked: draft.tickerRelativeTime !== false, onChange: event => setDraft({ ...draft, tickerRelativeTime: event.target.checked }) }),
+            "Show age"
+          ] })
+        ] }),
+        jsx("p", { className: "rss-muted rss-small", children: "The ticker runs along the bottom of the reader. Graded articles show their tag pill and grade color." })
+      ] }),
+      settingsTab === "main" && jsxs("form", { className: "rss-stack", "aria-label": "Reader settings", onSubmit: saveSettings, children: [
         jsxs("div", { className: "rss-settings-grid", children: [
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "General" }),
@@ -4336,7 +4633,7 @@ function ReaderProfile({ ctx, owner }) {
         ] })
       ] }) })
         })
-      ] })
+      ] }),
     ] })
   ] });
 }
@@ -4344,15 +4641,27 @@ var plugin_default = {
   id: ID,
   name: "RSS Reader",
   description: "RSS reader with reader-mode capture, edit-mode subscriptions, and keyboard shortcuts.",
-  version: "1.0.1",
+  version: "1.0.2",
   defaultEnabled: true,
   register(ctx) {
     rssRest = typeof ctx.rest === "function" ? ctx.rest : null;
     if (!rssRest) throw new Error("RSS Reader requires the plugin REST API.");
-    rssDebug("register", { id: ID, version: "1.0.1" });
+    rssCtx = ctx;
+    rssDebug("register", { id: ID, version: "1.0.2" });
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
     if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
     ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);
+    ctx.register({
+      id: "tickerPane",
+      area: "panes",
+      data: {
+        placement: "main",
+        headerVeto: true,
+        dock: { pane: "workspace", pos: "bottom" },
+        height: "30px"
+      },
+      render: () => jsx(TickerPane, {})
+    });
     ctx.register({
       id: "page",
       area: ROUTES_AREA,
