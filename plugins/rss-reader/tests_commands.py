@@ -78,7 +78,7 @@ class RssCommandTests(unittest.TestCase):
         self.assertIn('rssRest("/commands"', plugin)
         self.assertIn('rssRest("/feed"', plugin)
         self.assertIn('rssRest("/reddit"', plugin)
-        self.assertIn("Newswire starters", plugin)
+        self.assertIn("Popular starters", plugin)
         self.assertIn("Popular Reddit", plugin)
         self.assertIn("className: \"rss-subscribe-pill\"", plugin)
         self.assertNotIn("Test-Path -LiteralPath", plugin)

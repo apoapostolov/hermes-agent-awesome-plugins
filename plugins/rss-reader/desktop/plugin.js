@@ -220,12 +220,12 @@ function validateSummary(text, body) {
 // refresh path and never blocking the list: the grades land later and tint.
 var DEFAULT_GRADING_SKILL = "rss-reader-plugin";
 var SUBSCRIBE_STARTERS = [
-  { group: "Newswire starters", name: "Hacker News", url: "https://hnrss.org/frontpage" },
-  { group: "Newswire starters", name: "Ars Technica", url: "https://feeds.arstechnica.com/arstechnica/index" },
-  { group: "Newswire starters", name: "The Verge", url: "https://www.theverge.com/rss/index.xml" },
-  { group: "Newswire starters", name: "NASA News", url: "https://www.nasa.gov/news-release/feed/" },
-  { group: "Newswire starters", name: "TechCrunch", url: "https://techcrunch.com/feed/" },
-  { group: "Newswire starters", name: "VentureBeat AI", url: "https://venturebeat.com/category/ai/feed/" },
+  { group: "Popular starters", name: "Hacker News", url: "https://hnrss.org/frontpage" },
+  { group: "Popular starters", name: "Ars Technica", url: "https://feeds.arstechnica.com/arstechnica/index" },
+  { group: "Popular starters", name: "The Verge", url: "https://www.theverge.com/rss/index.xml" },
+  { group: "Popular starters", name: "NASA News", url: "https://www.nasa.gov/news-release/feed/" },
+  { group: "Popular starters", name: "TechCrunch", url: "https://techcrunch.com/feed/" },
+  { group: "Popular starters", name: "VentureBeat AI", url: "https://venturebeat.com/category/ai/feed/" },
   { group: "Popular Reddit", name: "r/technology", url: "https://www.reddit.com/r/technology" },
   { group: "Popular Reddit", name: "r/programming", url: "https://www.reddit.com/r/programming" },
   { group: "Popular Reddit", name: "r/science", url: "https://www.reddit.com/r/science" },
@@ -4571,7 +4571,7 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           /* @__PURE__ */ jsxs("div", { className: "rss-subscribe-starters", children: [
             jsx("span", { className: "rss-muted rss-small", children: "Starter packs" }),
-            ["Newswire starters", "Popular Reddit"].map(group => jsxs("div", { className: "rss-subscribe-starter-group", children: [
+            ["Popular starters", "Popular Reddit"].map(group => jsxs("div", { className: "rss-subscribe-starter-group", children: [
               jsx("span", { className: "rss-muted rss-small", children: group }),
               jsx("div", { className: "rss-subscribe-pills", children: SUBSCRIBE_STARTERS.filter(item => item.group === group).map(item => jsx(
                 "button",
