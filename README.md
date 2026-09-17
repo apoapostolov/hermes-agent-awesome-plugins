@@ -26,33 +26,122 @@ The pack is pinned and reproducible. Every entry in `hermes-pack.yaml` names a r
 
 ## The pack
 
-### Keep control of the session
+### Status bar
 
-| Plugin | What it gives you |
-| --- | --- |
-| [intelligent-tool-break](plugins/intelligent-tool-break/README.md) | Stop a stalled tool call, send a correction, or retry the last action with `/break`, `/break {message}`, and `/again`. |
-| [reasoning-switch](plugins/reasoning-switch/README.md) | Rotate reasoning effort from the status bar with per-level controls and prompt limits. |
-| [iteration-budget-meter](plugins/iteration-budget-meter/README.md) | See the focused session's tool-call budget live in the status bar. |
-| [scroll-on-switch](plugins/scroll-on-switch/README.md) | Keep the active transcript at the bottom when switching sessions. |
+<table>
+<thead>
+<tr>
+<th nowrap>Plugin</th>
+<th>What it gives you</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td nowrap><a href="plugins/provider-status/README.md">provider‑status</a></td>
+<td>Track provider quotas, OAuth status, multiple accounts, and key rotation in the status bar.</td>
+</tr>
+<tr>
+<td nowrap><a href="plugins/reasoning-switch/README.md">reasoning‑switch</a></td>
+<td>Rotate reasoning effort from the status bar with per-level controls and prompt limits.</td>
+</tr>
+<tr>
+<td nowrap><a href="plugins/iteration-budget-meter/README.md">iteration‑budget‑meter</a></td>
+<td>See the focused session's tool-call budget live in the status bar.</td>
+</tr>
+</tbody>
+</table>
 
-### See the desktop clearly
+### Tool calls, memory, and capabilities
 
-| Plugin | What it gives you |
-| --- | --- |
-| [better-session-appearance](plugins/better-session-appearance/README.md) | Make session names easier to scan with colors, emphasis, and idle-state icons. |
-| [drag-to-pin-session](plugins/drag-to-pin-session/README.md) | Reorganize pinned sessions with drag-and-drop. |
-| [sidebar-manager](plugins/sidebar-manager/README.md) | Hide and reorder sidebar nav rows and session sections from a dim glyph next to New session. |
-| [opaque-composer](plugins/opaque-composer/README.md) | Keep the desktop composer readable while the transcript scrolls behind it. |
-| [compact-reasoning-label](plugins/compact-reasoning-label/README.md) | Show the model name only in the model pill and leave the thinking level to the reasoning pill beside it. |
-| [provider-status](plugins/provider-status/README.md) | Track provider quotas, OAuth status, multiple accounts, and key rotation in the status bar. |
-| [better-capabilities](plugins/better-capabilities/README.md) | Delete a plugin or skill from Capabilities, zip a learned skill, save on/off presets, and apply them with /preset. |
+<table>
+<thead>
+<tr>
+<th nowrap>Plugin</th>
+<th>What it gives you</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td nowrap><a href="plugins/intelligent-tool-break/README.md">intelligent‑tool‑break</a></td>
+<td>Stop a stalled tool call, send a correction, or retry the last action with <code>/break</code>, <code>/break {message}</code>, and <code>/again</code>.</td>
+</tr>
+<tr>
+<td nowrap><a href="plugins/memory-review/README.md">memory‑review</a></td>
+<td>Inspect staged memory writes and approve or reject them from a dialog.</td>
+</tr>
+<tr>
+<td nowrap><a href="plugins/better-capabilities/README.md">better‑capabilities</a></td>
+<td>Delete a plugin or skill from Capabilities, zip a learned skill, save on/off presets, and apply them with /preset.</td>
+</tr>
+</tbody>
+</table>
 
-### Review and read
+### Sessions and sidebar
 
-| Plugin | What it gives you |
-| --- | --- |
-| [memory-review](plugins/memory-review/README.md) | Inspect staged memory writes and approve or reject them from a dialog. |
-| [rss-reader](plugins/rss-reader/README.md) | Read, organize, search, summarize, and grade RSS and Atom feeds in a three-column reader. |
+<table>
+<thead>
+<tr>
+<th nowrap>Plugin</th>
+<th>What it gives you</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td nowrap><a href="plugins/better-session-appearance/README.md">better‑session‑appearance</a></td>
+<td>Make session names easier to scan with colors, emphasis, and idle-state icons.</td>
+</tr>
+<tr>
+<td nowrap><a href="plugins/sidebar-manager/README.md">sidebar‑manager</a></td>
+<td>Hide and reorder sidebar nav rows and session sections from a dim glyph next to New session.</td>
+</tr>
+<tr>
+<td nowrap><a href="plugins/drag-to-pin-session/README.md">drag‑to‑pin‑session</a></td>
+<td>Reorganize pinned sessions with drag-and-drop.</td>
+</tr>
+<tr>
+<td nowrap><a href="plugins/scroll-on-switch/README.md">scroll‑on‑switch</a></td>
+<td>Keep the active transcript at the bottom when switching sessions.</td>
+</tr>
+</tbody>
+</table>
+
+### Composer
+
+<table>
+<thead>
+<tr>
+<th nowrap>Plugin</th>
+<th>What it gives you</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td nowrap><a href="plugins/opaque-composer/README.md">opaque‑composer</a></td>
+<td>Keep the desktop composer readable while the transcript scrolls behind it.</td>
+</tr>
+<tr>
+<td nowrap><a href="plugins/compact-reasoning-label/README.md">compact‑reasoning‑label</a></td>
+<td>Show the model name only in the model pill and leave the thinking level to the reasoning pill beside it.</td>
+</tr>
+</tbody>
+</table>
+
+### Reading
+
+<table>
+<thead>
+<tr>
+<th nowrap>Plugin</th>
+<th>What it gives you</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td nowrap><a href="plugins/rss-reader/README.md">rss‑reader</a></td>
+<td>Read, organize, search, summarize, and grade RSS and Atom feeds in a three-column reader.</td>
+</tr>
+</tbody>
+</table>
 
 ## Why these plugins belong together
 
@@ -121,18 +210,18 @@ This is an independent community project. It does not change Hermes Agent core, 
 Every plugin has a dedicated README:
 
 - [Provider Status](plugins/provider-status/README.md)
-- [Intelligent Tool Break](plugins/intelligent-tool-break/README.md)
-- [Better Session Appearance](plugins/better-session-appearance/README.md)
-- [Drag to Pin Session](plugins/drag-to-pin-session/README.md)
-- [Opaque Composer](plugins/opaque-composer/README.md)
-- [Compact Reasoning Label](plugins/compact-reasoning-label/README.md)
-- [Scroll on Switch](plugins/scroll-on-switch/README.md)
 - [Reasoning Switch](plugins/reasoning-switch/README.md)
 - [Iteration Budget Meter](plugins/iteration-budget-meter/README.md)
+- [Intelligent Tool Break](plugins/intelligent-tool-break/README.md)
 - [Memory Review](plugins/memory-review/README.md)
-- [RSS Reader](plugins/rss-reader/README.md)
 - [Better Capabilities](plugins/better-capabilities/README.md)
+- [Better Session Appearance](plugins/better-session-appearance/README.md)
 - [Sidebar Manager](plugins/sidebar-manager/README.md)
+- [Drag to Pin Session](plugins/drag-to-pin-session/README.md)
+- [Scroll on Switch](plugins/scroll-on-switch/README.md)
+- [Opaque Composer](plugins/opaque-composer/README.md)
+- [Compact Reasoning Label](plugins/compact-reasoning-label/README.md)
+- [RSS Reader](plugins/rss-reader/README.md)
 - [Maintainer sync skill](skills/hermes-awesome-plugins-sync/SKILL.md)
 
 ## Support and contributions
