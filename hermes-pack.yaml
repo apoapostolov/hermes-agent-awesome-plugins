@@ -38,6 +38,6 @@ plugins:
     ref: 6b4129153abd9c3be21a7fbe3bee2c3c74f57a27
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/sidebar-manager
-    ref: fa188e13817596bcbc95a85e7c2031e9fb51c998
+    ref: c7e84597ecc12d3dff9fde4984033fc912b9aa87
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync
