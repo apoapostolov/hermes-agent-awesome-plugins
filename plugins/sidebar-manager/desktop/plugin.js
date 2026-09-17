@@ -1,7 +1,7 @@
 /**
  * Sidebar Manager — Hermes desktop plugin.
  *
- * A dim gripper after the New session Ctrl/N hint enters edit mode.
+ * A dim list-ordered glyph after the New session Ctrl/N hint enters edit mode.
  * In edit mode, nav rows (Skills, Messaging, plugin pages, …) and session
  * sections (Pinned, Recents, platforms, Cron jobs) can be clicked on/off
  * and reordered from a grip with live HTML5 gap-opening, same idea as
@@ -161,14 +161,18 @@ function newSessionButton() {
 }
 
 function ensureEditBtn(button) {
+  const icon = '<i class="codicon codicon-list-ordered" aria-hidden="true"></i>'
   let btn = button.querySelector(':scope > [data-sbm-edit-btn]')
-  if (btn) return btn
+  if (btn) {
+    if (!btn.querySelector('.codicon-list-ordered')) btn.innerHTML = icon
+    return btn
+  }
   btn = document.createElement('span')
   btn.setAttribute('data-sbm-edit-btn', '1')
   btn.setAttribute('role', 'button')
   btn.setAttribute('tabindex', '0')
   btn.title = 'Edit sidebar'
-  btn.innerHTML = '<i class="codicon codicon-gripper" aria-hidden="true"></i>'
+  btn.innerHTML = icon
   const kbd = button.querySelector('[data-slot="kbd-group"]')
   if (kbd && kbd.parentNode === button) button.insertBefore(btn, kbd.nextSibling)
   else button.appendChild(btn)
