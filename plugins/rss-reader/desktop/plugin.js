@@ -2789,6 +2789,40 @@ var TICKER_PANE_POLL_MS = 30_000;
 // the workspace bottom edge), like hermes-newswire. Reads the profile
 // library straight from IndexedDB; headline clicks navigate to /rss and hand
 // the article id over via a window event.
+function openHermesPreview(url, label) {
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
+  const title = String(label || url);
+  const openWorkspaceBrowser = () => {
+    if (typeof host.openWorkspace !== "function") return false;
+    host.openWorkspace("rss-browser", {
+      title,
+      dock: { pane: "workspace", pos: "right" },
+      render: () => jsx("iframe", {
+        src: url,
+        title,
+        style: { width: "100%", height: "100%", border: 0, background: "#fff" },
+        referrerPolicy: "no-referrer",
+        sandbox: "allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+      })
+    });
+    return true;
+  };
+  void (async () => {
+    let openedNative = false;
+    try {
+      if (typeof rssRest === "function") {
+        const result = await rssRest("/preview", { method: "POST", body: { url, label: title } });
+        openedNative = !!(result && result.opened);
+      }
+    } catch {
+      openedNative = false;
+    }
+    if (openedNative) return;
+    if (!openWorkspaceBrowser() && rssCtx?.os?.openExternal) {
+      void rssCtx.os.openExternal(url);
+    }
+  })();
+}
 function tickerPaneOwner() {
   return JSON.stringify([host.state.connectionId?.get() || "local", host.state.profile?.get?.() || "default"]);
 }
@@ -2846,7 +2880,7 @@ function TickerPane() {
       return;
     }
     if (effectiveSettings.tickerClickBehavior === "browser") {
-      void rssRest?.("/preview", { method: "POST", body: { url: item.url } });
+      openHermesPreview(item.url, item.title || item.feed_title || "Article");
       return;
     }
     host.navigate("/rss");

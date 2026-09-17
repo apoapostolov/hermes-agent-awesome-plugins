@@ -242,3 +242,27 @@ def fetch_feed(payload: FeedRequest) -> dict[str, str | int]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         raise HTTPException(status_code=502, detail=f"Feed download failed: {exc}") from exc
+
+
+class PreviewRequest(BaseModel):
+    url: str
+    label: str = ""
+
+
+@router.post("/preview")
+def open_in_preview(payload: PreviewRequest) -> dict[str, str]:
+    """Open an article in the desktop in-app preview pane.
+
+    Emits the same preview.open gateway event Newswire and open_preview use.
+    """
+    try:
+        url = _validate_url(payload.url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    label = (payload.label or url).strip()
+    try:
+        from tui_gateway.server import _broadcast_global_event
+        _broadcast_global_event("preview.open", {"url": url, "label": label})
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Preview pane unavailable: {exc}") from exc
+    return {"opened": url}
