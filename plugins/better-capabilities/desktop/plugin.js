@@ -157,6 +157,10 @@ async function doReveal(kind, name) {
   }
 }
 
+function isHidden(el) {
+  return Boolean(el && el.closest('[data-pane-hidden]'))
+}
+
 function pluginKeyFromRow(row) {
   const testid = row.getAttribute('data-testid') || ''
   const m = /^plugin-row-(.+)$/.exec(testid)
@@ -164,6 +168,11 @@ function pluginKeyFromRow(row) {
   const id = row.getAttribute('id') || ''
   if (id.startsWith('plugin-')) return id.slice('plugin-'.length)
   return ''
+}
+
+function pluginKeyFromButton(btn) {
+  const row = btn && btn.closest('[data-testid^="plugin-row-"]')
+  return row ? pluginKeyFromRow(row) : ''
 }
 
 function paintPluginRows() {
@@ -180,12 +189,14 @@ function paintPluginRows() {
     const hostSlot = slot.parentElement
     if (!hostSlot) continue
     if (hostSlot.querySelector('[' + BTN + '="delete"]')) continue
-    const del = iconButton('codicon-trash', 'Remove ' + name)
+    const del = iconButton('codicon-trash', 'Remove plugin')
     del.setAttribute(BTN, 'delete')
     del.addEventListener('click', (e) => {
       e.preventDefault()
       e.stopPropagation()
-      confirmRemove('plugin', name, () => void doDelete('plugin', name))
+      const liveName = pluginKeyFromButton(e.currentTarget) || name
+      if (!liveName) return
+      confirmRemove('plugin', liveName, () => void doDelete('plugin', liveName))
     })
     const wrap = document.createElement('span')
     wrap.className = slot.className
@@ -196,70 +207,84 @@ function paintPluginRows() {
 }
 
 function skillNameFromActionRow(row) {
-  const header = row.previousElementSibling
-  if (!header) return ''
-  const title = header.querySelector('h3')
-  return title ? String(title.textContent || '').trim() : ''
+  if (!row) return ''
+  let sib = row.previousElementSibling
+  while (sib) {
+    const title = sib.tagName === 'H3' ? sib : sib.querySelector && sib.querySelector('h3')
+    const text = title ? String(title.textContent || '').trim() : ''
+    if (text) return text
+    sib = sib.previousElementSibling
+  }
+  const pane = row.parentElement
+  const fallback = pane && pane.querySelector('header h3, h3')
+  return fallback ? String(fallback.textContent || '').trim() : ''
+}
+
+function liveSkillName(btn) {
+  const row = btn && btn.parentElement
+  return skillNameFromActionRow(row)
 }
 
 function paintSkillRow() {
   const buttons = document.querySelectorAll('button')
-  let edit = null
-  let archive = null
-  let row = null
   for (const btn of buttons) {
     if (btn.getAttribute(BTN)) continue
+    if (isHidden(btn)) continue
     const label = String(btn.textContent || '').trim()
     if (label !== 'Edit') continue
-    const parent = btn.parentElement
-    if (!parent) continue
-    const sibs = parent.querySelectorAll('button')
-    let foundArchive = null
+    const row = btn.parentElement
+    if (!row) continue
+    const sibs = row.querySelectorAll('button')
+    let archive = null
     for (const sib of sibs) {
-      if (String(sib.textContent || '').trim() === 'Archive') foundArchive = sib
+      if (String(sib.textContent || '').trim() === 'Archive') archive = sib
     }
-    if (!foundArchive) continue
-    edit = btn
-    archive = foundArchive
-    row = parent
-    break
-  }
-  if (!edit || !archive || !row) return
-  if (row.getAttribute(MARK) === '1') return
-  const name = skillNameFromActionRow(row)
-  if (!name) return
+    if (!archive) continue
+    const name = skillNameFromActionRow(row)
+    if (!name) continue
+    if (row.getAttribute('data-bc-skill') !== name) row.setAttribute('data-bc-skill', name)
 
-  if (!row.querySelector('[' + BTN + '="zip"]')) {
-    const zip = textButton('Package (zip)')
-    zip.setAttribute(BTN, 'zip')
-    zip.addEventListener('click', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      void doZip(name)
-    })
-    row.insertBefore(zip, archive)
-  }
+    if (!row.querySelector('[' + BTN + '="zip"]')) {
+      const zip = textButton('Package (zip)')
+      zip.setAttribute(BTN, 'zip')
+      zip.addEventListener('click', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const liveName = liveSkillName(e.currentTarget)
+        if (!liveName) {
+          notify('error', 'Could not package', 'No skill name on this row.')
+          return
+        }
+        void doZip(liveName)
+      })
+      row.insertBefore(zip, archive)
+    }
 
-  if (!row.querySelector('[' + BTN + '="folder"]')) {
-    const folder = iconButton('codicon-folder-opened', 'Open skill folder')
-    folder.setAttribute(BTN, 'folder')
-    folder.addEventListener('click', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      void doReveal('skill', name)
-    })
-    const del = iconButton('codicon-trash', 'Remove ' + name)
-    del.setAttribute(BTN, 'delete')
-    del.addEventListener('click', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      confirmRemove('skill', name, () => void doDelete('skill', name))
-    })
-    row.appendChild(folder)
-    row.appendChild(del)
-  }
+    if (!row.querySelector('[' + BTN + '="folder"]')) {
+      const folder = iconButton('codicon-folder-opened', 'Open skill folder')
+      folder.setAttribute(BTN, 'folder')
+      folder.addEventListener('click', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const liveName = liveSkillName(e.currentTarget)
+        if (!liveName) return
+        void doReveal('skill', liveName)
+      })
+      const del = iconButton('codicon-trash', 'Remove skill')
+      del.setAttribute(BTN, 'delete')
+      del.addEventListener('click', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const liveName = liveSkillName(e.currentTarget)
+        if (!liveName) return
+        confirmRemove('skill', liveName, () => void doDelete('skill', liveName))
+      })
+      row.appendChild(folder)
+      row.appendChild(del)
+    }
 
-  row.setAttribute(MARK, '1')
+    row.setAttribute(MARK, '1')
+  }
 }
 
 function sweep() {

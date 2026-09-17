@@ -1,5 +1,5 @@
 name: better-capabilities
-version: 1.0.0
+version: 1.0.1
 description: "Delete a plugin or skill from Capabilities, and zip a skill folder from the Edit / Archive row."
 author: Apostol Apostolov
 license: MIT
