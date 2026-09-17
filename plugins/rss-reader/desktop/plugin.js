@@ -2600,7 +2600,7 @@ function refreshButtonLabel(at, now) {
 // Headline ticker components. buildTickerRows is a plain helper (no hooks) so
 // both marquee halves and the reduced-motion static row share one list.
 // Speed + grouping options mirror hermes-newswire's ticker settings.
-var TICKER_SPEED_DURATIONS = { barely: 1440, very_slow: 960, slow: 600, normal: 375, fast: 200 }; // seconds per loop (slowed ~2.5x vs newswire per Apo's read-speed feedback)
+var TICKER_SPEED_DURATIONS = { barely: 960, very_slow: 480, slow: 240, normal: 150, fast: 80 }; // seconds per loop; slow/normal/fast match newswire exactly, very_slow/barely double upward
 var TICKER_FONT_TO_HEIGHT = (px) => Math.max(28, Math.round(px * 2.1) + 6);
 function groupTickerArticles(articles, mode) {
   if (!Array.isArray(articles) || articles.length === 0) return [];
