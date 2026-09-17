@@ -2825,14 +2825,9 @@ function TickerPane() {
   const articles = useQuery({
     queryKey: ["rss-reader", owner, "ticker-articles"],
     queryFn: async () => {
-      const [rows, library] = await Promise.all([
-        libraryRequest("/articles?view=all&show_hidden=true&limit=100").catch(() => []),
-        transact(owner)
-      ]);
+      const library = await transact(owner);
       const byFeed = new Map((library.feeds || []).map((f) => [f.id, f]));
-      const sourceRows = Array.isArray(rows) ? rows : (Array.isArray(rows?.articles) ? rows.articles : (Array.isArray(rows?.data) ? rows.data : []));
-      const source = sourceRows.length ? sourceRows : (Array.isArray(library.articles) ? library.articles.slice(0, 100) : []);
-      return source.map((a) => {
+      return (library.articles || []).slice(0, 100).map((a) => {
         const feed = byFeed.get(a.feed_id);
         const feedTitle = a.feed_title || feed?.title || feed?.name || "RSS";
         let favicon = "";
@@ -2842,13 +2837,6 @@ function TickerPane() {
         return { ...a, feed_title: feedTitle, favicon };
       });
     },
-    refetchInterval: TICKER_PANE_POLL_MS,
-    retry: false
-  });
-  const unreadArticles = useQuery({
-    queryKey: ["rss-reader", owner, "ticker-unread"],
-    queryFn: () => libraryRequest("/articles?view=unread&limit=100"),
-    enabled: effectiveSettings?.tickerOnlyUnread === true,
     refetchInterval: TICKER_PANE_POLL_MS,
     retry: false
   });
@@ -2864,13 +2852,10 @@ function TickerPane() {
     host.navigate("/rss");
     setTimeout(() => window.dispatchEvent(new CustomEvent("hermes-rss-select-article", { detail: { owner, id: item.id } })), 120);
   };
-  const unreadRows = Array.isArray(unreadArticles.data) ? unreadArticles.data : (Array.isArray(unreadArticles.data?.articles) ? unreadArticles.data.articles : (Array.isArray(unreadArticles.data?.data) ? unreadArticles.data.data : []));
   const tickerArticles = effectiveSettings.tickerOnlyUnread === true
-    ? (unreadRows.length ? unreadRows : (articles.data || []).filter(isTickerUnread))
+    ? (articles.data || []).filter(isTickerUnread)
     : (articles.data || []);
-  const faviconById = new Map((articles.data || []).map((article) => [article.id, article.favicon]));
-  const feedTitleById = new Map((articles.data || []).map((article) => [article.id, article.feed_title || "RSS"]));
-  const tickerArticlesWithFavicons = tickerArticles.map((article) => ({ ...article, feed_title: article.feed_title || feedTitleById.get(article.id) || "RSS", favicon: article.favicon || faviconById.get(article.id) || "" }));
+  const tickerArticlesWithFavicons = tickerArticles;
   if (!effectiveSettings || effectiveSettings.headlineTicker !== true) return null;
   // Ticker rules are `.hermes-rss .rss-ticker-*` descendants: the pane must
   // mount a .hermes-rss root. Inline styles neutralize the page-level root
