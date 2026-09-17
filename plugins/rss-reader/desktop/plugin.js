@@ -1166,6 +1166,7 @@ function readSettings(ctx, owner) {
     tickerShowSource: stored.tickerShowSource !== false,
     tickerRelativeTime: stored.tickerRelativeTime !== false,
     tickerOnlyUnread: stored.tickerOnlyUnread === true,
+    tickerAssetSize: ["small", "normal", "font"].includes(stored.tickerAssetSize) ? stored.tickerAssetSize : "normal",
     gradingSkill: gradingSkillName(typeof stored.gradingSkill === "string" ? stored.gradingSkill : ""),
     gradingTags: readGradingTags(ctx, owner)
   };
@@ -2548,11 +2549,15 @@ html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
 .hermes-rss .rss-ticker-item{display:inline-flex;align-items:center;gap:.375rem;padding:0 1rem;height:100%;background:none;border:0;font:inherit;font-size:var(--rss-ticker-font,11px);line-height:1;color:var(--ui-text-tertiary);cursor:pointer;text-decoration:none;white-space:nowrap}
 .hermes-rss .rss-ticker-item:hover{background:var(--chrome-action-hover);color:var(--ui-text-primary)}
 .hermes-rss .rss-ticker-item:focus-visible{outline:1px solid var(--ui-accent);outline-offset:-1px}
-.hermes-rss .rss-ticker-item .rss-card-pill{flex:none;font-size:8px;padding:0 5px;line-height:1.6}
+.hermes-rss .rss-ticker-item .rss-card-pill{flex:none}
+.hermes-rss .rss-ticker.rss-ticker-small-assets .rss-card-pill{font-size:8px;padding:0 5px;line-height:1.6}
+.hermes-rss .rss-ticker.rss-ticker-small-assets .rss-ticker-favicon{width:11px;height:11px;border-radius:2px}
+.hermes-rss .rss-ticker.rss-ticker-font-assets .rss-card-pill{font-size:var(--rss-ticker-font);padding:0 6px;line-height:1.2}
+.hermes-rss .rss-ticker.rss-ticker-font-assets .rss-ticker-favicon{width:var(--rss-ticker-font);height:var(--rss-ticker-font);border-radius:3px}
 .hermes-rss .rss-ticker-item[data-read=true] .rss-ticker-title{color:var(--ui-text-quaternary)}
 .hermes-rss .rss-ticker-src{color:var(--ui-text-quaternary)}
 .hermes-rss .rss-ticker-dot{color:var(--rss-tag,var(--ui-accent));flex:none}
-.hermes-rss .rss-ticker-favicon{flex:none;width:11px;height:11px;border-radius:2px;object-fit:contain;background:none}
+.hermes-rss .rss-ticker-favicon{flex:none;width:14px;height:14px;border-radius:3px;object-fit:contain;background:none}
 .hermes-rss .rss-ticker-divider{flex:none;padding:0 .75rem 0 .25rem;font-size:.625rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ui-accent);white-space:nowrap}
 .hermes-rss .rss-settings-tabs{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--ui-stroke-secondary);padding-bottom:8px}
 .hermes-rss .rss-settings-tab{background:none;border:0;padding:4px 10px;font:inherit;font-size:12px;font-weight:600;color:var(--ui-text-secondary);cursor:pointer;border-radius:6px}
@@ -2708,7 +2713,7 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
     ? jsx("span", { "aria-hidden": "true", className: "rss-ticker-divider", children: `${row.source} \u2014` }, `d${i}`)
     : jsx(TickerItem, { row, onOpen, showSource: settings.tickerShowSource !== false, showAge: settings.tickerRelativeTime !== false }, row.item.id);
   return jsxs("div", {
-    className: `rss-ticker${settings.tickerPauseOnHover === false ? " rss-ticker-no-hover" : ""}`,
+    className: `rss-ticker${settings.tickerPauseOnHover === false ? " rss-ticker-no-hover" : ""}${settings.tickerAssetSize === "small" ? " rss-ticker-small-assets" : ""}${settings.tickerAssetSize === "font" ? " rss-ticker-font-assets" : ""}`,
     "data-paused": "false",
     role: "region",
     "aria-label": "RSS headline ticker",
@@ -2733,6 +2738,11 @@ var TICKER_SPEEDS = [
   { id: "slow", label: "Slow" },
   { id: "normal", label: "Normal" },
   { id: "fast", label: "Fast" }
+];
+var TICKER_ASSET_SIZES = [
+  { id: "small", label: "Small" },
+  { id: "normal", label: "Normal" },
+  { id: "font", label: "As font size" }
 ];
 var TICKER_GROUPINGS = [
   { id: "newest", label: "Newest" },
@@ -2767,9 +2777,23 @@ function useSettingsPane(owner) {
   }, []);
   return useMemo(() => [readSettings(rssCtx, owner)], [owner, version]);
 }
+function isTickerUnread(article) {
+  const read = article?.is_read === true || article?.is_read === 1 || article?.is_read === "1" || article?.read === true || article?.read === 1 || article?.read === "1";
+  const unreadFlag = article?.unread === false || article?.unread === 0 || article?.unread === "0";
+  return !read && !unreadFlag && !article?.read_at;
+}
 function TickerPane() {
   const owner = tickerPaneOwner();
   const [settings] = useSettingsPane(owner);
+  const [previewSettings, setPreviewSettings] = useState(null);
+  useEffect(() => {
+    const onPreview = (event) => {
+      if (event.detail?.owner === owner) setPreviewSettings(event.detail.settings || null);
+    };
+    window.addEventListener("hermes-rss-ticker-preview", onPreview);
+    return () => window.removeEventListener("hermes-rss-ticker-preview", onPreview);
+  }, [owner]);
+  const effectiveSettings = previewSettings || settings;
   const articles = useQuery({
     queryKey: ["rss-reader", owner, "ticker-articles"],
     queryFn: async () => {
@@ -2793,17 +2817,17 @@ function TickerPane() {
       setTimeout(() => window.dispatchEvent(new CustomEvent("hermes-rss-select-article", { detail: { owner, id: item.id } })), 120);
     }
   };
-  if (!settings || settings.headlineTicker !== true || !articles.data?.length) return null;
+  if (!effectiveSettings || effectiveSettings.headlineTicker !== true || !articles.data?.length) return null;
   // Ticker rules are `.hermes-rss .rss-ticker-*` descendants: the pane must
   // mount a .hermes-rss root. Inline styles neutralize the page-level root
   // sizing (height/min-height/flex) for the strip context.
-  const fontPx = Math.min(18, Math.max(9, Number(settings.tickerFontSize) || 11));
+  const fontPx = Math.min(18, Math.max(9, Number(effectiveSettings.tickerFontSize) || 11));
   return jsxs("div", { className: "hermes-rss", style: { height: "auto", minHeight: 0, display: "block", fontSize: `${fontPx}px` }, children: [
     jsx("style", { children: styles }),
     jsx(HeadlineTicker, {
-      articles: settings.tickerOnlyUnread === true ? (articles.data.filter((a) => !a.is_read)) : articles.data,
-      tags: settings.gradingTags,
-      settings,
+      articles: effectiveSettings.tickerOnlyUnread === true ? articles.data.filter(isTickerUnread) : articles.data,
+      tags: effectiveSettings.gradingTags,
+      settings: effectiveSettings,
       onOpen
     })
   ] });
@@ -3732,6 +3756,15 @@ function ReaderProfile({ ctx, owner }) {
     el.addEventListener("dragover", allow);
     return () => el.removeEventListener("dragover", allow);
   }, [reorderMode]);
+  const updateDraft = (patch) => {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    window.dispatchEvent(new CustomEvent("hermes-rss-ticker-preview", { detail: { owner, settings: next } }));
+  };
+  const restoreDraftPreview = (next) => {
+    setDraft(next);
+    window.dispatchEvent(new CustomEvent("hermes-rss-ticker-preview", { detail: { owner, settings: next } }));
+  };
   const saveSettings = event => {
     event.preventDefault();
     const minutes = Number(draft.refreshMinutes);
@@ -3746,6 +3779,7 @@ function ReaderProfile({ ctx, owner }) {
     storageSet(ctx, "settings", owner, next);
     setSettings(next);
     setDraft(next);
+    window.dispatchEvent(new CustomEvent("hermes-rss-ticker-preview", { detail: { owner, settings: next } }));
     if (next.fullCapture) {
       void libraryRequest("/articles?uncaptured=1").then((rows) => {
         if (Array.isArray(rows) && rows.length) captureEnqueue(owner, rows);
@@ -3889,7 +3923,7 @@ function ReaderProfile({ ctx, owner }) {
           }
         ),
         jsxs(Button, { variant: "ghost", "aria-expanded": filtersOpen, onClick: () => setFiltersOpen(!filtersOpen), children: [jsx(Codicon, { name: "filter", size: "0.7rem" }), "Filters"] }),
-        jsxs(Button, { variant: "ghost", "aria-expanded": settingsOpen, onClick: () => { setDraft(readSettings(ctx, owner)); setSettingsOpen(!settingsOpen); }, children: [jsx(Codicon, { name: "settings-gear", size: "0.7rem" }), "Settings"] }),
+        jsxs(Button, { variant: "ghost", "aria-expanded": settingsOpen, onClick: () => { const saved = readSettings(ctx, owner); restoreDraftPreview(saved); setSettingsOpen(!settingsOpen); }, children: [jsx(Codicon, { name: "settings-gear", size: "0.7rem" }), "Settings"] }),
         /* @__PURE__ */ jsx(Button, { onClick: () => setAdding(!adding), disabled, children: "+ Subscribe" })
       ] })
     ] }),
@@ -3937,43 +3971,47 @@ function ReaderProfile({ ctx, owner }) {
         jsxs("div", { className: "rss-settings-block", children: [
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("label", { className: "rss-setting", children: [
-            jsx("input", { type: "checkbox", checked: draft.headlineTicker === true, onChange: event => setDraft({ ...draft, headlineTicker: event.target.checked }) }),
+            jsx("input", { type: "checkbox", checked: draft.headlineTicker === true, onChange: event => updateDraft({ ...draft, headlineTicker: event.target.checked }) }),
             "Headline Ticker"
           ] }),
           jsx("label", { className: "rss-setting", children: [
-            jsx("input", { type: "checkbox", checked: draft.tickerPauseOnHover !== false, onChange: event => setDraft({ ...draft, tickerPauseOnHover: event.target.checked }) }),
+            jsx("input", { type: "checkbox", checked: draft.tickerPauseOnHover !== false, onChange: event => updateDraft({ ...draft, tickerPauseOnHover: event.target.checked }) }),
             "Pause on hover"
           ] }),
           jsx("label", { className: "rss-setting", children: [
-            jsx("input", { type: "checkbox", checked: draft.tickerOnlyUnread === true, onChange: event => setDraft({ ...draft, tickerOnlyUnread: event.target.checked }) }),
+            jsx("input", { type: "checkbox", checked: draft.tickerOnlyUnread === true, onChange: event => updateDraft({ ...draft, tickerOnlyUnread: event.target.checked }) }),
             "Only unread"
           ] })
         ] }),
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("span", { className: "rss-setting-label", children: "Scroll speed" }),
-          jsx(Segmented, { value: draft.tickerSpeed || "normal", onChange: v => setDraft({ ...draft, tickerSpeed: v }), options: TICKER_SPEEDS })
+          jsx(Segmented, { value: draft.tickerSpeed || "normal", onChange: v => updateDraft({ ...draft, tickerSpeed: v }), options: TICKER_SPEEDS })
         ] }),
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("span", { className: "rss-setting-label", children: "Group headlines" }),
-          jsx(Segmented, { value: draft.tickerGrouping || "newest", onChange: v => setDraft({ ...draft, tickerGrouping: v }), options: TICKER_GROUPINGS })
+          jsx(Segmented, { value: draft.tickerGrouping || "newest", onChange: v => updateDraft({ ...draft, tickerGrouping: v }), options: TICKER_GROUPINGS })
         ] }),
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("span", { className: "rss-setting-label", children: "Text size (px)" }),
-          jsx(Segmented, { value: String(draft.tickerFontSize || 11), onChange: v => setDraft({ ...draft, tickerFontSize: Number(v) }), options: TICKER_FONT_SIZES.map((n) => ({ id: n, label: n })) })
+          jsx(Segmented, { value: String(draft.tickerFontSize || 11), onChange: v => updateDraft({ ...draft, tickerFontSize: Number(v) }), options: TICKER_FONT_SIZES.map((n) => ({ id: n, label: n })) })
+        ] }),
+        jsxs("div", { className: "rss-setting-row", children: [
+          jsx("span", { className: "rss-setting-label", children: "Favicon and AI pill" }),
+          jsx(Segmented, { value: draft.tickerAssetSize || "normal", onChange: v => updateDraft({ ...draft, tickerAssetSize: v }), options: TICKER_ASSET_SIZES })
         ] }),
         jsxs("div", { className: "rss-setting-row", children: [
           jsx("label", { className: "rss-setting", children: [
-            jsx("input", { type: "checkbox", checked: draft.tickerShowSource !== false, onChange: event => setDraft({ ...draft, tickerShowSource: event.target.checked }) }),
+            jsx("input", { type: "checkbox", checked: draft.tickerShowSource !== false, onChange: event => updateDraft({ ...draft, tickerShowSource: event.target.checked }) }),
             "Show feed name"
           ] }),
           jsx("label", { className: "rss-setting", children: [
-            jsx("input", { type: "checkbox", checked: draft.tickerRelativeTime !== false, onChange: event => setDraft({ ...draft, tickerRelativeTime: event.target.checked }) }),
+            jsx("input", { type: "checkbox", checked: draft.tickerRelativeTime !== false, onChange: event => updateDraft({ ...draft, tickerRelativeTime: event.target.checked }) }),
             "Show age"
           ] })
         ] }),
         jsx("p", { className: "rss-muted rss-small", children: "The ticker runs along the bottom of the reader. Graded articles show their tag pill and grade color." }),
         ] }),
-        jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save Settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
+        jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save Settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => { const saved = readSettings(ctx, owner); setSettingsOpen(false); restoreDraftPreview(saved); }, children: "Cancel" })] })
       ] }),
       settingsTab === "main" && jsxs("form", { className: "rss-stack", "aria-label": "Reader settings", onSubmit: saveSettings, children: [
         jsxs("div", { className: "rss-settings-grid", children: [
@@ -3981,7 +4019,7 @@ function ReaderProfile({ ctx, owner }) {
             jsx("h2", { className: "rss-settings-header", children: "General" }),
             jsxs("label", { className: "rss-setting", children: [
               jsx("span", { children: "Default View" }),
-              jsxs("select", { "aria-label": "Default View", value: draft.defaultView || "all", onChange: event => setDraft({ ...draft, defaultView: event.target.value }), children: [
+              jsxs("select", { "aria-label": "Default View", value: draft.defaultView || "all", onChange: event => updateDraft({ ...draft, defaultView: event.target.value }), children: [
                 jsx("option", { value: "all", children: "All Articles" }),
                 jsx("option", { value: "unread", children: "Unread" }),
                 jsx("option", { value: "saved", children: "Saved" })
@@ -3989,12 +4027,12 @@ function ReaderProfile({ ctx, owner }) {
             ] }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
-                jsx("input", { type: "checkbox", checked: draft.autoRefresh, disabled: typeof ctx.onDispose !== "function", onChange: event => setDraft({ ...draft, autoRefresh: event.target.checked }) }),
+                jsx("input", { type: "checkbox", checked: draft.autoRefresh, disabled: typeof ctx.onDispose !== "function", onChange: event => updateDraft({ ...draft, autoRefresh: event.target.checked }) }),
                 "Automatically Refresh Feeds"
               ] }),
               jsxs("label", { className: "rss-setting rss-setting-inline", children: [
                 "Every",
-                jsx(Input, { type: "number", min: 1, max: 1440, step: 1, required: true, "aria-label": "Refresh interval in minutes", value: draft.refreshMinutes, onChange: event => setDraft({ ...draft, refreshMinutes: event.target.value }) }),
+                jsx(Input, { type: "number", min: 1, max: 1440, step: 1, required: true, "aria-label": "Refresh interval in minutes", value: draft.refreshMinutes, onChange: event => updateDraft({ ...draft, refreshMinutes: event.target.value }) }),
                 "minutes"
               ] })
             ] }),
@@ -4004,14 +4042,14 @@ function ReaderProfile({ ctx, owner }) {
             jsx("h2", { className: "rss-settings-header", children: "Capturing" }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
-                jsx("input", { type: "checkbox", checked: draft.fullCapture, onChange: event => setDraft({ ...draft, fullCapture: event.target.checked }) }),
+                jsx("input", { type: "checkbox", checked: draft.fullCapture, onChange: event => updateDraft({ ...draft, fullCapture: event.target.checked }) }),
                 "Capture Full Articles"
               ] })
             ] }),
             jsx("p", { className: "rss-muted rss-small", children: "After a refresh, the RSS Reader attempts to get the full article." }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
-                jsx("input", { type: "checkbox", checked: draft.paywallServices, onChange: event => setDraft({ ...draft, paywallServices: event.target.checked }) }),
+                jsx("input", { type: "checkbox", checked: draft.paywallServices, onChange: event => updateDraft({ ...draft, paywallServices: event.target.checked }) }),
                 "Use Paywall Removing Services (Experimental)"
               ] })
             ] }),
@@ -4020,7 +4058,7 @@ function ReaderProfile({ ctx, owner }) {
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "Reading" }),
             jsx("label", { className: "rss-setting", children: [
-              jsx("input", { type: "checkbox", checked: draft.markReadOnOpen, onChange: event => setDraft({ ...draft, markReadOnOpen: event.target.checked }) }),
+              jsx("input", { type: "checkbox", checked: draft.markReadOnOpen, onChange: event => updateDraft({ ...draft, markReadOnOpen: event.target.checked }) }),
               "Mark Articles Read When Opened"
             ] }),
             jsx("p", { className: "rss-muted rss-small", children: "Navigating over an article marks it as read." })
@@ -4029,11 +4067,11 @@ function ReaderProfile({ ctx, owner }) {
             jsx("h2", { className: "rss-settings-header", children: "Article Tagging" }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
-                jsx("input", { type: "checkbox", checked: draft.aiGrading, onChange: event => setDraft({ ...draft, aiGrading: event.target.checked }) }),
+                jsx("input", { type: "checkbox", checked: draft.aiGrading, onChange: event => updateDraft({ ...draft, aiGrading: event.target.checked }) }),
                 "Article Tagging by AI"
               ] }),
               jsx("label", { className: "rss-setting", children: [
-                jsx("input", { type: "checkbox", checked: draft.orderByImportance === true, onChange: event => setDraft({ ...draft, orderByImportance: event.target.checked }) }),
+                jsx("input", { type: "checkbox", checked: draft.orderByImportance === true, onChange: event => updateDraft({ ...draft, orderByImportance: event.target.checked }) }),
                 "Order by Importance"
               ] })
             ] }),
@@ -4042,7 +4080,7 @@ function ReaderProfile({ ctx, owner }) {
             jsxs("div", { className: "rss-setting-row", children: [
               jsxs("label", { className: "rss-skill-field", children: [
                 jsx("span", { children: "Preference Skill" }),
-                jsx(Input, { "aria-label": "Tagging preference skill name", placeholder: DEFAULT_GRADING_SKILL, value: draft.gradingSkill, maxLength: 60, onChange: event => setDraft({ ...draft, gradingSkill: event.target.value }) })
+                jsx(Input, { "aria-label": "Tagging preference skill name", placeholder: DEFAULT_GRADING_SKILL, value: draft.gradingSkill, maxLength: 60, onChange: event => updateDraft({ ...draft, gradingSkill: event.target.value }) })
               ] }),
               jsx(Button, { type: "button", disabled: disabled || !articles.data?.length, onClick: gradeNow, children: "Tag" }),
               jsx(Button, { type: "button", variant: "ghost", disabled, onClick: preferenceNow, children: "Preference Report" })
@@ -4051,7 +4089,7 @@ function ReaderProfile({ ctx, owner }) {
             preferenceReport && jsx("pre", { className: "rss-preference-report", children: preferenceReport })
           ] })
         ] }),
-        jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save Settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => setSettingsOpen(false), children: "Cancel" })] })
+        jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save Settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => { const saved = readSettings(ctx, owner); setSettingsOpen(false); restoreDraftPreview(saved); }, children: "Cancel" })] })
       ] }),
       jsxs("div", { className: "rss-settings-library", "aria-label": "Import/Export", children: [
         jsxs("div", { className: "rss-settings-library-head", children: [
