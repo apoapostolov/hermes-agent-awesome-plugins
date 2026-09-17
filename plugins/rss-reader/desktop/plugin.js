@@ -2668,8 +2668,72 @@ function buildTickerRows(articles, tags, grouping, showHeading) {
   }
   return rows;
 }
+function tickerIconCandidates(article, feed) {
+  const hosts = [];
+  const add = (raw) => {
+    if (typeof raw !== "string" || !raw) return;
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
+      const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+      if (host && !hosts.includes(host)) hosts.push(host);
+    } catch { /* ignore bad URLs */ }
+  };
+  add(article?.url);
+  add(article?.link);
+  add(feed?.site);
+  add(feed?.link);
+  add(feed?.url);
+  const urls = [];
+  for (const host of hosts) {
+    urls.push(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`);
+    urls.push(`https://icons.duckduckgo.com/ip3/${host}.ico`);
+  }
+  return urls;
+}
+function TickerFavicon({ urls }) {
+  const [index, setIndex] = useState(0);
+  const src = Array.isArray(urls) ? urls[index] : "";
+  if (!src) return null;
+  return jsx("img", {
+    src,
+    className: "rss-ticker-favicon",
+    alt: "",
+    loading: "lazy",
+    referrerPolicy: "no-referrer",
+    onError: () => setIndex((n) => n + 1)
+  });
+}
+function tickerPaneInTree(node, paneId) {
+  if (!node || !paneId) return false;
+  if (node.type === "group") return (node.panes || []).includes(paneId);
+  return (node.children || []).some((child) => tickerPaneInTree(child, paneId));
+}
+function tickerIsWorkspaceBottom(tree, paneId) {
+  if (!tree || !paneId) return false;
+  const walk = (node, parent) => {
+    if (!node) return false;
+    if (node.type === "group") {
+      if (!(node.panes || []).includes(paneId)) return false;
+      if ((node.panes || []).length !== 1) return false;
+      if (!parent || parent.type !== "split" || parent.orientation !== "column") return false;
+      const kids = parent.children || [];
+      return kids[kids.length - 1] === node;
+    }
+    return (node.children || []).some((child) => walk(child, node));
+  };
+  return walk(tree, null);
+}
+function readLayoutTree() {
+  try {
+    const raw = localStorage.getItem("hermes.desktop.layoutTree.v2");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 function TickerItem({ row, onOpen, showFavicon, websiteName, showAge, tagStyle }) {
-  const { item, pill } = row;
+    const { item, pill } = row;
   const showPill = pill && tagStyle === "pill";
   const titleStyle = pill && tagStyle === "article_color" ? { color: pill.color } : undefined;
   const beforeWebsite = websiteName === "before" && item.feed_title ? jsx("span", { className: "rss-ticker-src", children: item.feed_title }) : null;
@@ -2679,11 +2743,11 @@ function TickerItem({ row, onOpen, showFavicon, websiteName, showAge, tagStyle }
     type: "button",
     className: "rss-ticker-item",
     "data-read": item.is_read ? "true" : "false",
-    title: `${item.feed_title ? item.feed_title + " — " : ""}${item.title}${age ? ` (${age})` : ""}`,
+    title: `${item.feed_title ? item.feed_title + ": " : ""}${item.title}${age ? ` (${age})` : ""}`,
     onClick: () => onOpen(item),
     children: [
-      showFavicon && item.favicon && jsx("img", { src: item.favicon, className: "rss-ticker-favicon", alt: "", loading: "lazy", onError: (e) => { e.currentTarget.style.display = "none"; } }),
-      !item.favicon && showPill && jsx("span", { "aria-hidden": "true", className: "rss-ticker-dot", style: { "--rss-tag": pill.color }, children: "\u25CF" }),
+      showFavicon && jsx(TickerFavicon, { urls: item.faviconUrls }),
+      !showFavicon && showPill && jsx("span", { "aria-hidden": "true", className: "rss-ticker-dot", style: { "--rss-tag": pill.color }, children: "●" }),
       beforeWebsite,
       showPill && jsx("span", { className: "rss-card-pill", style: { "--rss-tag": pill.color }, children: pill.label }),
       jsx("span", { className: "rss-ticker-title", style: titleStyle, children: item.title || "(untitled)" }),
@@ -2897,11 +2961,7 @@ function TickerPane() {
       return rows.slice(0, 100).map((a) => {
         const feed = byFeed.get(a.feed_id);
         const feedTitle = a.feed_title || feed?.title || feed?.name || "RSS";
-        let favicon = "";
-        if (feed?.url) {
-          try { favicon = `${new URL(feed.url).origin}/favicon.ico`; } catch { favicon = ""; }
-        }
-        return { ...a, feed_title: feedTitle, favicon };
+        return { ...a, feed_title: feedTitle, faviconUrls: tickerIconCandidates(a, feed) };
       });
     },
     refetchInterval: TICKER_PANE_POLL_MS,
@@ -4903,16 +4963,16 @@ var plugin_default = {
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
     if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
     ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);
-    // Focus/other layout presets keep unknown plugin panes by stacking them as
-    // center tabs. A headerVeto bottom strip then unmounts. Re-register under a
-    // fresh id so adoption uses dock: workspace/bottom again.
+    // Layout presets stack unknown panes as center tabs (often the files rail).
+    // Home is a single-pane column split on workspace bottom. If the saved tree
+    // is not that shape, re-register under a new id so adoption uses the dock.
     let disposeTicker = null;
     let tickerMountGen = 0;
     let lastTickerMountAt = 0;
+    let currentTickerId = "rssTicker";
     const makeTickerPane = (id) => ({
       id,
       area: "panes",
-      title: "RSS",
       data: {
         placement: "main",
         headerVeto: true,
@@ -4929,8 +4989,8 @@ var plugin_default = {
       }
       tickerMountGen += 1;
       lastTickerMountAt = Date.now();
-      const id = tickerMountGen === 1 ? "tickerPane" : `tickerPane-${tickerMountGen}`;
-      disposeTicker = ctx.register(makeTickerPane(id));
+      currentTickerId = tickerMountGen === 1 ? "rssTicker" : `rssTicker-${tickerMountGen}`;
+      disposeTicker = ctx.register(makeTickerPane(currentTickerId));
     };
     const tickerIsOn = () => {
       try {
@@ -4943,7 +5003,10 @@ var plugin_default = {
     const tickerDockWatch = setInterval(() => {
       if (Date.now() - lastTickerMountAt < 1600) return;
       if (!tickerIsOn()) return;
-      if (typeof document !== "undefined" && document.querySelector("[data-rss-ticker]")) return;
+      if (tickerMountGen >= 8) return;
+      const tree = readLayoutTree();
+      if (!tree) return;
+      if (tickerIsWorkspaceBottom(tree, currentTickerId)) return;
       mountTickerPane();
     }, 700);
     if (typeof ctx.onDispose === "function") {
