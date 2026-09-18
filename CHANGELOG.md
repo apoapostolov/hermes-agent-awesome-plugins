@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **rss-reader:** upcoming `1.0.4`. Full-article capture no longer stops at a video, audio, or iframe in the body. Later paragraphs still land, and https embeds play in the reader. Captured posts note that scripts are stripped and only https links, images and embeds are shown.
+
 ## [1.14.0] - 2026-09-18
 
 ### Added

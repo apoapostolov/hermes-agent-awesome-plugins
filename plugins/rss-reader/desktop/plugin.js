@@ -2218,6 +2218,11 @@ function tableToMarkdown(table) {
 }
 function inlineMarkdown(node) {
   const clone = node.cloneNode(true);
+  for (const media of [...clone.querySelectorAll("video,audio,iframe,embed")]) {
+    const md = mediaToMarkdown(media);
+    if (md) media.replaceWith(document.createTextNode(md));
+    else media.remove();
+  }
   for (const img of [...clone.querySelectorAll("img")]) {
     if (isTrackingPixel(img)) { img.remove(); continue; }
     const src = imgSrcFrom(img);
@@ -2232,6 +2237,28 @@ function inlineMarkdown(node) {
     else a.replaceWith(document.createTextNode(a.textContent));
   }
   return clone.textContent.replace(/[^\S\n]+/g, " ").trim();
+}
+function mediaToMarkdown(el) {
+  if (!el) return "";
+  const name = el.localName;
+  const title = (el.getAttribute("title") || el.getAttribute("aria-label") || "").replace(/[[\]]/g, "");
+  if (name === "video" || name === "audio") {
+    const src = httpsSrc(el.getAttribute("src")) || httpsSrc(el.querySelector("source")?.getAttribute("src"));
+    const poster = httpsSrc(el.getAttribute("poster"));
+    if (name === "video" && src) return poster ? `!video[${title}](${src})(${poster})` : `!video[${title}](${src})`;
+    if (name === "audio" && src) return `[Audio](${src})`;
+    if (poster) return `![${title}](${poster})`;
+    return "";
+  }
+  if (name === "iframe" || name === "embed") {
+    const src = httpsSrc(el.getAttribute("src"));
+    return src ? `[Embed](${src})` : "";
+  }
+  if (name === "object") {
+    const src = httpsSrc(el.getAttribute("data") || el.getAttribute("src"));
+    return src ? `[Embed](${src})` : "";
+  }
+  return "";
 }
 // Testing only: paywall mirrors tried in order for a page that looks paywalled
 // or truncated. `page` builds the fetchable URL; `scope` and `strip` narrow
@@ -2340,26 +2367,40 @@ function extractReadable(html, options = {}) {
   }
   const template = document.createElement("template");
   template.innerHTML = scope;
-  template.content.querySelectorAll(`script,style,noscript,svg,form,iframe,button,input,select,textarea,nav,aside,footer,header,[aria-hidden=true]${options.strip ? `,${options.strip}` : ""}`).forEach((n) => n.remove());
-  const nodes = [...template.content.querySelectorAll("p,li,blockquote,pre,h1,h2,h3,h4,img,figure,table,div")];
+  template.content.querySelectorAll(`script,style,noscript,svg,form,button,input,select,textarea,nav,aside,footer,header,[aria-hidden=true]${options.strip ? `,${options.strip}` : ""}`).forEach((n) => n.remove());
+  const nodes = [...template.content.querySelectorAll("p,li,blockquote,pre,h1,h2,h3,h4,img,figure,table,div,video,audio,iframe,embed,object")];
   const parts = [];
   const seen = new Set();
   for (const node of nodes) {
+    try {
     if (node.closest("table") && node.localName !== "table") continue;
-    if (node.localName === "img" && node.closest("figure,p,li,h1,h2,h3,h4")) continue;
+    if (["img", "video", "audio", "iframe", "embed", "object"].includes(node.localName) && node.closest("figure,p,li,h1,h2,h3,h4")) continue;
     if (node.localName === "p" && node.closest("li,blockquote,figure")) continue;
     if (node.localName === "div") {
       // Paragraphs rendered as divs (no <p> in the page) are prose too, but a
       // wrapper div would duplicate the blocks it contains.
       if (node.closest("li,blockquote,figure,table")) continue;
-      if (node.querySelector("p,li,div,blockquote,pre,table,figure,h1,h2,h3,h4,img")) continue;
+      if (node.querySelector("p,li,div,blockquote,pre,table,figure,h1,h2,h3,h4,img,video,audio,iframe")) continue;
     }
     if (node.localName === "table") {
       const md = tableToMarkdown(node);
       if (md) parts.push(md);
       continue;
     }
-    if (node.localName === "figure" || node.localName === "img") {
+    if (node.localName === "figure" || node.localName === "img" || node.localName === "video" || node.localName === "audio" || node.localName === "iframe" || node.localName === "embed" || node.localName === "object") {
+      if (node.localName === "figure") {
+        const nested = node.querySelector("video,audio,iframe,embed,object,img");
+        const embed = nested ? mediaToMarkdown(nested) : "";
+        if (embed) {
+          parts.push(embed);
+          const cap = node.querySelector("figcaption")?.textContent.replace(/\s+/g, " ").trim();
+          if (cap) parts.push(cap);
+          continue;
+        }
+      } else {
+        const embed = mediaToMarkdown(node);
+        if (embed) { parts.push(embed); continue; }
+      }
       const img = node.localName === "img" ? node : node.querySelector("img");
       if (!img || isTrackingPixel(img)) continue;
       const src = imgSrcFrom(img);
@@ -2371,7 +2412,7 @@ function extractReadable(html, options = {}) {
     const name = node.localName;
     const content = name === "pre" ? node.textContent.replace(/\s+$/g, "").trim() : inlineMarkdown(node);
     if (!content || content.length < 2) continue;
-    if (content.length < 25 && !name.startsWith("h") && !/!\[/.test(content)) continue;
+    if (content.length < 25 && !name.startsWith("h") && !/!\[/.test(content) && !/!video\[/.test(content) && !/\[(Video|Audio|Embed)\]\(/.test(content)) continue;
     const key = content.slice(0, 80).toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -2380,6 +2421,7 @@ function extractReadable(html, options = {}) {
     else if (name === "blockquote") parts.push(`> ${content}`);
     else if (name === "pre") parts.push("```\n" + content + "\n```");
     else parts.push(content);
+    } catch {}
   }
   let text = "";
   let prevLi = false;
@@ -2443,6 +2485,7 @@ function escapeHtml(value) {
 }
 function renderInline(escaped) {
   return escaped
+    .replace(/!video\[(.*?)\]\((https?:\/\/[^)]+)\)(?:\((https?:\/\/[^)]+)\))?/g, '<video src="$2" poster="$3" controls playsinline preload="none"></video>')
     .replace(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g, '<img src="$2" alt="$1" loading="lazy">')
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
@@ -2452,7 +2495,7 @@ function renderInline(escaped) {
 function feedItemBody(rawContent) {
   const raw = String(rawContent || "");
   if (!raw) return "";
-  if (!/<\/?(p|div|h[1-6]|ul|ol|li|img|a|blockquote|table|br|figure)\b/i.test(raw))
+  if (!/<\/?(p|div|h[1-6]|ul|ol|li|img|a|blockquote|table|br|figure|video|audio|iframe|embed)\b/i.test(raw))
     return plainText(raw).slice(0, 16e3);
   const t = document.createElement("template");
   t.innerHTML = raw;
@@ -2465,7 +2508,7 @@ function feedItemBody(rawContent) {
 function sanitizeRichHtml(source) {
   const template = document.createElement("template");
   template.innerHTML = source;
-  template.content.querySelectorAll("script,style,noscript,iframe,object,embed,form,button,input,select,textarea,link,meta,svg").forEach((n) => n.remove());
+  template.content.querySelectorAll("script,style,noscript,form,button,input,select,textarea,link,meta,svg").forEach((n) => n.remove());
   for (const image of [...template.content.querySelectorAll("img")]) {
     if (isTrackingPixel(image)) { image.remove(); continue; }
     const src = imgSrcFrom(image);
@@ -2474,11 +2517,32 @@ function sanitizeRichHtml(source) {
     image.setAttribute("loading", "lazy");
     if (!image.getAttribute("alt")) image.setAttribute("alt", "");
   }
+  for (const media of [...template.content.querySelectorAll("video,audio,iframe,embed,object,source")]) {
+    const srcName = media.localName === "object" ? "data" : "src";
+    const src = httpsSrc(media.getAttribute(srcName) || (media.localName !== "source" ? media.querySelector?.("source")?.getAttribute("src") : ""));
+    if (!src && media.localName !== "video") { media.remove(); continue; }
+    if (src) media.setAttribute(srcName, src);
+    const poster = media.localName === "video" ? httpsSrc(media.getAttribute("poster")) : "";
+    if (poster) media.setAttribute("poster", poster);
+    else media.removeAttribute("poster");
+    if (media.localName === "video" || media.localName === "audio") {
+      media.setAttribute("controls", "");
+      media.setAttribute("preload", "none");
+    }
+  }
   for (const node of template.content.querySelectorAll("*")) {
     for (const attribute of [...node.attributes]) {
       const name = attribute.name.toLowerCase();
-      const allowed = name === "href" && node.localName === "a" || name === "src" && node.localName === "img" || name === "alt" || name === "title" || name === "colspan" || name === "rowspan" || name === "loading" && node.localName === "img";
-      if (!allowed || name === "href" && !/^https?:/i.test(attribute.value) || name === "src" && !/^https?:/i.test(attribute.value))
+      const tag = node.localName;
+      const allowed = name === "href" && tag === "a"
+        || name === "src" && ["img", "video", "audio", "iframe", "embed", "source"].includes(tag)
+        || name === "poster" && tag === "video"
+        || name === "data" && tag === "object"
+        || name === "type" && (tag === "source" || tag === "embed")
+        || name === "alt" || name === "title" || name === "colspan" || name === "rowspan"
+        || name === "loading" && tag === "img"
+        || ["controls", "loop", "muted", "playsinline", "preload", "width", "height"].includes(name) && ["video", "audio", "iframe", "embed"].includes(tag);
+      if (!allowed || (name === "href" || name === "src" || name === "poster" || name === "data") && attribute.value && !/^https?:/i.test(attribute.value))
         node.removeAttribute(attribute.name);
     }
   }
@@ -2551,7 +2615,7 @@ function mdTableHtml(rows) {
 }
 function bodyToRichHtml(raw, lead) {
   const source = String(raw || "");
-  const looksLikeHtml = /<\/?(p|div|h[1-6]|ul|ol|li|img|a|blockquote|table|br|figure)\b/i.test(source);
+  const looksLikeHtml = /<\/?(p|div|h[1-6]|ul|ol|li|img|a|blockquote|table|br|figure|video|audio|iframe|embed)\b/i.test(source);
   if (looksLikeHtml) {
     return { html: dedupeArticleImages(sanitizeRichHtml(source), lead), isHtml: true };
   }
@@ -2578,6 +2642,13 @@ function bodyToRichHtml(raw, lead) {
     if (mdImg) {
       flushParagraph(); closeList();
       out.push(`<p class="rss-figure"><img src="${escapeHtml(mdImg[2])}" alt="${escapeHtml(mdImg[1])}" loading="lazy"></p>`);
+      continue;
+    }
+    const mdVid = /^!video\[(.*?)\]\((https?:\/\/[^)]+)\)(?:\((https?:\/\/[^)]+)\))?$/.exec(trimmed);
+    if (mdVid) {
+      flushParagraph(); closeList();
+      const poster = mdVid[3] ? ` poster="${escapeHtml(mdVid[3])}"` : "";
+      out.push(`<p class="rss-figure"><video src="${escapeHtml(mdVid[2])}"${poster} controls playsinline preload="none"></video></p>`);
       continue;
     }
     if (/^\s*\|/.test(trimmed) && trimmed.indexOf("|", 1) !== -1) {
@@ -2738,11 +2809,11 @@ var styles = `
 .hermes-rss .rss-detail .rss-body code{font-size:.88em;background:color-mix(in srgb,var(--ui-text-secondary) 12%,transparent);border-radius:4px;padding:1px 5px}
 .hermes-rss .rss-detail .rss-body pre{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent);border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap}
 .hermes-rss .rss-detail .rss-body pre code{background:transparent;padding:0}
-.hermes-rss .rss-detail .rss-body img{max-width:100%;height:auto;display:block;margin:1.1em 0;border-radius:8px}
+.hermes-rss .rss-detail .rss-body img,.hermes-rss .rss-detail .rss-body video,.hermes-rss .rss-detail .rss-body iframe,.hermes-rss .rss-detail .rss-body audio{max-width:100%;height:auto;display:block;margin:1.1em 0;border-radius:8px}
 .hermes-rss .rss-detail .rss-body img.rss-small-image{float:right;width:min(42%,320px);max-width:320px;margin:0 0 12px 20px;image-rendering:auto}
 .hermes-rss .rss-detail .rss-body p:has(> img.rss-small-image){min-height:1px}
 .hermes-rss .rss-detail .rss-body hr{border:0;border-top:1px solid var(--ui-stroke-secondary);margin:1.6em 0}
-.hermes-rss .rss-lead,.hermes-rss .rss-figure{margin:0 0 1.25em}.hermes-rss .rss-lead img,.hermes-rss .rss-figure img{width:100%;margin:0}.hermes-rss .rss-table-wrap{overflow-x:auto;margin:1.1em 0;width:100%}.hermes-rss .rss-rich table{border-collapse:collapse;width:100%;margin:0;font-size:.92em}
+.hermes-rss .rss-lead,.hermes-rss .rss-figure{margin:0 0 1.25em}.hermes-rss .rss-lead img,.hermes-rss .rss-figure img,.hermes-rss .rss-figure video,.hermes-rss .rss-figure iframe{width:100%;margin:0}.hermes-rss .rss-table-wrap{overflow-x:auto;margin:1.1em 0;width:100%}.hermes-rss .rss-rich table{border-collapse:collapse;width:100%;margin:0;font-size:.92em}
 .hermes-rss .rss-rich th,.hermes-rss .rss-rich td{border:1px solid var(--ui-stroke-secondary);padding:6px 10px;text-align:left}
 .hermes-rss .rss-rich th{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent);font-weight:650}
 .hermes-rss .rss-rich h4{font-size:1em;margin:1.2em 0 .5em}
@@ -5342,7 +5413,7 @@ function ReaderProfile({ ctx, owner }) {
         ) }),
         tab === "article" && /* @__PURE__ */ jsxs("div", { id: "rss-article-panel-article", role: "tabpanel", "aria-labelledby": "rss-article-tab-article", children: [
           articleRender.bodyHtml ? /* @__PURE__ */ jsx("div", { ref: richRef, className: "rss-body rss-rich", onClick: onRichLinkClick, onAuxClick: onRichLinkClick, dangerouslySetInnerHTML: { __html: articleRender.bodyHtml } }) : /* @__PURE__ */ jsx("p", { className: "rss-body", children: "This feed contains only a headline. Open the original article to read more." }),
-          !article.captured && /* @__PURE__ */ jsx("div", { className: "rss-note", children: articleRender.rich.isHtml ? "Rendered from the feed's own HTML. Scripts are stripped and only https links and images survive sanitizing." : "This is the text supplied by the feed. It may be an excerpt. Scripts are stripped; https images and tables are kept." })
+          /* @__PURE__ */ jsx("div", { className: "rss-note", children: article.captured ? "Scripts are stripped and only https links, images and embeds are shown." : articleRender.rich.isHtml ? "Rendered from the feed's own HTML. Scripts are stripped and only https links, images and embeds are shown." : "This is the text supplied by the feed. It may be an excerpt. Scripts are stripped; https images, tables and embeds are kept." })
         ] }),
         tab === "summary" && /* @__PURE__ */ jsxs("div", { id: "rss-article-panel-summary", role: "tabpanel", "aria-labelledby": "rss-article-tab-summary", children: [
           summary ? /* @__PURE__ */ jsxs(Fragment, { children: [
