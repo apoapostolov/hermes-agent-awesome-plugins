@@ -2,9 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- **rss-reader:** upcoming `1.0.4`. Settings tab Self-Improvement runs Full Article Self-Improvement after a confirm. Hermes studies the collector against live problem pages and may edit this copy. An official update overwrites those edits unless you paste the Improvement Summary into the new copy and run it again. Copy Summary puts that handoff on the clipboard.
+
 ### Fixed
 
-- **rss-reader:** upcoming `1.0.4`. Full-article capture keeps https video, audio, and iframe embeds and continues past them. It drops sponsor, recirc, native-ad, and subscribers-only rails, stops at “Recent articles”, keeps short closing sentences, and no longer repeats the page title as a heading. Captured posts note that scripts are stripped and only https links, images and embeds are shown. Article downloads use a browser user agent (OpenAI pages can still 403).
+- **rss-reader:** upcoming `1.0.4`. Full-article capture keeps https video, audio, and iframe embeds. It drops share URLs (Facebook, Twitter, LinkedIn share, Reddit submit), sponsor, recirc, native-ad, and subscribers-only rails, and stops at Recent articles or Most Popular. Short closing sentences stay. The page title is not repeated as a heading. Manual recapture replaces the stored body even when the cleaned text is shorter. Article downloads use a browser user agent (OpenAI pages can still 403).
 
 ## [1.14.0] - 2026-09-18
 

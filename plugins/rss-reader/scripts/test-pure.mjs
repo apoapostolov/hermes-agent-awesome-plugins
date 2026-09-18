@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind")].join("\n");
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -59,6 +59,7 @@ exports.normalizeRefreshMinutes = normalizeRefreshMinutes;
 exports.articleNeedsCapture = articleNeedsCapture;
 exports.healthAgeLabel = healthAgeLabel;
 exports.healthNotice = healthNotice;
+exports.isShareHref = isShareHref;
 exports.htmlPageTitle = htmlPageTitle;
 exports.headingMatchesTitle = headingMatchesTitle;
 exports.readableChromeKind = readableChromeKind;
@@ -202,5 +203,10 @@ assert.equal(fns.readableChromeKind("Recent articles"), "stop");
 assert.equal(fns.readableChromeKind("Sponsored by: WorkOS — auth.md"), "skip");
 assert.equal(fns.readableChromeKind("Subscribers only Learn more"), "skip");
 assert.equal(fns.readableChromeKind("What a delight."), "");
+assert.equal(fns.isShareHref("https://www.facebook.com/sharer.php?u=https://techcrunch.com/x"), true);
+assert.equal(fns.isShareHref("https://www.linkedin.com/in/naderlikeladder"), false);
+assert.equal(fns.readableChromeKind("[https://www.facebook.com/sharer.php?u=https://x](https://www.facebook.com/sharer.php?u=https://x)"), "skip");
+assert.equal(fns.readableChromeKind("[AI](https://techcrunch.com/category/artificial-intelligence/), [nvidia](https://techcrunch.com/tag/nvidia/)"), "skip");
+assert.equal(fns.readableChromeKind("Most Popular"), "stop");
 
-console.log("ok", 47);
+console.log("ok", 52);
