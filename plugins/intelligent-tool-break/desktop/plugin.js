@@ -314,13 +314,10 @@ function backgroundStatusRows(stack) {
   if (!stack) {
     return []
   }
-  const closeRows = [...stack.querySelectorAll('[class*="status-row"]')].filter(row =>
-    row.querySelector('.codicon-close')
-  )
-  if (closeRows.length) {
-    return closeRows
-  }
-  return [...stack.querySelectorAll('.flex.min-h-6.items-center')].filter(row => row.querySelector('button'))
+  const sections = [...stack.querySelectorAll('[data-slot="status-stack-section"]')]
+    .filter(section => section.querySelector('.codicon-server-process'))
+  return sections.flatMap(section => [...section.querySelectorAll('[data-slot="status-row"]')]
+    .filter(row => row.querySelector('[data-slot="status-dismiss"]')))
 }
 
 function backgroundHeaders(stack) {
@@ -509,43 +506,18 @@ function fillActionHost(hostEl, tool) {
   )
 }
 
-function xSlot(row) {
-  const icon = row.querySelector('.codicon-close')
-  if (!icon) {
-    return null
-  }
-  let node = icon.parentElement
-  while (node && node !== row) {
-    if (node.parentElement === row) {
-      return node
-    }
-    node = node.parentElement
-  }
-  return icon.parentElement
-}
-
 function ensureRowHook(row) {
-  const slot = xSlot(row)
   let hostEl = row.querySelector(`[${NATIVE_HOOK}]`)
   if (!hostEl) {
     hostEl = document.createElement('div')
     hostEl.setAttribute(NATIVE_HOOK, '1')
     hostEl.className = 'flex shrink-0 items-center gap-0'
   }
-  if (slot) {
-    slot.style.position = 'relative'
-    slot.style.overflow = 'visible'
-    slot.style.flexWrap = 'nowrap'
-    hostEl.style.position = 'absolute'
-    hostEl.style.right = '1.15rem'
-    hostEl.style.top = '50%'
-    hostEl.style.transform = 'translateY(-50%)'
-    hostEl.style.zIndex = '2'
-    hostEl.style.background = 'color-mix(in srgb, var(--ui-chat-surface-background, var(--ui-bg-primary)) 90%, transparent)'
-    if (hostEl.parentElement !== slot || slot.firstElementChild !== hostEl) {
-      slot.insertBefore(hostEl, slot.firstChild)
-    }
-  } else if (!hostEl.parentElement) {
+  row.style.overflow = 'visible'
+  hostEl.style.flexShrink = '0'
+  hostEl.style.marginLeft = 'auto'
+  hostEl.style.background = 'color-mix(in srgb, var(--ui-chat-surface-background, var(--ui-bg-primary)) 90%, transparent)'
+  if (hostEl.parentElement !== row) {
     row.appendChild(hostEl)
   }
   return hostEl
@@ -596,17 +568,13 @@ function paintNativeStack(tools, newestId, onGear, grades) {
     // Only cancellable rows (running background tool calls) get the pill + its
     // Break / Message / Again buttons. Queued message rows render in the same
     // stack without a close affordance, so they must stay untouched.
-    if (!row.querySelector('.codicon-close')) {
+    if (!row.querySelector('[data-slot="status-dismiss"]')) {
       return
     }
     const tool = matchSpawnTool(nativeRowTitle(row), spawn) || spawn[0] || null
     const key = (tool && toolKey(tool)) || `row-${index}`
     hooked.add(key)
     keep.add(row)
-    const slot = xSlot(row)
-    if (slot) {
-      keep.add(slot)
-    }
     fillActionHost(ensureRowHook(row), tool)
     keep.add(ensurePill(row, tool, Date.now(), grades || loadGrades()))
   })
