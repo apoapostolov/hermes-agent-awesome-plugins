@@ -3023,6 +3023,9 @@ var styles = `
 .hermes-rss .rss-learn-dialog p{margin:0 0 10px;line-height:1.55}
 .hermes-rss .rss-learn-actions{display:flex;justify-content:center;align-items:center;gap:8px;width:100%;padding-top:4px}
 .hermes-rss textarea.rss-improve-handoff{width:100%;min-height:10rem;padding:8px 8px 8px 10px;resize:vertical;line-height:1.45;font-size:12px;border:1px solid var(--ui-stroke-secondary);border-left:3px solid var(--ui-accent);border-radius:5px;background:transparent;color:inherit;box-shadow:none}
+.hermes-rss .rss-improve-action{display:flex;align-items:flex-start;gap:12px}
+.hermes-rss .rss-improve-action > button{flex:0 0 auto;white-space:nowrap}
+.hermes-rss .rss-improve-action .rss-muted{margin:0;flex:1;min-width:0;line-height:1.45}
 .hermes-rss .rss-settings-library{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-top:14px;border-top:1px solid var(--ui-stroke-secondary)}
 .hermes-rss .rss-settings-library-head{display:flex;align-items:center;gap:10px;width:100%;min-width:0}
 .hermes-rss .rss-settings-library-head .rss-settings-header{margin:0;flex:1;min-width:0}
@@ -4934,9 +4937,10 @@ function ReaderProfile({ ctx, owner }) {
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save Settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => { const saved = readSettings(ctx, owner); setSettingsOpen(false); restoreDraftPreview(saved); }, children: "Cancel" })] })
       ] }),
       settingsTab === "improve" && jsxs("form", { id: "rss-settings-panel-improve", className: "rss-stack", role: "tabpanel", "aria-labelledby": "rss-settings-tab-improve", onSubmit: saveSettings, children: [
-        jsx("h2", { className: "rss-settings-header", children: "Full Article Self-Improvement" }),
-        jsx("p", { className: "rss-muted rss-small", children: "If full-article collection fails on a site, this opens a Hermes session that studies the collector against that site's live page and improves it. Those edits make this plugin yours. An official update overwrites them unless you paste the summary below into the new copy and run the improvement again." }),
-        jsx("div", { className: "rss-tools", children: jsx(Button, { type: "button", onClick: () => setImproveOpen(true), disabled, children: "Full Article Self-Improvement" }) }),
+        jsxs("div", { className: "rss-improve-action", children: [
+          jsx(Button, { type: "button", onClick: () => setImproveOpen(true), disabled, children: "Full Article Self-Improvement" }),
+          jsx("p", { className: "rss-muted rss-small", children: "If full-article collection fails on a site, this opens a Hermes session that studies the collector against that site's live page and improves it. Those edits make this plugin yours. An official update overwrites them unless you paste the summary below into the new copy and run the improvement again." })
+        ] }),
         jsx("textarea", {
           className: "rss-improve-handoff",
           "aria-label": "Improvement Summary",

@@ -4,7 +4,7 @@
 
 ### Added
 
-- **rss-reader:** upcoming `1.0.4`. Settings tab Self-Improvement runs Full Article Self-Improvement after a confirm. Hermes studies the collector against live problem pages and may edit this copy. An official update overwrites those edits unless you paste the Improvement Summary into the new copy and run it again. Copy Summary puts that handoff on the clipboard.
+- **rss-reader:** upcoming `1.0.4`. Settings tab Self-Improvement runs Full Article Self-Improvement after a confirm. The button sits on the left of the two-line hint. Hermes studies the collector against live problem pages and may edit this copy. An official update overwrites those edits unless you paste the Improvement Summary into the new copy and run it again. Copy Summary puts that handoff on the clipboard.
 
 ### Fixed
 
