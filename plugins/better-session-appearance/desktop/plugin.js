@@ -1,5 +1,5 @@
 /**
- * Better Colors for Hermes.
+ * Better Session Appearance for Hermes.
  *
  * Paints the whole session name with the Appearance color (lightness
  * flipped for the current mode). Bold is optional. Appearance submenu
@@ -1433,7 +1433,7 @@ function start() {
 
 export default {
   id: ID,
-  name: 'Better Colors',
+  name: 'Better Session Appearance',
   description: 'Session list appearance: color and bold titles, extra Appearance colors, idle-bullet glyphs.',
   defaultEnabled: true,
   register(ctx) {
