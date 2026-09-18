@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **rss-reader:** upcoming `1.0.4`. Full-article capture no longer stops at a video, audio, or iframe in the body. Later paragraphs still land, and https embeds play in the reader. Captured posts note that scripts are stripped and only https links, images and embeds are shown.
+- **rss-reader:** upcoming `1.0.4`. Full-article capture keeps https video, audio, and iframe embeds and continues past them. It drops sponsor, recirc, native-ad, and subscribers-only rails, stops at “Recent articles”, keeps short closing sentences, and no longer repeats the page title as a heading. Captured posts note that scripts are stripped and only https links, images and embeds are shown. Article downloads use a browser user agent (OpenAI pages can still 403).
 
 ## [1.14.0] - 2026-09-18
 

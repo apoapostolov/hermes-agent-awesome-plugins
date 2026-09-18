@@ -22,6 +22,10 @@ router = APIRouter()
 _MAX_BYTES = 2_000_000
 _TIMEOUT = 25
 _USER_AGENT = "HermesRSS/0.2"
+_ARTICLE_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+)
 
 
 class FeedRequest(BaseModel):
@@ -250,23 +254,36 @@ def fetch_reddit(payload: FeedRequest) -> dict[str, str | int]:
         raise HTTPException(status_code=502, detail=f"Reddit download failed: {exc}") from exc
 @router.post("/article")
 def fetch_article(payload: FeedRequest) -> dict[str, str | int]:
-    return fetch_feed(payload)
+    if _reddit_api_url(payload.url):
+        return fetch_reddit(payload)
+    return _download(
+        payload.url,
+        {
+            "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+            "Accept-Encoding": "identity",
+            "User-Agent": _ARTICLE_UA,
+        },
+    )
 
 
 @router.post("/feed")
 def fetch_feed(payload: FeedRequest) -> dict[str, str | int]:
     if _reddit_api_url(payload.url):
         return fetch_reddit(payload)
+    return _download(
+        payload.url,
+        {"Accept-Encoding": "identity", "User-Agent": _USER_AGENT},
+    )
+
+
+def _download(source_url: str, headers: dict[str, str]) -> dict[str, str | int]:
     try:
-        url = _validate_url(payload.url)
+        url = _validate_url(source_url)
         opener = build_opener(_NoRedirect())
         for _ in range(4):
             parsed = urlparse(url)
             _public_addresses(parsed.hostname or "")
-            request = Request(
-                url,
-                headers={"Accept-Encoding": "identity", "User-Agent": _USER_AGENT},
-            )
+            request = Request(url, headers=headers)
             try:
                 response = opener.open(request, timeout=_TIMEOUT)
             except HTTPError as exc:

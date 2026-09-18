@@ -79,7 +79,7 @@ function articleMarkdown(article) {
   let md = "";
   try { md = extractReadable(raw); } catch { md = ""; }
   if (!md || md.length < Math.min(80, raw.length / 20)) md = plainText(raw);
-  return String(md || "").trim().slice(0, 16e3);
+  return String(md || "").trim().slice(0, 6e4);
 }
 function fencedArticleMarkdown(article) {
   const body = articleMarkdown(article).replace(/```/g, "``\u200b`");
@@ -2300,9 +2300,11 @@ var PAYWALL_MARKERS = [
 ];
 function looksPaywalled(text) {
   const value = String(text || "");
-  // Only short pages count: a long article may quote these words itself.
-  if (!value || value.length > PAYWALL_TEXT_LIMIT) return false;
+  if (!value) return false;
   const lower = value.toLowerCase();
+  const head = lower.slice(0, 280).replace(/\s+/g, " ");
+  if (/\bsubscribers only\b/.test(head) && value.length < 2500) return true;
+  if (value.length > PAYWALL_TEXT_LIMIT) return false;
   return PAYWALL_MARKERS.some((marker) => lower.includes(marker));
 }
 function paywallServed(text, currentLength) {
@@ -2349,7 +2351,40 @@ function paywallCooling(id) {
 function paywallCool(id) {
   paywallParked.set(id, Date.now() + PAYWALL_COOLDOWN_MS);
 }
+function htmlPageTitle(html) {
+  const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(String(html || ""));
+  return (match ? match[1] : "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+}
+function headingMatchesTitle(heading, pageTitle) {
+  const headingText = String(heading || "").replace(/^#+\s+/, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const title = String(pageTitle || "").replace(/\s+/g, " ").trim().toLowerCase();
+  if (!headingText || headingText.length < 8 || !title) return false;
+  if (title.startsWith(headingText) || headingText.startsWith(title)) return true;
+  const site = title.split(/\s+[-|:]\s+/)[0].trim();
+  return Boolean(site.length >= 8 && (site === headingText || title.includes(headingText)));
+}
+function readableChromeKind(text) {
+  const value = String(text || "").replace(/^[#>\u2022]+\s*/, "").replace(/\s+/g, " ").trim();
+  if (!value) return "";
+  const lower = value.toLowerCase();
+  if (/^(recent articles|related articles|related stories|more stories|you may also like|you might also like|recommended|trending|most popular|advertisement|advertiser content|comments|leave a (comment|reply)|what to read next)$/i.test(value)) return "stop";
+  if (/^more from\b/i.test(value) && value.length < 80) return "stop";
+  if (/^sponsored by\b/i.test(value)) return "skip";
+  if (/^subscribers only\b/i.test(lower) && value.length < 160) return "skip";
+  if (/^(learn more|sign in|subscribe|follow|skip to (content|main)|this is the title for the native ad)$/i.test(value)) return "skip";
+  return "";
+}
+function nodeIsChrome(node) {
+  let el = node;
+  for (let i = 0; i < 5 && el && el.nodeType === 1; i++) {
+    const cls = `${el.id || ""} ${typeof el.className === "string" ? el.className : el.className && el.className.baseVal || ""}`;
+    if (/(entryFooter|recent-articles|sponsored-label|sponsor-scheme|edit-page-link|paywall|recirc|native-ad|newsletter-signup|related-posts|relatedPosts|subscribe-promo|ad--rail|ad-wrapper)/i.test(cls)) return true;
+    el = el.parentElement;
+  }
+  return false;
+}
 function extractReadable(html, options = {}) {
+  const pageTitle = options.pageTitle || htmlPageTitle(html);
   const cleaned = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<noscript[\s\S]*?<\/noscript>/gi, "").replace(/<svg[\s\S]*?<\/svg>/gi, "").replace(/<form[\s\S]*?<\/form>/gi, "").replace(/<nav[\s\S]*?<\/nav>/gi, "").replace(/<aside[\s\S]*?<\/aside>/gi, "").replace(/<footer[\s\S]*?<\/footer>/gi, "").replace(/<!--[\s\S]*?-->/g, "");
   let scope = "";
   if (options.scope) {
@@ -2367,12 +2402,13 @@ function extractReadable(html, options = {}) {
   }
   const template = document.createElement("template");
   template.innerHTML = scope;
-  template.content.querySelectorAll(`script,style,noscript,svg,form,button,input,select,textarea,nav,aside,footer,header,[aria-hidden=true]${options.strip ? `,${options.strip}` : ""}`).forEach((n) => n.remove());
+  template.content.querySelectorAll(`script,style,noscript,svg,form,button,input,select,textarea,nav,aside,footer,header,[aria-hidden=true],.entryFooter,.recent-articles,.edit-page-link,.sponsored-label${options.strip ? `,${options.strip}` : ""}`).forEach((n) => n.remove());
   const nodes = [...template.content.querySelectorAll("p,li,blockquote,pre,h1,h2,h3,h4,img,figure,table,div,video,audio,iframe,embed,object")];
   const parts = [];
   const seen = new Set();
   for (const node of nodes) {
     try {
+    if (nodeIsChrome(node)) continue;
     if (node.closest("table") && node.localName !== "table") continue;
     if (["img", "video", "audio", "iframe", "embed", "object"].includes(node.localName) && node.closest("figure,p,li,h1,h2,h3,h4")) continue;
     if (node.localName === "p" && node.closest("li,blockquote,figure")) continue;
@@ -2394,7 +2430,7 @@ function extractReadable(html, options = {}) {
         if (embed) {
           parts.push(embed);
           const cap = node.querySelector("figcaption")?.textContent.replace(/\s+/g, " ").trim();
-          if (cap) parts.push(cap);
+          if (cap && readableChromeKind(cap) !== "skip") parts.push(cap);
           continue;
         }
       } else {
@@ -2412,7 +2448,10 @@ function extractReadable(html, options = {}) {
     const name = node.localName;
     const content = name === "pre" ? node.textContent.replace(/\s+$/g, "").trim() : inlineMarkdown(node);
     if (!content || content.length < 2) continue;
-    if (content.length < 25 && !name.startsWith("h") && !/!\[/.test(content) && !/!video\[/.test(content) && !/\[(Video|Audio|Embed)\]\(/.test(content)) continue;
+    const chrome = readableChromeKind(content);
+    if (chrome === "stop") break;
+    if (chrome === "skip") continue;
+    if (name.startsWith("h") && headingMatchesTitle(content, pageTitle)) continue;
     const key = content.slice(0, 80).toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
