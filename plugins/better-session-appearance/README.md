@@ -1,36 +1,20 @@
-<div align="center">
-  <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
-  <h1>Better Session Appearance</h1>
-  <strong>Make the session list easier to scan.</strong>
-  <p>Give sessions readable colors, optional emphasis, and a personal idle icon without changing Hermes' working and unread indicators.</p>
-  [![Version](https://img.shields.io/badge/version-1.1.5-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
-</div>
+# better-colors
 
-## What it does
+Desktop plugin for **session list appearance**: titles take the Appearance color, optional per-session bold, extra colors in the picker, and a Codicon idle-bullet.
 
-- **Color session titles.** Use the Appearance color with lightness adjusted for the active theme.
-- **Emphasize important chats.** Toggle **Bold Session** per conversation.
-- **Pick an idle icon.** Search the full Codicon set and replace the idle bullet while keeping working and finished-unread dots intact.
-- **Keep choices per session.** Colors, bold state, and glyphs are stored by session id.
+- Session title uses the Appearance color. Lightness flips for light vs dark so one hue stays readable in both modes.
+- **Bold Session** is per chat, stored with that session's color.
+- Appearance submenu: Custom sits beside No color (half width each). Full Codicon set with an underline search. Chosen glyph replaces the **idle** bullet only. Working (orange) and finished-unread (green) status dots stay Hermes's.
+- **Auto Rules** (Icon header): save the current color, bold, and icon against title keywords split on commas or spaces. Future sessions whose title contains every keyword on a rule pick up that look. Matching ignores case, so Hermes and hermes are the same word. Edit and Remove are glyph buttons; Remove asks before it deletes.
 
-## Install
+## Files
 
-Install the pack, enable **Better Session Appearance**, then reload desktop plugins:
-
-```bash
-hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
-```
-
-Open a session's Appearance controls to choose its color, weight, and idle icon.
+- `plugin.yaml` — metadata
+- `__init__.py` — no-op agent register
+- `desktop/plugin.js` — overlay on the session list + Appearance picker
 
 ## How it works
 
-A desktop `MutationObserver` watches session-list rows and applies the stored presentation. The plugin uses the picker's own color-change callback and namespaces its session data.
+A MutationObserver restyles sidebar rows from the idle-dot color (`hermes.desktop.sessionColors`) and injects extra controls into `ColorSwatches`. Extra colors go through the picker's own `onChange`. Glyphs and bold live in plugin storage, keyed by session id.
 
-## Compatibility
-
-Desktop-only. The plugin reads Hermes session-list and picker surfaces. If a future Hermes release changes those surfaces, it should go quiet rather than alter unrelated session status.
-
-## Files and license
-
-`desktop/plugin.js` owns the overlay and picker. `plugin.yaml` contains metadata and `__init__.py` registers the desktop plugin. Licensed under [MIT](../../LICENSE).
+Drop `desktop/plugin.js` in `$HERMES_HOME/desktop-plugins/better-colors/` for auto-on, or keep it under `plugins/better-colors/desktop/` and enable it in Settings → Plugins.

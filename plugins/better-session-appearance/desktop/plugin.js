@@ -213,6 +213,382 @@ function saveGlyph(sessionId, glyph) {
   store.set('glyphs', next)
 }
 
+function loadRules() {
+  const raw = store.get('autoRules', [])
+  return Array.isArray(raw) ? raw : []
+}
+
+function saveRules(rules) {
+  store.set('autoRules', rules)
+}
+
+function loadAutoColors() {
+  const raw = store.get('autoColors', {})
+  return raw && typeof raw === 'object' ? raw : {}
+}
+
+function saveAutoColor(sessionId, color) {
+  if (!sessionId) return
+  const next = { ...loadAutoColors() }
+  if (color) next[sessionId] = color
+  else delete next[sessionId]
+  store.set('autoColors', next)
+}
+
+function fold(text) {
+  return String(text || '').toLocaleLowerCase()
+}
+
+function parseKeywords(text) {
+  return fold(text)
+    .split(/[,\s]+/)
+    .map(part => part.trim())
+    .filter(Boolean)
+}
+
+function newRuleId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+}
+
+function titleOf(row) {
+  const el = row.querySelector(TITLE)
+  return (el?.textContent || '').replace(/\s+/g, ' ').trim()
+}
+
+function matchRule(title, rules) {
+  const hay = fold(title).trim()
+  if (!hay) return null
+  for (const rule of rules) {
+    const kws = (Array.isArray(rule?.keywords) ? rule.keywords : [])
+      .map(kw => fold(kw).trim())
+      .filter(Boolean)
+    if (!kws.length) continue
+    if (kws.every(kw => hay.includes(kw))) return rule
+  }
+  return null
+}
+
+const knownTitles = new Map()
+let rulesUi = null
+
+function holdMenu(el) {
+  const stop = event => event.stopPropagation()
+  el.addEventListener('pointerdown', stop)
+  el.addEventListener('mousedown', stop)
+  el.addEventListener('click', stop)
+}
+
+function appearanceShell(host) {
+  return host?.closest('[data-slot="dropdown-menu-sub-content"]') || host
+}
+
+function liftAppearanceMenu(host) {
+  const shell = appearanceShell(host)
+  if (!shell || shell.dataset.bcLifted === '1') return
+  shell.dataset.bcLifted = '1'
+  shell.style.setProperty('max-height', 'none', 'important')
+  shell.style.setProperty('overflow', 'visible', 'important')
+}
+
+function durableIdFrom(row) {
+  const start = row?.querySelector('button') || row
+  const props = findProps(
+    start,
+    p => p.session && (typeof p.session.id === 'string' || typeof p.session._lineage_root_id === 'string')
+  )
+  const session = props?.session
+  if (session?._lineage_root_id) return session._lineage_root_id
+  if (session?.id) return session.id
+  return rowSessionId(row)
+}
+
+function writeSessionColorOverride(durableId, color) {
+  if (!durableId) return
+  const key = 'hermes.desktop.sessionColors'
+  let map = {}
+  try {
+    map = JSON.parse(localStorage.getItem(key) || '{}')
+  } catch {
+    map = {}
+  }
+  if (!map || typeof map !== 'object' || Array.isArray(map)) map = {}
+  if (color) map[durableId] = color
+  else delete map[durableId]
+  try {
+    localStorage.setItem(key, JSON.stringify(map))
+  } catch {
+    // storage is best-effort
+  }
+}
+
+function currentAppearance(sid, host) {
+  const stock = host?.querySelector('button.size-5.rounded-full')
+  const props = stock ? colorSwatchProps(stock) : null
+  const openRow = document.querySelector(`${ROW} [data-state="open"]`)?.closest('.row-hover')
+  const color = props?.value || openRow?._bcCached || loadAutoColors()[sid] || null
+  return {
+    color: color || null,
+    bold: sessionBold(sid),
+    glyph: loadGlyphs()[sid] || null
+  }
+}
+
+function applyRuleToSession(sid, row, rule) {
+  if (!sid || !rule) return
+  saveBold(sid, !!rule.bold)
+  saveGlyph(sid, rule.glyph || null)
+  if (rule.color) {
+    saveAutoColor(sid, rule.color)
+    row._bcCached = rule.color
+    const idle = row.querySelector(IDLE_DOT)
+    if (idle && idle.style.backgroundColor !== rule.color) idle.style.backgroundColor = rule.color
+    writeSessionColorOverride(durableIdFrom(row) || sid, rule.color)
+  }
+}
+
+function applyAutoRules() {
+  const rules = loadRules()
+  if (!rules.length) return
+  document.querySelectorAll(ROW).forEach(row => {
+    const sid = rowSessionId(row)
+    if (!sid) return
+    const title = titleOf(row)
+    const prev = knownTitles.get(sid)
+    knownTitles.set(sid, title)
+    if (prev === undefined || prev === title) return
+    const rule = matchRule(title, rules)
+    if (rule) applyRuleToSession(sid, row, rule)
+  })
+}
+
+function glyphBtn(name, label) {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.setAttribute(EXTRA_ATTR, 'rules-btn')
+  btn.setAttribute('aria-label', label)
+  btn.title = label
+  const icon = document.createElement('i')
+  icon.className = `codicon codicon-${name}`
+  btn.appendChild(icon)
+  return btn
+}
+
+function closeRulesPanel() {
+  rulesUi?.panel?.remove()
+  rulesUi = null
+  document.querySelectorAll(`[${EXTRA_ATTR}="auto-btn"]`).forEach(btn => {
+    btn.dataset.on = '0'
+  })
+}
+
+function placeRulesPanel(host) {
+  if (!rulesUi?.panel) return
+  const shell = appearanceShell(host)
+  const panel = rulesUi.panel
+  const box = shell.getBoundingClientRect()
+  const width = panel.offsetWidth || 248
+  const flip = box.right + 8 + width > window.innerWidth - 8
+  panel.style.position = 'absolute'
+  panel.style.top = '0'
+  panel.style.height = '100%'
+  panel.style.zIndex = '80'
+  if (flip) {
+    panel.style.left = 'auto'
+    panel.style.right = 'calc(100% + 8px)'
+  } else {
+    panel.style.right = 'auto'
+    panel.style.left = 'calc(100% + 8px)'
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function confirmDeletePreset(name, onYes) {
+  document.querySelector(`[${EXTRA_ATTR}="confirm"]`)?.remove()
+  const overlay = document.createElement('div')
+  overlay.setAttribute(EXTRA_ATTR, 'confirm')
+  overlay.innerHTML =
+    `<div ${EXTRA_ATTR}="confirm-box" role="dialog" aria-modal="true">` +
+    `<div ${EXTRA_ATTR}="confirm-title">Delete ${escapeHtml(name)}?</div>` +
+    `<div ${EXTRA_ATTR}="confirm-body">Are you sure you want to delete this preset? This action cannot be undone and will permanently remove this preset from your collection.</div>` +
+    `<div ${EXTRA_ATTR}="confirm-actions">` +
+    `<button type="button" data-cancel="1">Cancel</button>` +
+    `<button type="button" data-ok="1">Delete</button>` +
+    `</div></div>`
+  holdMenu(overlay)
+  overlay.addEventListener('pointerdown', event => event.preventDefault())
+  overlay.addEventListener('click', event => {
+    if (event.target === overlay) overlay.remove()
+  })
+  overlay.querySelector('[data-cancel]').addEventListener('click', () => overlay.remove())
+  overlay.querySelector('[data-ok]').addEventListener('click', () => {
+    overlay.remove()
+    onYes()
+  })
+  document.body.appendChild(overlay)
+}
+
+function renderRulesList() {
+  if (!rulesUi) return
+  const { list, selectedId } = rulesUi
+  list.replaceChildren()
+  const rules = loadRules()
+  if (!rules.length) {
+    const empty = document.createElement('div')
+    empty.setAttribute(EXTRA_ATTR, 'rules-empty')
+    empty.textContent = 'No rules yet'
+    list.appendChild(empty)
+    rulesUi.editBtn.disabled = true
+    rulesUi.removeBtn.disabled = true
+    return
+  }
+  rules.forEach(rule => {
+    const item = document.createElement('button')
+    item.type = 'button'
+    item.setAttribute(EXTRA_ATTR, 'rules-item')
+    item.dataset.on = rule.id === selectedId ? '1' : '0'
+    const swatch = document.createElement('span')
+    swatch.setAttribute(EXTRA_ATTR, 'rules-swatch')
+    if (rule.color) swatch.style.background = rule.color
+    item.appendChild(swatch)
+    if (rule.glyph) {
+      const icon = document.createElement('i')
+      icon.className = `codicon codicon-${rule.glyph}`
+      item.appendChild(icon)
+    }
+    const label = document.createElement('span')
+    label.textContent = (rule.keywords || []).join(', ')
+    item.appendChild(label)
+    item.addEventListener('click', event => {
+      event.preventDefault()
+      event.stopPropagation()
+      rulesUi.selectedId = rule.id
+      renderRulesList()
+    })
+    list.appendChild(item)
+  })
+  rulesUi.editBtn.disabled = !selectedId
+  rulesUi.removeBtn.disabled = !selectedId
+}
+
+function openRulesPanel(host, sid) {
+  if (rulesUi?.host === host) {
+    closeRulesPanel()
+    return
+  }
+  closeRulesPanel()
+  const panel = document.createElement('div')
+  panel.setAttribute(EXTRA_ATTR, 'rules')
+  holdMenu(panel)
+  panel.addEventListener('keydown', event => event.stopPropagation())
+
+  const head = document.createElement('div')
+  head.setAttribute(EXTRA_ATTR, 'rules-head')
+  head.textContent = 'Auto Rules'
+  panel.appendChild(head)
+
+  const row = document.createElement('div')
+  row.setAttribute(EXTRA_ATTR, 'rules-row')
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.setAttribute(EXTRA_ATTR, 'rules-input')
+  input.placeholder = 'keyword keyword'
+  input.autocomplete = 'off'
+  row.appendChild(input)
+  const saveBtn = glyphBtn('save', 'Save')
+  const editBtn = glyphBtn('edit', 'Edit')
+  const removeBtn = glyphBtn('trash', 'Remove')
+  row.appendChild(saveBtn)
+  row.appendChild(editBtn)
+  row.appendChild(removeBtn)
+  panel.appendChild(row)
+
+  const list = document.createElement('div')
+  list.setAttribute(EXTRA_ATTR, 'rules-list')
+  panel.appendChild(list)
+  const shell = appearanceShell(host)
+  if (shell !== host) {
+    const pos = getComputedStyle(shell).position
+    if (pos === 'static') shell.style.position = 'relative'
+  }
+  shell.appendChild(panel)
+
+  rulesUi = {
+    host,
+    sid,
+    panel,
+    input,
+    saveBtn,
+    editBtn,
+    removeBtn,
+    list,
+    selectedId: null,
+    editingId: null
+  }
+
+  saveBtn.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    const keywords = parseKeywords(input.value)
+    if (!keywords.length) return
+    const look = currentAppearance(sid, host)
+    const rules = loadRules()
+    const id = rulesUi.editingId
+    const next = {
+      id: id || newRuleId(),
+      keywords,
+      color: look.color,
+      bold: look.bold,
+      glyph: look.glyph
+    }
+    const idx = id ? rules.findIndex(rule => rule.id === id) : -1
+    if (idx >= 0) rules[idx] = next
+    else rules.push(next)
+    saveRules(rules)
+    rulesUi.editingId = null
+    rulesUi.selectedId = next.id
+    input.value = ''
+    renderRulesList()
+  })
+
+  editBtn.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    const rule = loadRules().find(item => item.id === rulesUi.selectedId)
+    if (!rule) return
+    input.value = (rule.keywords || []).join(', ')
+    rulesUi.editingId = rule.id
+    input.focus()
+  })
+
+  removeBtn.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    const rule = loadRules().find(item => item.id === rulesUi.selectedId)
+    if (!rule) return
+    const name = (rule.keywords || []).join(', ') || 'preset'
+    confirmDeletePreset(name, () => {
+      saveRules(loadRules().filter(item => item.id !== rule.id))
+      if (rulesUi) {
+        rulesUi.selectedId = null
+        rulesUi.editingId = null
+        renderRulesList()
+      }
+    })
+  })
+
+  renderRulesList()
+  placeRulesPanel(host)
+  const autoBtn = host.querySelector(`[${EXTRA_ATTR}="auto-btn"]`)
+  if (autoBtn) autoBtn.dataset.on = '1'
+}
+
 function isDark() {
   const scheme = getComputedStyle(document.documentElement).colorScheme || ''
   if (scheme.includes('dark')) return true
@@ -410,10 +786,178 @@ function ensureStyle() {
       background: var(--ui-stroke-tertiary, var(--ui-stroke-secondary, var(--ui-border)));
     }
     [${EXTRA_ATTR}="icon-label"] {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
       margin: 0 0 0.35rem;
       font-size: 0.75rem;
       font-weight: 600;
       color: var(--ui-text-secondary);
+    }
+    [${EXTRA_ATTR}="auto-btn"] {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.1rem;
+      margin-left: auto;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      font: inherit;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--ui-text-tertiary);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    [${EXTRA_ATTR}="auto-btn"]:hover,
+    [${EXTRA_ATTR}="auto-btn"][data-on="1"] {
+      color: var(--foreground, var(--ui-text-primary));
+    }
+    [${EXTRA_ATTR}="auto-btn"] .codicon {
+      font-size: 0.7rem;
+    }
+    [${EXTRA_ATTR}="rules"] {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      box-sizing: border-box;
+      width: 15.5rem;
+      padding: 0.5rem;
+      border: 1px solid var(--ui-stroke-secondary, var(--ui-border));
+      border-radius: 0.5rem;
+      background: color-mix(in srgb, var(--ui-bg-elevated) 96%, transparent);
+      box-shadow: var(--shadow-md, 0 8px 24px rgb(0 0 0 / 0.24));
+      color: var(--ui-text-primary);
+      font-size: 0.75rem;
+    }
+    [${EXTRA_ATTR}="rules-head"] {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ui-text-secondary);
+    }
+    [${EXTRA_ATTR}="rules-row"] {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    [${EXTRA_ATTR}="rules-input"] {
+      flex: 1;
+      min-width: 0;
+      padding: 0.15rem 0 0.25rem;
+      border: 0;
+      border-bottom: 1px solid var(--ui-text-tertiary);
+      border-radius: 0;
+      outline: none;
+      background: transparent;
+      color: var(--ui-text-primary);
+      font-size: 0.75rem;
+    }
+    [${EXTRA_ATTR}="rules-input"]:focus {
+      border-bottom-color: var(--ui-accent, var(--foreground));
+    }
+    [${EXTRA_ATTR}="rules-btn"] {
+      display: grid;
+      place-items: center;
+      flex: 0 0 1.35rem;
+      width: 1.35rem;
+      height: 1.35rem;
+      border: 0;
+      border-radius: 0.3rem;
+      padding: 0;
+      background: transparent;
+      color: var(--ui-text-tertiary);
+      cursor: pointer;
+    }
+    [${EXTRA_ATTR}="rules-btn"]:hover:not(:disabled) {
+      background: var(--ui-control-hover-background);
+      color: var(--foreground, var(--ui-text-primary));
+    }
+    [${EXTRA_ATTR}="rules-btn"]:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+    [${EXTRA_ATTR}="rules-list"] {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    [${EXTRA_ATTR}="rules-item"] {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      width: 100%;
+      border: 0;
+      border-radius: 0.3rem;
+      padding: 0.25rem 0.35rem;
+      background: transparent;
+      color: var(--ui-text-secondary);
+      font-size: 0.7rem;
+      text-align: left;
+      cursor: pointer;
+    }
+    [${EXTRA_ATTR}="rules-item"]:hover,
+    [${EXTRA_ATTR}="rules-item"][data-on="1"] {
+      background: var(--ui-control-hover-background);
+      color: var(--foreground, var(--ui-text-primary));
+    }
+    [${EXTRA_ATTR}="rules-empty"] {
+      padding: 0.35rem;
+      color: var(--ui-text-quaternary, var(--ui-text-tertiary));
+      font-size: 0.7rem;
+    }
+    [${EXTRA_ATTR}="rules-swatch"] {
+      flex: 0 0 0.55rem;
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 99px;
+      background: var(--ui-text-quaternary, #888);
+    }
+    [${EXTRA_ATTR}="confirm"] {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: grid;
+      place-items: center;
+      background: rgb(0 0 0 / 0.28);
+    }
+    [${EXTRA_ATTR}="confirm-box"] {
+      width: min(22rem, calc(100vw - 2rem));
+      padding: 0.85rem 0.9rem;
+      border: 1px solid var(--ui-stroke-secondary, var(--ui-border));
+      border-radius: 0.5rem;
+      background: var(--ui-bg-elevated, var(--background));
+      color: var(--ui-text-primary);
+    }
+    [${EXTRA_ATTR}="confirm-title"] {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    [${EXTRA_ATTR}="confirm-body"] {
+      margin-top: 0.35rem;
+      font-size: 0.75rem;
+      color: var(--ui-text-tertiary);
+    }
+    [${EXTRA_ATTR}="confirm-actions"] {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      margin-top: 0.75rem;
+    }
+    [${EXTRA_ATTR}="confirm-actions"] button {
+      border: 1px solid var(--ui-stroke-secondary, var(--ui-border));
+      border-radius: 0.3rem;
+      padding: 0.2rem 0.55rem;
+      background: transparent;
+      color: var(--ui-text-primary);
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    [${EXTRA_ATTR}="confirm-actions"] button[data-ok] {
+      border-color: color-mix(in srgb, var(--ui-accent) 70%, transparent);
+      background: color-mix(in srgb, var(--ui-accent) 55%, transparent);
     }
     [${EXTRA_ATTR}="search"] {
       display: block;
@@ -514,6 +1058,7 @@ function liveClearColor(stockBtn) {
   if (!row) return
   if (sid) row.dataset.bcSid = sid
   delete row._bcCached
+  saveAutoColor(sid, null)
   const idle = row.querySelector(IDLE_DOT)
   if (idle) {
     idle.style.removeProperty('background-color')
@@ -618,8 +1163,15 @@ function paintSessionTitles() {
     if (idle) {
       const fill = idle.style.backgroundColor
       const live = fill && fill !== 'transparent' && fill !== 'rgba(0, 0, 0, 0)'
+      const autoColor = sid ? loadAutoColors()[sid] : null
       if (live) row._bcCached = fill
-      else if (!idle.dataset.bcGlyphHidden) {
+      else if (autoColor) {
+        row._bcCached = autoColor
+        if (row.dataset.bcAutoPaint !== autoColor) {
+          row.dataset.bcAutoPaint = autoColor
+          idle.style.backgroundColor = autoColor
+        }
+      } else if (!idle.dataset.bcGlyphHidden) {
         delete row._bcCached
         clearTitle(row)
         paintGlyph(row, null)
@@ -712,7 +1264,20 @@ function injectPanel(host, stockBtn) {
 
   const heading = document.createElement('div')
   heading.setAttribute(EXTRA_ATTR, 'icon-label')
-  heading.textContent = 'Icon'
+  heading.appendChild(document.createTextNode('Icon'))
+  const autoBtn = document.createElement('button')
+  autoBtn.type = 'button'
+  autoBtn.setAttribute(EXTRA_ATTR, 'auto-btn')
+  autoBtn.appendChild(document.createTextNode('Auto Rules'))
+  const autoArrow = document.createElement('i')
+  autoArrow.className = 'codicon codicon-chevron-right'
+  autoBtn.appendChild(autoArrow)
+  autoBtn.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    openRulesPanel(host, sid)
+  })
+  heading.appendChild(autoBtn)
   panel.appendChild(heading)
 
   const search = document.createElement('input')
@@ -818,13 +1383,18 @@ function enhancePickers() {
       clearBtn.addEventListener('click', () => liveClearColor(stock[0]), true)
     }
     injectCustomButton(host, stock[0])
-    if (host.querySelector(`[${EXTRA_ATTR}="panel"]`)) return
-    injectPanel(host, stock[0])
+    if (!host.querySelector(`[${EXTRA_ATTR}="panel"]`)) injectPanel(host, stock[0])
+    liftAppearanceMenu(host)
   })
+  if (rulesUi) {
+    if (!document.body.contains(rulesUi.host)) closeRulesPanel()
+    else placeRulesPanel(rulesUi.host)
+  }
 }
 
 function start() {
   ensureStyle()
+  applyAutoRules()
   paintSessionTitles()
   enhancePickers()
 
@@ -834,6 +1404,7 @@ function start() {
     scheduled = true
     requestAnimationFrame(() => {
       scheduled = false
+      applyAutoRules()
       paintSessionTitles()
       enhancePickers()
     })
@@ -851,6 +1422,8 @@ function start() {
 
   return () => {
     observer.disconnect()
+    closeRulesPanel()
+    document.querySelector(`[${EXTRA_ATTR}="confirm"]`)?.remove()
     document.getElementById(STYLE_ID)?.remove()
     document.querySelectorAll(`[${EXTRA_ATTR}]`).forEach(node => node.remove())
     document.querySelectorAll(`${ROW}[data-bc-color]`).forEach(clearTitle)
