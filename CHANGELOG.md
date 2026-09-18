@@ -4,7 +4,7 @@
 
 ### Added
 
-- **better-session-appearance:** version `1.2.0`. Auto Rules on the Icon header save the current color, bold, and idle icon against title keywords (comma or space, all words must match, case-insensitive). Future sessions whose titles contain those words pick up that look. The Appearance submenu grows so the icon grid is no longer trapped behind the old 320px cap.
+- **better-session-appearance:** version `1.2.0`. Auto Rules on the Icon header save the current color, bold, and idle icon against title keywords (comma or space, all words must match, case-insensitive). Each rule row has Edit and Remove. Future sessions whose titles contain those words pick up that look. The Appearance submenu grows so the icon grid is no longer trapped behind the old 320px cap.
 
 ## [1.13.1] - 2026-09-17
 

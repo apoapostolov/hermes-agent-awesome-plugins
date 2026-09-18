@@ -5,7 +5,7 @@ Desktop plugin for **session list appearance**: titles take the Appearance color
 - Session title uses the Appearance color. Lightness flips for light vs dark so one hue stays readable in both modes.
 - **Bold Session** is per chat, stored with that session's color.
 - Appearance submenu: Custom sits beside No color (half width each). Full Codicon set with an underline search. Chosen glyph replaces the **idle** bullet only. Working (orange) and finished-unread (green) status dots stay Hermes's.
-- **Auto Rules** (Icon header): save the current color, bold, and icon against title keywords split on commas or spaces. Future sessions whose title contains every keyword on a rule pick up that look. Matching ignores case, so Hermes and hermes are the same word. Edit and Remove are glyph buttons; Remove asks before it deletes.
+- **Auto Rules** (Icon header): save the current color, bold, and icon against title keywords split on commas or spaces. Future sessions whose title contains every keyword on a rule pick up that look. Matching ignores case, so Hermes and hermes are the same word. Each rule row has Edit and Remove; Remove asks before it deletes.
 
 ## Files
 

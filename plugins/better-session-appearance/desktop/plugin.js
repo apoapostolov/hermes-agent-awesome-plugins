@@ -434,9 +434,32 @@ function confirmDeletePreset(name, onYes) {
   document.body.appendChild(overlay)
 }
 
+function startEditRule(rule) {
+  if (!rulesUi || !rule) return
+  rulesUi.input.value = (rule.keywords || []).join(' ')
+  rulesUi.editingId = rule.id
+  renderRulesList()
+  rulesUi.input.focus()
+}
+
+function removeRule(rule) {
+  if (!rule) return
+  const name = (rule.keywords || []).join(' ') || 'preset'
+  confirmDeletePreset(name, () => {
+    saveRules(loadRules().filter(item => item.id !== rule.id))
+    if (rulesUi) {
+      if (rulesUi.editingId === rule.id) {
+        rulesUi.editingId = null
+        rulesUi.input.value = ''
+      }
+      renderRulesList()
+    }
+  })
+}
+
 function renderRulesList() {
   if (!rulesUi) return
-  const { list, selectedId } = rulesUi
+  const { list, editingId } = rulesUi
   list.replaceChildren()
   const rules = loadRules()
   if (!rules.length) {
@@ -444,15 +467,12 @@ function renderRulesList() {
     empty.setAttribute(EXTRA_ATTR, 'rules-empty')
     empty.textContent = 'No rules yet'
     list.appendChild(empty)
-    rulesUi.editBtn.disabled = true
-    rulesUi.removeBtn.disabled = true
     return
   }
   rules.forEach(rule => {
-    const item = document.createElement('button')
-    item.type = 'button'
+    const item = document.createElement('div')
     item.setAttribute(EXTRA_ATTR, 'rules-item')
-    item.dataset.on = rule.id === selectedId ? '1' : '0'
+    item.dataset.on = rule.id === editingId ? '1' : '0'
     const swatch = document.createElement('span')
     swatch.setAttribute(EXTRA_ATTR, 'rules-swatch')
     if (rule.color) swatch.style.background = rule.color
@@ -463,18 +483,25 @@ function renderRulesList() {
       item.appendChild(icon)
     }
     const label = document.createElement('span')
-    label.textContent = (rule.keywords || []).join(', ')
+    label.setAttribute(EXTRA_ATTR, 'rules-label')
+    label.textContent = (rule.keywords || []).join(' ')
     item.appendChild(label)
-    item.addEventListener('click', event => {
+    const editBtn = glyphBtn('edit', 'Edit')
+    editBtn.addEventListener('click', event => {
       event.preventDefault()
       event.stopPropagation()
-      rulesUi.selectedId = rule.id
-      renderRulesList()
+      startEditRule(rule)
     })
+    const removeBtn = glyphBtn('trash', 'Remove')
+    removeBtn.addEventListener('click', event => {
+      event.preventDefault()
+      event.stopPropagation()
+      removeRule(rule)
+    })
+    item.appendChild(editBtn)
+    item.appendChild(removeBtn)
     list.appendChild(item)
   })
-  rulesUi.editBtn.disabled = !selectedId
-  rulesUi.removeBtn.disabled = !selectedId
 }
 
 function openRulesPanel(host, sid) {
@@ -502,11 +529,7 @@ function openRulesPanel(host, sid) {
   input.autocomplete = 'off'
   row.appendChild(input)
   const saveBtn = glyphBtn('save', 'Save')
-  const editBtn = glyphBtn('edit', 'Edit')
-  const removeBtn = glyphBtn('trash', 'Remove')
   row.appendChild(saveBtn)
-  row.appendChild(editBtn)
-  row.appendChild(removeBtn)
   panel.appendChild(row)
 
   const list = document.createElement('div')
@@ -525,10 +548,7 @@ function openRulesPanel(host, sid) {
     panel,
     input,
     saveBtn,
-    editBtn,
-    removeBtn,
     list,
-    selectedId: null,
     editingId: null
   }
 
@@ -552,35 +572,8 @@ function openRulesPanel(host, sid) {
     else rules.push(next)
     saveRules(rules)
     rulesUi.editingId = null
-    rulesUi.selectedId = next.id
     input.value = ''
     renderRulesList()
-  })
-
-  editBtn.addEventListener('click', event => {
-    event.preventDefault()
-    event.stopPropagation()
-    const rule = loadRules().find(item => item.id === rulesUi.selectedId)
-    if (!rule) return
-    input.value = (rule.keywords || []).join(', ')
-    rulesUi.editingId = rule.id
-    input.focus()
-  })
-
-  removeBtn.addEventListener('click', event => {
-    event.preventDefault()
-    event.stopPropagation()
-    const rule = loadRules().find(item => item.id === rulesUi.selectedId)
-    if (!rule) return
-    const name = (rule.keywords || []).join(', ') || 'preset'
-    confirmDeletePreset(name, () => {
-      saveRules(loadRules().filter(item => item.id !== rule.id))
-      if (rulesUi) {
-        rulesUi.selectedId = null
-        rulesUi.editingId = null
-        renderRulesList()
-      }
-    })
   })
 
   renderRulesList()
@@ -887,16 +880,23 @@ function ensureStyle() {
     [${EXTRA_ATTR}="rules-item"] {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.25rem;
       width: 100%;
       border: 0;
       border-radius: 0.3rem;
-      padding: 0.25rem 0.35rem;
+      padding: 0.15rem 0.2rem 0.15rem 0.35rem;
       background: transparent;
       color: var(--ui-text-secondary);
       font-size: 0.7rem;
       text-align: left;
-      cursor: pointer;
+      cursor: default;
+    }
+    [${EXTRA_ATTR}="rules-label"] {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     [${EXTRA_ATTR}="rules-item"]:hover,
     [${EXTRA_ATTR}="rules-item"][data-on="1"] {
