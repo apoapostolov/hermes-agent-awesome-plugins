@@ -1043,6 +1043,12 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
             if (!article2) throw new Error("Article not found.");
             for (const key of ["is_saved", "is_read"])
               if (typeof body[key] === "boolean") article2[key] = body[key];
+            if (body.clear_grade === true) {
+              delete article2.grade;
+              library2.gradeCache ||= {};
+              if (article2.url) delete library2.gradeCache[article2.url];
+              if (article2.identity) delete library2.gradeCache[article2.identity];
+            }
           });
         if (parts[2] === "capture" && method === "POST")
           return write((library2) => {
@@ -1198,6 +1204,7 @@ function readSettings(ctx, owner) {
     tickerTagStyle: ["pill", "article_color", "none"].includes(stored.tickerTagStyle) ? stored.tickerTagStyle : "pill",
     tickerClickBehavior: ["reader", "browser", "external"].includes(stored.tickerClickBehavior) ? stored.tickerClickBehavior : "reader",
     openInExternalBrowser: stored.openInExternalBrowser === true,
+    registerHermesTools: stored.registerHermesTools === true,
     gradingSkill: gradingSkillName(typeof stored.gradingSkill === "string" ? stored.gradingSkill : ""),
     gradingTags: readGradingTags(ctx, owner)
   };
@@ -1328,17 +1335,64 @@ async function startRefinementConversation(host2, days) {
   assertOwner(host2, route);
   await host2.openSession(created.stored_session_id, { profile: route.profile, route, intent: "main" });
 }
+function rssToolFindFeed(feeds, target) {
+  const needle = String(target || "").trim().toLowerCase();
+  if (!needle) return null;
+  return feeds.find(feed => feed.id === needle || String(feed.url || "").toLowerCase() === needle || String(feed.title || "").trim().toLowerCase() === needle) || null;
+}
+function rssToolFindArticle(articles, payload) {
+  const id = String(payload?.id || "").trim();
+  if (id) return articles.find(article => article.id === id) || null;
+  const url = String(payload?.url || "").trim().toLowerCase();
+  if (url) return articles.find(article => String(article.url || "").toLowerCase() === url) || null;
+  const title = String(payload?.title || "").trim().toLowerCase();
+  if (!title) return null;
+  const exact = articles.filter(article => String(article.title || "").trim().toLowerCase() === title);
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) throw new Error("More than one article has that title. Pass id.");
+  return articles.find(article => String(article.title || "").toLowerCase().includes(title)) || null;
+}
+function rssToolResolveTag(ctx, owner, value) {
+  const needle = String(value || "").trim().toLowerCase();
+  if (!needle) throw new Error("Give a tag key.");
+  const tags = readSettings(ctx, owner).gradingTags || DEFAULT_GRADING_TAGS;
+  const hit = (tags || []).find(tag => tag && (String(tag.key || "").toLowerCase() === needle || String(tag.label || "").trim().toLowerCase() === needle));
+  if (!hit || !hit.key) throw new Error(`Unknown tag. Known: ${(tags || []).map(tag => tag.key).filter(Boolean).join(", ") || "none"}`);
+  return hit;
+}
+function rssToolArticleCard(article, feedTitle) {
+  return {
+    id: article.id,
+    title: article.title || "Untitled",
+    url: article.url || "",
+    feed: feedTitle || "",
+    published_at: article.published_at || article.received_at || "",
+    is_read: !!article.is_read,
+    is_saved: !!article.is_saved,
+    captured: !!article.captured,
+    grade: article.grade && article.grade.level || "",
+    excerpt: cheapExcerpt(article.body)
+  };
+}
 async function executeRssCommand(ctx, host2, owner, command) {
   const library = createLibrary(owner, url => fetchFeed(host2, url), transact);
   const payload = command.payload || {};
   if (command.action === "refresh") {
     rssDebug("command-start", { action: command.action, id: command.id, owner });
+    if (payload.target) {
+      const feeds = await library("/feeds");
+      const feed = rssToolFindFeed(feeds, payload.target);
+      if (!feed) throw new Error(`Subscription not found: ${payload.target}`);
+      await library(`/feeds/${feed.id}/refresh`, { method: "POST", body: {} });
+      publishLibraryChange(owner, `Refreshed ${feed.title}.`);
+      return { refreshed: feed.title };
+    }
     const result = await refreshSubscriptions(library);
     const at = Date.now();
     storageSet(ctx, "lastRefresh", owner, at);
     rssDebug("command-refresh-result", { id: command.id, owner, added: result.added, failed: result.failed, fresh: result.fresh?.length || 0 });
     publishLibraryChange(owner, `${result.added} new articles${result.failed ? ` · ${result.failed} feeds could not refresh.` : " · Up to date."}`);
-    return;
+    return { added: result.added, failed: result.failed, fresh: result.fresh?.length || 0 };
   }
   if (command.action === "refresh-period") {
     const next = readSettings(ctx, owner);
@@ -1423,6 +1477,183 @@ async function executeRssCommand(ctx, host2, owner, command) {
     publishLibraryChange(owner, `Added ${parts.title || discovered.title || discovered.url}${payload.folder ? ` to ${payload.folder}` : ""}.`);
     return;
   }
+
+  if (command.action === "list-feeds") {
+    const feeds = await library("/feeds");
+    return { feeds: feeds.map(feed => ({ id: feed.id, title: feed.title, url: feed.url, folder: feed.folder || "", unread: feed.unread || 0, saved: feed.saved || 0 })) };
+  }
+  if (command.action === "list-folders") {
+    return { folders: await library("/folders") };
+  }
+  if (command.action === "list-articles") {
+    const feeds = await library("/feeds");
+    const byId = new Map(feeds.map(feed => [feed.id, feed]));
+    const view = ["unread", "saved"].includes(payload.view) ? payload.view : "all";
+    const query = String(payload.query || "").trim();
+    const limit = Math.max(1, Math.min(80, Number(payload.limit) || 20));
+    let feedId = "";
+    if (payload.feed) {
+      const feed = rssToolFindFeed(feeds, payload.feed);
+      if (!feed) throw new Error(`Subscription not found: ${payload.feed}`);
+      feedId = feed.id;
+    } else if (payload.folder) {
+      const folder = String(payload.folder).trim().toLowerCase();
+      const ids = feeds.filter(feed => String(feed.folder || "").trim().toLowerCase() === folder).map(feed => feed.id);
+      if (!ids.length) throw new Error(`Folder not found: ${payload.folder}`);
+      const rows = [];
+      for (const id of ids) {
+        const batch = await library(`/articles?view=${encodeURIComponent(view)}&feed_id=${encodeURIComponent(id)}&limit=${limit}&q=${encodeURIComponent(query)}`);
+        rows.push(...batch);
+      }
+      return { articles: rows.slice(0, limit).map(article => rssToolArticleCard(article, (byId.get(article.feed_id) || {}).title || "")) };
+    }
+    const params = new URLSearchParams({ view, limit: String(limit) });
+    if (query) params.set("q", query);
+    if (feedId) params.set("feed_id", feedId);
+    const rows = await library(`/articles?${params}`);
+    return { articles: rows.map(article => rssToolArticleCard(article, (byId.get(article.feed_id) || {}).title || "")) };
+  }
+  if (command.action === "find") {
+    const needle = String(payload.query || "").trim().toLowerCase();
+    if (!needle) throw new Error("Give a search phrase.");
+    const feeds = await library("/feeds");
+    const byId = new Map(feeds.map(feed => [feed.id, feed]));
+    let pool = feeds;
+    if (payload.feed) {
+      const feed = rssToolFindFeed(feeds, payload.feed);
+      if (!feed) throw new Error(`Subscription not found: ${payload.feed}`);
+      pool = [feed];
+    } else if (payload.folder) {
+      const folder = String(payload.folder).trim().toLowerCase();
+      pool = feeds.filter(feed => String(feed.folder || "").trim().toLowerCase() === folder);
+      if (!pool.length) throw new Error(`Folder not found: ${payload.folder}`);
+    }
+    const allowed = new Set(pool.map(feed => feed.id));
+    const rows = await library("/articles?view=all&show_hidden=true&limit=300");
+    const limit = Math.max(1, Math.min(12, Number(payload.limit) || 8));
+    const hits = rows.filter(article => allowed.has(article.feed_id) && String(article.title || "").toLowerCase().includes(needle));
+    const read = hits.slice(0, limit);
+    const extra = hits.slice(limit);
+    return {
+      query: String(payload.query || "").trim(),
+      count: hits.length,
+      articles: read.map(article => ({ ...rssToolArticleCard(article, (byId.get(article.feed_id) || {}).title || ""), body: articleMarkdown(article) })),
+      more_titles: extra.map(article => ({ id: article.id, title: article.title || "Untitled", feed: (byId.get(article.feed_id) || {}).title || "", url: article.url || "" }))
+    };
+  }
+  if (command.action === "get-article") {
+    const feeds = await library("/feeds");
+    const articles = await library("/articles?view=all&show_hidden=true&limit=300");
+    const article = rssToolFindArticle(articles, payload);
+    if (!article) throw new Error("Article not found.");
+    const full = await library(`/articles/${article.id}`);
+    const feed = feeds.find(item => item.id === full.feed_id);
+    return { ...rssToolArticleCard(full, feed && feed.title || ""), body: articleMarkdown(full) };
+  }
+  if (command.action === "capture") {
+    const articles = await library("/articles?view=all&show_hidden=true&limit=300");
+    const article = rssToolFindArticle(articles, payload);
+    if (!article) throw new Error("Article not found.");
+    if (!article.url) throw new Error("This article has no URL to capture.");
+    const result = await captureArticle(host2, article.url, { paywallServices: readSettings(ctx, owner).paywallServices, knownLength: (article.body || "").length, urgent: true });
+    const fullBody = result && result.body;
+    if (fullBody && fullBody.length > (article.body || "").length) {
+      await library(`/articles/${article.id}/capture`, { method: "POST", body: { body: fullBody } });
+    }
+    const full = await library(`/articles/${article.id}`);
+    return { captured: !!full.captured, source: result && result.source || "", ...rssToolArticleCard(full, ""), body: articleMarkdown(full) };
+  }
+  if (command.action === "remove") {
+    const feeds = await library("/feeds");
+    const feed = rssToolFindFeed(feeds, payload.target);
+    if (!feed) throw new Error(`Subscription not found: ${payload.target}`);
+    await library(`/feeds/${feed.id}`, { method: "DELETE" });
+    publishLibraryChange(owner, `Unsubscribed from ${feed.title}.`);
+    return { removed: feed.title };
+  }
+  if (command.action === "move-feed") {
+    const feeds = await library("/feeds");
+    const feed = rssToolFindFeed(feeds, payload.target);
+    if (!feed) throw new Error(`Subscription not found: ${payload.target}`);
+    const folder = String(payload.folder || "").trim().slice(0, 100);
+    const folders = {};
+    for (const item of feeds) folders[item.id] = item.id === feed.id ? folder : (item.folder || "");
+    await library("/feeds/reorder", { method: "POST", body: { order: feeds.map(item => item.id), folders } });
+    publishLibraryChange(owner, folder ? `Moved ${feed.title} to ${folder}.` : `Moved ${feed.title} to Ungrouped.`);
+    return { moved: feed.title, folder };
+  }
+  if (command.action === "add-folder") {
+    const name = String(payload.name || "").trim().slice(0, 100);
+    if (!name) throw new Error("Folder name is empty.");
+    await library("/folders", { method: "POST", body: { action: "create", name } });
+    publishLibraryChange(owner, `Folder created: ${name}`);
+    return { folder: name };
+  }
+  if (command.action === "star") {
+    const articles = await library("/articles?view=all&show_hidden=true&limit=300");
+    const article = rssToolFindArticle(articles, payload);
+    if (!article) throw new Error("Article not found.");
+    const saved = payload.saved !== false;
+    await library(`/articles/${article.id}`, { method: "PATCH", body: { is_saved: saved } });
+    publishLibraryChange(owner, saved ? `Starred ${article.title}.` : `Removed star from ${article.title}.`);
+    return { id: article.id, title: article.title, is_saved: saved };
+  }
+  if (command.action === "tag") {
+    const articles = await library("/articles?view=all&show_hidden=true&limit=300");
+    const article = rssToolFindArticle(articles, payload);
+    if (!article) throw new Error("Article not found.");
+    const tag = rssToolResolveTag(ctx, owner, payload.tag || payload.level);
+    await library("/articles/grades", { method: "POST", body: { grades: [{ id: article.id, level: tag.key, reason: String(payload.reason || "set by Hermes").slice(0, 140) }] } });
+    publishLibraryChange(owner, `Tagged ${article.title} as ${tag.key}.`);
+    return { id: article.id, title: article.title, tag: tag.key };
+  }
+  if (command.action === "untag") {
+    const articles = await library("/articles?view=all&show_hidden=true&limit=300");
+    const article = rssToolFindArticle(articles, payload);
+    if (!article) throw new Error("Article not found.");
+    await library(`/articles/${article.id}`, { method: "PATCH", body: { clear_grade: true } });
+    publishLibraryChange(owner, `Removed tag from ${article.title}.`);
+    return { id: article.id, title: article.title, tag: "" };
+  }
+  if (command.action === "list-filters") {
+    const filters = await library("/filters");
+    return {
+      mutes: (filters.mutes || []).map(rule => ({ id: rule.id, kind: rule.kind === "tag" || rule.tag ? "tag" : "keyword", phrase: rule.phrase || "", tag: rule.tag || "", hits: rule.hits || 0 })),
+      searches: (filters.searches || []).map(rule => ({ id: rule.id, name: rule.name || "", exclude: rule.exclude || "", enabled: rule.enabled !== false }))
+    };
+  }
+  if (command.action === "add-filter") {
+    const kind = String(payload.kind || "").trim().toLowerCase() === "tag" ? "tag" : "keyword";
+    if (kind === "tag") {
+      const tag = rssToolResolveTag(ctx, owner, payload.tag || payload.phrase);
+      await library("/filters/mutes", { method: "POST", body: { phrase: tag.label || tag.key, kind: "tag", tag: tag.key, folders: [], feed_ids: [] } });
+      publishLibraryChange(owner, `Filter added for tag ${tag.key}.`);
+      return { kind: "tag", tag: tag.key };
+    }
+    const phrase = String(payload.phrase || payload.query || "").trim().slice(0, 200);
+    if (!phrase) throw new Error("Give a keyword.");
+    await library("/filters/mutes", { method: "POST", body: { phrase, folders: [], feed_ids: [] } });
+    publishLibraryChange(owner, `Muted across all feeds: ${phrase}`);
+    return { kind: "keyword", phrase };
+  }
+  if (command.action === "remove-filter") {
+    const filters = await library("/filters");
+    const needle = String(payload.id || payload.phrase || payload.tag || payload.query || "").trim().toLowerCase();
+    if (!needle) throw new Error("Give a filter id, keyword, or tag.");
+    const mute = (filters.mutes || []).find(rule => rule.id === needle || String(rule.phrase || "").toLowerCase() === needle || String(rule.tag || "").toLowerCase() === needle);
+    if (mute) {
+      await library(`/filters/mutes/${mute.id}`, { method: "DELETE" });
+      publishLibraryChange(owner, `Removed filter ${mute.phrase || mute.tag}.`);
+      return { removed: { kind: mute.kind === "tag" || mute.tag ? "tag" : "keyword", id: mute.id, phrase: mute.phrase || "", tag: mute.tag || "" } };
+    }
+    const search = (filters.searches || []).find(rule => rule.id === needle || String(rule.exclude || rule.name || "").toLowerCase() === needle);
+    if (search) {
+      await library(`/filters/searches/${search.id}`, { method: "DELETE" });
+      publishLibraryChange(owner, `Removed saved exclude ${search.exclude || search.name}.`);
+      return { removed: { kind: "search", id: search.id, phrase: search.exclude || search.name || "" } };
+    }
+    throw new Error("Filter not found.");
+  }
   throw new Error("Unknown RSS command.");
 }
 function startRssCommandBridge(ctx, host2) {
@@ -1438,13 +1669,19 @@ function startRssCommandBridge(ctx, host2) {
       const commands = await rssCommandQueue(host2, route);
       for (const command of commands) {
         if (seen.has(command.id)) continue;
+        let reply = { id: command.id, ok: true, result: null, error: "" };
         try {
-          await executeRssCommand(ctx, host2, owner, command);
+          reply.result = await executeRssCommand(ctx, host2, owner, command) || { ok: true };
           rememberRssCommand(ctx, owner, seen, command.id);
         } catch (error) {
           rssDebug("command-error", { id: command.id, action: command.action, message: error?.message || error, stack: error?.stack || "" });
           rememberRssCommand(ctx, owner, seen, command.id);
-          publishLibraryChange(owner, `RSS command failed: ${String(error?.message || error).slice(0, 300)}`);
+          reply.ok = false;
+          reply.error = String(error?.message || error).slice(0, 300);
+          publishLibraryChange(owner, `RSS command failed: ${reply.error}`);
+        }
+        if (command.reply) {
+          try { await rssRest("/command-result", { method: "POST", body: reply }); } catch {}
         }
       }
     } catch (error) {
@@ -4212,6 +4449,7 @@ function ReaderProfile({ ctx, owner }) {
     storageSet(ctx, "settings", owner, next);
     setSettings(next);
     setDraft(next);
+    void rssRest("/tools-enabled", { method: "POST", body: { enabled: next.registerHermesTools === true } }).catch(() => {});
     window.dispatchEvent(new CustomEvent("hermes-rss-ticker-preview", { detail: { owner, settings: next } }));
     if (next.fullCapture) {
       void libraryRequest("/articles?uncaptured=1").then((rows) => {
@@ -4505,7 +4743,12 @@ function ReaderProfile({ ctx, owner }) {
               ] }),
               jsx(Segmented, { value: String(normalizeRefreshMinutes(draft.refreshMinutes)), onChange: v => updateDraft({ ...draft, refreshMinutes: Number(v) }), options: REFRESH_MINUTES.map((n) => ({ id: String(n), label: n })) })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Fetches new posts on this interval, including the headline ticker, only while the Hermes desktop client is open." : "Background refresh is unavailable on this Hermes build. Use Refresh." })
+            jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Fetches new posts on this interval, including the headline ticker, only while the Hermes desktop client is open." : "Background refresh is unavailable on this Hermes build. Use Refresh." }),
+            jsx("label", { className: "rss-setting", children: [
+              jsx("input", { type: "checkbox", checked: draft.registerHermesTools === true, onChange: event => updateDraft({ ...draft, registerHermesTools: event.target.checked }) }),
+              "Register Hermes Tools"
+            ] }),
+            jsx("p", { className: "rss-muted rss-small", children: "Adds an rss tool so Hermes can read posts, manage subscriptions, capture full articles, and refresh feeds. Hermes desktop must be running. The RSS Reader page does not need to be open." }),
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "Capturing" }),
@@ -4572,8 +4815,7 @@ function ReaderProfile({ ctx, owner }) {
             jsx(Button, { type: "button", disabled, onClick: chooseFile, children: "Import OPML" }),
             jsx(Button, { type: "button", variant: "ghost", disabled: disabled || !feeds.data?.length, onClick: exportFeeds, children: "Export OPML" })
           ] })
-        ] }),
-        jsx("p", { className: "rss-muted rss-small", children: "Import or export your subscription list as OPML." })
+        ] })
       ] })
     ] }),
     feedToRemove && jsxs("div", { className: "rss-confirm", role: "alertdialog", ref: confirmation, tabIndex: -1, "aria-labelledby": "rss-unsubscribe-title", children: [
@@ -5209,13 +5451,13 @@ var plugin_default = {
   id: ID,
   name: "RSS Reader",
   description: "RSS reader with reader-mode capture, edit-mode subscriptions, and keyboard shortcuts.",
-  version: "1.0.2",
+  version: "1.0.3",
   defaultEnabled: true,
   register(ctx) {
     rssRest = typeof ctx.rest === "function" ? ctx.rest : null;
     if (!rssRest) throw new Error("RSS Reader requires the plugin REST API.");
     rssCtx = ctx;
-    rssDebug("register", { id: ID, version: "1.0.2" });
+    rssDebug("register", { id: ID, version: "1.0.3" });
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
     if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
     ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);

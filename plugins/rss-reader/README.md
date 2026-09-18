@@ -3,7 +3,7 @@
   <h1>RSS Reader</h1>
   <strong>A calmer place for the stories you mean to finish.</strong>
   <p>Read, organize, search, summarize, and investigate RSS and Atom feeds without turning your reading list into another job.</p>
-  [![Hermes Desktop](https://img.shields.io/badge/Hermes%20Desktop-plugin-6f42c1)](https://github.com/NousResearch/hermes-agent) [![Version](https://img.shields.io/badge/version-1.0.2-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  [![Hermes Desktop](https://img.shields.io/badge/Hermes%20Desktop-plugin-6f42c1)](https://github.com/NousResearch/hermes-agent) [![Version](https://img.shields.io/badge/version-1.0.3-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
 </div>
 
 [Install it](#install) · [See what it does](#what-it-does) · [Understand the data](#privacy)

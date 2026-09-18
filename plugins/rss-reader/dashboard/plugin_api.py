@@ -39,6 +39,17 @@ class PreferenceFileRequest(BaseModel):
     content: str
 
 
+class ToolsEnabledRequest(BaseModel):
+    enabled: bool = False
+
+
+class CommandResultRequest(BaseModel):
+    id: str
+    ok: bool = True
+    result: object | None = None
+    error: str = ""
+
+
 class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -113,6 +124,42 @@ def write_preference_file(payload: PreferenceFileRequest) -> dict[str, str]:
     path = _hermes_home() / "rss-reader" / payload.filename
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(payload.content, encoding="utf-8")
+    return {"path": str(path)}
+
+
+@router.post("/tools-enabled")
+def write_tools_enabled(payload: ToolsEnabledRequest) -> dict[str, bool]:
+    path = _hermes_home() / "rss-reader" / "tools-enabled.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"enabled": bool(payload.enabled)}), encoding="utf-8")
+    return {"enabled": bool(payload.enabled)}
+
+
+@router.get("/tools-enabled")
+def read_tools_enabled() -> dict[str, bool]:
+    path = _hermes_home() / "rss-reader" / "tools-enabled.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {"enabled": False}
+    return {"enabled": bool(isinstance(data, dict) and data.get("enabled") is True)}
+
+
+@router.post("/command-result")
+def write_command_result(payload: CommandResultRequest) -> dict[str, str]:
+    ident = re.sub(r"[^a-zA-Z0-9_-]", "", payload.id)[:80]
+    if not ident:
+        raise HTTPException(status_code=400, detail="Invalid command id.")
+    folder = _hermes_home() / "rss-reader" / "results"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{ident}.json"
+    path.write_text(
+        json.dumps(
+            {"id": ident, "ok": bool(payload.ok), "result": payload.result, "error": str(payload.error or "")[:400]},
+            ensure_ascii=True,
+        ),
+        encoding="utf-8",
+    )
     return {"path": str(path)}
 
 

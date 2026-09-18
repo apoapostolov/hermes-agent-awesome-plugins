@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.13.1] - 2026-09-17
+
+### Added
+
+- **rss-reader:** version `1.0.3`. Optional Register Hermes Tools adds one `rss` tool so Hermes can read and find posts, tag or untag them, manage keyword and tag filters, and change subscriptions. `/rss find` returns matching titles and post text. `/rss tag`, `/rss untag`, `/rss mute tag`, and `/rss unmute` cover the same library from chat.
+
 ## [1.12.1] - 2026-09-17
 
 ### Fixed
