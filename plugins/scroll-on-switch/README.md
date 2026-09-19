@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Scroll on Switch" />
+</div>
+
 ## What it does
 
 - Scrolls newly mounted sessions to the bottom.
