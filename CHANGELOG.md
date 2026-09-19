@@ -2,13 +2,9 @@
 
 ## [Unreleased]
 
-### Added
-
-- **rss-reader:** version `1.0.4`. Settings tab Self-Improvement runs Full Article Self-Improvement after a confirm. The button sits on the left of the two-line hint. Hermes studies the collector against live problem pages and may edit this copy. An official update overwrites those edits unless you paste the Improvement Summary into the new copy and run it again. Copy Summary puts that handoff on the clipboard. The `rss` tool's find searches titles, summaries, and captured bodies, and Hermes should use it when the user refers to RSS, RSS Reader, feeds, or an article they saw there.
-
 ### Fixed
 
-- **rss-reader:** version `1.0.4`. Full-article capture keeps https video, audio, and iframe embeds. It drops share URLs (Facebook, Twitter, LinkedIn share, Reddit submit), sponsor, recirc, native-ad, and subscribers-only rails, and stops at Recent articles or Most Popular. Short closing sentences stay. The page title is not repeated as a heading. Manual recapture replaces the stored body even when the cleaned text is shorter. The last remaining Unread post leaves an empty Unread view and hides the count. Article downloads use a browser user agent (OpenAI pages can still 403).
+- **rss-reader:** version `1.0.5`. Loads on packaged desktop. JSX uses `react` only. A find stopword list no longer looks like an illegal import.
 
 ## [1.14.0] - 2026-09-18
 

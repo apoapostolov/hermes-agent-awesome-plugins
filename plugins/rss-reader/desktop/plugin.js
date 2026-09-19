@@ -1,5 +1,5 @@
 // src/plugin.jsx
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createElement, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Codicon,
@@ -1402,7 +1402,7 @@ async function startRefinementConversation(host2, days) {
   await host2.openSession(created.stored_session_id, { profile: route.profile, route, intent: "main" });
 }
 function rssFindTokens(query) {
-  const stop = new Set(["a", "an", "the", "that", "this", "those", "these", "about", "article", "articles", "post", "posts", "rss", "feed", "feeds", "reader", "in", "on", "of", "for", "to", "from", "with", "and", "or", "my", "your", "our"]);
+  const stop = new Set("a an the that this those these about article articles post posts rss feed feeds reader in on of for to from with and or my your our".split(" "));
   const words = String(query || "").toLowerCase().match(/[a-z0-9][a-z0-9'+-]*/g) || [];
   const tokens = [];
   for (const word of words) {
@@ -3180,7 +3180,11 @@ html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
 `;
 
 // src/plugin.jsx
-import { Fragment, jsx, jsxs } from "react/jsx-runtime";
+function jsx(type, props, key) {
+  if (key !== undefined) props = Object.assign({}, props, { key });
+  return createElement(type, props);
+}
+var jsxs = jsx;
 var ID = "rss-reader";
 var SOURCE_URL = "https://github.com/apoapostolov/hermes-agent-awesome-plugins";
 // Personal GitHub promo for Apo's pack. Never include this logo or link in PRs to other projects.
@@ -5732,13 +5736,13 @@ var plugin_default = {
   id: ID,
   name: "RSS Reader",
   description: "RSS reader with reader-mode capture, edit-mode subscriptions, and keyboard shortcuts.",
-  version: "1.0.4",
+  version: "1.0.5",
   defaultEnabled: true,
   register(ctx) {
     rssRest = typeof ctx.rest === "function" ? ctx.rest : null;
     if (!rssRest) throw new Error("RSS Reader requires the plugin REST API.");
     rssCtx = ctx;
-    rssDebug("register", { id: ID, version: "1.0.4" });
+    rssDebug("register", { id: ID, version: "1.0.5" });
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
     if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
     ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);
