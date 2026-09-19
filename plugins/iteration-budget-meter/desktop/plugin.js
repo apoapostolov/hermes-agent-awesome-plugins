@@ -12,10 +12,9 @@
  * (see ceilingSuggestion).
  * v1.2.1: chained-continuation fix. The gateway emits message.complete and a
  * busy dip between chained segments of one logical request (goal follow-ups,
- * queued drains, auto-continue), which reset the counter mid-request. A
- * GAP_MS grace window now separates a real request boundary (idle persists
- * past the window -> commit peak + rebaseline) from a chained segment (busy
- * returns inside the window -> same request continues).
+ * queued drains, auto-continue), which reset the counter mid-request.
+ * v1.2.2: every observed busy->idle edge is a per-round boundary, and focused
+ * session changes reset the baseline before the next usage sample.
  */
 import { cn, host, Tip as Tooltip, Popover, PopoverContent, PopoverTrigger, useValue } from '@hermes/plugin-sdk'
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
@@ -33,7 +32,6 @@ const RED = '#ef4444'
 // ceiling-suggestion stats.
 const _turnPeaks = []
 const MAX_TURNS = 30
-const GAP_MS = 4000 // idle window that ends a request; shorter gaps = chained continuation
 const MIN_SAMPLE_FOR_SUGGESTION = 5 // finished requests before suggesting a ceiling
 const MIN_HITS = 2 // ...and the cap must have been hit at least twice
 const MIN_HIT_RATIO = 0.2 // suggest only when >= 20% of requests hit the cap
@@ -72,80 +70,57 @@ function IterBudgetChip() {
   // (per-request stats) on click and on each turn boundary.
   const [, bump] = useState(0)
 
+  const sessionId = useValue(host.state.focusedSessionId)
+  const previousSessionId = useRef(null)
+  const hasSession = useRef(false)
   const wasBusy = useRef(false)
   const peak = useRef(0)
-  // Cumulative session counter observed at the request's start boundary.
-  // Null until the first observation; clamped while running.
+  // Cumulative session counter observed at the current round's start.
   const base = useRef(null)
-  // Chained-continuation guard (v1.2.1): the gateway emits message.complete +
-  // a busy dip between chained segments of ONE logical request (goal
-  // follow-ups, queued-prompt drains, synthetic/auto-continue turns), so a
-  // busy->idle edge must NOT immediately commit the peak and rebaseline.
-  // Arm a grace window instead: if busy returns before the window ends, the
-  // same request continues (base and peak survive); if the session stays idle
-  // for GAP_MS, the timeout commits the peak and rebaselines to the value
-  // observed at the idle edge (usage merges that land later cannot shift it).
-  const commitTimer = useRef(null)
-  const pendingPeak = useRef(0)
-  const armCalls = useRef(null)
-
-  const cancelCommit = () => {
-    if (commitTimer.current !== null) {
-      clearTimeout(commitTimer.current)
-      commitTimer.current = null
-    }
-    pendingPeak.current = 0
-    armCalls.current = null
-  }
 
   useEffect(() => {
     const isBusy = !!busy
     const calls = usage && typeof usage.calls === 'number' && usage.calls >= 0 ? usage.calls : null
+    const sessionChanged = hasSession.current && previousSessionId.current !== sessionId
+
+    // A focused-session change is a hard boundary. Never compare cumulative
+    // usage from one session with the baseline of another session.
+    if (sessionChanged) {
+      if (peak.current > 0) pushPeak(peak.current)
+      base.current = calls
+      peak.current = 0
+      wasBusy.current = isBusy
+      previousSessionId.current = sessionId
+      hasSession.current = true
+      bump(Date.now())
+      return
+    }
+    previousSessionId.current = sessionId
+    hasSession.current = true
 
     if (!isBusy) {
       if (wasBusy.current) {
-        // Request may be over OR just chaining: arm the grace window.
-        pendingPeak.current = peak.current
-        armCalls.current = calls !== null && base.current !== null ? Math.max(base.current, calls) : calls
-        commitTimer.current = setTimeout(() => {
-          commitTimer.current = null
-          if (pendingPeak.current > 0) pushPeak(pendingPeak.current)
-          if (armCalls.current !== null && (base.current === null || armCalls.current >= base.current)) {
-            base.current = armCalls.current
-          }
-          pendingPeak.current = 0
-          armCalls.current = null
-          peak.current = 0
-          bump(Date.now())
-        }, GAP_MS)
+        // Every observed idle edge closes one normal round. This deliberately
+        // resets goal, queue, loop, and auto-continue segments independently.
+        if (peak.current > 0) pushPeak(peak.current)
+        peak.current = 0
+        if (calls !== null) base.current = calls
         bump(Date.now())
-      } else if (base.current === null && calls !== null) {
-        // First observation while idle seeds the baseline.
+      } else if (calls !== null) {
+        // Idle usage may arrive after message.complete. Keep the next round's
+        // baseline at the latest settled cumulative value.
         base.current = calls
       }
-    } else {
-      if (commitTimer.current !== null) cancelCommit() // chained segment: same request
-      if (calls !== null) {
-        // Rebaseline on session switch / first mount; the old peak belonged
-        // to the old baseline, so reset it with the base.
-        if (base.current === null || calls < base.current) {
-          base.current = calls
-          peak.current = 0
-        }
-        const delta = calls - base.current
-        if (delta > peak.current) peak.current = delta
+    } else if (calls !== null) {
+      if (base.current === null || calls < base.current) {
+        base.current = calls
+        peak.current = 0
       }
+      const delta = calls - base.current
+      if (delta > peak.current) peak.current = delta
     }
     wasBusy.current = isBusy
-  }, [busy, usage])
-
-  // Timeout cleanup on unmount.
-  useEffect(
-    () => () => {
-      if (commitTimer.current !== null) clearTimeout(commitTimer.current)
-    },
-    []
-  )
+  }, [busy, usage, sessionId])
 
   // Hidden while idle — the chip only exists during a running turn.
   if (!busy) return null
