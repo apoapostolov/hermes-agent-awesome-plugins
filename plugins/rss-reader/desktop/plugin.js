@@ -1401,6 +1401,28 @@ async function startRefinementConversation(host2, days) {
   assertOwner(host2, route);
   await host2.openSession(created.stored_session_id, { profile: route.profile, route, intent: "main" });
 }
+function rssFindTokens(query) {
+  const stop = new Set(["a", "an", "the", "that", "this", "those", "these", "about", "article", "articles", "post", "posts", "rss", "feed", "feeds", "reader", "in", "on", "of", "for", "to", "from", "with", "and", "or", "my", "your", "our"]);
+  const words = String(query || "").toLowerCase().match(/[a-z0-9][a-z0-9'+-]*/g) || [];
+  const tokens = [];
+  for (const word of words) {
+    if (word.length < 2 || stop.has(word)) continue;
+    if (!tokens.includes(word)) tokens.push(word);
+  }
+  if (tokens.length) return tokens;
+  const trimmed = String(query || "").trim().toLowerCase();
+  return trimmed ? [trimmed] : [];
+}
+function rssArticleFindHaystack(article, feedTitle) {
+  return `${article && article.title || ""}\n${article && article.body || ""}\n${feedTitle || ""}`.toLowerCase();
+}
+function rssArticleFindScore(article, feedTitle, tokens) {
+  if (!tokens || !tokens.length) return 0;
+  const title = String(article && article.title || "").toLowerCase();
+  const hay = rssArticleFindHaystack(article, feedTitle);
+  if (!tokens.every(token => hay.includes(token))) return 0;
+  return tokens.every(token => title.includes(token)) ? 2 : 1;
+}
 function rssToolFindFeed(feeds, target) {
   const needle = String(target || "").trim().toLowerCase();
   if (!needle) return null;
@@ -1580,8 +1602,8 @@ async function executeRssCommand(ctx, host2, owner, command) {
     return { articles: rows.map(article => rssToolArticleCard(article, (byId.get(article.feed_id) || {}).title || "")) };
   }
   if (command.action === "find") {
-    const needle = String(payload.query || "").trim().toLowerCase();
-    if (!needle) throw new Error("Give a search phrase.");
+    const tokens = rssFindTokens(payload.query);
+    if (!tokens.length) throw new Error("Give a search phrase.");
     const feeds = await library("/feeds");
     const byId = new Map(feeds.map(feed => [feed.id, feed]));
     let pool = feeds;
@@ -1595,16 +1617,26 @@ async function executeRssCommand(ctx, host2, owner, command) {
       if (!pool.length) throw new Error(`Folder not found: ${payload.folder}`);
     }
     const allowed = new Set(pool.map(feed => feed.id));
-    const rows = await library("/articles?view=all&show_hidden=true&limit=300");
+    const rows = await library("/articles?view=all&show_hidden=true&limit=800");
     const limit = Math.max(1, Math.min(12, Number(payload.limit) || 8));
-    const hits = rows.filter(article => allowed.has(article.feed_id) && String(article.title || "").toLowerCase().includes(needle));
-    const read = hits.slice(0, limit);
-    const extra = hits.slice(limit);
+    const scored = [];
+    for (const article of rows) {
+      if (!allowed.has(article.feed_id)) continue;
+      const feedTitle = (byId.get(article.feed_id) || {}).title || "";
+      const score = rssArticleFindScore(article, feedTitle, tokens);
+      if (!score) continue;
+      scored.push({ article, score, feedTitle, published: article.published_at || article.received_at || "" });
+    }
+    scored.sort((a, b) => b.score - a.score || String(b.published).localeCompare(String(a.published)));
+    const hits = scored.map(row => row.article);
+    const read = scored.slice(0, limit);
+    const extra = scored.slice(limit);
     return {
       query: String(payload.query || "").trim(),
+      tokens,
       count: hits.length,
-      articles: read.map(article => ({ ...rssToolArticleCard(article, (byId.get(article.feed_id) || {}).title || ""), body: articleMarkdown(article) })),
-      more_titles: extra.map(article => ({ id: article.id, title: article.title || "Untitled", feed: (byId.get(article.feed_id) || {}).title || "", url: article.url || "" }))
+      articles: read.map(row => ({ ...rssToolArticleCard(row.article, row.feedTitle), body: articleMarkdown(row.article) })),
+      more_titles: extra.map(row => ({ id: row.article.id, title: row.article.title || "Untitled", feed: row.feedTitle, url: row.article.url || "" }))
     };
   }
   if (command.action === "get-article") {

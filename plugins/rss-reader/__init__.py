@@ -144,7 +144,7 @@ def _parse(raw_args: str) -> tuple[str, dict[str, Any]] | None:
     if action in {"find", "search"}:
         phrase = rest[:_MAX_TEXT].strip()
         if not phrase:
-            raise ValueError("Usage: /rss find <text in article titles>")
+            raise ValueError("Usage: /rss find <text in titles or article bodies>")
         return "find", {"query": phrase}
 
     raise ValueError(f"Unknown RSS action '{action}'. {_usage()}")

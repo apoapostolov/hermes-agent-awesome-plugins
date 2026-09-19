@@ -4,7 +4,7 @@
 
 ### Added
 
-- **rss-reader:** version `1.0.4`. Settings tab Self-Improvement runs Full Article Self-Improvement after a confirm. The button sits on the left of the two-line hint. Hermes studies the collector against live problem pages and may edit this copy. An official update overwrites those edits unless you paste the Improvement Summary into the new copy and run it again. Copy Summary puts that handoff on the clipboard.
+- **rss-reader:** version `1.0.4`. Settings tab Self-Improvement runs Full Article Self-Improvement after a confirm. The button sits on the left of the two-line hint. Hermes studies the collector against live problem pages and may edit this copy. An official update overwrites those edits unless you paste the Improvement Summary into the new copy and run it again. Copy Summary puts that handoff on the clipboard. The `rss` tool's find searches titles, summaries, and captured bodies, and Hermes should use it when the user refers to RSS, RSS Reader, feeds, or an article they saw there.
 
 ### Fixed
 

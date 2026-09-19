@@ -35,10 +35,9 @@ _ACTIONS = (
 RSS_SCHEMA = {
     "name": "rss",
     "description": (
-        "Use list_articles, find, or get_article to learn from posts, tag_article/untag_article to set tags, "
-        "add_filter/remove_filter for keyword or tag filters, add_feed/remove_feed/move_feed "
-        "to organize subscriptions, capture_article for full text, and refresh to fetch feeds. "
-        "Hermes desktop must be running; the RSS Reader page does not need to be open."
+        "When the user refers to RSS, RSS Reader, feeds, or an article they saw there, use this tool as library context. "
+        "find searches titles, summaries, and full captured text; put distinctive topic words in query (example: paizo), not filler like 'that article'. "
+        "get_article loads one post by id. list_articles lists recent rows. Hermes desktop must be running; the RSS Reader page does not need to be open."
     ),
     "parameters": {
         "type": "object",
@@ -48,7 +47,7 @@ RSS_SCHEMA = {
                 "enum": list(_ACTIONS),
                 "description": "Library action to run.",
             },
-            "query": {"type": "string", "description": "Search phrase. find matches article titles, then returns those posts' text."},
+            "query": {"type": "string", "description": "Search phrase for find. Matches titles, summaries, and full article text. Use topic words, not 'rss article'."},
             "view": {
                 "type": "string",
                 "enum": ["all", "unread", "saved"],
@@ -138,7 +137,7 @@ def _run(action: str, payload: dict[str, Any], timeout: float = 90.0) -> str:
     return _wait_result(_enqueue(action, payload), timeout)
 
 
-def handle_rss(args: dict[str, Any]) -> str:
+def handle_rss(args: dict[str, Any], **_extra: Any) -> str:
     action = str(args.get("action") or "").strip()
     if action not in _ACTIONS:
         return f"Unknown RSS action '{action}'."
