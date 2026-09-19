@@ -13,6 +13,10 @@
   <img src="docs/hero.png" width="100%" alt="Iteration Budget Meter" />
 </div>
 
+## See it in action
+
+![Iteration Budget Meter showing per-turn usage and request statistics](docs/iteration-budget-meter.png)
+
 ## What it does
 
 - **Watch the current turn.** See tool-call usage against the session's iteration budget while work runs.
