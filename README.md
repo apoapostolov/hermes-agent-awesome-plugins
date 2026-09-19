@@ -18,6 +18,10 @@
 
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Hermes Agent Awesome Plugins" />
+</div>
+
 ## What this pack is for
 
 Hermes Agent Awesome Plugins adds small, focused capabilities to Hermes Desktop. Each plugin owns one desktop problem and documents its own behavior, requirements, and checks.

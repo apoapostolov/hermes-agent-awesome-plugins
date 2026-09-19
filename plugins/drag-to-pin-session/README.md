@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Drag to Pin Session" />
+</div>
+
 ## What it does
 
 - **Pin by dragging.** Drag a session row into **Pinned** and drop at the visible slot.

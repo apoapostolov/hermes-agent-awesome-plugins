@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Intelligent Tool Break" />
+</div>
+
 ## What it does
 
 - **Break the newest task.** `/break` stops the newest in-flight spawn tree and keeps the turn alive.

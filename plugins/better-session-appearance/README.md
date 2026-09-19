@@ -7,6 +7,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Better Session Appearance" />
+</div>
+
 ## Screenshot
 
 <div align="center">

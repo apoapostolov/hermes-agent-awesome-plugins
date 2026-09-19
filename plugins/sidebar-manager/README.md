@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Sidebar Manager" />
+</div>
+
 ## What it does
 
 - A dim list-ordered glyph sits after the New session keyboard hint. Click it to enter edit mode. Click it again, or press Escape, to leave. Row drag handles stay the gripper.

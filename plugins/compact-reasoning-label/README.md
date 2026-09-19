@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Compact Reasoning Label" />
+</div>
+
 ## Screenshot
 
 <div align="center">

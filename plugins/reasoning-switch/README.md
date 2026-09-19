@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Reasoning Switch" />
+</div>
+
 ## What it does
 
 - **Cycle from the status bar.** The active level is visible and a click advances through your selected rotation.

@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Memory Review" />
+</div>
+
 ## Screenshot
 
 <div align="center">

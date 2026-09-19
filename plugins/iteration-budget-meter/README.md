@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Iteration Budget Meter" />
+</div>
+
 ## What it does
 
 - **Watch the current turn.** See tool-call usage against the session's iteration budget while work runs.
