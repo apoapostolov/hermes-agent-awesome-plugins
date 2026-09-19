@@ -6,6 +6,12 @@
   [![Hermes Desktop](https://img.shields.io/badge/Hermes%20Desktop-plugin-6f42c1)](https://github.com/NousResearch/hermes-agent) [![Version](https://img.shields.io/badge/version-1.0.3-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
 </div>
 
+## Screenshot
+
+<div align="center">
+  <img src="docs/screenshot.png" alt="RSS Reader three-column layout with folders, article list, and reader pane" />
+</div>
+
 [Install it](#install) · [See what it does](#what-it-does) · [Understand the data](#privacy)
 
 ## What it does
