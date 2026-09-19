@@ -6,6 +6,12 @@
   [![Version](https://img.shields.io/badge/version-1.0.0-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
 </div>
 
+## Screenshot
+
+<div align="center">
+  <img src="docs/screenshot.png" alt="Composer model pill showing Glm 5.3 Flash next to a Med reasoning pill" />
+</div>
+
 ## What it does
 
 - The composer's model pill reads "Grok 4.6 Medium" even though a separate reasoning pill already shows the level. This plugin removes the duplicated effort word, so the model pill reads "Grok 4.6" and the reasoning pill reads "Medium".
