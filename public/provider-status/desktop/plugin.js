@@ -1368,11 +1368,6 @@ function SetupBody({ variant } = {}) {
     }
   }, [addMenuOpen])
 
-  const [applyHermesEnv, setApplyHermesEnv] = useState(Boolean(cfg.apply_hermes_env))
-  useEffect(() => {
-    setApplyHermesEnv(Boolean(cfg.apply_hermes_env))
-  }, [cfg.apply_hermes_env])
-
   if (metaWaiting) return jsx('div', { className: 'p-2 text-xs', children: 'Loading…' })
 
   const banner = (!metaLive) ? jsxs('div', {
@@ -1386,14 +1381,8 @@ function SetupBody({ variant } = {}) {
   }) : null
 
   const saveProvider = async (pid, next) => {
-    await postJson('config', { providers: { ...provCfg, [pid]: next }, order: pids, poll_minutes: cfg.poll_minutes || undefined, apply_hermes_env: applyHermesEnv })
+    await postJson('config', { providers: { ...provCfg, [pid]: next }, order: pids, poll_minutes: cfg.poll_minutes || undefined })
     postJson('refresh')
-    refetchCfg()
-  }
-
-  const saveApplyHermesEnv = async value => {
-    setApplyHermesEnv(value)
-    await postJson('config', { apply_hermes_env: value, order: pids })
     refetchCfg()
   }
 
@@ -1455,14 +1444,6 @@ function SetupBody({ variant } = {}) {
       variant === 'hermes'
         ? jsx('div', { ref: flipRef, className: 'overflow-hidden rounded-lg border border-(--stroke-nous) divide-y divide-(--ui-stroke-secondary)', children: rows })
         : jsx('div', { ref: flipRef, className: 'flex flex-col gap-2', children: rows }),
-      jsxs('div', {
-        className: 'flex items-center justify-end gap-1 text-[0.65rem] leading-none',
-        style: { color: 'var(--ui-text-quaternary)' },
-        children: [
-          jsx(Checkbox, { checked: applyHermesEnv, onCheckedChange: value => saveApplyHermesEnv(Boolean(value)), size: 'sm' }),
-          jsx('span', { children: 'Apply Changes to Hermes .env' }),
-        ],
-      }),
     ] })
 }
 
