@@ -31,7 +31,7 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 
 - **Personal behavior (before the fix):** `/decide` built `pending_dir / f"{pid}.json"` from request ids, then unlinked or applied the file. `../../` could delete or apply arbitrary user `*.json` under `HERMES_HOME`.
 - **Standing rule:** keep the hex-id gate (`^[0-9a-f]{8}$` or resolve-then-`relative_to(pending_dir)`). Do not list a build without it.
-- **Tracker:** [apoapostolov/hermes-agent-awesome-plugins#1](https://github.com/apoapostolov/hermes-agent-awesome-plugins/pull/1). Present in personal, public, and `plugins/`.
+- **Tracker:** [apoapostolov/hermes-agent-awesome-plugins#1](https://github.com/apoapostolov/hermes-agent-awesome-plugins/pull/1). Present in personal and public.
 
 ## Checklist before listing personal
 

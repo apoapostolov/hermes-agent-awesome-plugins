@@ -5,7 +5,7 @@ author: Apostol Apostolov
 license: MIT
 manifest_version: 2
 api_version: 1
-homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/better-session-appearance
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/better-session-appearance
 tags:
   - desktop
   - appearance

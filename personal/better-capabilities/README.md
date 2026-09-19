@@ -39,7 +39,7 @@ hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/herme
 Or install just this plugin:
 
 ```bash
-hermes plugins install apoapostolov/hermes-agent-awesome-plugins/plugins/better-capabilities
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/better-capabilities
 ```
 
 Enable **Better Capabilities** under **Capabilities → Plugins**. Zip and delete need the plugin's Python routes, which mount when Desktop starts. If those buttons error after a first install, fully quit and reopen Hermes Desktop once.

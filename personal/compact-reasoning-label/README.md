@@ -37,7 +37,7 @@ hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/herme
 Or install just this plugin:
 
 ```bash
-hermes plugins install apoapostolov/hermes-agent-awesome-plugins/plugins/compact-reasoning-label
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/compact-reasoning-label
 ```
 
 Enable **Compact Reasoning Label** under **Capabilities → Plugins**. Reload desktop plugins from **Cmd+K** or **Ctrl+K** on Windows if needed.

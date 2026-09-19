@@ -4,14 +4,13 @@ Repo rules for `personal/` and `public/` plugin editions.
 
 ## Editions
 
-- `personal/` is the full-featured copy Apo runs. Keep reach-in behavior he actually uses.
+- `personal/` is the full-featured copy Apo runs. Keep reach-in behavior he actually uses. The pack pins this tree.
 - `public/` is the catalog-listable edition. Stay inside the plugin SDK. Drop a surface when the hook does not exist yet.
-- `plugins/` is the pack-install path until public is listing-clean. Treat it as personal bytes unless a later note says otherwise.
 - Live installs hash against personal. Never copy a listing cut onto live or personal.
 
 ## Backport public fixes to personal
 
-When a public edition gets a real defect fix, copy that same fix onto personal in the same change. Copy it onto `plugins/` too while that tree still tracks personal.
+When a public edition gets a real defect fix, copy that same fix onto personal in the same change.
 
 A real defect is a crash, data loss, path traversal, wrong result, or a security hole. Backport it only when personal still has that code path.
 

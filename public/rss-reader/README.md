@@ -60,7 +60,7 @@ hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/herme
 Or install just this plugin:
 
 ```bash
-hermes plugins install apoapostolov/hermes-agent-awesome-plugins/plugins/rss-reader
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/rss-reader
 ```
 
 Enable **RSS Reader** under **Capabilities → Plugins**, add a feed URL, and press **Refresh**.

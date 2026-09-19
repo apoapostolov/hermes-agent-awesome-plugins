@@ -4,7 +4,7 @@ Working list for this plugin. Ideas and rejected scope live in `PROPOSAL.md`,
 the code audit in `AUDIT.md`.
 
 - Live copy: `%LOCALAPPDATA%/hermes/plugins/rss-reader/`
-- Repo: `C:/git/hermes-agent-awesome-plugins/plugins/rss-reader/`
+- Repo: `C:/git/hermes-agent-awesome-plugins/personal/rss-reader/`
 - Ship a slice: edit live → `node --check` a `.mjs` copy → `node scripts/lint-plugin.mjs <live plugin.js>` → copy live to the repo → commit and push `main` → toggle the plugin in Capabilities. Do not bump `plugin.yaml` version unless Apo asks.
 
 ---

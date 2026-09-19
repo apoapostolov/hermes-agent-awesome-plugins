@@ -28,7 +28,7 @@ const ITEM_ATTR = 'data-mrc-item'
 const SEP_ATTR = 'data-mrc-sep'
 const DOT = ' \u00b7\u00a0'
 const OPEN_EVENT = 'hermes-mrc-open'
-const SOURCE = 'https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/memory-review'
+const SOURCE = 'https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/memory-review'
 const STYLE_ID = 'memory-review-style'
 
 let rest = null

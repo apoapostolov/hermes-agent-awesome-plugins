@@ -25,7 +25,7 @@
 **Not included in `hermes-pack.yaml`.** Default off. Install it on its own:
 
 ```bash
-hermes plugins install apoapostolov/hermes-agent-awesome-plugins/plugins/reasoning-switch
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/reasoning-switch
 ```
 
 Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) **0.21.0 or newer**. Enable **Reasoning Switch** under **Capabilities → Plugins**. Use the status-bar word to cycle; open its gear for levels, colors, and limits.

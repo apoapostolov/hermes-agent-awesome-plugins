@@ -32,7 +32,7 @@ hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/herme
 Or install just this plugin:
 
 ```bash
-hermes plugins install apoapostolov/hermes-agent-awesome-plugins/plugins/sidebar-manager
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/sidebar-manager
 ```
 
 Enable **Sidebar Manager** under **Capabilities → Plugins**, then toggle it off and on once so the desktop loader picks it up.

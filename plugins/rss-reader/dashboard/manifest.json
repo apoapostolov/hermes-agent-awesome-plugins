@@ -1,7 +1,0 @@
-{
-  "name": "rss-reader",
-  "label": "RSS Reader",
-  "description": "RSS Reader backend API",
-  "version": "1.0.5",
-  "api": "plugin_api.py"
-}

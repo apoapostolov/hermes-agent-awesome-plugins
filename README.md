@@ -24,20 +24,18 @@
 
 ## Personal and public
 
-This repository keeps three trees. They are not interchangeable.
+This repository keeps two trees. They are not interchangeable.
 
-**[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk.
+**[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
 **[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. Not every personal plugin has a public copy: `better-capabilities` stays personal until a catalog hook exists.
-
-**[plugins/](plugins)** is the pack-install path. [`hermes-pack.yaml`](hermes-pack.yaml) still pins this tree. Treat it as personal bytes until a public edition is listing-clean.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/<id>
 ```
 
-The pack command in [Install](#install) still pulls `plugins/<id>`.
+The pack command in [Install](#install) pulls `personal/<id>`.
 
 ### Public listing status
 
@@ -62,39 +60,39 @@ Twelve plugins are pinned in `hermes-pack.yaml` (pack version 1.14.0). **reasoni
 
 | Plugin | What you get |
 | --- | --- |
-| [provider-status](plugins/provider-status/README.md) | Status-bar quota used/remaining. Multi-account. Rotate on low quota or reset day. Grok/Codex OAuth. Providers: tavily, opencode, deepseek, glm, openrouter, grok, codex. |
-| [iteration-budget-meter](plugins/iteration-budget-meter/README.md) | Per-turn N/budget while work runs. Hover and click for request stats. |
-| [reasoning-switch](plugins/reasoning-switch/README.md) | Cycle reasoning effort from the status bar, with colors and per-level prompt demote. **Not in the pack; enable separately.** |
+| [provider-status](personal/provider-status/README.md) | Status-bar quota used/remaining. Multi-account. Rotate on low quota or reset day. Grok/Codex OAuth. Providers: tavily, opencode, deepseek, glm, openrouter, grok, codex. |
+| [iteration-budget-meter](personal/iteration-budget-meter/README.md) | Per-turn N/budget while work runs. Hover and click for request stats. |
+| [reasoning-switch](personal/reasoning-switch/README.md) | Cycle reasoning effort from the status bar, with colors and per-level prompt demote. **Not in the pack; enable separately.** |
 
 ### Tools and Memory
 
 | Plugin | What you get |
 | --- | --- |
-| [intelligent-tool-break](plugins/intelligent-tool-break/README.md) | `/break`, `/break {msg}`, and `/again`. Desktop strip. Turn stays alive. |
-| [memory-review](plugins/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
-| [better-capabilities](plugins/better-capabilities/README.md) | Delete plugins/skills. Zip a skill. On/off presets. |
+| [intelligent-tool-break](personal/intelligent-tool-break/README.md) | `/break`, `/break {msg}`, and `/again`. Desktop strip. Turn stays alive. |
+| [memory-review](personal/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
+| [better-capabilities](personal/better-capabilities/README.md) | Delete plugins/skills. Zip a skill. On/off presets. |
 
 ### Sessions and Sidebar
 
 | Plugin | What you get |
 | --- | --- |
-| [better-session-appearance](plugins/better-session-appearance/README.md) | Idle color, bold, and icon. Auto Rules by title keywords. |
-| [sidebar-manager](plugins/sidebar-manager/README.md) | Hide and reorder nav rows and session sections. |
-| [drag-to-pin-session](plugins/drag-to-pin-session/README.md) | Drag pin/unpin with lasting order. |
-| [scroll-on-switch](plugins/scroll-on-switch/README.md) | Snap to bottom on session switch. Does not fight streaming. |
+| [better-session-appearance](personal/better-session-appearance/README.md) | Idle color, bold, and icon. Auto Rules by title keywords. |
+| [sidebar-manager](personal/sidebar-manager/README.md) | Hide and reorder nav rows and session sections. |
+| [drag-to-pin-session](personal/drag-to-pin-session/README.md) | Drag pin/unpin with lasting order. |
+| [scroll-on-switch](personal/scroll-on-switch/README.md) | Snap to bottom on session switch. Does not fight streaming. |
 
 ### Composer
 
 | Plugin | What you get |
 | --- | --- |
-| [opaque-composer](plugins/opaque-composer/README.md) | Solid composer while the transcript scrolls behind it. |
-| [compact-reasoning-label](plugins/compact-reasoning-label/README.md) | Model pill shows the name only. Effort stays in the reasoning pill. |
+| [opaque-composer](personal/opaque-composer/README.md) | Solid composer while the transcript scrolls behind it. |
+| [compact-reasoning-label](personal/compact-reasoning-label/README.md) | Model pill shows the name only. Effort stays in the reasoning pill. |
 
 ### Reading
 
 | Plugin | What you get |
 | --- | --- |
-| [rss-reader](plugins/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
+| [rss-reader](personal/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
 
 ## Install
 
@@ -135,19 +133,19 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [Personal editions](personal/README.md)
 - [Public editions](public/README.md)
 - [AGENTS.md](AGENTS.md): personal/public backport and version rules
-- [provider-status](plugins/provider-status/README.md)
-- [intelligent-tool-break](plugins/intelligent-tool-break/README.md)
-- [iteration-budget-meter](plugins/iteration-budget-meter/README.md)
-- [reasoning-switch](plugins/reasoning-switch/README.md) (not in the pack)
-- [better-session-appearance](plugins/better-session-appearance/README.md)
-- [sidebar-manager](plugins/sidebar-manager/README.md)
-- [drag-to-pin-session](plugins/drag-to-pin-session/README.md)
-- [scroll-on-switch](plugins/scroll-on-switch/README.md)
-- [opaque-composer](plugins/opaque-composer/README.md)
-- [compact-reasoning-label](plugins/compact-reasoning-label/README.md)
-- [memory-review](plugins/memory-review/README.md)
-- [better-capabilities](plugins/better-capabilities/README.md)
-- [rss-reader](plugins/rss-reader/README.md)
+- [provider-status](personal/provider-status/README.md)
+- [intelligent-tool-break](personal/intelligent-tool-break/README.md)
+- [iteration-budget-meter](personal/iteration-budget-meter/README.md)
+- [reasoning-switch](personal/reasoning-switch/README.md) (not in the pack)
+- [better-session-appearance](personal/better-session-appearance/README.md)
+- [sidebar-manager](personal/sidebar-manager/README.md)
+- [drag-to-pin-session](personal/drag-to-pin-session/README.md)
+- [scroll-on-switch](personal/scroll-on-switch/README.md)
+- [opaque-composer](personal/opaque-composer/README.md)
+- [compact-reasoning-label](personal/compact-reasoning-label/README.md)
+- [memory-review](personal/memory-review/README.md)
+- [better-capabilities](personal/better-capabilities/README.md)
+- [rss-reader](personal/rss-reader/README.md)
 - [Maintainer sync skill](skills/hermes-awesome-plugins-sync/SKILL.md)
 
 ## Support
