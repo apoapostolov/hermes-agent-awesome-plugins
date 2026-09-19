@@ -24,7 +24,7 @@
 
 ## Personal and public
 
-This repository keeps two trees. They are not interchangeable.
+This repository keeps two trees. 
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
