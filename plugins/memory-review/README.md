@@ -6,6 +6,12 @@
   [![Version](https://img.shields.io/badge/version-1.2.1-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
 </div>
 
+## Screenshot
+
+<div align="center">
+  <img src="docs/screenshot.png" alt="Memory review dialog with generic staged writes, All selected, Reject and Approve" />
+</div>
+
 ## What it does
 
 - **Open pending memory.** Use **Ctrl+K → Memory: pending** or right-click empty app chrome.
