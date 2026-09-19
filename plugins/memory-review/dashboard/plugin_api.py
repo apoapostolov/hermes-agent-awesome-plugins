@@ -45,6 +45,17 @@ def pending_dir(home: Path) -> Path:
     return home / "pending" / "memory"
 
 
+# Core writes pending ids as ``uuid4().hex[:8]``; accept only hex ids so a
+# request body cannot build a path outside ``pending/memory/`` (``../``, ``/``).
+_PENDING_ID_RE = re.compile(r"^[0-9a-f]{8,64}$")
+
+
+def pending_path(folder: Path, pid: str) -> Path | None:
+    if not _PENDING_ID_RE.fullmatch(pid):
+        return None
+    return folder / f"{pid}.json"
+
+
 def char_limits(home: Path) -> tuple[int, int]:
     memory_limit = _DEFAULT_MEMORY_LIMIT
     user_limit = _DEFAULT_USER_LIMIT
@@ -252,15 +263,19 @@ def prepare_payload(payload: dict, store) -> dict:
 def reject_ids(ids: list[str], home: Path) -> dict:
     folder = pending_dir(home)
     n = 0
+    failed: list[dict[str, str]] = []
     for pid in ids:
-        path = folder / f"{pid}.json"
+        path = pending_path(folder, pid)
+        if path is None:
+            failed.append({"id": pid, "error": "invalid id"})
+            continue
         try:
             if path.is_file():
                 path.unlink()
                 n += 1
         except OSError:
             continue
-    return {"ok": True, "rejected": n, "failed": []}
+    return {"ok": True, "rejected": n, "failed": failed}
 
 
 def _apply_one(rec: dict, apply_fn, store) -> tuple[bool, str]:
@@ -286,7 +301,10 @@ def approve_ids(ids: list[str], home: Path, apply_fn=None, store=None) -> dict:
     applied = 0
     failed: list[dict[str, str]] = []
     for pid in ids:
-        path = folder / f"{pid}.json"
+        path = pending_path(folder, pid)
+        if path is None:
+            failed.append({"id": pid, "error": "invalid id"})
+            continue
         if not path.is_file():
             failed.append({"id": pid, "error": "missing"})
             continue

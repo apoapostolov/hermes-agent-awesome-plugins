@@ -79,6 +79,33 @@ def test_reject(tmp_path: Path) -> None:
     assert [row["id"] for row in left] == ["efgh5678"]
 
 
+def test_decide_rejects_ids_outside_pending_dir(tmp_path: Path) -> None:
+    _write_pending(tmp_path, "abcd1234")
+    outside = tmp_path / "victim.json"
+    outside.write_text("{}", encoding="utf-8")
+    bad_ids = ["../../victim", "/etc/passwd", "abcd1234/../../victim", "ABCD1234", "", "abc"]
+
+    out = mod.decide("reject", bad_ids, home=tmp_path)
+    assert out["ok"] is True
+    assert out["rejected"] == 0
+    assert {row["error"] for row in out["failed"]} == {"invalid id"}
+    assert outside.is_file()
+    assert [row["id"] for row in mod.list_items(tmp_path)] == ["abcd1234"]
+
+    calls = []
+
+    def apply_spy(payload, store):
+        calls.append(payload)
+        return {"success": True}
+
+    out = mod.decide("approve", bad_ids, home=tmp_path, apply_fn=apply_spy, store=object())
+    assert out["ok"] is True
+    assert out["applied"] == 0
+    assert calls == []
+    assert all(row["error"] == "invalid id" for row in out["failed"])
+    assert outside.is_file()
+
+
 def test_approve_mocked(tmp_path: Path) -> None:
     _write_pending(tmp_path, "abcd1234")
     _write_pending(tmp_path, "deadbeef")
