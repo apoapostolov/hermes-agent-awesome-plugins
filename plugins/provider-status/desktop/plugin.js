@@ -1472,7 +1472,7 @@ const PLUGIN_ID = 'provider-status'
 
 export default {
   id: PLUGIN_ID,
-  name: 'Provider Status',
+  name: 'Provider Quota Status',
   description: 'Unified multi-provider usage bars in the statusbar with a setup modal.',
 
   register(ctx) {

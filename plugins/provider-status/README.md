@@ -1,14 +1,20 @@
 <div align="center">
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
-  <h1>Provider Status</h1>
+  <h1>Provider Quota Status</h1>
   <strong>See provider health and quota without leaving Hermes.</strong>
   <p>Track enabled providers in the status bar, keep multiple credentials organized, and rotate keys when a pool is exhausted.</p>
   [![Version](https://img.shields.io/badge/version-1.5.7-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
 </div>
 
+## Screenshot
+
+<div align="center">
+  <img src="docs/screenshot.png" alt="Providers dialog with quota dots, extra keys, and key rotation" />
+</div>
+
 ## What it does
 
-Provider Status turns provider setup and quota checks into one desktop surface:
+Provider Quota Status turns provider setup and quota checks into one desktop surface:
 
 - **Read the status bar.** See used and remaining quota for each enabled provider, with color-coded thresholds.
 - **Keep keys in order.** Paste credentials, reorder rows, set polling intervals, and choose a reset day per key.
@@ -19,7 +25,7 @@ Supported providers include `tavily`, `opencode`, `deepseek`, `glm`, `openrouter
 
 ## Install
 
-Install the pack and enable **Provider Status** under **Capabilities → Plugins**:
+Install the pack and enable **Provider Quota Status** under **Capabilities → Plugins**:
 
 ```bash
 hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml

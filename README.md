@@ -153,7 +153,7 @@ RSS Reader is the largest workflow in the pack. It keeps a local reading library
 
 The individual plugin manifests are the version authority. The current pack includes:
 
-- **Provider Status 1.5.7:** quota visibility, multi-account support, and key rotation controls.
+- **Provider Quota Status 1.5.7:** quota visibility, multi-account support, and key rotation controls.
 - **Intelligent Tool Break 1.3.2:** `/break`, correction messages, and `/again` retry handling.
 - **RSS Reader 1.0.1:** local Python API transport, nested folders, improved unread behavior, and compact handling for small full-article images.
 - **Memory Review 1.2.1:** staged-write review and approval controls.
@@ -209,7 +209,7 @@ This is an independent community project. It does not change Hermes Agent core, 
 
 Every plugin has a dedicated README:
 
-- [Provider Status](plugins/provider-status/README.md)
+- [Provider Quota Status](plugins/provider-status/README.md)
 - [Reasoning Switch](plugins/reasoning-switch/README.md)
 - [Iteration Budget Meter](plugins/iteration-budget-meter/README.md)
 - [Intelligent Tool Break](plugins/intelligent-tool-break/README.md)
