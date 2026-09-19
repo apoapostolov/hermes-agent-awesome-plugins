@@ -4272,7 +4272,8 @@ function ReaderProfile({ ctx, owner }) {
     if (readTimerRef.current) window.clearTimeout(readTimerRef.current);
     readTimerRef.current = window.setTimeout(() => {
       readTimerRef.current = null;
-      markArticleRead(item, false);
+      const othersUnread = (articles.data || []).some(row => row.id !== item.id && !row.is_read);
+      markArticleRead(item, !othersUnread);
     }, 1000);
   };
   const openArticle = (item) => {

@@ -8,7 +8,7 @@
 
 ### Fixed
 
-- **rss-reader:** version `1.0.4`. Full-article capture keeps https video, audio, and iframe embeds. It drops share URLs (Facebook, Twitter, LinkedIn share, Reddit submit), sponsor, recirc, native-ad, and subscribers-only rails, and stops at Recent articles or Most Popular. Short closing sentences stay. The page title is not repeated as a heading. Manual recapture replaces the stored body even when the cleaned text is shorter. Article downloads use a browser user agent (OpenAI pages can still 403).
+- **rss-reader:** version `1.0.4`. Full-article capture keeps https video, audio, and iframe embeds. It drops share URLs (Facebook, Twitter, LinkedIn share, Reddit submit), sponsor, recirc, native-ad, and subscribers-only rails, and stops at Recent articles or Most Popular. Short closing sentences stay. The page title is not repeated as a heading. Manual recapture replaces the stored body even when the cleaned text is shorter. The last remaining Unread post leaves an empty Unread view and hides the count. Article downloads use a browser user agent (OpenAI pages can still 403).
 
 ## [1.14.0] - 2026-09-18
 
