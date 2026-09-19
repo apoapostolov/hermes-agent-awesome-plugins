@@ -1290,6 +1290,10 @@ function currentOwner(host2) {
 function publishLibraryChange(owner, notice = "") {
   window.dispatchEvent(new CustomEvent("hermes-rss-library-changed", { detail: { owner, notice } }));
 }
+function publishTickerRefresh(owner) {
+  window.dispatchEvent(new CustomEvent("hermes-rss-ticker-refresh", { detail: { owner } }));
+}
+var TICKER_READ_REFRESH_DEBOUNCE_MS = 1e3;
 var rssCommandBusy = false;
 async function rssCommandQueue(host2, route) {
   assertOwner(host2, route);
@@ -3664,10 +3668,23 @@ function TickerPane() {
     retry: false
   });
   useEffect(() => {
-    const changed = () => { void articles.refetch(); };
+    let timer = null;
+    const changed = (event) => {
+      if (event.detail?.owner && event.detail.owner !== owner) return;
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        void articles.refetch();
+      }, TICKER_READ_REFRESH_DEBOUNCE_MS);
+    };
     window.addEventListener("hermes-rss-library-changed", changed);
-    return () => window.removeEventListener("hermes-rss-library-changed", changed);
-  }, [articles.refetch]);
+    window.addEventListener("hermes-rss-ticker-refresh", changed);
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      window.removeEventListener("hermes-rss-library-changed", changed);
+      window.removeEventListener("hermes-rss-ticker-refresh", changed);
+    };
+  }, [articles.refetch, owner]);
   const onOpen = (item) => {
     if (!item) {
       host.navigate("/rss");
@@ -4395,7 +4412,10 @@ function ReaderProfile({ ctx, owner }) {
       rows?.map(feed => feed.id === item.feed_id ? { ...feed, unread: Math.max(0, (Number(feed.unread) || 0) - 1) } : feed));
     void libraryRequest(`/articles/${item.id}`, {
       method: "PATCH", body: { is_read: true }
-    }).then(() => refreshList ? refresh() : undefined).catch(async () => {
+    }).then(() => {
+      publishTickerRefresh(owner);
+      return refreshList ? refresh() : undefined;
+    }).catch(async () => {
       if (refreshList) await refresh();
       setNotice("Could not save read state. Open the article again to retry.");
     });
@@ -4476,6 +4496,7 @@ function ReaderProfile({ ctx, owner }) {
   };
   const markAllRead = () => act("Marking read…", async () => {
     const result = await libraryRequest("/articles/read-all", { method: "POST", body: { feed_id: feedId } });
+    publishTickerRefresh(owner);
     setNotice(`${result.count} article${result.count === 1 ? "" : "s"} marked as read.`);
   });
   const gradeNow = () => act("Tagging articles\u2026", async () => {
@@ -5635,10 +5656,13 @@ function ReaderProfile({ ctx, owner }) {
                 title: article.is_read ? "Mark unread" : "Mark read",
                 onClick: () => act(
                   "Updating\u2026",
-                  () => libraryRequest(`/articles/${article.id}`, {
-                    method: "PATCH",
-                    body: { is_read: !article.is_read }
-                  })
+                  async () => {
+                    await libraryRequest(`/articles/${article.id}`, {
+                      method: "PATCH",
+                      body: { is_read: !article.is_read }
+                    });
+                    publishTickerRefresh(owner);
+                  }
                 ),
                 children: /* @__PURE__ */ jsx("i", { className: `codicon ${article.is_read ? "codicon-eye-closed" : "codicon-mail-read"}`, "aria-hidden": "true" })
               }
