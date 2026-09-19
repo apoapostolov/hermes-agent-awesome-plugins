@@ -36,9 +36,9 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 
 ### 4. Lifestyle path, secret copy, bind port (LOW)
 
-- **Personal behavior:** hard-coded `C:/git/lifestyle/.env`. Hermes `.env` secrets copied into plaintext `library.env` inside the plugin tree on poll. `/codex/browser/start` binds a caller-chosen loopback port.
-- **Why it fails:** machine-specific paths, plaintext secret copies, and caller-chosen bind ports are listing defects.
-- **Needed hook:** none. Drop the lifestyle path, drop `library.env` copies, and do not bind a caller-chosen port from a listed build.
+- **Personal behavior:** Hermes `.env` secrets copied into plaintext `library.env` inside the plugin tree on poll. `/codex/browser/start` binds a caller-chosen loopback port. The hard-coded `C:/git/lifestyle/.env` path is gone.
+- **Why it fails:** plaintext secret copies and caller-chosen bind ports are listing defects.
+- **Needed hook:** none. Drop `library.env` copies, and do not bind a caller-chosen port from a listed build.
 - **Public edition:** lifestyle path and `library.env` copy removed.
 
 ## Checklist before listing personal
@@ -47,6 +47,7 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 - [ ] No token refresh that burns a rotating CLI refresh token.
 - [ ] No automatic `$HERMES_HOME/.env` or `config.yaml` writes. User-initiated only, comments preserved, owned keys only.
 - [ ] Catalog description has the Codex/Grok client-identity disclosure.
-- [ ] No `C:/git/lifestyle/.env`. No `library.env` secret copy.
+- [x] No `C:/git/lifestyle/.env`.
+- [ ] No `library.env` secret copy.
 - [ ] No caller-chosen loopback bind for Codex browser start.
 - [ ] Re-pin catalog `sha:` to the clean tree and comment on #115969.

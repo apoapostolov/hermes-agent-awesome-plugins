@@ -40,7 +40,6 @@ def _default_hermes_home() -> Path:
 
 
 HERMES_HOME = _default_hermes_home()
-LIFESTYLE_ENV = Path("C:/git/lifestyle/.env")
 CACHE_TTL = 60  # 1 min — keep the bar fresh, APIs are cheap
 
 # ── Config ─────────────────────────────────────────────────────────
@@ -119,7 +118,7 @@ def _load_env_files() -> None:
     if _env_loaded:
         return
     _env_loaded = True
-    for p in [LIFESTYLE_ENV, HERMES_HOME / ".env"]:
+    for p in [HERMES_HOME / ".env"]:
         try:
             if not p.exists():
                 continue
