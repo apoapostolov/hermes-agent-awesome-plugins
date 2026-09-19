@@ -6,6 +6,13 @@
   [![Version](https://img.shields.io/badge/version-1.0.0-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
 </div>
 
+## Screenshot
+
+<div align="center">
+  <img src="docs/screenshot-presets.png" alt="Skills presets dialog on the Capabilities Presets tab" />
+  <img src="docs/screenshot-skill-files.png" alt="Learned skill with Package zip and SKILL.md file dropdown" />
+</div>
+
 ## What it does
 
 - Puts a delete control immediately to the right of the folder icon on a Capabilities plugin row.
