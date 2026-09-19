@@ -19,7 +19,7 @@ Full-featured, install-at-your-own-risk builds live in [`../personal`](../person
 | memory-review | Path-id gate. No shell-menu inject. No hidden composer submit. Palette + dialog stay. |
 | intelligent-tool-break | Hooks + slash commands stay. No Popen patch, no private CLI rebind, no process SIGKILL, no composer insert. |
 | better-capabilities | Not in public. The product is Capabilities-page reach-in (row buttons, app-store writes, raw bridge). Kept in personal until a catalog hook exists. |
-| provider-status | Snapshot only. Still needs read-only vendor tokens, user-initiated `.env` writes, drop `library.env` copy and lifestyle path, plus catalog disclosure. |
+| provider-status | Quota chips, probes, plugin-owned config. No vendor CLI auth files, no token refresh on poll, no automatic Hermes `.env` / `config.yaml` writes, no `library.env` copy. |
 | sidebar-manager | Snapshot. Held until `host.sidebar` exists. |
 | drag-to-pin-session | Snapshot. Held until `host.sessions.pin` / `reorder`. |
 | better-session-appearance | Snapshot. Held until session-row slot / `setColor`. |

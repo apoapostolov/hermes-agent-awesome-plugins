@@ -12,4 +12,4 @@ hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
 
 Replace `<id>` with the plugin folder name (`provider-status`, `sidebar-manager`, …).
 
-Listed, SDK-only builds live in [`../public`](../public).
+Listed, SDK-only builds live in [`../public`](../public). The pack-install tree is [`../plugins`](../plugins) and currently tracks personal bytes.

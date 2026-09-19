@@ -8,7 +8,7 @@
 
   <strong>Focused plugins for a more capable Hermes Desktop.</strong>
 
-  Provider visibility, session control, reading, memory review, and interface polish — each plugin owns one job.
+  Provider visibility, session control, reading, memory review, and interface polish, with each plugin owning one job.
 
   [![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-0.21.0%2B-6f42c1)](https://github.com/NousResearch/hermes-agent)
   [![Plugins](https://img.shields.io/badge/plugins-13-2ea44f)](#whats-in-the-pack)
@@ -24,21 +24,39 @@
 
 ## Personal and public
 
-Every plugin in this repo has two editions.
+This repository keeps three trees. They are not interchangeable.
 
-- **[personal](personal/README.md)** is the full-featured copy I run. It may reach into Hermes Desktop internals. Install at your own risk: a Desktop update can break it, and it is outside the plugin SDK contract.
-- **[public](public/README.md)** is the listed edition. It stays inside the plugin SDK so it can go in the Hermes Plugin Catalog. Where the app has no hook yet, this edition drops that surface instead of reaching in.
+**[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk.
+
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. Not every personal plugin has a public copy: `better-capabilities` stays personal until a catalog hook exists.
+
+**[plugins/](plugins)** is the pack-install path. [`hermes-pack.yaml`](hermes-pack.yaml) still pins this tree. Treat it as personal bytes until a public edition is listing-clean.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/<id>
 ```
 
-The pack file still pins `plugins/<id>` (same bytes as personal at the split) until public editions are listing-clean.
+The pack command in [Install](#install) still pulls `plugins/<id>`.
+
+### Public listing status
+
+| Plugin | Public copy |
+| --- | --- |
+| [memory-review](public/memory-review) | Ready: pending-id gate, palette + dialog. No shell-menu inject, no hidden composer submit. |
+| [intelligent-tool-break](public/intelligent-tool-break) | Ready: hooks and slash commands. No process-wide Popen patch, no private CLI rebind, no descendant SIGKILL, no composer insert. |
+| [provider-status](public/provider-status) | Ready: quota chips, probes, plugin-owned config. No vendor CLI auth files, no token refresh on poll, no automatic Hermes `.env` / `config.yaml` writes, no `library.env` copy. |
+| better-capabilities | None. Kept in [personal](personal/better-capabilities) until a catalog hook exists. |
+| [sidebar-manager](public/sidebar-manager) | Held until a sidebar hide/reorder hook exists. |
+| [drag-to-pin-session](public/drag-to-pin-session) | Held until `host.sessions.pin` / reorder exists. |
+| [better-session-appearance](public/better-session-appearance) | Held until a session-row decoration / color hook exists. |
+| Remaining plugins | Same as personal at the split. Review before a catalog pin. |
+
+Agent rules for these trees live in [AGENTS.md](AGENTS.md).
 
 ## What's in the Pack
 
-Twelve plugins are pinned in `hermes-pack.yaml` (pack version 1.14.0). **reasoning-switch** lives in this repo but is **not** in the pack and stays off by default — install it separately if you want it.
+Twelve plugins are pinned in `hermes-pack.yaml` (pack version 1.14.0). **reasoning-switch** lives in this repo but is **not** in the pack and stays off by default, so install it separately if you want it.
 
 ### Status Bar
 
@@ -86,7 +104,7 @@ Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) **0.21.0 o
 hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
 ```
 
-Each plugin keeps its own capability consent. Packs do not bulk-grant. Secrets stay `requires_env` — not embedded in the pack.
+Each plugin keeps its own capability consent. Packs do not bulk-grant. Secrets stay `requires_env` and are never embedded in the pack.
 
 Verify:
 
@@ -95,7 +113,7 @@ hermes plugins list
 hermes plugins pack show https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
 ```
 
-For a single plugin, follow that plugin's README. For **reasoning-switch**, use its README — it is not installed by the pack.
+For a single plugin, follow that plugin's README. For **reasoning-switch**, use its README because the pack does not install it.
 
 ## How It Works
 
@@ -116,10 +134,11 @@ This is an independent community project. It does not change Hermes Agent core, 
 
 - [Personal editions](personal/README.md)
 - [Public editions](public/README.md)
+- [AGENTS.md](AGENTS.md): personal/public backport and version rules
 - [provider-status](plugins/provider-status/README.md)
 - [intelligent-tool-break](plugins/intelligent-tool-break/README.md)
 - [iteration-budget-meter](plugins/iteration-budget-meter/README.md)
-- [reasoning-switch](plugins/reasoning-switch/README.md) — not in the pack
+- [reasoning-switch](plugins/reasoning-switch/README.md) (not in the pack)
 - [better-session-appearance](plugins/better-session-appearance/README.md)
 - [sidebar-manager](plugins/sidebar-manager/README.md)
 - [drag-to-pin-session](plugins/drag-to-pin-session/README.md)
@@ -130,7 +149,6 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [better-capabilities](plugins/better-capabilities/README.md)
 - [rss-reader](plugins/rss-reader/README.md)
 - [Maintainer sync skill](skills/hermes-awesome-plugins-sync/SKILL.md)
-
 
 ## Support
 
