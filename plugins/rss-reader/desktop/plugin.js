@@ -4296,6 +4296,8 @@ function ReaderProfile({ ctx, owner }) {
     client.setQueriesData({ queryKey: [...key, "articles"] }, rows =>
       rows?.map(row => row.id === item.id ? { ...row, is_read: true } : row));
     client.setQueryData([...key, "article", item.id], old => old ? { ...old, is_read: true } : old);
+    client.setQueriesData({ queryKey: [...key, "feeds"] }, rows =>
+      rows?.map(feed => feed.id === item.feed_id ? { ...feed, unread: Math.max(0, (Number(feed.unread) || 0) - 1) } : feed));
     void libraryRequest(`/articles/${item.id}`, {
       method: "PATCH", body: { is_read: true }
     }).then(() => refreshList ? refresh() : undefined).catch(async () => {
@@ -4308,8 +4310,7 @@ function ReaderProfile({ ctx, owner }) {
     if (readTimerRef.current) window.clearTimeout(readTimerRef.current);
     readTimerRef.current = window.setTimeout(() => {
       readTimerRef.current = null;
-      const othersUnread = (articles.data || []).some(row => row.id !== item.id && !row.is_read);
-      markArticleRead(item, !othersUnread);
+      markArticleRead(item, false);
     }, 1000);
   };
   const openArticle = (item) => {
