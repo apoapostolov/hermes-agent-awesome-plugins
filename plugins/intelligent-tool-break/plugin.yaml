@@ -10,7 +10,7 @@ tags:
   - desktop
   - commands
   - hooks
-hooks:
+provides_hooks:
   - pre_tool_call
   - post_tool_call
   - transform_tool_result
