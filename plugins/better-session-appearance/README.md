@@ -1,5 +1,11 @@
 # better-colors
 
+## Screenshot
+
+<div align="center">
+  <img src="docs/screenshot.png" alt="Better Session Appearance color picker, Bold Session, icon grid, and Auto Rules" />
+</div>
+
 Desktop plugin for **session list appearance**: titles take the Appearance color, optional per-session bold, extra colors in the picker, and a Codicon idle-bullet.
 
 - Session title uses the Appearance color. Lightness flips for light vs dark so one hue stays readable in both modes.
