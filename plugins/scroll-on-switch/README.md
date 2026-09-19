@@ -3,7 +3,10 @@
   <h1>Scroll on Switch</h1>
   <strong>Start each selected session at its newest message.</strong>
   <p>Keep session switching predictable without interrupting manual scrolling or live work.</p>
-  [![Version](https://img.shields.io/badge/version-1.4.5-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.4.5-2ea44f" alt="Version 1.4.5" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## What it does

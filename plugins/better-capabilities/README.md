@@ -3,7 +3,10 @@
   <h1>Better Capabilities</h1>
   <strong>Remove plugins and skills from Capabilities, and zip a skill folder.</strong>
   <p>Adds a delete control next to the folder icon, and a Package (zip) button between Edit and Archive on a learned skill.</p>
-  [![Version](https://img.shields.io/badge/version-1.0.0-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## Screenshot

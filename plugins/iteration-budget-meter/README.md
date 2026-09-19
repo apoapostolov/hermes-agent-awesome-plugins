@@ -3,7 +3,10 @@
   <h1>Iteration Budget Meter</h1>
   <strong>See how hard the focused session is pushing.</strong>
   <p>Watch per-turn tool-call usage live and inspect the session's longer-term budget pattern from the status bar.</p>
-  [![Version](https://img.shields.io/badge/version-1.2.1-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.1-2ea44f" alt="Version 1.2.1" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## What it does

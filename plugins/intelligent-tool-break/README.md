@@ -3,7 +3,10 @@
   <h1>Intelligent Tool Break</h1>
   <strong>Recover a stuck tool call without losing the turn.</strong>
   <p>Stop an in-flight spawn, send a correction, or retry the last action from Hermes Desktop.</p>
-  [![Version](https://img.shields.io/badge/version-1.3.2-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.3-2ea44f" alt="Version 1.3.3" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## What it does

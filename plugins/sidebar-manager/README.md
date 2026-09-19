@@ -3,7 +3,10 @@
   <h1>Sidebar Manager</h1>
   <strong>Hide and reorder the sidebar from a dim reorder glyph next to New session.</strong>
   <p>Click the list-ordered glyph after the Ctrl/N hint to enter edit mode. Click a nav row or session section to turn it off. Drag the grip to reorder with a live gap, the same HTML5 pattern used in Provider Status and RSS Reader.</p>
-  [![Version](https://img.shields.io/badge/version-1.0.0-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## What it does

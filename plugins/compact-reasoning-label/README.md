@@ -3,7 +3,10 @@
   <h1>Compact Reasoning Label</h1>
   <strong>The model pill shows the model. The reasoning pill shows the level.</strong>
   <p>Strips the thinking-level word from the composer's model dropdown label so each pill carries exactly one piece of information.</p>
-  [![Version](https://img.shields.io/badge/version-1.0.0-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## Screenshot

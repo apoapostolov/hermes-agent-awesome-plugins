@@ -3,7 +3,10 @@
   <h1>Reasoning Switch</h1>
   <strong>Change reasoning effort without opening model settings.</strong>
   <p>Cycle the focused session through the levels you choose, with colors and prompt limits that make the current setting visible.</p>
-  [![Version](https://img.shields.io/badge/version-1.1.1-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.1-2ea44f" alt="Version 1.1.1" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## What it does

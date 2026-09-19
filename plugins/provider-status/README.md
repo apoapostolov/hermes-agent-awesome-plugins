@@ -3,7 +3,10 @@
   <h1>Provider Quota Status</h1>
   <strong>See provider health and quota without leaving Hermes.</strong>
   <p>Track enabled providers in the status bar, keep multiple credentials organized, and rotate keys when a pool is exhausted.</p>
-  [![Version](https://img.shields.io/badge/version-1.5.7-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.5.7-2ea44f" alt="Version 1.5.7" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## Screenshot

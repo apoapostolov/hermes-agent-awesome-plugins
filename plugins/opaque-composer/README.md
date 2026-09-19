@@ -3,7 +3,10 @@
   <h1>Opaque Composer</h1>
   <strong>Keep the message composer readable while you scroll.</strong>
   <p>Replace the translucent input surface with the active theme's card color so transcript text does not show through it.</p>
-  [![Version](https://img.shields.io/badge/version-1.0.0-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## What it does

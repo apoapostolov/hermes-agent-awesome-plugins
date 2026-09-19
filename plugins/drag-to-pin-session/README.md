@@ -3,7 +3,10 @@
   <h1>Drag to Pin Session</h1>
   <strong>Arrange pinned sessions with the gesture you already use.</strong>
   <p>Drag a session into Pinned to place it, or drag it back to Sessions to unpin it.</p>
-  [![Version](https://img.shields.io/badge/version-1.1.0-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.0-2ea44f" alt="Version 1.1.0" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## What it does

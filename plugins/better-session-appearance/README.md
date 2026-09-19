@@ -1,4 +1,11 @@
-# better-colors
+# Better Session Appearance
+
+<div align="center">
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.1-2ea44f" alt="Version 1.2.1" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
+</div>
 
 ## Screenshot
 

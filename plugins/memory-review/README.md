@@ -3,7 +3,10 @@
   <h1>Memory Review</h1>
   <strong>Review staged memory writes before they land.</strong>
   <p>Open a Hermes-style dialog, select the writes you want, and approve or reject them deliberately.</p>
-  [![Version](https://img.shields.io/badge/version-1.2.1-2ea44f)](plugin.yaml) [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+  <p>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.1-2ea44f" alt="Version 1.2.1" /></a>
+    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
+  </p>
 </div>
 
 ## Screenshot
