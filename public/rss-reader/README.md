@@ -76,6 +76,10 @@ Desktop reader plus a local Python API for feed, article, grading, and preferenc
 - Saved stories survive feed removal. Paywall bypass services are not used.
 - AI actions receive only the selected or bounded article context.
 
+This plugin is a fork of [Adolanium/hermes-rss](https://github.com/Adolanium/hermes-rss) (MIT). Copyright notices are in [LICENSE](../../LICENSE).
+
+The public edition does not use archive or proxy mirrors, does not submit a self-improvement prompt that edits the installed plugin, and does not import private Hermes gateway internals.
+
 ## License
 
 [MIT](../../LICENSE)

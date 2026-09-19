@@ -73,8 +73,10 @@ Desktop reader plus a local Python API for feed, article, grading, and preferenc
 - Feed and article downloads are bounded. Public HTTP(S) only; no embedded credentials; private hosts blocked.
 - An entry may be excerpt-only; full capture depends on the original page.
 - Small images (largest dimension 480 px or less) stay capped beside text. Larger images keep reading width.
-- Saved stories survive feed removal. Paywall bypass services are not used.
+- Saved stories survive feed removal. Optional capture fallbacks may use archive.today, 12ft.io, PrintFriendly, or the Wayback Machine when that setting is on.
 - AI actions receive only the selected or bounded article context.
+
+This plugin is a fork of [Adolanium/hermes-rss](https://github.com/Adolanium/hermes-rss) (MIT). Copyright notices are in [LICENSE](../../LICENSE).
 
 ## License
 
