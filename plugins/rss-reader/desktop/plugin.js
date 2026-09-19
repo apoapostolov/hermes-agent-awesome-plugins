@@ -922,8 +922,21 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
     if (parts[0] === "folders") {
       if (method === "GET") {
         const library = await read();
-        const named = new Set((library.folders || []).map((item) => String(item || "")).filter(Boolean));
-        return [...named];
+        const seen = new Set();
+        const ordered = [];
+        for (const item of library.folders || []) {
+          const key = String(item || "");
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          ordered.push(key);
+        }
+        for (const feed of library.feeds || []) {
+          const key = folderOf(feed);
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          ordered.push(key);
+        }
+        return ordered;
       }
       if (method === "POST")
         return write((library) => applyFolderAction(library, body));
@@ -2966,6 +2979,11 @@ var styles = `
 .hermes-rss .rss-nav .rss-folder-header{display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin:0 0 4px;padding:6px 8px;border:0;border-radius:6px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent);color:var(--ui-text-tertiary);font-size:10px;font-weight:650;letter-spacing:1.5px;text-transform:uppercase;gap:6px;cursor:pointer}
 .hermes-rss .rss-nav .rss-folder-header:hover{background:color-mix(in srgb,var(--ui-accent) 16%,transparent);color:var(--ui-text-secondary)}
 .hermes-rss .rss-folder-drop .rss-folder-header,.hermes-rss .rss-nav .rss-folder-header[data-drop=true]{outline:1px dashed var(--ui-accent);outline-offset:-1px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
+.hermes-rss .rss-nav .rss-folder-drag-handle{width:14px;height:18px;flex:0 0 14px;margin:0 2px 0 0;padding:0;display:inline-flex;align-items:center;justify-content:center;color:var(--ui-text-tertiary);cursor:grab}
+.hermes-rss .rss-nav .rss-folder-drag-handle:active{cursor:grabbing}
+.hermes-rss .rss-nav .rss-folder-drag-handle .codicon{font-size:10px;line-height:1;display:block}
+.hermes-rss .rss-folder-dragging{opacity:.48}
+.hermes-rss .rss-folder-order-target .rss-folder-header{outline:2px solid var(--ui-accent);outline-offset:-2px}
 .hermes-rss .rss-folder-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
 .hermes-rss .rss-nav .rss-folder-chevron-button{flex:0 0 20px;width:20px;height:20px;margin:0;padding:0;border:0;background:transparent;color:inherit;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 .hermes-rss .rss-nav .rss-folder-chevron-button:hover{color:var(--foreground)}
@@ -3942,7 +3960,26 @@ function groupFeedsByFolder(list, extraFolders) {
     seen.set(key, group);
     groups.push(group);
   }
-  return groups;
+  if (!Array.isArray(extraFolders)) return groups;
+  const ordered = extraFolders.map(item => String(item || "")).filter(Boolean);
+  const rank = new Map();
+  let index = 0;
+  rank.set("", index++);
+  for (const key of ordered) if (!rank.has(key)) rank.set(key, index++);
+  for (const group of groups) if (!rank.has(group.key)) rank.set(group.key, index++);
+  return groups.slice().sort((a, b) => (rank.get(a.key) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.key) ?? Number.MAX_SAFE_INTEGER));
+}
+function previewFolderOrder(groups, draggingKey, dropIndex) {
+  const list = Array.isArray(groups) ? groups : [];
+  if (!draggingKey || !Number.isInteger(dropIndex)) return list;
+  const named = list.filter(group => group.key);
+  const moved = named.find(group => group.key === draggingKey);
+  if (!moved) return list;
+  const rest = named.filter(group => group.key !== draggingKey);
+  const index = Math.max(0, Math.min(dropIndex, rest.length));
+  const reordered = [...rest.slice(0, index), moved, ...rest.slice(index)];
+  let cursor = 0;
+  return list.map(group => group.key ? reordered[cursor++] : group);
 }
 function normalizeFolderName(name) {
   return String(name || "").trim().replace(/\s+/g, " ").slice(0, 100);
@@ -3965,6 +4002,24 @@ function remapMuteFolders(library, from, to) {
 function applyFolderAction(library, body) {
   const action = String(body?.action || "");
   library.folders = Array.isArray(library.folders) ? library.folders.map((item) => String(item || "")).filter(Boolean) : [];
+  if (action === "reorder") {
+    const requested = Array.isArray(body.order) ? body.order.map(item => String(item || "")).filter(Boolean) : [];
+    const named = [...new Set([
+      ...library.folders,
+      ...library.feeds.map(feed => folderOf(feed)).filter(Boolean)
+    ])];
+    const allowed = new Set(named);
+    const order = [];
+    const seen = new Set();
+    for (const item of requested) {
+      if (!allowed.has(item) || seen.has(item)) continue;
+      seen.add(item);
+      order.push(item);
+    }
+    for (const item of named) if (!seen.has(item)) order.push(item);
+    library.folders = order;
+    return { order };
+  }
   if (action === "create") {
     const name = normalizeFolderName(body.name);
     if (!name) throw new Error("Enter a folder name.");
@@ -4160,6 +4215,12 @@ function ReaderProfile({ ctx, owner }) {
   const [draggingId, setDraggingId] = useState(null);
   const [dragDropIndex, setDragDropIndex] = useState(null);
   const [dragTargetFolder, setDragTargetFolder] = useState(null);
+  const [draggingFolder, setDraggingFolder] = useState(null);
+  const [folderDropIndex, setFolderDropIndex] = useState(null);
+  const [folderDropTarget, setFolderDropTarget] = useState(null);
+  const folderDragKey = useRef(null);
+  const folderDragOrder = useRef(null);
+  const folderDropIndexRef = useRef(null);
   const [folderOpen, setFolderOpen] = useState(() => {
     const stored = storageGet(ctx, "folderOpen", owner, null);
     return stored && typeof stored === "object" ? stored : {};
@@ -4683,11 +4744,63 @@ function ReaderProfile({ ctx, owner }) {
   })).sort((a, b) => a.index - b.index).map(entry => entry.feed);
   const previewFeeds = previewNavFeeds(displayedFeeds, draggingId, dragDropIndex, dragTargetFolder);
   const groupedFeeds = groupFeedsByFolder(previewFeeds, extraFolders.data);
+  const previewFolders = previewFolderOrder(groupedFeeds, draggingFolder, folderDropIndex);
   const folderIsOpen = (key) => folderOpen[key] !== false;
   const toggleFolder = (key) => {
     const next = { ...folderOpen, [key]: !folderIsOpen(key) };
     setFolderOpen(next);
     storageSet(ctx, "folderOpen", owner, next);
+  };
+  const startFolderDrag = group => event => {
+    if (!reorderMode || !group.key) return;
+    event.stopPropagation();
+    const named = groupedFeeds.filter(item => item.key).map(item => item.key);
+    folderDragKey.current = group.key;
+    folderDragOrder.current = named;
+    folderDropIndexRef.current = named.indexOf(group.key);
+    setDraggingFolder(group.key);
+    setFolderDropIndex(folderDropIndexRef.current);
+    setFolderDropTarget(null);
+    try { event.dataTransfer.setData("text/plain", group.key); } catch {}
+    event.dataTransfer.effectAllowed = "move";
+  };
+  const endFolderDrag = () => {
+    folderDragKey.current = null;
+    folderDragOrder.current = null;
+    folderDropIndexRef.current = null;
+    setDraggingFolder(null);
+    setFolderDropIndex(null);
+    setFolderDropTarget(null);
+  };
+  const handleFolderOrderDragOver = group => event => {
+    const dragged = folderDragKey.current;
+    if (!dragged || !group.key) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    const rest = groupedFeeds.filter(item => item.key && item.key !== dragged);
+    const target = rest.findIndex(item => item.key === group.key);
+    if (target < 0) return;
+    const after = event.clientY > event.currentTarget.getBoundingClientRect().top + event.currentTarget.getBoundingClientRect().height / 2;
+    const next = target + (after ? 1 : 0);
+    folderDropIndexRef.current = next;
+    setFolderDropTarget(group.key);
+    if (next !== folderDropIndex) setFolderDropIndex(next);
+  };
+  const persistFolderOrder = () => {
+    const dragged = folderDragKey.current;
+    const dropIndex = folderDropIndexRef.current;
+    const original = groupedFeeds.filter(group => group.key).map(group => group.key);
+    const order = previewFolderOrder(groupedFeeds, dragged, dropIndex).filter(group => group.key).map(group => group.key);
+    endFolderDrag();
+    if (!dragged || !order.length || order.join("\u0000") === original.join("\u0000")) return;
+    runFolderAction({ action: "reorder", order }, "Folders reordered.");
+  };
+  const handleFolderOrderDrop = event => {
+    if (!folderDragKey.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    persistFolderOrder();
   };
   const runFolderAction = (body, ok) => act("Updating folders…", async () => {
     await libraryRequest("/folders", { method: "POST", body });
@@ -4786,7 +4899,7 @@ function ReaderProfile({ ctx, owner }) {
     const el = navRef.current;
     if (!el || !reorderMode) return undefined;
     const allow = event => {
-      if (!dragFeedId.current) return;
+      if (!dragFeedId.current && !folderDragKey.current) return;
       event.preventDefault();
       if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
     };
@@ -5359,12 +5472,18 @@ function ReaderProfile({ ctx, owner }) {
           jsx("button", { type: "submit", disabled: disabled || !normalizeFolderName(folderCreate), title: "Add folder", "aria-label": "Add folder", children: jsx("i", { className: "codicon codicon-add", "aria-hidden": "true" }) }),
           jsx("button", { type: "button", disabled, title: "Cancel", "aria-label": "Cancel", onClick: () => setFolderCreate(null), children: jsx("i", { className: "codicon codicon-close", "aria-hidden": "true" }) })
         ] }),
-        groupedFeeds.map((group) => {
+        previewFolders.map((group) => {
           const open = folderIsOpen(group.key) || !!(draggingId && dragTargetFolder === group.key);
           return jsxs("div", {
-            className: `rss-folder${draggingId && dragTargetFolder === group.key ? " rss-folder-drop" : ""}`,
-            onDragOver: reorderMode ? handleFolderDragOver(group.key) : undefined,
-            onDrop: reorderMode ? handleDrop() : undefined,
+            className: `rss-folder${draggingId && dragTargetFolder === group.key ? " rss-folder-drop" : ""}${draggingFolder === group.key ? " rss-folder-dragging" : ""}${folderDropTarget === group.key ? " rss-folder-order-target" : ""}`,
+            onDragOver: reorderMode ? (event => {
+              if (folderDragKey.current) handleFolderOrderDragOver(group)(event);
+              else handleFolderDragOver(group.key)(event);
+            }) : undefined,
+            onDrop: reorderMode ? (event => {
+              if (folderDragKey.current) handleFolderOrderDrop(event);
+              else handleDrop()(event);
+            }) : undefined,
             children: [
               jsxs("div", {
                 className: "rss-folder-header",
@@ -5373,8 +5492,10 @@ function ReaderProfile({ ctx, owner }) {
                   if (suppressFolderClick.current) { suppressFolderClick.current = false; return; }
                   browseFolder(group.key);
                 },
-                onDragOver: reorderMode ? handleFolderDragOver(group.key) : undefined,
+                onDragOver: reorderMode ? handleFolderOrderDragOver(group) : undefined,
+                onDrop: reorderMode ? handleFolderOrderDrop : undefined,
                 children: [
+                  reorderMode && group.key && jsx("span", { className: "rss-folder-drag-handle", draggable: true, title: "Drag to reorder folder", "aria-label": `Drag to reorder ${group.title}`, onClick: event => event.stopPropagation(), onDragStart: startFolderDrag(group), onDragEnd: endFolderDrag, children: jsx("i", { className: "codicon codicon-gripper", "aria-hidden": "true" }) }),
                   jsx("button", { type: "button", className: "rss-folder-chevron-button", "aria-label": `${open ? "Collapse" : "Expand"} ${group.title}`, "aria-expanded": open, onClick: event => { event.stopPropagation(); toggleFolder(group.key); }, children: jsx("i", { className: `codicon codicon-chevron-right rss-folder-chevron${open ? " rss-folder-chevron-open" : ""}`, "aria-hidden": "true" }) }),
                   reorderMode && group.key && folderRename?.key === group.key
                     ? jsx("form", { style: { flex: 1, minWidth: 0, display: "flex" }, onClick: event => event.stopPropagation(), onSubmit: event => {

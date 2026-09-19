@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFolderOrder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta")].join("\n");
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -36,6 +36,7 @@ exports.imageKey = imageKey;
 exports.folderOf = folderOf;
 exports.folderTitle = folderTitle;
 exports.groupFeedsByFolder = groupFeedsByFolder;
+exports.previewFolderOrder = previewFolderOrder;
 exports.previewNavFeeds = previewNavFeeds;
 exports.applyFeedMove = applyFeedMove;
 exports.muteScope = muteScope;
@@ -91,6 +92,17 @@ assert.equal(grouped.length, 2);
 assert.equal(grouped[0].title, "AI");
 assert.equal(grouped[0].unread, 5);
 assert.equal(grouped[1].title, "Ungrouped");
+const folderRanked = fns.groupFeedsByFolder([
+  { id: "1", folder: "AI", unread: 1 },
+  { id: "2", folder: "News", unread: 1 }
+], ["News", "AI"]);
+assert.deepEqual(folderRanked.map(group => group.key), ["News", "AI"]);
+const folderPreview = fns.previewFolderOrder([
+  { key: "", title: "Ungrouped" },
+  { key: "AI", title: "AI" },
+  { key: "News", title: "News" }
+], "News", 0);
+assert.deepEqual(folderPreview.map(group => group.key), ["", "News", "AI"]);
 const previewStay = fns.previewNavFeeds(
   [{ id: "1", folder: "AI" }, { id: "2", folder: "News" }],
   "1",
@@ -149,6 +161,9 @@ assert.equal(fns.normalizeFolderName("  News  "), "News");
 const lib = { feeds: [{ id: "1", folder: "AI" }], folders: [], filters: { mutes: [{ folders: ["AI"] }] } };
 fns.applyFolderAction(lib, { action: "create", name: "News" });
 assert.equal(lib.folders.join(","), "News");
+fns.applyFolderAction(lib, { action: "create", name: "Games" });
+fns.applyFolderAction(lib, { action: "reorder", order: ["Games", "News", "AI"] });
+assert.equal(lib.folders.join(","), "Games,News,AI");
 fns.applyFolderAction(lib, { action: "rename", from: "AI", to: "ML" });
 assert.equal(lib.feeds[0].folder, "ML");
 assert.equal(lib.filters.mutes[0].folders.join(","), "ML");

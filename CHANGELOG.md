@@ -2,9 +2,9 @@
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- **rss-reader:** version `1.0.5`. Loads on packaged desktop. JSX uses `react` only. A find stopword list no longer looks like an illegal import. Unread posts stay in the list while you read them and drop off when you pick another post or leave Unread. On the last one the Unread count hides and the row stays.
+- **rss-reader:** version `1.0.6`. Edit mode adds a gripper on named folders so you can drag them into a new order. That order is saved and used after reload. Ungrouped stays first. Feeds inside a folder keep their own order.
 
 ## [1.14.0] - 2026-09-18
 
