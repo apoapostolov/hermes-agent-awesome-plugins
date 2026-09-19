@@ -1,8 +1,8 @@
 <div align="center">
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
   <h1>Reasoning Switch</h1>
-  <strong>Change reasoning effort without opening model settings.</strong>
-  <p>Cycle the focused session through the levels you choose, with colors and prompt limits that make the current setting visible.</p>
+  <strong>Cycle reasoning effort from the status bar.</strong>
+  <p>Colors and per-level prompt demote make the current setting visible. Lives in the repo but is <strong>not</strong> in the pack and stays off by default.</p>
   <p>
     <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.1-2ea44f" alt="Version 1.1.1" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
@@ -13,27 +13,27 @@
   <img src="docs/hero.png" width="100%" alt="Reasoning Switch" />
 </div>
 
-## What it does
+## What You Can Do
 
-- **Cycle from the status bar.** The active level is visible and a click advances through your selected rotation.
-- **Use standard levels.** Choose from `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`.
-- **Set prompt limits.** Demote a level after a chosen number of user prompts, such as High for three prompts then Medium.
-- **Keep the change local.** The focused session changes; the global profile default does not.
+- Click the status-bar word to advance through the levels you chose.
+- Pick from `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`.
+- Demote a level after a chosen number of user prompts (for example High for three prompts, then Medium).
+- Change the focused session only. The global profile default stays put.
 
 ## Install
 
-Install the pack and enable **Reasoning Switch** under **Capabilities → Plugins**:
+**Not included in `hermes-pack.yaml`.** Default off. Install it on its own:
 
 ```bash
-hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/plugins/reasoning-switch
 ```
 
-Use the status-bar word to cycle and its gear to configure levels, colors, and limits.
+Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) **0.21.0 or newer**. Enable **Reasoning Switch** under **Capabilities → Plugins**. Use the status-bar word to cycle; open its gear for levels, colors, and limits.
 
-## How it works
+## Requirements / Limits
 
-The plugin calls the same session-scoped `config.set` gateway path used by Hermes' model menu. The prompt counter follows the focused session's awaiting-response signal.
+Desktop-only. Available levels follow what the connected Hermes backend accepts.
 
-## Compatibility and license
+## License
 
-Desktop-only. Reasoning levels are validated by the Hermes backend, so available behavior follows the connected version. Licensed under [MIT](../../LICENSE).
+[MIT](../../LICENSE)
