@@ -761,14 +761,22 @@ function mergeFeed(library, feedId, parsed) {
   for (const item of parsed.items) {
     const old = byIdentity.get(item.identity);
     if (old) {
+      const previousUrl = old.url;
+      const urlChanged = Boolean(item.url && previousUrl && item.url !== previousUrl);
       if (old.body !== item.body || old.title !== item.title || old.url !== item.url)
         old.actions = (old.actions || []).map((a) => ({ ...a, stale: true }));
+      if (urlChanged) {
+        old.captured = false;
+        delete old.captureGaveUp;
+        old.body = item.body;
+        old.image = item.image || "";
+      }
       old.title = item.title;
       old.url = item.url || old.url;
       old.published_at = item.published_at || old.published_at;
       old.feed_title = feed.title;
       const keepBody = old.captured || ((old.body || "").length > (item.body || "").length);
-      if (!keepBody) {
+      if (!urlChanged && !keepBody) {
         old.body = item.body;
         old.image = item.image || old.image;
       } else {
@@ -777,6 +785,7 @@ function mergeFeed(library, feedId, parsed) {
       applyCachedBody(library, old);
       applyCachedGrade(library, old);
       if (old.captured) rememberCapture(library, old, old.body);
+      if (old.url && articleNeedsCapture(old)) fresh.push(old);
     } else {
       const article = {
         ...item,
@@ -1100,12 +1109,12 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
       }
       const library = await read(), q = (url.searchParams.get("q") || "").trim().toLowerCase();
       const exclude = (url.searchParams.get("exclude") || "").trim().toLowerCase();
-      const view = url.searchParams.get("view"), feed = url.searchParams.get("feed_id");
+      const view = url.searchParams.get("view"), feed = url.searchParams.get("feed_id"), folder = url.searchParams.get("folder");
       const rules = url.searchParams.get("show_hidden") === "true" ? [] : (library.filters?.mutes || []).map(rule => ({ ...rule, phrase: rule.phrase.toLowerCase() }));
       const savedExcludes = (library.filters?.searches || []).filter(search => search.enabled !== false).map(search => String(search.exclude || search.name || "").trim().toLowerCase()).filter(Boolean);
       let dirty = false;
       const rows = library.articles.filter((a) => {
-        if (feed && a.feed_id !== feed || view === "unread" && a.is_read || view === "saved" && !a.is_saved) return false;
+        if (feed && a.feed_id !== feed || folder !== null && !library.feeds.some(item => item.id === a.feed_id && item.folder === folder) || view === "unread" && a.is_read || view === "saved" && !a.is_saved) return false;
         if (!q && !exclude && !rules.length && !savedExcludes.length) return true;
         const text = `${a.title}\n${a.body}`.toLowerCase();
         return (!q || text.includes(q)) && (!exclude || !text.includes(exclude)) &&
@@ -1307,6 +1316,77 @@ function commandWebsiteUrl(input) {
   if (/^https?:\/\//i.test(value)) return value;
   if (/^[a-z0-9.-]+(?:\/.*)?$/i.test(value) && value.includes(".")) return `https://${value}`;
   throw new Error("Give a website URL, a domain name, or r/name so RSS Reader can discover its feed.");
+}
+function feedsearchCanonicalUrl(raw) {
+  try {
+    const parsed = new URL(String(raw || "").trim());
+    if (!["http:", "https:"].includes(parsed.protocol)) return "";
+    parsed.hash = "";
+    parsed.username = "";
+    parsed.password = "";
+    parsed.protocol = "https:";
+    parsed.hostname = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "") || "/";
+    return parsed.href;
+  } catch {
+    return "";
+  }
+}
+function feedsearchIsFresh(row, now, days) {
+  const stamp = Date.parse(String(row?.last_updated || row?.last_seen || ""));
+  if (!Number.isFinite(stamp)) return false;
+  return (now - stamp) <= days * 86400000;
+}
+function feedsearchRank(rows, now, days) {
+  const when = Number.isFinite(now) ? now : Date.now();
+  const windowDays = Number.isFinite(days) ? days : 90;
+  const best = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row || typeof row !== "object") continue;
+    const url = String(row.url || row.self_url || "").trim();
+    const key = feedsearchCanonicalUrl(url);
+    if (!key) continue;
+    const score = Number(row.score) || 0;
+    const updated = Date.parse(String(row.last_updated || "")) || 0;
+    const candidate = {
+      url,
+      title: String(row.title || row.site_name || url).slice(0, 200),
+      items: Number(row.item_count) || 0,
+      velocity: Number(row.velocity) || 0,
+      last_updated: String(row.last_updated || ""),
+      score,
+      bozo: Number(row.bozo) === 1,
+      fresh: feedsearchIsFresh(row, when, windowDays)
+    };
+    const prev = best.get(key);
+    if (!prev || score > prev.score || (score === prev.score && updated > (Date.parse(prev.last_updated) || 0)))
+      best.set(key, candidate);
+  }
+  return [...best.values()].sort((a, b) => {
+    if (a.fresh !== b.fresh) return a.fresh ? -1 : 1;
+    if (a.bozo !== b.bozo) return a.bozo ? 1 : -1;
+    return b.score - a.score || b.velocity - a.velocity || b.items - a.items;
+  });
+}
+function feedsearchVisible(rows, showStale) {
+  const list = Array.isArray(rows) ? rows : [];
+  return showStale ? list : list.filter(row => row.fresh && !row.bozo);
+}
+function feedsearchMeta(row) {
+  const items = `${Number(row.items) || 0} items`;
+  const stamp = Date.parse(String(row.last_updated || ""));
+  const updated = Number.isFinite(stamp) ? new Date(stamp).toISOString().slice(0, 10) : "unknown date";
+  const velocity = Number(row.velocity) || 0;
+  const pace = velocity >= 0.1 ? `${velocity.toFixed(velocity >= 10 ? 0 : 1)}/day` : "slow";
+  const flags = [row.fresh ? "" : "stale", row.bozo ? "broken" : ""].filter(Boolean).join(", ");
+  return flags ? `${items} · ${updated} · ${pace} · ${flags}` : `${items} · ${updated} · ${pace}`;
+}
+async function discoverFeedsViaApi(input) {
+  const raw = String(input || "").trim();
+  if (!raw) throw new Error("Give a site name, domain, or website URL.");
+  const response = await rssRest("/discover", { method: "POST", body: { url: raw } });
+  const rows = Array.isArray(response?.feeds) ? response.feeds : [];
+  return feedsearchRank(rows);
 }
 async function discoverFeed(host2, input) {
   const website = new URL(commandWebsiteUrl(input));
@@ -2883,6 +2963,8 @@ var styles = `
 .hermes-rss .rss-nav .rss-folder-header:hover{background:color-mix(in srgb,var(--ui-accent) 16%,transparent);color:var(--ui-text-secondary)}
 .hermes-rss .rss-folder-drop .rss-folder-header,.hermes-rss .rss-nav .rss-folder-header[data-drop=true]{outline:1px dashed var(--ui-accent);outline-offset:-1px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
 .hermes-rss .rss-folder-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.hermes-rss .rss-nav .rss-folder-chevron-button{flex:0 0 20px;width:20px;height:20px;margin:0;padding:0;border:0;background:transparent;color:inherit;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.hermes-rss .rss-nav .rss-folder-chevron-button:hover{color:var(--foreground)}
 .hermes-rss .rss-folder-chevron{flex:0 0 12px;width:12px;font-size:10px;display:block;transition:transform .12s ease}
 .hermes-rss .rss-folder-chevron-open{transform:rotate(90deg)}
 .hermes-rss .rss-folder-body{display:grid;gap:0}
@@ -3033,8 +3115,8 @@ var styles = `
 .hermes-rss .rss-bullet{padding:16px 0;border-bottom:1px solid var(--ui-stroke-secondary);font-size:14px;line-height:1.7}
 .hermes-rss details{font-size:12px;color:var(--ui-text-secondary);margin-top:8px}.hermes-rss summary{cursor:pointer;color:var(--ui-accent)}
 .hermes-rss blockquote{margin:10px 0;padding-left:14px;border-left:2px solid var(--ui-stroke-secondary);white-space:pre-wrap}
-.hermes-rss .rss-form{padding:20px 28px;border-bottom:1px solid var(--ui-stroke-secondary);display:flex;gap:10px;align-items:end;flex-wrap:wrap}.hermes-rss .rss-form label{display:grid;gap:7px;flex:1;min-width:150px}
-.hermes-rss .rss-form input{width:100%}.hermes-rss .rss-subscribe-starters{flex:1 1 100%;display:grid;gap:6px;padding-top:4px}.hermes-rss .rss-subscribe-starter-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hermes-rss .rss-subscribe-starter-group>.rss-small{min-width:112px}.hermes-rss .rss-subscribe-pills{display:flex;gap:6px;flex-wrap:wrap}.hermes-rss .rss-subscribe-pill{border:1px solid var(--ui-stroke-secondary);border-radius:999px;background:transparent;color:var(--ui-text-secondary);padding:3px 9px;font:inherit;font-size:11px;cursor:pointer}.hermes-rss .rss-subscribe-pill:hover{border-color:var(--ui-accent);color:var(--ui-text-primary)}.hermes-rss .rss-subscribe-pill:focus-visible{outline:1px solid var(--ui-accent);outline-offset:1px}.hermes-rss .rss-small{font-size:11px}.hermes-rss .rss-stack{display:grid;gap:12px}
+.hermes-rss .rss-form{padding:20px 28px;border-bottom:1px solid var(--ui-stroke-secondary);display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}.hermes-rss .rss-form label{display:grid;gap:7px;flex:1 1 auto;min-width:0}
+.hermes-rss .rss-form input,.hermes-rss .rss-form select{width:100%;box-sizing:border-box}.hermes-rss .rss-form select{height:26px;padding:2px 8px;line-height:20px}.hermes-rss .rss-subscribe-source{white-space:nowrap}.hermes-rss .rss-discover-trigger{display:flex;flex-direction:column;align-items:stretch;gap:1px;flex:0 0 auto;margin-top:24px}.hermes-rss .rss-discover-trigger button{white-space:nowrap}.hermes-rss .rss-discover-trigger .rss-muted{font-size:9px;line-height:1;width:100%;text-align:center;white-space:nowrap}.hermes-rss .rss-discover{flex:1 1 100%;display:grid;gap:6px}.hermes-rss .rss-discover-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:220px;overflow:auto}.hermes-rss .rss-discover-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--ui-stroke-secondary);background:transparent;color:inherit;padding:7px 9px;font:inherit;cursor:pointer}.hermes-rss .rss-discover-row:hover,.hermes-rss .rss-discover-row:focus-visible{border-color:var(--ui-accent)}.hermes-rss .rss-discover-row.is-stale{opacity:.55}.hermes-rss .rss-discover-meta{font-size:11px;color:var(--ui-text-tertiary);text-align:right;white-space:nowrap}.hermes-rss .rss-subscribe-starters{flex:1 1 100%;display:grid;gap:6px;padding-top:4px}.hermes-rss .rss-subscribe-starter-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hermes-rss .rss-subscribe-starter-group>.rss-small{min-width:112px}.hermes-rss .rss-subscribe-pills{display:flex;gap:6px;flex-wrap:wrap}.hermes-rss .rss-subscribe-pill{border:1px solid var(--ui-stroke-secondary);border-radius:999px;background:transparent;color:var(--ui-text-secondary);padding:3px 9px;font:inherit;font-size:11px;cursor:pointer}.hermes-rss .rss-subscribe-pill:hover{border-color:var(--ui-accent);color:var(--ui-text-primary)}.hermes-rss .rss-subscribe-pill:focus-visible{outline:1px solid var(--ui-accent);outline-offset:1px}.hermes-rss .rss-small{font-size:11px}.hermes-rss .rss-stack{display:grid;gap:12px}
 .hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}.hermes-rss .rss-nav .rss-feed-open{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:9px 10px;cursor:pointer}.hermes-rss .rss-nav .rss-unsubscribe{width:26px;flex-shrink:0;padding:7px;justify-content:center;color:var(--ui-text-tertiary)}
 .hermes-rss .rss-nav .rss-unsubscribe-edit{width:14px;height:18px;flex:0 0 14px;padding:0;margin:0 4px 0 6px;display:inline-flex;align-items:center;justify-content:center}
 .hermes-rss .rss-nav .rss-unsubscribe-edit .codicon{font-size:10px;line-height:1;display:block}
@@ -3975,6 +4057,7 @@ function ReaderProfile({ ctx, owner }) {
   const client = useQueryClient();
   const [view, setView] = useState(() => normalizeDefaultView(readSettings(ctx, owner).defaultView));
   const [feedId, setFeedId] = useState(null);
+  const [folderId, setFolderId] = useState(null);
   const [selected, updateSelected] = useState(
     () => storageGet(ctx, "selected", owner, null) || null
   );
@@ -4010,6 +4093,8 @@ function ReaderProfile({ ctx, owner }) {
   const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
   const [folder, setFolder] = useState("");
+  const [folderPick, setFolderPick] = useState("");
+  const [foundFeeds, setFoundFeeds] = useState([]);
   const [busy, setBusy] = useState("");
   // Declared here: the keyboard-shortcut effect below reads it during render.
   const disabled = !!busy;
@@ -4099,8 +4184,9 @@ function ReaderProfile({ ctx, owner }) {
   const mutes = filters.data?.mutes || [];
   const params = new URLSearchParams({ view, q: query, exclude, show_hidden: String(showHidden), limit: String(limit) });
   if (feedId) params.set("feed_id", feedId);
+  if (folderId !== null) params.set("folder", folderId);
   const articles = useQuery({
-    queryKey: [...key, "articles", feedId, view, query, exclude, showHidden, limit, searches.map(search => `${search.id}:${search.exclude || search.name}:${search.enabled !== false}`).join("|")],
+    queryKey: [...key, "articles", feedId, folderId, view, query, exclude, showHidden, limit, searches.map(search => `${search.id}:${search.exclude || search.name}:${search.enabled !== false}`).join("|")],
     queryFn: () => libraryRequest(`/articles?${params}`),
     placeholderData: previous => previous,
     retry: false
@@ -4216,12 +4302,21 @@ function ReaderProfile({ ctx, owner }) {
       setBusy("");
     }
   };
-  const selectView = (next, feed = null) => {
+  const findFeeds = () => act("Finding feeds…", async () => {
+    const ranked = await discoverFeedsViaApi(url);
+    setFoundFeeds(ranked);
+    const live = feedsearchVisible(ranked, false);
+    if (!ranked.length) setNotice("No feeds found for that site.");
+    else if (!live.length) setNotice("No current feeds found for that site.");
+  });
+  const selectView = (next, feed = null, folder = null) => {
     setView(next);
     setFeedId(feed);
+    setFolderId(folder);
     setSelected(null);
     setLimit(100);
   };
+  const browseFolder = folder => selectView(view, null, folder);
   const resetFilters = () => {
     selectView("all");
     setQuery(""); setExclude(""); setShowHidden(false);
@@ -5115,23 +5210,27 @@ function ReaderProfile({ ctx, owner }) {
           act("Subscribing\u2026", async () => {
             const feed = await libraryRequest("/feeds", {
               method: "POST",
-              body: { url: expandSubscribeUrl(url), folder }
+              body: { url: expandSubscribeUrl(url), folder: String(folder || folderPick || "").trim().slice(0, 100) }
             });
             setAdding(false);
             setUrl("");
             setFolder("");
+            setFolderPick("");
+            setFoundFeeds([]);
             try {
-              await libraryRequest(`/feeds/${feed.id}/refresh`, {
+              const result = await libraryRequest(`/feeds/${feed.id}/refresh`, {
                 method: "POST"
               });
+              const queued = settings.fullCapture && result.fresh?.length ? captureEnqueue(owner, result.fresh) : 0;
+              setNotice(`Subscription saved.${queued ? ` Capturing ${queued} full article${queued === 1 ? "" : "s"} in the background.` : ""}`);
             } catch (error) {
               setNotice(`Subscription saved. ${error.message}`);
             }
           });
         },
         children: [
-          /* @__PURE__ */ jsxs("label", { children: [
-            "RSS or Atom URL, or r/name of Reddit communities",
+          /* @__PURE__ */ jsxs("label", { className: "rss-subscribe-source", children: [
+            "Search, or provide RSS or Atom URL, or r/name Reddit community.",
             /* @__PURE__ */ jsx(
               Input,
               {
@@ -5139,22 +5238,41 @@ function ReaderProfile({ ctx, owner }) {
                 required: true,
                 value: url,
                 onChange: (event) => setUrl(event.target.value),
-                placeholder: "https://example.com/feed.xml or r/programming",
-                "aria-label": "RSS or Atom URL, or r/name of Reddit communities"
+                onKeyDown: (event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!disabled && String(event.currentTarget.value || "").trim()) void findFeeds();
+                },
+                placeholder: "https://example.com or r/programming",
+                "aria-label": "Site, feed URL, or r/name of Reddit communities"
               }
             )
           ] }),
-          /* @__PURE__ */ jsxs("label", { children: [
-            "Folder (optional)",
-            /* @__PURE__ */ jsx(
-              Input,
-              {
-                value: folder,
-                maxLength: 100,
-                onChange: (event) => setFolder(event.target.value),
-                placeholder: "Research"
-              }
-            )
+          jsxs("div", { className: "rss-discover-trigger", children: [
+            jsx(Button, { type: "button", disabled: disabled || !String(url || "").trim(), onClick: () => void findFeeds(), children: "Find Feeds" }),
+            jsx("span", { className: "rss-muted", children: "by Feedsearch" })
+          ] }),
+          jsxs("label", { children: [
+            "Folder",
+            jsxs("select", { "aria-label": "Existing folder", value: folderPick, onChange: event => { setFolderPick(event.target.value); if (event.target.value) setFolder(""); }, children: [
+              jsx("option", { value: "", children: "Ungrouped" }),
+              groupedFeeds.filter(group => group.key).map(group => jsx("option", { value: group.key, children: group.title }, group.key))
+            ] })
+          ] }),
+          jsxs("label", { children: [
+            "New folder",
+            jsx(Input, { value: folder, maxLength: 100, onChange: event => { setFolder(event.target.value); if (event.target.value) setFolderPick(""); }, placeholder: "Research" })
+          ] }),
+          foundFeeds.length > 0 && jsxs("div", { className: "rss-discover", children: [
+            jsx("div", { className: "rss-discover-list", children: feedsearchVisible(foundFeeds, false).map(row => jsxs(
+              "button",
+              { type: "button", className: "rss-discover-row" + (row.fresh && !row.bozo ? "" : " is-stale"), onClick: () => setUrl(row.url), children: [
+                jsx("span", { children: row.title }),
+                jsx("span", { className: "rss-discover-meta", children: feedsearchMeta(row) })
+              ] },
+              row.url
+            )) })
           ] }),
           /* @__PURE__ */ jsxs("div", { className: "rss-subscribe-starters", children: [
             jsx("span", { className: "rss-muted rss-small", children: "Starter packs" }),
@@ -5173,7 +5291,7 @@ function ReaderProfile({ ctx, owner }) {
             {
               variant: "ghost",
               type: "button",
-              onClick: () => setAdding(false),
+              onClick: () => { setAdding(false); setFoundFeeds([]); },
               children: "Cancel"
             }
           )
@@ -5228,24 +5346,15 @@ function ReaderProfile({ ctx, owner }) {
             onDrop: reorderMode ? handleDrop() : undefined,
             children: [
               jsxs("div", {
-                role: "button",
-                tabIndex: 0,
                 className: "rss-folder-header",
-                "aria-expanded": open,
                 "data-drop": draggingId && dragTargetFolder === group.key ? "true" : undefined,
                 onClick: () => {
                   if (suppressFolderClick.current) { suppressFolderClick.current = false; return; }
-                  toggleFolder(group.key);
+                  browseFolder(group.key);
                 },
                 onDragOver: reorderMode ? handleFolderDragOver(group.key) : undefined,
-                onDrop: reorderMode ? handleDrop() : undefined,
-                onKeyDown: event => {
-                  if (event.key !== "Enter" && event.key !== " ") return;
-                  event.preventDefault();
-                  toggleFolder(group.key);
-                },
                 children: [
-                  jsx("i", { className: `codicon codicon-chevron-right rss-folder-chevron${open ? " rss-folder-chevron-open" : ""}`, "aria-hidden": "true" }),
+                  jsx("button", { type: "button", className: "rss-folder-chevron-button", "aria-label": `${open ? "Collapse" : "Expand"} ${group.title}`, "aria-expanded": open, onClick: event => { event.stopPropagation(); toggleFolder(group.key); }, children: jsx("i", { className: `codicon codicon-chevron-right rss-folder-chevron${open ? " rss-folder-chevron-open" : ""}`, "aria-hidden": "true" }) }),
                   reorderMode && group.key && folderRename?.key === group.key
                     ? jsx("form", { style: { flex: 1, minWidth: 0, display: "flex" }, onClick: event => event.stopPropagation(), onSubmit: event => {
                       event.preventDefault();

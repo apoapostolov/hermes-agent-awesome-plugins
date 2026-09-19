@@ -6,12 +6,13 @@ import json
 import os
 import re
 import socket
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from html import escape
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from fastapi import APIRouter, HTTPException
@@ -264,6 +265,78 @@ def fetch_article(payload: FeedRequest) -> dict[str, str | int]:
             "User-Agent": _ARTICLE_UA,
         },
     )
+
+
+_FEEDSEARCH = "https://feedsearch.dev/api/v1/search"
+_DISCOVERY_TLDS = (
+    "com", "org", "net", "io", "co", "ai", "dev", "app", "me", "tv",
+    "info", "biz", "news", "online", "xyz", "site", "tech", "store",
+    "us", "ca", "uk", "au", "nz", "de", "fr", "es", "it", "nl",
+    "be", "se", "no", "dk", "fi", "pl", "cz", "at", "ch", "ie",
+    "pt", "in", "jp", "kr", "sg", "za", "br", "mx", "bg"
+)
+
+
+def _discover_targets(raw: str) -> tuple[str, list[str]]:
+    value = str(raw or "").strip()
+    if not value:
+        raise ValueError("Give a website URL, domain, or site name to search.")
+    if "://" in value or "." in value or "/" in value:
+        query = _discover_query(value)
+        return query, [query]
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,62}", value, re.IGNORECASE):
+        raise ValueError("Use a site name, domain, or public website URL.")
+    return value, [f"https://{value}.{tld}" for tld in _DISCOVERY_TLDS]
+
+
+def _feedsearch_lookup(query: str) -> list[dict[str, object]]:
+    target = f"{_FEEDSEARCH}?url={quote(query, safe='')}&info=true"
+    opener = build_opener(_NoRedirect())
+    request = Request(
+        target,
+        headers={
+            "Accept": "application/json",
+            "Accept-Encoding": "identity",
+            "User-Agent": _USER_AGENT,
+        },
+    )
+    with opener.open(request, timeout=min(_TIMEOUT, 12)) as response:
+        body = _read_response(response)
+    data = json.loads(body.decode("utf-8"))
+    if not isinstance(data, list):
+        raise ValueError("Feedsearch returned an unexpected payload.")
+    return [row for row in data if isinstance(row, dict)]
+
+
+def _discover_query(raw: str) -> str:
+    value = str(raw or "").strip()
+    if not value:
+        raise ValueError("Give a website URL or domain to search.")
+    if "://" not in value:
+        value = "https://" + value
+    return _validate_url(value)
+
+
+@router.post("/discover")
+def discover_feeds(payload: FeedRequest) -> dict[str, object]:
+    try:
+        query, targets = _discover_targets(payload.url)
+        rows: list[dict[str, object]] = []
+        failures = 0
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(_feedsearch_lookup, target): target for target in targets}
+            for future in as_completed(futures):
+                try:
+                    rows.extend(future.result())
+                except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+                    failures += 1
+        if not rows and failures == len(targets):
+            raise ValueError("Feed discovery returned no usable results.")
+        return {"feeds": rows[:300], "query": query, "targets": len(targets)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        raise HTTPException(status_code=502, detail=f"Feedsearch failed: {exc}") from exc
 
 
 @router.post("/feed")

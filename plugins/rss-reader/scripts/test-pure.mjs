@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta")].join("\n");
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -66,6 +66,10 @@ exports.readableChromeKind = readableChromeKind;
 exports.rssFindTokens = rssFindTokens;
 exports.rssArticleFindHaystack = rssArticleFindHaystack;
 exports.rssArticleFindScore = rssArticleFindScore;
+exports.feedsearchCanonicalUrl = feedsearchCanonicalUrl;
+exports.feedsearchRank = feedsearchRank;
+exports.feedsearchVisible = feedsearchVisible;
+exports.feedsearchMeta = feedsearchMeta;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -215,5 +219,18 @@ assert.deepEqual(fns.rssFindTokens("that rss article about paizo"), ["paizo"]);
 assert.equal(fns.rssArticleFindScore({ title: "Weekly news", body: "Paizo announced a Pathfinder reprint." }, "RPG", ["paizo"]), 1);
 assert.equal(fns.rssArticleFindScore({ title: "Paizo Q&A", body: "interview" }, "News", ["paizo"]), 2);
 assert.equal(fns.rssArticleFindScore({ title: "Unrelated", body: "nope" }, "News", ["paizo"]), 0);
+const now = Date.parse("2026-09-19T00:00:00Z");
+assert.equal(fns.feedsearchCanonicalUrl("http://www.Example.com/feed/"), "https://example.com/feed");
+const ranked = fns.feedsearchRank([
+  { url: "http://example.com/feed/", title: "Old", item_count: 20, velocity: 1, score: 10, last_updated: "2026-09-10T00:00:00Z", bozo: 0 },
+  { url: "https://www.example.com/feed", title: "New", item_count: 20, velocity: 2, score: 40, last_updated: "2026-09-18T00:00:00Z", bozo: 0 },
+  { url: "https://dead.example.com/rss", title: "Dead", item_count: 9, velocity: 0, score: 80, last_updated: "2019-02-20T00:00:00Z", bozo: 0 },
+  { url: "https://broken.example.com/rss", title: "Broken", item_count: 1, velocity: 1, score: 90, last_updated: "2026-09-18T00:00:00Z", bozo: 1 }
+], now, 90);
+assert.equal(ranked.length, 3);
+assert.equal(ranked[0].title, "New");
+assert.equal(fns.feedsearchVisible(ranked, false).map(row => row.title).join(","), "New");
+assert.equal(fns.feedsearchVisible(ranked, true).length, 3);
+assert.match(fns.feedsearchMeta(ranked[0]), /20 items/);
 
-console.log("ok", 56);
+console.log("ok", 61);
