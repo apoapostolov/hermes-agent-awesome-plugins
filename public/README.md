@@ -12,6 +12,8 @@ Replace `<id>` with the plugin folder name.
 
 Full-featured, install-at-your-own-risk builds live in [`../personal`](../personal).
 
+Each public plugin that diverged from personal (or is held because of it) has `LIMITATIONS.md`. Read that file before migrating a personal feature back into the listed edition.
+
 ## Listing status
 
 | Plugin | Public edition |

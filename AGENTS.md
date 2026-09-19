@@ -32,3 +32,5 @@ Do not lower personal to match a public cut. Never ship personal behind public.
 ## Catalog work
 
 Do not gut personal to get a listing. Do not restore public reach-in just to keep the two trees identical.
+
+Each plugin that could not list as personal has `LIMITATIONS.md` in that plugin folder. Read it before a catalog pin, and before copying a personal feature into `public/`. For every blocker: still comply, or confirm the linked Hermes issue or PR is resolved and the SDK hook exists.

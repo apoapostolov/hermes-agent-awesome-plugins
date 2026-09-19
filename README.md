@@ -52,7 +52,7 @@ The pack command in [Install](#install) still pulls `plugins/<id>`.
 | [better-session-appearance](public/better-session-appearance) | Held until a session-row decoration / color hook exists. |
 | Remaining plugins | Same as personal at the split. Review before a catalog pin. |
 
-Agent rules for these trees live in [AGENTS.md](AGENTS.md).
+Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for the personal editions live in each plugin's `LIMITATIONS.md`.
 
 ## What's in the Pack
 
