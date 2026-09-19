@@ -1,0 +1,11 @@
+name: memory-review
+version: 1.2.1
+description: "A dialog to checkbox staged memory writes and approve or reject the selection."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/memory-review
+tags:
+  - desktop
+  - memory

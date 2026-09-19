@@ -14,13 +14,27 @@
   [![Plugins](https://img.shields.io/badge/plugins-13-2ea44f)](#whats-in-the-pack)
   [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-  [Install the pack](#install) &nbsp;·&nbsp; [Explore the plugins](#whats-in-the-pack) &nbsp;·&nbsp; [Pinning model](#how-it-works)
+  [Install the pack](#install) &nbsp;·&nbsp; [Explore the plugins](#whats-in-the-pack) &nbsp;·&nbsp; [Personal and public](#personal-and-public) &nbsp;·&nbsp; [Pinning model](#how-it-works)
 
 </div>
 
 <div align="center">
   <img src="docs/hero.png" width="100%" alt="Hermes Agent Awesome Plugins" />
 </div>
+
+## Personal and public
+
+Every plugin in this repo has two editions.
+
+- **[personal](personal/README.md)** is the full-featured copy I run. It may reach into Hermes Desktop internals. Install at your own risk: a Desktop update can break it, and it is outside the plugin SDK contract.
+- **[public](public/README.md)** is the listed edition. It stays inside the plugin SDK so it can go in the Hermes Plugin Catalog. Where the app has no hook yet, this edition drops that surface instead of reaching in.
+
+```bash
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/<id>
+```
+
+The pack file still pins `plugins/<id>` (same bytes as personal at the split) until public editions are listing-clean.
 
 ## What's in the Pack
 
@@ -100,6 +114,8 @@ This is an independent community project. It does not change Hermes Agent core, 
 
 ## Documentation
 
+- [Personal editions](personal/README.md)
+- [Public editions](public/README.md)
 - [provider-status](plugins/provider-status/README.md)
 - [intelligent-tool-break](plugins/intelligent-tool-break/README.md)
 - [iteration-budget-meter](plugins/iteration-budget-meter/README.md)

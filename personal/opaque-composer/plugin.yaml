@@ -1,0 +1,13 @@
+name: opaque-composer
+version: 1.0.0
+description: "Keep the desktop composer solid while scrolling so conversation text stays readable."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/opaque-composer
+tags:
+  - desktop
+  - composer
+  - ui
+  - accessibility

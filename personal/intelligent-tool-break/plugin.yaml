@@ -1,0 +1,18 @@
+name: intelligent-tool-break
+version: 1.3.3
+description: "Intelligent Tool Break: never let a stalled tool call force you to cancel a long task. You can abort an in-flight call with /break, instruct with /break {message}, or force it to repeat with /again."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/intelligent-tool-break
+tags:
+  - desktop
+  - commands
+  - hooks
+provides_hooks:
+  - pre_tool_call
+  - post_tool_call
+  - transform_tool_result
+  - on_session_start
+  - on_session_end

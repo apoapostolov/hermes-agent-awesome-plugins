@@ -1,0 +1,11 @@
+name: scroll-on-switch
+version: 1.4.5
+description: "Snap the transcript to the bottom when switching to a session."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+tags:
+  - desktop
+  - sessions
+  - scroll

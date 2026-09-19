@@ -1,0 +1,12 @@
+name: drag-to-pin-session
+version: 1.1.0
+description: "Reorganize your pinned sessions with drag-and-drop. Drag a session into Pinned to pin it at the drop slot, or drag it out to unpin."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/plugins/drag-to-pin-session
+tags:
+  - desktop
+  - sessions
+  - sidebar
