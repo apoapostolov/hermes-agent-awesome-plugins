@@ -29,7 +29,7 @@ plugins:
     ref: c3f78c597c6fd4707138dfb075689322e1968235
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/rss-reader
-    ref: cae0d4bc2b40a93e4b5c30ff0d70ba113766fa6c
+    ref: 3071d03f5f2e8e98047f6b45d536944ba0db58e6
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: plugins/compact-reasoning-label
     ref: 946af32ad7ee9559298a2ffaf63a8289cd4aaafb
