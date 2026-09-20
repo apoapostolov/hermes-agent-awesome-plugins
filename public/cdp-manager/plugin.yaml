@@ -1,5 +1,5 @@
 name: cdp-manager
-version: 1.0.1
+version: 1.0.0
 description: "Local Chrome CDP debug ports in the status bar (probe, launch, stop, recheck)
   plus a managed port Hermes keeps alive and the `cdp` agent tool. Disclosure: launches
   local Chrome on 127.0.0.1 only, with per-port profiles under the Hermes home directory

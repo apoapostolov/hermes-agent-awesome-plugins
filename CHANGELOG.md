@@ -6,6 +6,10 @@
 
 - **sessionretitler** (formerly `session-retitler`): version `1.1.0`. Retitles the session every N titleable user messages from the latest exchanges (llm-rank rewrites, user titles untouchable). Now pinned in the pack (pack `1.16.0`).
 
+### Fixed
+
+- **cdp-manager:** version `1.0.0` (the pre-release `1.0.1` tag is retired, never shipped). `config.json` now writes inside the plugin directory instead of the shared `$HERMES_HOME/plugins/` folder, and the default Chrome profile path derives from `%LOCALAPPDATA%` instead of a hardcoded personal path. The public edition's repo link points at `public/cdp-manager`. Pack re-pinned to the fix commit (pack `1.17.0`); catalog entry updated with `platforms: [windows]` and corrected profile-path wording.
+
 ## [rss-reader 1.0.7] - 2026-09-20
 
 Subscribe accepts YouTube and Substack pages, a folder view includes nested feeds, and each feed has its own capture and ticker settings.
