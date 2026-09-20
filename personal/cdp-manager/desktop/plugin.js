@@ -660,7 +660,9 @@ function Root() {
         open: dialogOpen,
         onOpenChange: setDialogOpen,
         cfg,
-        setCfg: next => setCfg(prev => ({ ...prev, ...next })),
+        // Accepts an object OR an updater function (React setState parity):
+        // spreading a function yields nothing, so resolve it first.
+        setCfg: next => setCfg(prev => ({ ...prev, ...(typeof next === 'function' ? next(prev) : next) })),
         onNotify: notify,
       }),
     ],
