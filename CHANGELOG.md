@@ -2,9 +2,13 @@
 
 ## [Unreleased]
 
+## [rss-reader 1.0.6] - 2026-09-20
+
+Folder order is yours to set, and old posts leave when the feed no longer lists them.
+
 ### Added
 
-- **rss-reader:** version `1.0.6`. Edit mode adds a gripper on named folders so you can drag them into a new order. That order is saved and used after reload. Ungrouped stays first. Feeds inside a folder keep their own order.
+- **rss-reader:** version `1.0.6`. Edit mode adds a gripper on named folders so you can drag them into a new order. That order is saved and used after reload. Ungrouped stays first. Feeds inside a folder keep their own order. Settings Main **Keep Articles** (7 to 365 days, default 14) drops posts older than that limit when the live feed no longer lists them, and deletes their full-article cache. Starred posts stay. Slow feeds that still list an old item keep it.
 
 ## [1.14.0] - 2026-09-18
 

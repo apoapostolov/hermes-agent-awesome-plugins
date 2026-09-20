@@ -745,7 +745,7 @@ function safeUrl(raw) {
   url.hash = "";
   return url.href;
 }
-function mergeFeed(library, feedId, parsed) {
+function mergeFeed(library, feedId, parsed, keepDays) {
   const feed = library.feeds.find((f) => f.id === feedId);
   if (!feed) throw new Error("This subscription was removed while refreshing.");
   feed.title = parsed.title;
@@ -812,6 +812,7 @@ function mergeFeed(library, feedId, parsed) {
   );
   const remove = new Set(unsaved.slice(300).map((a) => a.id));
   library.articles = library.articles.filter((a) => !remove.has(a.id));
+  pruneExpiredArticles(library, feedId, parsed.items.map((item) => item.identity), keepDays);
   pruneArticleCache(library);
   return { added, fresh: fresh.map((a) => ({ id: a.id, url: a.url })) };
 }
@@ -991,7 +992,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
           if (!feed) throw new Error("Subscription not found.");
           try {
             const result = await fetchFeed2(feed.url);
-            return await write((library) => mergeFeed(library, feed.id, result));
+            return await write((library) => mergeFeed(library, feed.id, result, cacheKeepDaysFor(owner)));
           } catch (error) {
             await write((library) => {
               const current = library.feeds.find((f) => f.id === feed.id);
@@ -1200,11 +1201,37 @@ function normalizeDefaultView(value) {
   return value === "unread" || value === "saved" ? value : "all";
 }
 var REFRESH_MINUTES = [5, 10, 15, 30, 60, 120, 180];
+var CACHE_KEEP_DAYS = [7, 14, 30, 60, 90, 180, 365];
 function normalizeRefreshMinutes(value) {
   const n = Number(value);
   if (REFRESH_MINUTES.includes(n)) return n;
   if (!Number.isFinite(n)) return 15;
   return REFRESH_MINUTES.reduce((best, minutes) => Math.abs(n - minutes) < Math.abs(n - best) ? minutes : best, REFRESH_MINUTES[0]);
+}
+function normalizeCacheKeepDays(value) {
+  const n = Number(value);
+  if (CACHE_KEEP_DAYS.includes(n)) return n;
+  if (!Number.isFinite(n)) return 14;
+  return CACHE_KEEP_DAYS.reduce((best, days) => Math.abs(n - days) < Math.abs(n - best) ? days : best, CACHE_KEEP_DAYS[0]);
+}
+function cacheKeepDaysFor(owner) {
+  try {
+    if (rssCtx) return normalizeCacheKeepDays(readSettings(rssCtx, owner).cacheKeepDays);
+  } catch {}
+  return 14;
+}
+function pruneExpiredArticles(library, feedId, liveIdentities, keepDays, now) {
+  const cutoff = (Number.isFinite(now) ? now : Date.now()) - normalizeCacheKeepDays(keepDays) * 86400000;
+  const live = liveIdentities instanceof Set ? liveIdentities : new Set(Array.isArray(liveIdentities) ? liveIdentities : []);
+  library.articles = (library.articles || []).filter((article) => {
+    if (article.feed_id !== feedId) return true;
+    if (article.is_saved) return true;
+    if (article.identity && live.has(article.identity)) return true;
+    const stamp = Date.parse(article.published_at || article.received_at || "");
+    if (!Number.isFinite(stamp)) return true;
+    return stamp >= cutoff;
+  });
+  pruneArticleCache(library);
 }
 function defaultCaptureImproveHandoff() {
   return [
@@ -1256,6 +1283,7 @@ function readSettings(ctx, owner) {
   return {
     autoRefresh: stored.autoRefresh === true,
     refreshMinutes: normalizeRefreshMinutes(stored.refreshMinutes),
+    cacheKeepDays: normalizeCacheKeepDays(stored.cacheKeepDays),
     markReadOnOpen: stored.markReadOnOpen !== false,
     defaultView: normalizeDefaultView(stored.defaultView),
     fullCapture: stored.fullCapture === true,
@@ -4882,7 +4910,7 @@ function ReaderProfile({ ctx, owner }) {
   const saveSettings = event => {
     event.preventDefault();
     const minutes = normalizeRefreshMinutes(draft.refreshMinutes);
-    const next = { ...draft, refreshMinutes: minutes };
+    const next = { ...draft, refreshMinutes: minutes, cacheKeepDays: normalizeCacheKeepDays(draft.cacheKeepDays) };
     next.gradingSkill = gradingSkillName(next.gradingSkill);
     next.defaultView = normalizeDefaultView(next.defaultView);
     next.captureImproveHandoff = String(next.captureImproveHandoff || "").slice(0, 5e4);
@@ -5186,6 +5214,11 @@ function ReaderProfile({ ctx, owner }) {
               jsx(Segmented, { value: String(normalizeRefreshMinutes(draft.refreshMinutes)), onChange: v => updateDraft({ ...draft, refreshMinutes: Number(v) }), options: REFRESH_MINUTES.map((n) => ({ id: String(n), label: n })) })
             ] }),
             jsx("p", { className: "rss-muted rss-small", children: typeof ctx.onDispose === "function" ? "Fetches new posts on this interval, including the headline ticker, only while the Hermes desktop client is open." : "Background refresh is unavailable on this Hermes build. Use Refresh." }),
+            jsxs("div", { className: "rss-setting-row", children: [
+              jsx("span", { className: "rss-setting", children: "Keep Articles" }),
+              jsx(Segmented, { value: String(normalizeCacheKeepDays(draft.cacheKeepDays)), onChange: v => updateDraft({ ...draft, cacheKeepDays: Number(v) }), options: CACHE_KEEP_DAYS.map((n) => ({ id: String(n), label: String(n) })) })
+            ] }),
+            jsx("p", { className: "rss-muted rss-small", children: "Posts older than this leave the library when the feed no longer lists them. Full article text for those posts is deleted too. Posts still in a slow feed stay." }),
             jsx("label", { className: "rss-setting", children: [
               jsx("input", { type: "checkbox", checked: draft.registerHermesTools === true, onChange: event => updateDraft({ ...draft, registerHermesTools: event.target.checked }) }),
               "Register Hermes Tools"

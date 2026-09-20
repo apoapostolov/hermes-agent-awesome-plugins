@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFolderOrder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFolderOrder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("pruneArticleCache"), grab("normalizeCacheKeepDays"), grab("pruneExpiredArticles"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta")].join("\n");
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -27,6 +27,7 @@ new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "spam", label: "SPAM", color: "#6b6b6b", tint: 10, rank: 10 }
 ];
 const REFRESH_MINUTES = [5, 10, 15, 30, 60, 120, 180];
+const CACHE_KEEP_DAYS = [7, 14, 30, 60, 90, 180, 365];
 ${bundle}
 exports.profileFromOwner = profileFromOwner;
 exports.cheapExcerpt = cheapExcerpt;
@@ -57,6 +58,8 @@ exports.buildPreferenceSnapshot = buildPreferenceSnapshot;
 exports.interestPayloadJson = interestPayloadJson;
 exports.normalizeDefaultView = normalizeDefaultView;
 exports.normalizeRefreshMinutes = normalizeRefreshMinutes;
+exports.normalizeCacheKeepDays = normalizeCacheKeepDays;
+exports.pruneExpiredArticles = pruneExpiredArticles;
 exports.articleNeedsCapture = articleNeedsCapture;
 exports.healthAgeLabel = healthAgeLabel;
 exports.healthNotice = healthNotice;
@@ -202,6 +205,23 @@ assert.equal(fns.normalizeRefreshMinutes(180), 180);
 assert.equal(fns.normalizeRefreshMinutes(7), 5);
 assert.equal(fns.normalizeRefreshMinutes(1440), 180);
 assert.equal(fns.normalizeRefreshMinutes("nope"), 15);
+assert.equal(fns.normalizeCacheKeepDays(), 14);
+assert.equal(fns.normalizeCacheKeepDays(14), 14);
+assert.equal(fns.normalizeCacheKeepDays(365), 365);
+assert.equal(fns.normalizeCacheKeepDays(20), 14);
+const keepLib = {
+  articles: [
+    { id: "old", feed_id: "f1", identity: "old", published_at: "2026-01-01T00:00:00.000Z", is_saved: false, url: "https://x/old" },
+    { id: "live", feed_id: "f1", identity: "live", published_at: "2026-01-01T00:00:00.000Z", is_saved: false, url: "https://x/live" },
+    { id: "star", feed_id: "f1", identity: "star", published_at: "2026-01-01T00:00:00.000Z", is_saved: true, url: "https://x/star" },
+    { id: "new", feed_id: "f1", identity: "new", published_at: "2026-09-10T00:00:00.000Z", is_saved: false, url: "https://x/new" }
+  ],
+  articleCache: { "https://x/old": { body: "old" }, "https://x/live": { body: "live" } }
+};
+fns.pruneExpiredArticles(keepLib, "f1", ["live"], 14, Date.parse("2026-09-20T00:00:00.000Z"));
+assert.deepEqual(keepLib.articles.map((a) => a.id).sort(), ["live", "new", "star"]);
+assert.equal("https://x/old" in keepLib.articleCache, false);
+assert.equal("https://x/live" in keepLib.articleCache, true);
 assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: false, body: "short" }), true);
 assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: true, body: "x".repeat(900) }), false);
 assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: true, body: "short" }), true);
