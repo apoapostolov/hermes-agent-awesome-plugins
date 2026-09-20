@@ -1,8 +1,9 @@
 /**
- * Intelligent Tool Break desktop half. Layout A: name + time pill left,
- * Break / Message / Again / gear right. Message injects "/break "
- * into the composer. Gear sets elapsed color grades, auto-break
- * checkboxes, and tools that never show the strip.
+ * Intelligent Tool Break desktop half: BreakBar strip (name + time pill left,
+ * Break / Message / Again / gear right) rendered in the plugin's own
+ * composer-top contribution. Message notifies the user to type "/break " in
+ * the composer. Gear sets elapsed color grades, auto-break checkboxes, and
+ * tools that never show the strip.
  */
 import {
   cn,
@@ -232,309 +233,6 @@ function visibleTools(status, hide) {
     const spawn = name === 'terminal' || name === 'process'
     return tool.killable === true || spawn
   })
-}
-
-const NATIVE_HOOK = 'data-itb-actions'
-const NATIVE_GEAR = 'data-itb-gear'
-const NATIVE_PILL = 'data-itb-pill'
-const firstSeen = new Map()
-
-function isSpawnTool(tool) {
-  const name = String(tool && tool.name ? tool.name : '').toLowerCase()
-  return name === 'terminal' || name === 'process'
-}
-
-function visibleStatusStack() {
-  const stacks = document.querySelectorAll('[data-slot="composer-status-stack"]')
-  for (const stack of stacks) {
-    if (stack.closest('[data-pane-hidden]')) {
-      continue
-    }
-    return stack
-  }
-  return null
-}
-
-function backgroundStatusRows(stack) {
-  if (!stack) {
-    return []
-  }
-  const sections = [...stack.querySelectorAll('[data-slot="status-stack-section"]')]
-    .filter(section => section.querySelector('.codicon-server-process'))
-  return sections.flatMap(section => [...section.querySelectorAll('[data-slot="status-row"]')]
-    .filter(row => row.querySelector('[data-slot="status-dismiss"]')))
-}
-
-function backgroundHeaders(stack) {
-  if (!stack) {
-    return []
-  }
-  const headers = []
-  for (const icon of stack.querySelectorAll('.codicon-server-process')) {
-    let node = icon.parentElement
-    for (let i = 0; i < 8 && node; i++) {
-      const cls = String(node.className || '')
-      if (cls.includes('flex') && node.querySelector('button[aria-expanded]')) {
-        headers.push(node)
-        break
-      }
-      node = node.parentElement
-    }
-  }
-  return headers
-}
-
-function nativeBackgroundPresent() {
-  const stack = visibleStatusStack()
-  return Boolean(stack && stack.querySelector('.codicon-server-process'))
-}
-
-function nativeRowTitle(row) {
-  const span = row.querySelector('.truncate')
-  return String((span && span.textContent) || '').trim()
-}
-
-function matchSpawnTool(title, tools) {
-  const spawn = tools.filter(isSpawnTool)
-  const needle = String(title || '').toLowerCase()
-  const hit = spawn.find(tool => {
-    const label = String(tool.label || '').toLowerCase()
-    const cmd = label.replace(/^(terminal|process)\s+/, '')
-    if (!needle) {
-      return false
-    }
-    return label.includes(needle.slice(0, 48)) || needle.includes(cmd.slice(0, 24))
-  })
-  if (hit) {
-    return hit
-  }
-  if (spawn.length === 1) {
-    return spawn[0]
-  }
-  return null
-}
-
-function toolKey(tool) {
-  return String((tool && (tool.id || tool.name)) || '')
-}
-
-const NATIVE_BTN =
-  'h-6 shrink-0 whitespace-nowrap rounded-md px-1 text-[0.65rem] font-semibold text-(--ui-text-primary) hover:bg-(--chrome-action-hover)'
-const NATIVE_BTN_OFF =
-  'h-6 shrink-0 whitespace-nowrap rounded-md px-1 text-[0.65rem] font-semibold text-(--ui-text-tertiary) opacity-40 cursor-not-allowed'
-
-function makeNativeBtn(label, title, disabled, onClick) {
-  const btn = document.createElement('button')
-  btn.type = 'button'
-  btn.className = disabled ? NATIVE_BTN_OFF : NATIVE_BTN
-  btn.textContent = label
-  btn.style.flexShrink = '0'
-  btn.title = title.replace(/\n/g, ' ')
-  btn.disabled = Boolean(disabled)
-  btn.addEventListener('pointerdown', event => {
-    event.stopPropagation()
-  })
-  btn.addEventListener('click', event => {
-    event.preventDefault()
-    event.stopPropagation()
-    if (!disabled) {
-      onClick()
-    }
-  })
-  return btn
-}
-
-function clearNativeHooks() {
-  document.querySelectorAll(`[${NATIVE_HOOK}], [${NATIVE_GEAR}], [${NATIVE_PILL}]`).forEach(node => node.remove())
-}
-
-function rowStartMs(row, tool) {
-  if (tool && tool.started_wall) {
-    return Number(tool.started_wall) * 1000
-  }
-  const title = nativeRowTitle(row) || 'row'
-  if (!firstSeen.has(title)) {
-    firstSeen.set(title, Date.now())
-  }
-  return firstSeen.get(title)
-}
-
-function ensurePill(row, tool, now, grades) {
-  const title = row.querySelector('.truncate')
-  if (!title || !title.parentElement) {
-    return null
-  }
-  title.style.flex = '0 1 auto'
-  title.style.flexGrow = '0'
-  title.style.flexShrink = '1'
-  title.style.flexBasis = 'auto'
-  title.style.minWidth = '0'
-  title.style.maxWidth = 'calc(100% - 3.25rem)'
-  title.style.width = 'auto'
-  title.style.overflow = 'hidden'
-  title.style.textOverflow = 'ellipsis'
-  title.style.whiteSpace = 'nowrap'
-  let pill = title.parentElement.querySelector(`[${NATIVE_PILL}]`)
-  if (!pill) {
-    pill = document.createElement('span')
-    pill.setAttribute(NATIVE_PILL, '1')
-    title.insertAdjacentElement('afterend', pill)
-  }
-  row.querySelectorAll(`[${NATIVE_PILL}]`).forEach(node => {
-    if (node !== pill) {
-      node.remove()
-    }
-  })
-  pill.className = 'shrink-0 font-mono text-[0.62rem] tabular-nums leading-4'
-  pill.style.color = 'color-mix(in srgb, var(--ui-text-tertiary) 72%, transparent)'
-  pill.style.fontWeight = '500'
-  pill.style.background = 'transparent'
-  pill.style.flexShrink = '0'
-  pill.style.marginLeft = '0.35rem'
-  const waited = Math.max(0, now - rowStartMs(row, tool))
-  const clock = fmtElapsed(waited)
-  if (pill.textContent !== clock) {
-    pill.textContent = clock
-  }
-  return pill
-}
-
-function makeGearButton(onGear) {
-  const gear = document.createElement('button')
-  gear.type = 'button'
-  gear.className = GEAR
-  gear.setAttribute('aria-label', 'Break settings')
-  gear.title = 'Grades, auto break, hide list'
-  gear.addEventListener('pointerdown', event => event.stopPropagation())
-  gear.addEventListener('click', event => {
-    event.preventDefault()
-    event.stopPropagation()
-    onGear()
-  })
-  const icon = document.createElement('i')
-  icon.className = 'codicon codicon-settings-gear'
-  icon.style.fontSize = '0.7rem'
-  gear.appendChild(icon)
-  return gear
-}
-
-let lastNativePaintKey = ''
-
-function fillActionHost(hostEl, tool) {
-  const breakCmd = tool && tool.id ? `/break --id ${tool.id}` : '/break'
-  const againCmd = tool && tool.id ? `/again --id ${tool.id}` : '/again'
-  const againOff = Boolean(tool && tool.again_disabled)
-  const sig = `${breakCmd}|${againCmd}|${againOff ? 1 : 0}|overlay1`
-  if (hostEl.getAttribute('data-itb-sig') === sig) {
-    return
-  }
-  hostEl.setAttribute('data-itb-sig', sig)
-  hostEl.className = 'flex shrink-0 items-center gap-0 whitespace-nowrap'
-  hostEl.style.flexShrink = '0'
-  hostEl.style.minWidth = 'max-content'
-  hostEl.replaceChildren()
-  hostEl.appendChild(makeNativeBtn('Break', 'Kill this spawn. Keep the turn.', false, () => {
-    void breakNow(breakCmd)
-  }))
-  hostEl.appendChild(makeNativeBtn('Message', 'Put /break in the composer so you can type a hint.', false, injectBreakMessage))
-  hostEl.appendChild(
-    makeNativeBtn(
-      'Again',
-      againOff ? 'Again used twice on this call. Break instead.' : 'Kill and reissue this call once.',
-      false,
-      () => {
-        if (!againOff) {
-          void breakNow(againCmd)
-        }
-      }
-    )
-  )
-}
-
-function ensureRowHook(row) {
-  let hostEl = row.querySelector(`[${NATIVE_HOOK}]`)
-  if (!hostEl) {
-    hostEl = document.createElement('div')
-    hostEl.setAttribute(NATIVE_HOOK, '1')
-    hostEl.className = 'flex shrink-0 items-center gap-0'
-  }
-  row.style.overflow = 'visible'
-  hostEl.style.flexShrink = '0'
-  hostEl.style.marginLeft = 'auto'
-  hostEl.style.background = 'color-mix(in srgb, var(--ui-chat-surface-background, var(--ui-bg-primary)) 90%, transparent)'
-  if (hostEl.parentElement !== row) {
-    row.appendChild(hostEl)
-  }
-  return hostEl
-}
-
-function ensureHeaderGear(header, onGear) {
-  let hostEl = header.querySelector(`[${NATIVE_GEAR}]`)
-  if (!hostEl) {
-    hostEl = document.createElement('div')
-    hostEl.setAttribute(NATIVE_GEAR, '1')
-    hostEl.className = 'flex shrink-0 items-center'
-    header.appendChild(hostEl)
-    hostEl.appendChild(makeGearButton(onGear))
-  }
-  return hostEl
-}
-
-function paintNativeStack(tools, newestId, onGear, grades) {
-  const hooked = new Set()
-  const stack = visibleStatusStack()
-  if (!stack) {
-    clearNativeHooks()
-    return hooked
-  }
-  const spawn = tools.filter(isSpawnTool)
-  const rows = backgroundStatusRows(stack)
-  const headers = backgroundHeaders(stack)
-  const keep = new Set()
-  const paintKey = `${headers.length}:${rows.length}:${spawn.length}`
-  if (paintKey !== lastNativePaintKey) {
-    lastNativePaintKey = paintKey
-    console.warn('[intelligent-tool-break] native paint', {
-      headers: headers.length,
-      rows: rows.length,
-      spawn: spawn.length
-    })
-  }
-  if (!headers.length && !rows.length) {
-    clearNativeHooks()
-    return hooked
-  }
-  headers.forEach(header => {
-    keep.add(header)
-    keep.add(ensureHeaderGear(header, onGear))
-    hooked.add('header')
-  })
-  rows.forEach((row, index) => {
-    // Only cancellable rows (running background tool calls) get the pill + its
-    // Break / Message / Again buttons. Queued message rows render in the same
-    // stack without a close affordance, so they must stay untouched.
-    if (!row.querySelector('[data-slot="status-dismiss"]')) {
-      return
-    }
-    const tool = matchSpawnTool(nativeRowTitle(row), spawn) || spawn[0] || null
-    const key = (tool && toolKey(tool)) || `row-${index}`
-    hooked.add(key)
-    keep.add(row)
-    fillActionHost(ensureRowHook(row), tool)
-    keep.add(ensurePill(row, tool, Date.now(), grades || loadGrades()))
-  })
-  const liveTitles = new Set(rows.map(row => nativeRowTitle(row) || 'row'))
-  for (const title of Array.from(firstSeen.keys())) {
-    if (!liveTitles.has(title)) {
-      firstSeen.delete(title)
-    }
-  }
-  document.querySelectorAll(`[${NATIVE_HOOK}], [${NATIVE_GEAR}], [${NATIVE_PILL}]`).forEach(node => {
-    if (!keep.has(node.parentElement) && !keep.has(node)) {
-      node.remove()
-    }
-  })
-  return hooked
 }
 
 function GradeRow({ label, hint, value, onChange, auto, onAuto }) {
@@ -870,7 +568,6 @@ function BreakBar() {
   const [grades, setGrades] = useState(loadGrades)
   const [hide, setHide] = useState(loadHide)
   const [open, setOpen] = useState(false)
-  const [hooked, setHooked] = useState(() => new Set())
   const fired = useRef(new Set())
 
   useEffect(() => {
@@ -903,65 +600,6 @@ function BreakBar() {
   }, [status.inflight, status.tools.length])
 
   const tools = visibleTools(status, hide)
-  const nativeLive = hooked.size > 0 || nativeBackgroundPresent()
-  const shown = tools.filter(tool => {
-    if (nativeLive && isSpawnTool(tool)) {
-      return false
-    }
-    return !hooked.has(toolKey(tool))
-  })
-  const toolsKey = tools.map(tool => `${toolKey(tool)}:${tool.again_disabled ? 1 : 0}`).join('|')
-
-  useEffect(() => {
-    let stop = false
-    let frame = 0
-    const apply = () => {
-      if (stop) {
-        return
-      }
-      const newestId = tools[0] ? tools[0].id : ''
-      const next = paintNativeStack(tools, newestId, () => setOpen(true), loadGrades())
-      setHooked(prev => {
-        if (prev.size === next.size && [...next].every(id => prev.has(id))) {
-          return prev
-        }
-        return next
-      })
-    }
-    const schedule = records => {
-      if (
-        records &&
-        records.every(
-          record =>
-            record.target.closest &&
-            (record.target.closest(`[${NATIVE_HOOK}]`) ||
-              record.target.closest(`[${NATIVE_GEAR}]`) ||
-              record.target.closest(`[${NATIVE_PILL}]`))
-        )
-      ) {
-        return
-      }
-      if (frame) {
-        return
-      }
-      frame = window.requestAnimationFrame(() => {
-        frame = 0
-        apply()
-      })
-    }
-    apply()
-    const obs = new MutationObserver(schedule)
-    obs.observe(document.body, { childList: true, subtree: true })
-    const timer = window.setInterval(apply, 250)
-    return () => {
-      stop = true
-      obs.disconnect()
-      window.clearInterval(timer)
-      if (frame) {
-        window.cancelAnimationFrame(frame)
-      }
-    }
-  }, [toolsKey])
 
   // Elapsed-time clock only while there are visible tools to animate;
   // an idle bar no longer re-renders 4x/second for nothing.
@@ -1017,14 +655,14 @@ function BreakBar() {
     }
   })
 
-  if (!shown.length) {
+  if (!tools.length) {
     return dialog
   }
 
   return jsxs('div', {
     className: 'flex flex-col gap-0.5',
     children: [
-      ...shown.map((tool, index) =>
+      ...tools.map((tool, index) =>
         jsx(
           ToolRow,
           {
@@ -1053,9 +691,6 @@ export default {
   id: ID,
   name: 'Intelligent Tool Break',
   register(ctx) {
-    ctx.onDispose(() => {
-      clearNativeHooks()
-    })
     ctx.register({
       id: 'break-bar',
       area: COMPOSER_AREAS.top,

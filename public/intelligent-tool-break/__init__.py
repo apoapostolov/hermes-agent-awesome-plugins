@@ -2,19 +2,18 @@
 
 Port of pi-break for this agent process:
 
-- ``/break`` kills the newest in-flight spawned child tree and keeps the turn
-- ``/break --id {id}`` kills that specific spawn
+- ``/break`` marks the newest in-flight tool call broken and keeps the turn
+- ``/break --id {id}`` breaks that specific call
 - ``/break {message}`` same, then that text rides in the broken tool result
   (ahead of any later /steer drain)
-- ``/again`` same kill, tells the model to reissue that exact call once
+- ``/again`` same, tells the model to reissue that exact call once
 - ``/again {hint}`` same, with a tweak
 - ``/again`` is refused after two uses of the same (name, args) this session
 
-Desktop ``slash.exec`` already runs plugin commands while a turn is live.
-Classic CLI queues every slash until the turn ends, so this plugin patches
-``HermesCLI._should_handle_steer_command_inline`` to also dispatch /break
-and /again on the UI thread. Gateway messaging still rejects unknown
-busy-slash commands; use desktop or wait.
+This edition is hook-only (``VALID_HOOKS``): it relabels the in-flight call
+and never kills processes or patches the host. Desktop ``slash.exec`` runs
+plugin commands while a turn is live. Classic CLI queues every slash until
+the turn ends; use desktop, or wait.
 
 In-process hangs (web_search, a silent stream) get marked. If they never
 return, Escape / interrupt is still the way out.
@@ -25,7 +24,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import subprocess
 import sys
 import threading
 import time
@@ -43,44 +41,6 @@ _lock = threading.Lock()
 _inflight: dict[str, dict[str, Any]] = {}
 _broken: dict[str, dict[str, Any]] = {}
 _again_by_fp: dict[str, int] = {}
-_cli_patched = False
-_popen_patched = False
-_orig_popen = subprocess.Popen
-
-
-def _attach_spawned_pid(pid: int) -> None:
-    if not pid or pid <= 1:
-        return
-    with _lock:
-        target = None
-        for item in _inflight.values():
-            if target is None or item["started_at"] > target["started_at"]:
-                target = item
-        if not target:
-            return
-        seen: set[int] = target["seen"]
-        pids: list[int] = target["pids"]
-        if pid in seen or pid == os.getpid():
-            return
-        pids.append(pid)
-        seen.add(pid)
-
-
-class _TrackingPopen(_orig_popen):  # type: ignore[valid-type,misc]
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        try:
-            _attach_spawned_pid(int(getattr(self, "pid", 0) or 0))
-        except Exception:
-            pass
-
-
-def _install_popen_hook() -> None:
-    global _popen_patched
-    if _popen_patched:
-        return
-    subprocess.Popen = _TrackingPopen  # type: ignore[misc,assignment]
-    _popen_patched = True
 
 
 def _fmt_duration(ms: float) -> str:
@@ -228,32 +188,6 @@ def _descendants(pid: int) -> list[int]:
 
 def _children_of(pid: int) -> list[int]:
     return _descendants(pid)
-
-
-def _kill_tree(pid: int) -> None:
-    if pid in {os.getpid(), os.getppid(), 0, 1}:
-        return
-    if sys.platform == "win32":
-        try:
-            subprocess.Popen(
-                ["taskkill", "/F", "/T", "/PID", str(pid)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) or 0x08000000,
-            )
-        except Exception:
-            pass
-        return
-    for child in _children_of(pid):
-        _kill_tree(child)
-    try:
-        os.kill(-pid, 9)
-    except OSError:
-        pass
-    try:
-        os.kill(pid, 9)
-    except OSError:
-        pass
 
 
 def _claimed_pids() -> set[int]:
@@ -457,25 +391,6 @@ def _kill_list_for(target: dict[str, Any]) -> list[int]:
     return sorted((now - set(target.get("seen") or [])) - later_new)
 
 
-def _kill_registry_since(started_wall: float) -> int:
-    n = 0
-    for session in _registry_sessions(started_wall):
-        sid = getattr(session, "id", None)
-        pid = getattr(session, "pid", None)
-        if pid:
-            _kill_tree(int(pid))
-        if not sid:
-            continue
-        try:
-            from tools.process_registry import process_registry
-
-            process_registry.kill_process(sid, source="intelligent-tool-break")
-            n += 1
-        except Exception:
-            pass
-    return n
-
-
 def _break_oldest(*, hint: Optional[str], again: bool, tool_call_id: Optional[str] = None) -> str:
     with _lock:
         target = _inflight.get(tool_call_id) if tool_call_id else _newest_visible()
@@ -658,42 +573,6 @@ def _handle_status(raw_args: str) -> str:
     if text.startswith("--session-id "):
         session_id = text[len("--session-id "):].strip() or None
     return json.dumps(_status_payload(session_id), separators=(",", ":"))
-
-
-def _install_cli_busy_dispatch() -> None:
-    """Make classic CLI dispatch /break and /again while a turn is running.
-
-    Desktop slash.exec already does this. CLI otherwise queues every slash
-    behind chat(), which is exactly the hang we are trying to cut.
-    """
-    global _cli_patched
-    if _cli_patched:
-        return
-    try:
-        import cli as cli_mod
-    except Exception:
-        return
-    cls = getattr(cli_mod, "HermesCLI", None)
-    orig = getattr(cls, "_should_handle_steer_command_inline", None)
-    if cls is None or orig is None:
-        return
-
-    def _wrapped(self, text, has_images=False):
-        try:
-            if orig(self, text, has_images=has_images):
-                return True
-        except TypeError:
-            if orig(self, text):
-                return True
-        if has_images or not text:
-            return False
-        if not getattr(self, "_agent_running", False):
-            return False
-        base = text.split(None, 1)[0].lower().lstrip("/")
-        return base in {"break", "again"}
-
-    cls._should_handle_steer_command_inline = _wrapped
-    _cli_patched = True
 
 
 def register(ctx: Any) -> None:
