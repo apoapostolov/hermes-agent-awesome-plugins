@@ -1,7 +1,7 @@
 ---
 name: hermes-awesome-plugins-sync
 category: hermes
-description: "Use when provider-status, intelligent-tool-break, or better-session-appearance changes — sync live plugins into the hermes-agent-awesome-plugins monorepo."
+description: "Use when provider-status, tool-break, or better-colors changes — sync live plugins into the hermes-agent-awesome-plugins monorepo."
 version: 1.0.0
 tags:
 - hermes
@@ -13,11 +13,11 @@ related_skills:
 
 # Hermes Awesome Plugins Sync
 
-Keep `C:/git-public/hermes-agent-awesome-plugins` (GitHub `apoapostolov/hermes-agent-awesome-plugins`) in sync with the live installs at `C:/Users/theap/AppData/Local/hermes/plugins/{provider-status,intelligent-tool-break,better-session-appearance}`. When any of those plugins is touched, the monorepo must be updated in the same session — no drift.
+Keep `C:/git-public/hermes-agent-awesome-plugins` (GitHub `apoapostolov/hermes-agent-awesome-plugins`) in sync with the live installs at `C:/Users/theap/AppData/Local/hermes/plugins/{provider-status,tool-break,better-colors}`. When any of those plugins is touched, the monorepo must be updated in the same session — no drift.
 
 ## Trigger
 
-- Any edit to `provider-status`, `intelligent-tool-break`, or `better-session-appearance`.
+- Any edit to `provider-status`, `tool-break`, or `better-colors`.
 - Version bump, bug fix, UI tweak, new provider — all of them.
 - Explicit "sync the awesome plugins" / "push to awesome-plugins".
 
@@ -34,7 +34,7 @@ Keep `C:/git-public/hermes-agent-awesome-plugins` (GitHub `apoapostolov/hermes-a
 
 ```bash
 hermes plugins doctor provider-status
-hermes plugins doctor intelligent-tool-break
+hermes plugins doctor tool-break
 ```
 
 Fix any failures before syncing.
@@ -52,8 +52,8 @@ python "C:/git-public/hermes-agent-awesome-plugins/skills/hermes-awesome-plugins
 It copies:
 
 - `C:/Users/theap/AppData/Local/hermes/plugins/provider-status` → `C:/git-public/hermes-agent-awesome-plugins/plugins/provider-status` (ignores `config.json`, `library.env`, `__pycache__`)
-- renamed: live `tool-break`/`better-colors` dirs move to `intelligent-tool-break`/`better-session-appearance`eak`
-- live `better-colors` install moves to `C:/Users/theap/AppData/Local/hermes/plugins/better-session-appearance` (renamed) → `C:/git-public/hermes-agent-awesome-plugins/plugins/better-session-appearance` (root `plugin.js` is moved to `desktop/plugin.js` for the pack layout)
+- `C:/Users/theap/AppData/Local/hermes/plugins/tool-break` → `C:/git-public/hermes-agent-awesome-plugins/plugins/tool-break`
+- `C:/Users/theap/AppData/Local/hermes/plugins/better-colors` → `C:/git-public/hermes-agent-awesome-plugins/plugins/better-colors` (root `plugin.js` is moved to `desktop/plugin.js` for the pack layout)
 
 It preserves `.example` files and `README.md` in the monorepo if they are newer than live stubs.
 
@@ -62,7 +62,7 @@ Manual fallback (if script missing):
 ```bash
 python -c "
 import shutil, pathlib
-for name in ('provider-status','intelligent-tool-break','better-session-appearance'):
+for name in ('provider-status','tool-break','better-colors'):
   src=pathlib.Path(f'C:/Users/theap/AppData/Local/hermes/plugins/{name}')
   dst=pathlib.Path(f'C:/git-public/hermes-agent-awesome-plugins/plugins/{name}')
   if dst.exists(): shutil.rmtree(dst)
@@ -79,7 +79,7 @@ If new config keys were added, update `plugins/provider-status/config.json.examp
 ```bash
 git -C C:/git-public/hermes-agent-awesome-plugins status
 git -C C:/git-public/hermes-agent-awesome-plugins add -A
-git -C C:/git-public/hermes-agent-awesome-plugins commit -m "sync: provider-status vX.Y.Z + intelligent-tool-break vA.B.C — <one-line why>"
+git -C C:/git-public/hermes-agent-awesome-plugins commit -m "sync: provider-status vX.Y.Z + tool-break vA.B.C — <one-line why>"
 git -C C:/git-public/hermes-agent-awesome-plugins push
 # capture new SHA then patch hermes-pack.yaml refs
 SHA=$(git -C C:/git-public/hermes-agent-awesome-plugins rev-parse HEAD)
@@ -96,6 +96,25 @@ hermes plugins pack show https://raw.githubusercontent.com/apoapostolov/hermes-a
 ```
 
 Both must parse and list 3 plugins with exact SHAs.
+
+## Installing monorepo → live (Win11 pull-latest path)
+
+`hermes plugins install` and `hermes plugins pack install` CANNOT install Apo's own plugins on Hermes 0.21.x: every `plugin.yaml` is `manifest_version: 2` and the installer caps at v1 ("installer only supports up to 1"), while the runtime loads v2 fine. Bare-name install from the catalog also fails because the Revell index PRs have not landed. Do NOT npm or curl the monorepo; use the hand-copy path below.
+
+Monorepo layout after the 2026-09 restructure: pack sources are `personal/<name>/` (and public exports `public/<name>/`), not `plugins/<name>/`. The old `plugins/` dirs are deleted from the repo. Install therefore means copying `personal/<name>` → live plugin dir and mirroring `desktop/plugin.js` → `desktop-plugins/<name>/plugin.js`, preserving live `config.json`/`library.env`.
+
+```bash
+python "C:/Users/theap/AppData/Local/hermes/cache/scratch/awesome-sync.py"   # reverse sync: repo personal/ -> live
+hermes plugins doctor <name>                                                 # every installed plugin must pass
+hermes plugins enable intelligent-tool-break                                 # one name per call; enable replaces
+hermes plugins enable better-session-appearance                              # the old tool-break / better-colors
+hermes plugins disable better-colors tool-break                              # also one name per call
+hermes config get plugins.enabled                                            # verify final set
+```
+
+The reverse-sync script is a scratch-style helper: it wipes each live plugin dir (after backing up `config.json`/`library.env`), copies the `personal/<name>` tree, restores the secrets, and updates the desktop mirror. Plugin works best as a saved script in this skill — promote `awesome-sync.py` to `scripts/` when the layout settles.
+
+Renames to respect: `tool-break` → `intelligent-tool-break`, `better-colors` → `better-session-appearance`. Disable the old names so hooks and desktop code do not double-load.
 
 ## Also mirrored in-repo
 
