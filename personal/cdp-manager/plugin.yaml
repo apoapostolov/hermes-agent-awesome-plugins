@@ -1,5 +1,5 @@
 name: cdp-manager
-version: 2.0.0
+version: 1.0.0
 description: "Manage local Chrome CDP debug ports from the statusbar and the `cdp` agent tool: probe, launch, stop, and mark a preferred default port."
 author: Apostol Apostolov
 license: MIT
