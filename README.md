@@ -44,6 +44,7 @@ The pack command in [Install](#install) pulls `personal/<id>`.
 | [memory-review](public/memory-review) | Ready: pending-id gate, palette + dialog. No shell-menu inject, no hidden composer submit. |
 | [intelligent-tool-break](public/intelligent-tool-break) | Ready: hooks and slash commands. No process-wide Popen patch, no private CLI rebind, no descendant SIGKILL, no composer insert. |
 | [provider-status](public/provider-status) | Ready: quota chips, probes, plugin-owned config. No vendor CLI auth files, no token refresh on poll, no automatic Hermes `.env` / `config.yaml` writes, no `library.env` copy. |
+| [cdp-manager](public/cdp-manager) | Ready: port chips, launch/stop/recheck, managed port, `cdp` tool. Launches loopback-only Chrome the user asked it to manage; plugin-owned config only. |
 | better-capabilities | None. Kept in [personal](personal/better-capabilities) until a catalog hook exists. |
 | [sidebar-manager](public/sidebar-manager) | Held until a sidebar hide/reorder hook exists. |
 | [drag-to-pin-session](public/drag-to-pin-session) | Held until `host.sessions.pin` / reorder exists. |
