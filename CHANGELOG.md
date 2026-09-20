@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **rss-reader:** version `1.0.7`. Settings Main **Default View** sits in Reading, above Mark Articles Read When Opened.
+
 ## [rss-reader 1.0.6] - 2026-09-20
 
 Folder order is yours to set, and old posts leave when the feed no longer lists them.

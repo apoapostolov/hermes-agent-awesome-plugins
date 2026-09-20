@@ -5198,14 +5198,6 @@ function ReaderProfile({ ctx, owner }) {
         jsxs("div", { className: "rss-settings-grid", children: [
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "General" }),
-            jsxs("label", { className: "rss-setting", children: [
-              jsx("span", { children: "Default View" }),
-              jsxs("select", { "aria-label": "Default View", value: draft.defaultView || "all", onChange: event => updateDraft({ ...draft, defaultView: event.target.value }), children: [
-                jsx("option", { value: "all", children: "All Articles" }),
-                jsx("option", { value: "unread", children: "Unread" }),
-                jsx("option", { value: "saved", children: "Starred" })
-              ] })
-            ] }),
             jsxs("div", { className: "rss-setting-row", children: [
               jsx("label", { className: "rss-setting", children: [
                 jsx("input", { type: "checkbox", checked: draft.autoRefresh, disabled: typeof ctx.onDispose !== "function", onChange: event => updateDraft({ ...draft, autoRefresh: event.target.checked }) }),
@@ -5237,6 +5229,14 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "Reading" }),
+            jsxs("label", { className: "rss-setting", children: [
+              jsx("span", { children: "Default View" }),
+              jsxs("select", { "aria-label": "Default View", value: draft.defaultView || "all", onChange: event => updateDraft({ ...draft, defaultView: event.target.value }), children: [
+                jsx("option", { value: "all", children: "All Articles" }),
+                jsx("option", { value: "unread", children: "Unread" }),
+                jsx("option", { value: "saved", children: "Starred" })
+              ] })
+            ] }),
             jsx("label", { className: "rss-setting", children: [
               jsx("input", { type: "checkbox", checked: draft.markReadOnOpen, onChange: event => updateDraft({ ...draft, markReadOnOpen: event.target.checked }) }),
               "Mark Articles Read When Opened"
