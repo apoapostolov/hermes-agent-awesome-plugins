@@ -2,7 +2,7 @@
   "name": "cdp-manager",
   "label": "CDP Manager",
   "description": "Manage local Chrome CDP debug ports: probe, launch, stop, preferred default",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api": "plugin_api.py",
   "tab": {
     "path": "/cdp-manager",
