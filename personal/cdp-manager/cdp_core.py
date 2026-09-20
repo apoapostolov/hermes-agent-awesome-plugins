@@ -252,3 +252,135 @@ def resolve_port(port: int | None) -> tuple[int | None, str | None]:
     if len(live) == 1:
         return live[0], None
     return None, "no port given, no preferred port set, and not exactly one port is live"
+
+
+# ── health + managed-port supervision ────────────────────────────────
+#
+# Health model (drives the statusbar chip and the dialog):
+#   ok        at least one port live, all probes healthy
+#   down      no port live (and nothing is wrong beyond "not running")
+#   warn      a live port is degraded: probe slow, or the managed port is
+#             down while others are up
+#   critical  the managed port is repeatedly failing to come up / needs a
+#             reboot (launch attempts exhausted)
+#
+# The supervisor runs as one daemon thread: every poll tick it probes all
+# ports (regular health check for every port), and if the managed port is
+# down it launches it; if launches keep failing it escalates to critical
+# and force-reboots (stop + launch) on the next tick.
+
+SUPERVISE_TICK_S = 2.0          # supervisor loop granularity
+SUPERVISE_MAX_BACKOFF_S = 60.0  # cap for the retry backoff
+SLOW_PROBE_MS = 1500            # live but slower than this = warn
+CRITICAL_AFTER = 3              # consecutive failed launches -> critical
+HEALTH_CACHE_TTL_S = 2.0
+
+_health_cache: dict = {"at": 0.0, "payload": None}
+_supervise_started = False
+
+
+def _classify(results: list[dict], managed: int | None, fail_streak: int) -> tuple[str, str | None]:
+    """Map probe results to (health, reason)."""
+    by_port = {r["port"]: r for r in results}
+    any_live = any(r["state"] == "live" for r in results)
+    managed_res = by_port.get(managed) if managed else None
+    managed_down = managed is not None and (managed_res is None or managed_res["state"] != "live")
+
+    if fail_streak >= CRITICAL_AFTER:
+        return "critical", f"managed port {managed} failed {fail_streak}x, needs reboot"
+    if not any_live:
+        return "down", None
+    if managed_down:
+        return "warn", f"managed port {managed} is down"
+    slow = [r["port"] for r in results if r["state"] == "live" and (r.get("ms") or 0) > SLOW_PROBE_MS]
+    if slow:
+        return "warn", f"slow probe: {', '.join(map(str, slow))}"
+    if managed is None and not any_live:
+        return "down", None
+    return "ok", None
+
+
+def health() -> dict:
+    """Cached health snapshot for the statusbar chip. Probes only when the
+    cache is older than HEALTH_CACHE_TTL_S."""
+    now = time.monotonic()
+    if _health_cache["payload"] is not None and now - _health_cache["at"] < HEALTH_CACHE_TTL_S:
+        return _health_cache["payload"]
+    cfg = load_config()
+    results = probe_all()
+    payload = {
+        "health": "down",
+        "reason": None,
+        "results": results,
+        "preferredPort": cfg.get("preferredPort"),
+        "ports": cfg["ports"],
+        "supervisor": {
+            "failStreak": _supervisor_state.get("fail_streak", 0),
+            "lastAction": _supervisor_state.get("last_action"),
+        },
+    }
+    payload["health"], payload["reason"] = _classify(
+        results, cfg.get("preferredPort"), _supervisor_state.get("fail_streak", 0)
+    )
+    _health_cache["at"] = now
+    _health_cache["payload"] = payload
+    return payload
+
+
+def invalidate_health() -> None:
+    """Drop the cached snapshot so the next health() re-probes."""
+    _health_cache["at"] = 0.0
+    _health_cache["payload"] = None
+
+
+def _supervise_loop() -> None:
+    """One daemon thread: keeps health fresh, starts the managed port when
+    down, force-reboots it when launches keep failing."""
+    while True:
+        try:
+            cfg = load_config()
+            managed = cfg.get("preferredPort")
+            h = health()  # refreshes the cache (respects its own TTL)
+            if managed:
+                by_port = {r["port"]: r for r in h["results"]}
+                managed_res = by_port.get(managed)
+                is_up = managed_res is not None and managed_res["state"] == "live"
+                st = _supervisor_state
+                if is_up:
+                    st["fail_streak"] = 0
+                    st["last_action"] = None
+                else:
+                    # managed port is down: start it, or reboot after streak
+                    if st["fail_streak"] >= CRITICAL_AFTER:
+                        # critical: stop anything on the port, then launch
+                        try:
+                            stop(managed)
+                        except Exception:
+                            pass
+                        st["last_action"] = f"reboot {managed}"
+                    else:
+                        st["last_action"] = f"start {managed}"
+                    out = launch(managed)
+                    if out.get("ok") and not out.get("already"):
+                        st["fail_streak"] = 0
+                        st["last_action"] = f"started {managed}"
+                    elif out.get("already"):
+                        pass  # probe race; next tick re-classifies
+                    else:
+                        st["fail_streak"] = st.get("fail_streak", 0) + 1
+        except Exception:
+            pass
+        time.sleep(SUPERVISE_TICK_S)
+
+
+_supervisor_state: dict = {"fail_streak": 0, "last_action": None}
+
+
+def ensure_supervisor() -> None:
+    """Start the supervision thread once per process."""
+    global _supervise_started
+    if _supervise_started:
+        return
+    t = threading.Thread(target=_supervise_loop, name="cdp-manager-supervisor", daemon=True)
+    t.start()
+    _supervise_started = True
