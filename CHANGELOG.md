@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **session-retitler:** version `1.1.0`. Retitles the session every N titleable user messages from the latest exchanges (llm-rank rewrites, user titles untouchable). Now pinned in the pack (pack `1.16.0`).
+
 ### Changed
 
 - **rss-reader:** version `1.0.7`. Settings Main **Default View** sits in Reading, above Mark Articles Read When Opened.

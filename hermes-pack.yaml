@@ -1,6 +1,6 @@
 name: hermes-agent-awesome-plugins
-description: Hand-picked Hermes plugins that actually matter. Pack pins provider-status, intelligent-tool-break, better-session-appearance, drag-to-pin-session, opaque-composer, scroll-on-switch, iteration-budget-meter, memory-review, rss-reader, compact-reasoning-label, better-capabilities, cdp-manager, and sidebar-manager to reproducible SHAs.
-version: 1.15.0
+description: Hand-picked Hermes plugins that actually matter. Pack pins provider-status, intelligent-tool-break, better-session-appearance, drag-to-pin-session, opaque-composer, scroll-on-switch, iteration-budget-meter, memory-review, rss-reader, compact-reasoning-label, better-capabilities, cdp-manager, sidebar-manager, and session-retitler to reproducible SHAs.
+version: 1.16.0
 author: Apostol Apostolov
 plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
@@ -41,6 +41,9 @@ plugins:
     ref: b270520f14d5141c2ad686d7053907a341c8a46f
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/cdp-manager
+    ref: c7edbf8dd5a6a977531b04d9757b0c10a2c0f1a6
+  - repo: apoapostolov/hermes-agent-awesome-plugins
+    subdir: personal/session-retitler
     ref: c7edbf8dd5a6a977531b04d9757b0c10a2c0f1a6
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync

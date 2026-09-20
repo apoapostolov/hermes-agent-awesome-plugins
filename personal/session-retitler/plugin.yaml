@@ -1,0 +1,15 @@
+name: session-retitler
+version: 1.1.0
+description: "Rename sessions dynamically every N user messages (llm-rank rewrites, user titles untouchable)."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/session-retitler
+tags:
+  - sessions
+  - titles
+provides_hooks:
+  - pre_llm_call
+  - post_llm_call
+  - on_session_reset

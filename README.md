@@ -11,7 +11,7 @@
   Provider visibility, session control, reading, memory review, and interface polish, with each plugin owning one job.
 
   [![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-0.21.0%2B-6f42c1)](https://github.com/NousResearch/hermes-agent)
-  [![Plugins](https://img.shields.io/badge/plugins-13-2ea44f)](#whats-in-the-pack)
+  [![Plugins](https://img.shields.io/badge/plugins-14-2ea44f)](#whats-in-the-pack)
   [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
   [Install the pack](#install) &nbsp;·&nbsp; [Explore the plugins](#whats-in-the-pack) &nbsp;·&nbsp; [Personal and public](#personal-and-public) &nbsp;·&nbsp; [Pinning model](#how-it-works)
@@ -48,6 +48,7 @@ The pack command in [Install](#install) pulls `personal/<id>`.
 | better-capabilities | None. Kept in [personal](personal/better-capabilities) until a catalog hook exists. |
 | [sidebar-manager](public/sidebar-manager) | Held until a sidebar hide/reorder hook exists. |
 | [drag-to-pin-session](public/drag-to-pin-session) | Held until `host.sessions.pin` / reorder exists. |
+| [session-retitler](personal/session-retitler) | Not in public. Held until an SDK-level llm-rank title write / catalog-safe `title_generation` route exists (see [LIMITATIONS](personal/session-retitler/LIMITATIONS.md)). |
 | [better-session-appearance](public/better-session-appearance) | Held until a session-row decoration / color hook exists. |
 | Remaining plugins | Same as personal at the split. Review before a catalog pin. |
 
@@ -55,7 +56,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 ## What's in the Pack
 
-Twelve plugins are pinned in `hermes-pack.yaml` (pack version 1.14.0). **reasoning-switch** lives in this repo but is **not** in the pack and stays off by default, so install it separately if you want it.
+Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.15.0). **reasoning-switch** lives in this repo but is **not** in the pack and stays off by default, so install it separately if you want it.
 
 ### Status Bar
 
@@ -81,6 +82,7 @@ Twelve plugins are pinned in `hermes-pack.yaml` (pack version 1.14.0). **reasoni
 | [better-session-appearance](personal/better-session-appearance/README.md) | Idle color, bold, and icon. Auto Rules by title keywords. |
 | [sidebar-manager](personal/sidebar-manager/README.md) | Hide and reorder nav rows and session sections. |
 | [drag-to-pin-session](personal/drag-to-pin-session/README.md) | Drag pin/unpin with lasting order. |
+| [session-retitler](personal/session-retitler/README.md) | Retitles the session every N titleable user messages, from the latest exchanges. A title you set yourself is never touched. |
 | [scroll-on-switch](personal/scroll-on-switch/README.md) | Snap to bottom on session switch. Does not fight streaming. |
 
 ### Composer
