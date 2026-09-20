@@ -108,7 +108,7 @@ function Segmented({ value, onChange, options }) {
 
 // ── port row ──
 
-function PortRow({ port, result, preferred, mode, onAction, onPrefer, onMode, onCopy }) {
+function PortRow({ port, result, preferred, mode, restarting, onAction, onPrefer, onMode, onCopy }) {
   const live = result?.state === 'live'
   const dead = result?.state === 'dead'
   const [busy, setBusy] = useState(null) // 'launch' | 'stop' | 'probe' | null
@@ -124,9 +124,11 @@ function PortRow({ port, result, preferred, mode, onAction, onPrefer, onMode, on
 
   // Show launch OR stop depending on confirmed state: a live port gets stop,
   // a dead port gets launch. While an action runs the button reflects the
-  // state being reached, so it never flickers.
-  const confirming = busy === 'launch' || busy === 'stop'
-  const showStop = busy === 'stop' || (live && busy !== 'launch')
+  // state being reached, so it never flickers. `restarting` is the dialog's
+  // mode-switch restart (stop+launch): the row shows busy until the new mode
+  // is confirmed, and the dropdown keeps the OLD mode until then.
+  const confirming = busy === 'launch' || busy === 'stop' || !!restarting
+  const showStop = busy === 'stop' || (live && busy !== 'launch') || (!!restarting && live)
 
   return jsxs('div', {
     'data-cdp-row': String(port),
@@ -220,12 +222,14 @@ function PortRow({ port, result, preferred, mode, onAction, onPrefer, onMode, on
         children: jsxs('select', {
           'data-cdp-mode': String(port),
           value: mode === 'headless' ? 'headless' : 'headful',
+          disabled: !!restarting,
           onChange: e => onMode(port, e.target.value, live),
           className: 'h-6 shrink-0 cursor-pointer rounded-md border px-1 text-[0.65rem]',
           style: {
             background: 'transparent',
             color: 'var(--ui-text-secondary)',
             borderColor: 'var(--ui-stroke-secondary)',
+            opacity: restarting ? 0.5 : 1,
           },
           children: [
             jsx('option', { value: 'headful', children: 'Windowed' }, 'headful'),
@@ -249,6 +253,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
   const [results, setResults] = useState({})
   const [busy, setBusy] = useState(false)
   const [portsDraft, setPortsDraft] = useState('')
+  const [busyPort, setBusyPort] = useState(null) // port mid mode-switch restart
   const abortRef = useRef(null)
   const busyRef = useRef(false)
   const actionLockRef = useRef(false)
@@ -365,35 +370,52 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
     }
   }
 
+  // Mode switch. The dropdown keeps the OLD mode until the restart is
+  // confirmed: on a dead port the save is the confirmation; on a live port
+  // the dropdown flips only after stop+launch comes back with the new mode.
   const setMode = async (port, mode, wasLive) => {
-    setCfg(prev => ({ ...prev, modes: { ...prev.modes, [port]: mode } }))
+    if (actionLockRef.current || busyPort !== null) {
+      onNotify('restart already in progress')
+      return
+    }
+    const prevMode = cfg?.modes?.[port] || 'headful'
+    if (prevMode === mode) return
     try {
       await api('/mode', { port, mode })
     } catch {
       onNotify('mode save failed')
       return
     }
-    // Live port + mode change = restart in the new mode.
-    if (wasLive) {
-      try {
-        actionLockRef.current = true
-        const stopRes = await api('/stop', { port })
-        if (stopRes?.error) {
-          onNotify(`restart failed: ${stopRes.error}`)
-          return
-        }
-        const launchRes = await api('/launch', { port, mode })
-        if (launchRes?.error) {
-          onNotify(`restart failed: ${launchRes.error}`)
-          return
-        }
-        onNotify(`port ${port} restarted ${mode === 'headless' ? 'headless' : 'windowed'}`)
-        await sweep(cfg.ports)
-      } catch {
-        onNotify('restart failed')
-      } finally {
-        actionLockRef.current = false
+    if (!wasLive) {
+      setCfg(prev => ({ ...prev, modes: { ...prev.modes, [port]: mode } }))
+      onNotify(`port ${port} will launch ${mode === 'headless' ? 'headless' : 'windowed'}`)
+      return
+    }
+    try {
+      actionLockRef.current = true
+      setBusyPort(port)
+      const stopRes = await api('/stop', { port })
+      if (stopRes?.error) {
+        onNotify(`restart failed: ${stopRes.error}`)
+        return
       }
+      const launchRes = await api('/launch', { port, mode })
+      if (launchRes?.error || !launchRes?.ok) {
+        onNotify(`restart failed: ${launchRes?.error || 'launch failed'}`)
+        return
+      }
+      if (launchRes?.already) {
+        onNotify(`port ${port} already live, mode unchanged`)
+        return
+      }
+      setCfg(prev => ({ ...prev, modes: { ...prev.modes, [port]: launchRes.mode || mode } }))
+      onNotify(`port ${port} restarted ${(launchRes.mode || mode) === 'headless' ? 'headless' : 'windowed'}`)
+      await sweep(cfg.ports)
+    } catch {
+      onNotify('restart failed')
+    } finally {
+      actionLockRef.current = false
+      setBusyPort(null)
     }
   }
 
@@ -458,6 +480,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
                     result: results[p],
                     preferred: cfg.preferredPort === p,
                     mode: cfg?.modes?.[p],
+                    restarting: busyPort === p,
                     onAction: act,
                     onPrefer: prefer,
                     onMode: setMode,
