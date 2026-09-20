@@ -1,4 +1,4 @@
-"""Local checks for session-retitler: counting, digest, titles, claim ladder."""
+"""Local checks for sessionretitler: counting, digest, titles, claim ladder."""
 from __future__ import annotations
 
 import importlib.util

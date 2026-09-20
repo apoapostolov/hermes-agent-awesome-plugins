@@ -27,7 +27,7 @@ hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/herme
 Or install just this plugin:
 
 ```bash
-hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/session-retitler
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/sessionretitler
 ```
 
 Enable **Session Retitler** under **Capabilities → Plugins**.

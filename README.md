@@ -48,7 +48,7 @@ The pack command in [Install](#install) pulls `personal/<id>`.
 | better-capabilities | None. Kept in [personal](personal/better-capabilities) until a catalog hook exists. |
 | [sidebar-manager](public/sidebar-manager) | Held until a sidebar hide/reorder hook exists. |
 | [drag-to-pin-session](public/drag-to-pin-session) | Held until `host.sessions.pin` / reorder exists. |
-| [session-retitler](personal/session-retitler) | Not in public. Held until an SDK-level llm-rank title write / catalog-safe `title_generation` route exists (see [LIMITATIONS](personal/session-retitler/LIMITATIONS.md)). |
+| [sessionretitler](personal/sessionretitler) | Not in public. Held until an SDK-level llm-rank title write / catalog-safe `title_generation` route exists (see [LIMITATIONS](personal/sessionretitler/LIMITATIONS.md)). |
 | [better-session-appearance](public/better-session-appearance) | Held until a session-row decoration / color hook exists. |
 | Remaining plugins | Same as personal at the split. Review before a catalog pin. |
 
@@ -82,7 +82,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.15.0). **reaso
 | [better-session-appearance](personal/better-session-appearance/README.md) | Idle color, bold, and icon. Auto Rules by title keywords. |
 | [sidebar-manager](personal/sidebar-manager/README.md) | Hide and reorder nav rows and session sections. |
 | [drag-to-pin-session](personal/drag-to-pin-session/README.md) | Drag pin/unpin with lasting order. |
-| [session-retitler](personal/session-retitler/README.md) | Retitles the session every N titleable user messages, from the latest exchanges. A title you set yourself is never touched. |
+| [sessionretitler](personal/sessionretitler/README.md) | Retitles the session every N titleable user messages, from the latest exchanges. A title you set yourself is never touched. |
 | [scroll-on-switch](personal/scroll-on-switch/README.md) | Snap to bottom on session switch. Does not fight streaming. |
 
 ### Composer

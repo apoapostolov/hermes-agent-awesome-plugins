@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-PLUGIN_ID = "session-retitler"
+PLUGIN_ID = "sessionretitler"
 
 DEFAULTS = {
     "interval": 20,       # user messages between retitles
@@ -100,7 +100,7 @@ def _load_counts(ctx: Any) -> Dict[str, Dict[str, float]]:
         data = ctx.state.get("turn_counts", {})
         return data if isinstance(data, dict) else {}
     except Exception:
-        logger.debug("session-retitler: counter read failed", exc_info=True)
+        logger.debug("sessionretitler: counter read failed", exc_info=True)
         return {}
 
 
@@ -113,7 +113,7 @@ def _save_counts(ctx: Any, counts: Dict[str, Dict[str, float]]) -> None:
     try:
         ctx.state.set("turn_counts", counts)
     except Exception:
-        logger.debug("session-retitler: counter write failed", exc_info=True)
+        logger.debug("sessionretitler: counter write failed", exc_info=True)
 
 
 def _extra_counts(history: List[Any], extra_text: Optional[str]) -> bool:
@@ -296,14 +296,14 @@ def _write_llm_title(db: Any, session_id: str, title: str) -> bool:
     except Exception:
         source = None
     if source == "user":
-        logger.debug("session-retitler: %s holds a user title; not rewriting", session_id)
+        logger.debug("sessionretitler: %s holds a user title; not rewriting", session_id)
         return False
 
     if source == "llm":
         try:
             db.set_session_title(session_id, "")  # normalize to None/untitled
         except Exception:
-            logger.debug("session-retitler: pre-rewrite clear failed", exc_info=True)
+            logger.debug("sessionretitler: pre-rewrite clear failed", exc_info=True)
             return False
 
     try:
@@ -313,14 +313,14 @@ def _write_llm_title(db: Any, session_id: str, title: str) -> bool:
         persisted = _persist_session_title(db, session_id, title, source="llm")
         return persisted is not None
     except Exception:
-        logger.debug("session-retitler: core persist helper unavailable", exc_info=True)
+        logger.debug("sessionretitler: core persist helper unavailable", exc_info=True)
     try:
         return bool(db.set_auto_title(session_id, title, source="llm"))
     except ValueError:
-        logger.debug("session-retitler: title collision on %r", title)
+        logger.debug("sessionretitler: title collision on %r", title)
         return False
     except Exception:
-        logger.debug("session-retitler: title write failed", exc_info=True)
+        logger.debug("sessionretitler: title write failed", exc_info=True)
         return False
 
 
@@ -347,7 +347,7 @@ def _retitle(ctx: Any, session_id: str, digest: str) -> None:
         parsed = getattr(result, "parsed", None)
         title = _clean_title((parsed or {}).get("title") if isinstance(parsed, dict) else None)
         if not title:
-            logger.debug("session-retitler: model gave no usable title")
+            logger.debug("sessionretitler: model gave no usable title")
             return
 
         from hermes_state import SessionDB
@@ -356,14 +356,14 @@ def _retitle(ctx: Any, session_id: str, digest: str) -> None:
         try:
             ok = _write_llm_title(db, session_id, title)
             if ok:
-                logger.info("session-retitler: renamed %s -> %r", session_id, title)
+                logger.info("sessionretitler: renamed %s -> %r", session_id, title)
         finally:
             close = getattr(db, "close", None)
             if callable(close):
                 close()
     except Exception:
         # Never let a background rename disturb the host process.
-        logger.debug("session-retitler: retitle failed", exc_info=True)
+        logger.debug("sessionretitler: retitle failed", exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -391,7 +391,7 @@ def _maybe_retitle(
     digest = build_digest(snapshot, _cfg(ctx, "max_pairs"))
     pairs = digest.count("USER: ")
     if pairs < _cfg(ctx, "min_pairs"):
-        logger.debug("session-retitler: only %d pairs; skipping", pairs)
+        logger.debug("sessionretitler: only %d pairs; skipping", pairs)
         _record_count(ctx, session_id, n)
         return
     if not _record_count(ctx, session_id, n, claim=True):
@@ -450,7 +450,7 @@ def register(ctx):  # noqa: ANN001 — host-defined PluginContext
     """
     state = ctx.state  # touch early: fail load loudly on a broken state store
     logger.info(
-        "session-retitler: loading (state at %s, interval=%s, count=user_messages)",
+        "sessionretitler: loading (state at %s, interval=%s, count=user_messages)",
         getattr(state, "path", "?"),
         _cfg(ctx, "interval"),
     )
@@ -462,7 +462,7 @@ def register(ctx):  # noqa: ANN001 — host-defined PluginContext
         try:
             _on_pre_llm_call(ctx, session_id, history, user_message if isinstance(user_message, str) else None)
         except Exception:
-            logger.debug("session-retitler: pre_llm_call handler failed", exc_info=True)
+            logger.debug("sessionretitler: pre_llm_call handler failed", exc_info=True)
 
     def on_post_llm_call(**kwargs):
         session_id = str(kwargs.get("session_id") or "")
@@ -470,14 +470,14 @@ def register(ctx):  # noqa: ANN001 — host-defined PluginContext
         try:
             _on_post_llm_call(ctx, session_id, history)
         except Exception:
-            logger.debug("session-retitler: post_llm_call handler failed", exc_info=True)
+            logger.debug("sessionretitler: post_llm_call handler failed", exc_info=True)
 
     def on_session_reset(**kwargs):
         session_id = str(kwargs.get("session_id") or "")
         try:
             _on_session_reset(ctx, session_id)
         except Exception:
-            logger.debug("session-retitler: reset handler failed", exc_info=True)
+            logger.debug("sessionretitler: reset handler failed", exc_info=True)
 
     ctx.register_hook("pre_llm_call", on_pre_llm_call)
     ctx.register_hook("post_llm_call", on_post_llm_call)

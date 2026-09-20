@@ -1,6 +1,6 @@
 # LIMITATIONS
 
-Personal edition of **Session Retitler** (`session-retitler`). This file is why that edition cannot be listed in the Hermes Plugin Catalog as-is.
+Personal edition of **Session Retitler** (`sessionretitler`). This file is why that edition cannot be listed in the Hermes Plugin Catalog as-is.
 
 Before you pin personal to the catalog, or copy a personal feature into `public/`, walk every blocker below. Either still comply, or confirm the linked Hermes issue or PR is resolved and the SDK hook exists in the Desktop build you target.
 
@@ -17,7 +17,7 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 
 - **Personal behavior:** imports `agent.title_generator` and `hermes_state.SessionDB` directly, and calls the private-ish `_persist_session_title` helper.
 - **Why it fails:** touching core internals outside the plugin SDK contract. A core rename or refactor silently breaks title persistence, and a listing cannot carry that coupling.
-- **Needed hook:** a public, SDK-level way to write an `llm`-rank session title (the plugin genuinely needs an llm rank write plus llm-to-llm rewrite). Until that exists, there is no public edition: `public/session-retitler/` does not exist and personal is held from the catalog.
+- **Needed hook:** a public, SDK-level way to write an `llm`-rank session title (the plugin genuinely needs an llm rank write plus llm-to-llm rewrite). Until that exists, there is no public edition: `public/sessionretitler/` does not exist and personal is held from the catalog.
 
 ### 2. Structured LLM call routed through an aux task
 

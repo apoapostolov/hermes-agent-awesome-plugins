@@ -4,7 +4,7 @@
 
 ### Added
 
-- **session-retitler:** version `1.1.0`. Retitles the session every N titleable user messages from the latest exchanges (llm-rank rewrites, user titles untouchable). Now pinned in the pack (pack `1.16.0`).
+- **sessionretitler** (formerly `session-retitler`): version `1.1.0`. Retitles the session every N titleable user messages from the latest exchanges (llm-rank rewrites, user titles untouchable). Now pinned in the pack (pack `1.16.0`).
 
 ### Changed
 
