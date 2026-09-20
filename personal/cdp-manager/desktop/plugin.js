@@ -219,7 +219,7 @@ function PortRow({ port, result, preferred, mode, onAction, onPrefer, onMode, on
         label: `Launch mode for port ${port}: ${mode === 'headless' ? 'headless (no window)' : 'windowed'} · ${live ? 'changing restarts the port' : 'applies on next launch'}`,
         children: jsxs('select', {
           'data-cdp-mode': String(port),
-          value: mode || 'headful',
+          value: mode === 'headless' ? 'headless' : 'headful',
           onChange: e => onMode(port, e.target.value, live),
           className: 'h-6 shrink-0 cursor-pointer rounded-md border px-1 text-[0.65rem]',
           style: {
@@ -271,6 +271,10 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
         const next = {}
         for (const res of r?.results || []) next[res.port] = res
         setResults(next)
+        // Hydrate modes on every open: the tool or supervisor may have
+        // changed them while the dialog was closed.
+        if (r?.modes) setCfg({ modes: r.modes })
+        if (r?.pollSeconds !== undefined) setCfg({ pollSeconds: r.pollSeconds })
       } catch {
         if (alive) onNotify('backend unreachable')
       } finally {
@@ -339,6 +343,8 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
         return
       }
       onNotify(kind === 'launch' ? (r.already ? `port ${port} already live` : `port ${port} launched (${r.mode === 'headless' ? 'headless' : 'windowed'})`) : (r.already ? `port ${port} was not live` : `port ${port} stopped`))
+      // Record the backend-confirmed mode so the dropdown reflects reality.
+      if (kind === 'launch' && r?.mode) setCfg(prev => ({ ...prev, modes: { ...prev.modes, [port]: r.mode } }))
       await sweep(cfg.ports)
     } catch {
       onNotify(`${kind} failed`)
@@ -555,7 +561,7 @@ function chipStyle(health, bold) {
 // ── root ──
 
 function Root() {
-  const [cfg, setCfg] = useState(() => ({ ports: [9222, 9333, 9335], preferredPort: null, pollSeconds: 5 }))
+  const [cfg, setCfg] = useState(() => ({ ports: [9222, 9333, 9335], preferredPort: null, pollSeconds: 5, modes: {} }))
   const [dialogOpen, setDialogOpen] = useState(false)
   const [ready, setReady] = useState(false)
   const [note, setNote] = useState('')
