@@ -42,10 +42,16 @@ class PreferredBody(BaseModel):
 
 class PortBody(BaseModel):
     port: int
+    mode: str | None = None  # 'headful' | 'headless'
 
 
 class PollBody(BaseModel):
     seconds: int
+
+
+class ModeBody(BaseModel):
+    port: int
+    mode: str  # 'headful' | 'headless'
 
 
 # Supervisor: starts the managed port on backend boot ("on hermes launch")
@@ -63,14 +69,25 @@ def health():
 @router.get("/status")
 def status():
     cfg = cdp_core.load_config()
+    modes = {str(p): cfg.get(f"mode_{p}") or "headful" for p in cfg["ports"]}
     return {
         "ports": cfg["ports"],
         "preferredPort": cfg.get("preferredPort"),
         "chromePath": cfg["chromePath"],
         "userDataDir": cfg["userDataDir"],
         "pollSeconds": int(cfg.get("pollSeconds") or 0),
+        "modes": modes,
         "results": cdp_core.probe_all(),
     }
+
+
+@router.post("/mode")
+def mode(body: ModeBody):
+    """Save the launch mode (headful/headless) for a port. Used by the next
+    launch, including supervisor auto-starts."""
+    m = "headless" if body.mode == "headless" else "headful"
+    cdp_core.mutate_config(lambda c: c.update({f"mode_{int(body.port)}": m}))
+    return {"ok": True, "port": int(body.port), "mode": m}
 
 
 @router.post("/poll")
@@ -88,7 +105,7 @@ def probe(body: PortsBody):
 
 @router.post("/launch")
 def launch(body: PortBody):
-    out = cdp_core.launch(body.port)
+    out = cdp_core.launch(body.port, mode=body.mode)
     cdp_core.invalidate_health()
     return out
 

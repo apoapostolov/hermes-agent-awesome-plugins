@@ -100,9 +100,15 @@ def probe_all(ports: list[int] | None = None) -> list[dict]:
 
 # ── mutations ─────────────────────────────────────────────────────────
 
-def launch(port: int) -> dict:
+def launch(port: int, mode: str | None = None) -> dict:
     """Start Chrome with --remote-debugging-port on 127.0.0.1. DETACHED_PROCESS
-    + CREATE_NO_WINDOW: no visible terminal (standing Apo rule)."""
+    + CREATE_NO_WINDOW: no visible terminal (standing Apo rule).
+
+    mode: 'headful' (default) or 'headless' (--headless=new). Each port gets
+    its own user-data-dir (config override userDataDir + '-' + port): a
+    second Chrome on an occupied profile joins the running instance instead
+    of binding its debug port, so per-port dirs are required.
+    """
     cfg = load_config()
     port = int(port)
     if not 0 < port < 65536:
@@ -113,10 +119,21 @@ def launch(port: int) -> dict:
     chrome = cfg["chromePath"]
     if not Path(chrome).exists():
         return {"ok": False, "error": f"chrome.exe not found at {chrome}"}
+    headless = (mode or load_config().get("mode") or "headful") == "headless"
     flags = subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+    args = [
+        chrome,
+        f"--remote-debugging-port={port}",
+        f"--user-data-dir={cfg['userDataDir']}-{port}",
+        "--no-first-run",
+    ]
+    if headless:
+        args.append("--headless=new")
+    # remember the mode so the supervisor auto-start uses the same one
+    mutate_config(lambda c: c.update({f"mode_{port}": "headless" if headless else "headful"}))
     try:
         subprocess.Popen(
-            [chrome, f"--remote-debugging-port={port}", f"--user-data-dir={cfg['userDataDir']}"],
+            args,
             creationflags=flags,
             cwd=str(Path(chrome).parent),
             stdout=subprocess.DEVNULL,
@@ -136,6 +153,7 @@ def launch(port: int) -> dict:
     return {
         "ok": bool(result and result["state"] == "live"),
         "port": port,
+        "mode": "headless" if headless else "headful",
         "result": result,
         "error": None if result and result["state"] == "live" else "no listener after 8s",
     }
@@ -360,7 +378,7 @@ def _supervise_loop() -> None:
                         st["last_action"] = f"reboot {managed}"
                     else:
                         st["last_action"] = f"start {managed}"
-                    out = launch(managed)
+                    out = launch(managed, mode=load_config().get(f"mode_{managed}"))
                     if out.get("ok") and not out.get("already"):
                         st["fail_streak"] = 0
                         st["last_action"] = f"started {managed}"

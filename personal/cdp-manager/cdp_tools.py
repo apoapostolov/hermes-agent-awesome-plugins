@@ -35,8 +35,11 @@ def cdp(args: dict, **kwargs) -> str:
             target, err = cdp_core.resolve_port(port)
             if err:
                 return json.dumps({"ok": False, "error": err, "action": action})
-            fn = cdp_core.launch if action == "launch" else cdp_core.stop
-            out = fn(target)
+            mode = args.get("mode")  # 'headful' | 'headless' (launch only)
+            if action == "launch":
+                out = cdp_core.launch(target, mode=mode)
+            else:
+                out = cdp_core.stop(target)
             out["action"] = action
             out["port"] = target
             return json.dumps(out)

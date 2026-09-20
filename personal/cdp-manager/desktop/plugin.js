@@ -108,7 +108,7 @@ function Segmented({ value, onChange, options }) {
 
 // ── port row ──
 
-function PortRow({ port, result, preferred, onAction, onPrefer, onCopy }) {
+function PortRow({ port, result, preferred, mode, onAction, onPrefer, onMode, onCopy }) {
   const live = result?.state === 'live'
   const dead = result?.state === 'dead'
   const [busy, setBusy] = useState(null) // 'launch' | 'stop' | 'probe' | null
@@ -206,12 +206,31 @@ function PortRow({ port, result, preferred, onAction, onPrefer, onCopy }) {
       confirming || result
         ? jsx(GlyphButton, {
             glyph: showStop ? 'stop' : 'play',
-            label: showStop ? `Stop the listener on port ${port}` : `Launch Chrome on port ${port}`,
+            label: showStop ? `Stop the listener on port ${port}` : `Launch Chrome on port ${port}${mode === 'headless' ? ' (headless)' : ''}`,
             busy: confirming,
             danger: showStop,
             onClick: () => run(showStop ? 'stop' : 'launch'),
           })
         : null,
+      // headless / headful mode dropdown (custom, themed; native selects are OS-drawn)
+      jsx(Tooltip, {
+        label: `Launch mode for port ${port}: ${mode === 'headless' ? 'headless (no window)' : 'headful (window)'} · applied on next launch`,
+        children: jsxs('select', {
+          'data-cdp-mode': String(port),
+          value: mode || 'headful',
+          onChange: e => onMode(port, e.target.value),
+          className: 'h-6 shrink-0 cursor-pointer rounded-md border px-1 text-[0.65rem]',
+          style: {
+            background: 'transparent',
+            color: 'var(--ui-text-secondary)',
+            borderColor: 'var(--ui-stroke-secondary)',
+          },
+          children: [
+            jsx('option', { value: 'headful', children: 'Headful' }, 'headful'),
+            jsx('option', { value: 'headless', children: 'Headless' }, 'headless'),
+          ],
+        }),
+      }),
       jsx(GlyphButton, {
         glyph: 'refresh',
         label: `Recheck port ${port}`,
@@ -311,12 +330,13 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
         return
       }
       actionLockRef.current = true
-      const r = await api(`/${kind}`, { port })
+      const mode = cfg?.modes?.[port]
+      const r = await api(`/${kind}`, { port, ...(kind === 'launch' && mode ? { mode } : {}) })
       if (r?.error) {
         onNotify(`${kind} failed: ${r.error}`)
         return
       }
-      onNotify(kind === 'launch' ? (r.already ? `port ${port} already live` : `port ${port} launched`) : (r.already ? `port ${port} was not live` : `port ${port} stopped`))
+      onNotify(kind === 'launch' ? (r.already ? `port ${port} already live` : `port ${port} launched (${r.mode || mode || 'headful'})`) : (r.already ? `port ${port} was not live` : `port ${port} stopped`))
       await sweep(cfg.ports)
     } catch {
       onNotify(`${kind} failed`)
@@ -335,6 +355,11 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
     } catch {
       onNotify('save failed')
     }
+  }
+
+  const setMode = (port, mode) => {
+    setCfg(prev => ({ ...prev, modes: { ...prev.modes, [port]: mode } }))
+    api('/mode', { port, mode }).catch(() => onNotify('mode save failed'))
   }
 
   const savePorts = () => {
@@ -397,8 +422,10 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
                     port: p,
                     result: results[p],
                     preferred: cfg.preferredPort === p,
+                    mode: cfg?.modes?.[p],
                     onAction: act,
                     onPrefer: prefer,
+                    onMode: setMode,
                     onCopy: (text, label) => {
                       navigator.clipboard.writeText(text).then(
                         () => onNotify(`${label} copied`),
@@ -512,7 +539,7 @@ function Root() {
     api('/status')
       .then(r => {
         if (!r) return
-        setCfg({ ports: r.ports, preferredPort: r.preferredPort, pollSeconds: r.pollSeconds })
+        setCfg({ ports: r.ports, preferredPort: r.preferredPort, pollSeconds: r.pollSeconds, modes: r.modes || {} })
         setReady(true)
       })
       .catch(() => setReady(true))
@@ -590,6 +617,21 @@ export default {
   register(ctx) {
     _rest = ctx.rest // plugin-scoped REST door to /api/plugins/cdp-manager (auth handled)
     _openExternal = ctx.os?.openExternal ?? null
+
+    // Native <select> popups are OS-drawn: pin color-scheme to the app's
+    // resolved mode or a dark app on a light OS renders a white popup.
+    const STYLE_ID = 'cdp-manager-select-theme'
+    const style = document.createElement('style')
+    style.id = STYLE_ID
+    style.textContent = `
+      select[data-cdp-mode] { color-scheme: light dark; }
+      html[data-hermes-mode='dark'] select[data-cdp-mode],
+      html.dark select[data-cdp-mode] { color-scheme: dark; }
+      html[data-hermes-mode='light'] select[data-cdp-mode] { color-scheme: light; }
+      select[data-cdp-mode] option { background: var(--ui-bg-elevated, var(--ui-bg-secondary)); color: var(--ui-text-primary, var(--foreground)); }
+    `
+    document.head.appendChild(style)
+    ctx.onDispose?.(() => document.getElementById(STYLE_ID)?.remove())
 
     ctx.register({
       id: 'chip',

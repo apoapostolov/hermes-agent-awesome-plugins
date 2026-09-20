@@ -28,6 +28,15 @@ CDP = {
                     "it marks this port as managed (0 clears the mark)."
                 ),
             },
+            "mode": {
+                "type": "string",
+                "enum": ["headful", "headless"],
+                "description": (
+                    "Launch mode (launch action only, default headful): "
+                    "headful shows a Chrome window, headless runs "
+                    "--headless=new with no window."
+                ),
+            },
         },
         "required": [],
     },
