@@ -468,7 +468,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
             }),
             jsx('p', {
               className: 'text-xs text-(--ui-text-tertiary)',
-              children: 'Probes 127.0.0.1 ports on /json/version while this dialog is open.',
+              children: 'CDP Manager probes 127.0.0.1 ports on /json/version for running Chrome servers.',
             }),
             jsxs('div', {
               className: 'flex flex-col gap-2',
@@ -503,7 +503,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
                 jsx('span', {
                   className: 'text-xs',
                   style: { color: 'var(--ui-text-secondary)' },
-                  children: 'Ports to probe',
+                  children: 'Monitored Ports',
                 }),
                 jsx(Input, {
                   'data-cdp-ports-input': '',
@@ -516,7 +516,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
                 }),
                 jsx('span', {
                   className: 'text-[0.65rem] text-(--ui-text-quaternary)',
-                  children: 'Comma or space separated. Saved when the field loses focus.',
+                  children: 'Comma or space separated.',
                 }),
               ],
             }),
