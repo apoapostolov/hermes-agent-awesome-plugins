@@ -1,5 +1,9 @@
 # CDP Manager
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="CDP Manager" />
+</div>
+
 Statusbar plugin + `cdp` agent tool for managing local Chrome DevTools
 Protocol (CDP) debug ports on 127.0.0.1.
 
