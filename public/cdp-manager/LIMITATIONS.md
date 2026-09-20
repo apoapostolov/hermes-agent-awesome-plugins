@@ -20,7 +20,14 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 - **Needed hook:** none. Keep a `Disclosure` line in the catalog description.
 - **Public edition:** same behavior, disclosure is in `plugin.yaml` / README. Keep it on any catalog pin.
 
-### 2. No other reach-in
+### 2. Personal Chrome profile reuse (disclosure, not a code block)
+
+- **Personal behavior:** a port can run on a profile from the real Chrome User Data dir (`chrome:<dirname>`), so automation reuses your cookies. The backend refuses before spawning when that dir is locked by a running Chrome (spawning would only pop a stray window in that Chrome) or already served by another live port (one debug port per user-data-dir, verified). The choice is remembered per port and reused by supervisor auto-starts.
+- **Why it needs disclosure:** automation running with the user's own cookies must be named in the catalog description.
+- **Needed hook:** none. Keep the `Disclosure` line covering personal profiles in the catalog description.
+- **Public edition:** same behavior, disclosure is in `plugin.yaml` / README. Keep it on any catalog pin.
+
+### 3. No other reach-in
 
 - **Personal behavior:** statusbar chip plus dialog built only from SDK components (`Dialog`, `Input`, `Button`, `Codicon`, `Tip`), backend reached through `ctx.rest`, one external link through `ctx.os.openExternal`. State lives in the plugin's own `config.json`. No Hermes `.env` or `config.yaml` writes, no vendor credentials, no secrets, no app DOM selectors, no `localStorage` keys.
 - **Public edition:** identical. Nothing to drop.

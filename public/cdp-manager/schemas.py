@@ -37,6 +37,16 @@ CDP = {
                     "--headless=new with no window."
                 ),
             },
+            "profile": {
+                "type": "string",
+                "description": (
+                    "Launch profile (launch action only, default hermes): "
+                    "hermes runs an isolated per-port profile, guest runs "
+                    "ephemeral, chrome:<dirname> reuses a profile from your "
+                    "real Chrome (cookies included) when that Chrome is not "
+                    "running. Remembered per port and reused next time."
+                ),
+            },
         },
         "required": [],
     },

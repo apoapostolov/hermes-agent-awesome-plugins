@@ -100,14 +100,23 @@ def probe_all(ports: list[int] | None = None) -> list[dict]:
 
 # ── mutations ─────────────────────────────────────────────────────────
 
-def launch(port: int, mode: str | None = None) -> dict:
+def launch(port: int, mode: str | None = None, profile: str | None = None) -> dict:
     """Start Chrome with --remote-debugging-port on 127.0.0.1. DETACHED_PROCESS
     + CREATE_NO_WINDOW: no visible terminal (standing Apo rule).
 
-    mode: 'headful' (default) or 'headless' (--headless=new). Each port gets
-    its own user-data-dir (config override userDataDir + '-' + port): a
-    second Chrome on an occupied profile joins the running instance instead
-    of binding its debug port, so per-port dirs are required.
+    mode: 'headful' (default) or 'headless' (--headless=new).
+
+    profile: which Chrome profile the server runs on (remembered per port,
+    reused by the supervisor):
+      'hermes' (default)  isolated per-port dir (userDataDir + '-' + port)
+      'guest'             same isolated dir + --guest (ephemeral, no cookies)
+      'chrome:<dirname>'  the real Chrome User Data dir + --profile-directory
+                          (reuses your cookies). Refused when that dir is
+                          locked by a running Chrome or already served by
+                          another live port: a second Chrome on an occupied
+                          dir joins the running instance instead of binding
+                          its debug port (verified), so spawning would only
+                          pop a stray window elsewhere.
     """
     cfg = load_config()
     port = int(port)
@@ -120,17 +129,29 @@ def launch(port: int, mode: str | None = None) -> dict:
     if not Path(chrome).exists():
         return {"ok": False, "error": f"chrome.exe not found at {chrome}"}
     headless = (mode or load_config().get("mode") or "headful") == "headless"
+    prof = resolve_profile(port, profile, cfg)
+    if prof.startswith("chrome:"):
+        problem = check_profile_dir(port, prof, cfg)
+        if problem:
+            return {"ok": False, "error": problem}
     flags = subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
     args = [
         chrome,
         f"--remote-debugging-port={port}",
-        f"--user-data-dir={cfg['userDataDir']}-{port}",
+        f"--user-data-dir={profile_data_dir(prof, port, cfg)}",
         "--no-first-run",
     ]
+    if prof == "guest":
+        args.append("--guest")
+    elif prof.startswith("chrome:"):
+        args.append(f"--profile-directory={prof.split(':', 1)[1]}")
     if headless:
         args.append("--headless=new")
-    # remember the mode so the supervisor auto-start uses the same one
-    mutate_config(lambda c: c.update({f"mode_{port}": "headless" if headless else "headful"}))
+    # remember mode + profile so the supervisor auto-start reuses them
+    mutate_config(lambda c: c.update({
+        f"mode_{port}": "headless" if headless else "headful",
+        f"profile_{port}": prof,
+    }))
     try:
         subprocess.Popen(
             args,
@@ -154,9 +175,131 @@ def launch(port: int, mode: str | None = None) -> dict:
         "ok": bool(result and result["state"] == "live"),
         "port": port,
         "mode": "headless" if headless else "headful",
+        "profile": prof,
         "result": result,
         "error": None if result and result["state"] == "live" else "no listener after 8s",
     }
+
+
+# ── profiles ──────────────────────────────────────────────────────────
+
+def chrome_user_data_dir(cfg: dict | None = None) -> str | None:
+    """Real Chrome User Data dir (holds the personal profiles + cookies).
+    Config override wins; otherwise the Chrome default when it exists."""
+    cfg = cfg or load_config()
+    override = (cfg.get("chromeUserDataDir") or "").strip()
+    if override and Path(override, "Local State").exists():
+        return override
+    import sys as _sys
+    if _sys.platform != "win32":
+        return None
+    local = os.environ.get("LOCALAPPDATA") or ""
+    cand = str(Path(local) / "Google" / "Chrome" / "User Data")
+    if cand and Path(cand, "Local State").exists():
+        return cand
+    return None
+
+
+def available_profiles(cfg: dict | None = None) -> list[dict]:
+    """Dropdown options: Hermes (isolated, default), personal profiles from
+    the real Chrome dir, Guest (ephemeral) last."""
+    cfg = cfg or load_config()
+    opts = [{"id": "hermes", "label": "Hermes (isolated)"}]
+    real = chrome_user_data_dir(cfg)
+    if real:
+        try:
+            state = json.loads(Path(real, "Local State").read_text("utf-8"))
+            cache = state.get("profile", {}).get("info_cache", {})
+            for dirname in sorted(cache):
+                name = cache[dirname].get("name") or dirname
+                opts.append({"id": f"chrome:{dirname}", "label": f"{name} (personal)"})
+        except Exception:
+            pass
+    opts.append({"id": "guest", "label": "Guest (ephemeral)"})
+    return opts
+
+
+def resolve_profile(port: int, profile: str | None, cfg: dict | None = None) -> str:
+    """Explicit arg > saved profile_<port> > hermes. Unknown ids fall back
+    to hermes rather than failing the launch."""
+    cfg = cfg or load_config()
+    prof = (profile or cfg.get(f"profile_{int(port)}") or "hermes").strip()
+    known = {o["id"] for o in available_profiles(cfg)} | {"hermes", "guest"}
+    if prof not in known and not prof.startswith("chrome:"):
+        return "hermes"
+    if prof.startswith("chrome:") and prof not in known:
+        return "hermes"
+    return prof
+
+
+def profile_data_dir(profile_id: str, port: int, cfg: dict | None = None) -> str:
+    """user-data-dir backing a profile: per-port isolated, except chrome:*
+    profiles which share the real Chrome dir (one debug port per dir)."""
+    cfg = cfg or load_config()
+    if profile_id.startswith("chrome:"):
+        return chrome_user_data_dir(cfg) or f"{cfg['userDataDir']}-{port}"
+    return f"{cfg['userDataDir']}-{port}"
+
+
+def _norm_dir(p: str) -> str:
+    return os.path.normcase(os.path.normpath(p))
+
+
+def main_chrome_dirs() -> list[str] | None:
+    """user-data-dirs held by running main Chrome instances (no --type=).
+    None when the scan itself fails (caller decides how to treat that)."""
+    import subprocess
+    import sys as _sys
+    if _sys.platform != "win32":
+        return []
+    try:
+        out = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-Command",
+             "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
+             "Where-Object {$_.CommandLine -notmatch '--type=' -and $_.CommandLine -notmatch 'remote-debugging-port'} | "
+             "ForEach-Object { $_.CommandLine }"],
+            capture_output=True, text=True, timeout=20,
+        )
+        dirs = []
+        for line in (out.stdout or "").splitlines():
+            line = line.strip()
+            if "chrome.exe" not in line:
+                continue
+            m = __import__("re").search(r"--user-data-dir=(\"[^\"]+\"|\S+)", line)
+            if m:
+                dirs.append(_norm_dir(m.group(1).strip('"')))
+            else:
+                real = chrome_user_data_dir()
+                if real:
+                    dirs.append(_norm_dir(real))
+        return dirs
+    except Exception:
+        return None
+
+
+def check_profile_dir(port: int, profile_id: str, cfg: dict | None = None) -> str | None:
+    """Refuse-before-spawn for chrome:* profiles. Returns an error string,
+    or None when the dir is free. Never spawns: spawning onto a locked dir
+    only pops a stray window in the owning Chrome."""
+    cfg = cfg or load_config()
+    target = _norm_dir(profile_data_dir(profile_id, port, cfg))
+    held = main_chrome_dirs()
+    if held is None:
+        return "could not verify the profile lock; not starting (retry in a moment)"
+    if target in held:
+        name = profile_id.split(":", 1)[1]
+        return (
+            f"profile '{name}' is open in a running Chrome - close that "
+            f"Chrome window first, or pick another profile"
+        )
+    # one debug port per user-data-dir: another live port may serve it
+    for r in probe_all(cfg["ports"]):
+        if r["state"] != "live" or r["port"] == port:
+            continue
+        other_prof = resolve_profile(r["port"], None, cfg)
+        if _norm_dir(profile_data_dir(other_prof, r["port"], cfg)) == target:
+            return f"port {r['port']} already serves this profile - one debug port per profile"
+    return None
 
 
 def stop(port: int) -> dict:
@@ -378,7 +521,8 @@ def _supervise_loop() -> None:
                         st["last_action"] = f"reboot {managed}"
                     else:
                         st["last_action"] = f"start {managed}"
-                    out = launch(managed, mode=load_config().get(f"mode_{managed}"))
+                    out = launch(managed, mode=load_config().get(f"mode_{managed}"),
+                                 profile=load_config().get(f"profile_{managed}"))
                     if out.get("ok") and not out.get("already"):
                         st["fail_streak"] = 0
                         st["last_action"] = f"started {managed}"

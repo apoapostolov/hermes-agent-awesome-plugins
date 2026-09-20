@@ -13,7 +13,10 @@
  *
  * Per-port glyph buttons: launch / stop (state-aware, one at a time) and
  * recheck. Segmented Auto-refresh selector (Manual/2s/5s/10s/30s) while the
- * dialog is open. The github glyph before the footer hint opens the repo.
+ * dialog is open. Windowed/Headless mode dropdown plus a profile dropdown
+ * (Hermes isolated, personal Chrome profiles with cookies, Guest last):
+ * changing either on a live port restarts it, confirmed before the dropdown
+ * flips. The github glyph before the footer hint opens the repo.
  */
 import {
   cn,
@@ -108,7 +111,7 @@ function Segmented({ value, onChange, options }) {
 
 // ── port row ──
 
-function PortRow({ port, result, preferred, mode, restarting, onAction, onPrefer, onMode, onCopy }) {
+function PortRow({ port, result, preferred, mode, selection, profiles, restarting, onAction, onPrefer, onMode, onProfile, onCopy }) {
   const live = result?.state === 'live'
   const dead = result?.state === 'dead'
   const [busy, setBusy] = useState(null) // 'launch' | 'stop' | 'probe' | null
@@ -129,6 +132,12 @@ function PortRow({ port, result, preferred, mode, restarting, onAction, onPrefer
   // is confirmed, and the dropdown keeps the OLD mode until then.
   const confirming = busy === 'launch' || busy === 'stop' || !!restarting
   const showStop = busy === 'stop' || (live && busy !== 'launch') || (!!restarting && live)
+
+  // Options fallback when the backend predates the profiles list: the two
+  // choices that need no profile discovery.
+  const profileOptions = profiles && profiles.length
+    ? profiles
+    : [{ id: 'hermes', label: 'Hermes (isolated)' }, { id: 'guest', label: 'Guest (ephemeral)' }]
 
   return jsxs('div', {
     'data-cdp-row': String(port),
@@ -237,6 +246,28 @@ function PortRow({ port, result, preferred, mode, restarting, onAction, onPrefer
           ],
         }),
       }),
+      // Profile dropdown: Hermes (isolated), personal Chrome profiles (with
+      // cookies), Guest last. Changing on a LIVE port restarts onto the new
+      // profile; locked or double-served profiles refuse with an error.
+      jsx(Tooltip, {
+        label: `Profile for port ${port}: ${profileOptions.find(o => o.id === (selection || 'hermes'))?.label || selection || 'Hermes (isolated)'} · ${live ? 'changing restarts the port' : 'applies on next launch'}`,
+        children: jsxs('select', {
+          'data-cdp-profile': String(port),
+          value: selection || 'hermes',
+          disabled: !!restarting,
+          onChange: e => onProfile(port, e.target.value, live),
+          className: 'h-6 w-24 shrink-0 cursor-pointer truncate rounded-md border px-1 text-[0.65rem]',
+          style: {
+            background: 'transparent',
+            color: 'var(--ui-text-secondary)',
+            borderColor: 'var(--ui-stroke-secondary)',
+            opacity: restarting ? 0.5 : 1,
+          },
+          children: profileOptions.map(o =>
+            jsx('option', { value: o.id, children: o.label }, o.id),
+          ),
+        }),
+      }),
       jsx(GlyphButton, {
         glyph: 'refresh',
         label: `Recheck port ${port}`,
@@ -276,9 +307,11 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
         const next = {}
         for (const res of r?.results || []) next[res.port] = res
         setResults(next)
-        // Hydrate modes on every open: the tool or supervisor may have
-        // changed them while the dialog was closed.
+        // Hydrate modes + profiles on every open: the tool or supervisor may
+        // have changed them while the dialog was closed.
         if (r?.modes) setCfg({ modes: r.modes })
+        if (r?.profiles) setCfg({ profiles: r.profiles })
+        if (r?.selections) setCfg({ selections: r.selections })
         if (r?.pollSeconds !== undefined) setCfg({ pollSeconds: r.pollSeconds })
       } catch {
         if (alive) onNotify('backend unreachable')
@@ -342,14 +375,16 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
       }
       actionLockRef.current = true
       const mode = cfg?.modes?.[port]
-      const r = await api(`/${kind}`, { port, ...(kind === 'launch' && mode ? { mode } : {}) })
+      const profile = cfg?.selections?.[port]
+      const r = await api(`/${kind}`, { port, ...(kind === 'launch' && mode ? { mode } : {}), ...(kind === 'launch' && profile ? { profile } : {}) })
       if (r?.error) {
         onNotify(`${kind} failed: ${r.error}`)
         return
       }
       onNotify(kind === 'launch' ? (r.already ? `port ${port} already live` : `port ${port} launched (${r.mode === 'headless' ? 'headless' : 'windowed'})`) : (r.already ? `port ${port} was not live` : `port ${port} stopped`))
-      // Record the backend-confirmed mode so the dropdown reflects reality.
+      // Record the backend-confirmed mode + profile so the dropdowns reflect reality.
       if (kind === 'launch' && r?.mode) setCfg(prev => ({ ...prev, modes: { ...prev.modes, [port]: r.mode } }))
+      if (kind === 'launch' && r?.profile) setCfg(prev => ({ ...prev, selections: { ...prev.selections, [port]: r.profile } }))
       await sweep(cfg.ports)
     } catch {
       onNotify(`${kind} failed`)
@@ -391,32 +426,82 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
       onNotify(`port ${port} will launch ${mode === 'headless' ? 'headless' : 'windowed'}`)
       return
     }
+    const profile = cfg?.selections?.[port]
+    const r = await restartPort(port, { mode, ...(profile ? { profile } : {}) })
+    if (r.error) {
+      onNotify(`restart failed: ${r.error}`)
+      return
+    }
+    if (r.already) {
+      onNotify(`port ${port} already live, mode unchanged`)
+      return
+    }
+    setCfg(prev => ({ ...prev, modes: { ...prev.modes, [port]: r.mode || mode } }))
+    onNotify(`port ${port} restarted ${(r.mode || mode) === 'headless' ? 'headless' : 'windowed'}`)
+  }
+
+  // Profile switch. Same confirm-then-flip contract as setMode: the dropdown
+  // keeps the OLD profile until stop+launch confirms the new one. Refusals
+  // (profile locked by a running Chrome, or already served by another port)
+  // arrive as launch errors, so the dropdown never flips on a refusal.
+  const setProfile = async (port, profile, wasLive) => {
+    if (actionLockRef.current || busyPort !== null) {
+      onNotify('restart already in progress')
+      return
+    }
+    const prev = cfg?.selections?.[port] || 'hermes'
+    if (prev === profile) return
+    let saved
     try {
-      actionLockRef.current = true
-      setBusyPort(port)
-      const stopRes = await api('/stop', { port })
-      if (stopRes?.error) {
-        onNotify(`restart failed: ${stopRes.error}`)
-        return
-      }
-      const launchRes = await api('/launch', { port, mode })
-      if (launchRes?.error || !launchRes?.ok) {
-        onNotify(`restart failed: ${launchRes?.error || 'launch failed'}`)
-        return
-      }
-      if (launchRes?.already) {
-        onNotify(`port ${port} already live, mode unchanged`)
-        return
-      }
-      setCfg(prev => ({ ...prev, modes: { ...prev.modes, [port]: launchRes.mode || mode } }))
-      onNotify(`port ${port} restarted ${(launchRes.mode || mode) === 'headless' ? 'headless' : 'windowed'}`)
-      await sweep(cfg.ports)
+      const r = await api('/profile', { port, profile })
+      saved = r?.profile || profile
     } catch {
-      onNotify('restart failed')
+      onNotify('profile save failed')
+      return
+    }
+    if (!wasLive) {
+      setCfg(prevCfg => ({ ...prevCfg, selections: { ...prevCfg.selections, [port]: saved } }))
+      onNotify(`port ${port} will launch on ${profileLabel(saved)}`)
+      return
+    }
+    const mode = cfg?.modes?.[port]
+    const r = await restartPort(port, { ...(mode ? { mode } : {}), profile: saved })
+    if (r.error) {
+      onNotify(`restart failed: ${r.error}`)
+      return
+    }
+    if (r.already) {
+      onNotify(`port ${port} already live, profile unchanged`)
+      return
+    }
+    setCfg(prevCfg => ({ ...prevCfg, selections: { ...prevCfg.selections, [port]: r.profile || saved } }))
+    onNotify(`port ${port} restarted on ${profileLabel(r.profile || saved)}`)
+  }
+
+  // Shared stop+launch used by mode and profile switches. Returns the
+  // confirmed launch result; dialog state flips only from confirmations.
+  const restartPort = async (port, launchExtra) => {
+    actionLockRef.current = true
+    setBusyPort(port)
+    try {
+      const stopRes = await api('/stop', { port })
+      if (stopRes?.error) return { error: stopRes.error }
+      const launchRes = await api('/launch', { port, ...launchExtra })
+      if (launchRes?.error || !launchRes?.ok) return { error: launchRes?.error || 'launch failed' }
+      if (launchRes?.already) return { already: true }
+      await sweep(cfg.ports)
+      return { ok: true, mode: launchRes.mode, profile: launchRes.profile }
+    } catch {
+      return { error: 'restart failed' }
     } finally {
       actionLockRef.current = false
       setBusyPort(null)
     }
+  }
+
+  const profileLabel = id => {
+    const found = (cfg?.profiles || []).find(o => o.id === id)
+    return found ? found.label : id
   }
 
   const savePorts = () => {
@@ -480,10 +565,13 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
                     result: results[p],
                     preferred: cfg.preferredPort === p,
                     mode: cfg?.modes?.[p],
+                    selection: cfg?.selections?.[p],
+                    profiles: cfg?.profiles || [],
                     restarting: busyPort === p,
                     onAction: act,
                     onPrefer: prefer,
                     onMode: setMode,
+                    onProfile: setProfile,
                     onCopy: (text, label) => {
                       navigator.clipboard.writeText(text).then(
                         () => onNotify(`${label} copied`),
@@ -584,7 +672,7 @@ function chipStyle(health, bold) {
 // ── root ──
 
 function Root() {
-  const [cfg, setCfg] = useState(() => ({ ports: [9222, 9333, 9335], preferredPort: null, pollSeconds: 5, modes: {} }))
+  const [cfg, setCfg] = useState(() => ({ ports: [9222, 9333, 9335], preferredPort: null, pollSeconds: 5, modes: {}, profiles: [], selections: {} }))
   const [dialogOpen, setDialogOpen] = useState(false)
   const [ready, setReady] = useState(false)
   const [note, setNote] = useState('')
@@ -597,7 +685,7 @@ function Root() {
     api('/status')
       .then(r => {
         if (!r) return
-        setCfg({ ports: r.ports, preferredPort: r.preferredPort, pollSeconds: r.pollSeconds, modes: r.modes || {} })
+        setCfg({ ports: r.ports, preferredPort: r.preferredPort, pollSeconds: r.pollSeconds, modes: r.modes || {}, profiles: r.profiles || [], selections: r.selections || {} })
         setReady(true)
       })
       .catch(() => setReady(true))
@@ -684,11 +772,14 @@ export default {
     const style = document.createElement('style')
     style.id = STYLE_ID
     style.textContent = `
-      select[data-cdp-mode] { color-scheme: light dark; }
+      select[data-cdp-mode], select[data-cdp-profile] { color-scheme: light dark; }
       html[data-hermes-mode='dark'] select[data-cdp-mode],
-      html.dark select[data-cdp-mode] { color-scheme: dark; }
-      html[data-hermes-mode='light'] select[data-cdp-mode] { color-scheme: light; }
-      select[data-cdp-mode] option { background: var(--ui-bg-elevated, var(--ui-bg-secondary)); color: var(--ui-text-primary, var(--foreground)); }
+      html.dark select[data-cdp-mode],
+      html[data-hermes-mode='dark'] select[data-cdp-profile],
+      html.dark select[data-cdp-profile] { color-scheme: dark; }
+      html[data-hermes-mode='light'] select[data-cdp-mode],
+      html[data-hermes-mode='light'] select[data-cdp-profile] { color-scheme: light; }
+      select[data-cdp-mode] option, select[data-cdp-profile] option { background: var(--ui-bg-elevated, var(--ui-bg-secondary)); color: var(--ui-text-primary, var(--foreground)); }
     `
     document.head.appendChild(style)
     ctx.onDispose?.(() => document.getElementById(STYLE_ID)?.remove())

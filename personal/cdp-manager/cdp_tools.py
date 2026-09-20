@@ -36,8 +36,9 @@ def cdp(args: dict, **kwargs) -> str:
             if err:
                 return json.dumps({"ok": False, "error": err, "action": action})
             mode = args.get("mode")  # 'headful' | 'headless' (launch only)
+            profile = args.get("profile")  # 'hermes' | 'guest' | 'chrome:<dir>' (launch only)
             if action == "launch":
-                out = cdp_core.launch(target, mode=mode)
+                out = cdp_core.launch(target, mode=mode, profile=profile)
             else:
                 out = cdp_core.stop(target)
             out["action"] = action

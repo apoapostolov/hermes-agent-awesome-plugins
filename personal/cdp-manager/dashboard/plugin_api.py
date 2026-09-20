@@ -43,6 +43,7 @@ class PreferredBody(BaseModel):
 class PortBody(BaseModel):
     port: int
     mode: str | None = None  # 'headful' | 'headless'
+    profile: str | None = None  # 'hermes' | 'guest' | 'chrome:<dirname>'
 
 
 class PollBody(BaseModel):
@@ -52,6 +53,11 @@ class PollBody(BaseModel):
 class ModeBody(BaseModel):
     port: int
     mode: str  # 'headful' | 'headless'
+
+
+class ProfileBody(BaseModel):
+    port: int
+    profile: str  # 'hermes' | 'guest' | 'chrome:<dirname>'
 
 
 # Supervisor: starts the managed port on backend boot ("on hermes launch")
@@ -70,6 +76,7 @@ def health():
 def status():
     cfg = cdp_core.load_config()
     modes = {str(p): cfg.get(f"mode_{p}") or "headful" for p in cfg["ports"]}
+    selections = {str(p): cdp_core.resolve_profile(p, None, cfg) for p in cfg["ports"]}
     return {
         "ports": cfg["ports"],
         "preferredPort": cfg.get("preferredPort"),
@@ -77,6 +84,8 @@ def status():
         "userDataDir": cfg["userDataDir"],
         "pollSeconds": int(cfg.get("pollSeconds") or 0),
         "modes": modes,
+        "profiles": cdp_core.available_profiles(cfg),
+        "selections": selections,
         "results": cdp_core.probe_all(),
     }
 
@@ -88,6 +97,15 @@ def mode(body: ModeBody):
     m = "headless" if body.mode == "headless" else "headful"
     cdp_core.mutate_config(lambda c: c.update({f"mode_{int(body.port)}": m}))
     return {"ok": True, "port": int(body.port), "mode": m}
+
+
+@router.post("/profile")
+def profile(body: ProfileBody):
+    """Save the profile for a port (remembered, reused by the next launch
+    including supervisor auto-starts). Unknown ids fall back to hermes."""
+    sel = cdp_core.resolve_profile(body.port, body.profile)
+    cdp_core.mutate_config(lambda c: c.update({f"profile_{int(body.port)}": sel}))
+    return {"ok": True, "port": int(body.port), "profile": sel}
 
 
 @router.post("/poll")
@@ -105,7 +123,7 @@ def probe(body: PortsBody):
 
 @router.post("/launch")
 def launch(body: PortBody):
-    out = cdp_core.launch(body.port, mode=body.mode)
+    out = cdp_core.launch(body.port, mode=body.mode, profile=body.profile)
     cdp_core.invalidate_health()
     return out
 

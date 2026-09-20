@@ -1,6 +1,10 @@
 name: cdp-manager
 version: 1.0.0
-description: "Local Chrome CDP debug ports in the status bar: probe, launch, stop, recheck, and a managed port Hermes keeps alive, plus the `cdp` agent tool. Disclosure: launches local Chrome on 127.0.0.1 only, with per-port profiles under the Hermes home directory, and closes it with a clean Browser.close; state lives in the plugin's own config file."
+description: "Local Chrome CDP debug ports in the status bar (probe, launch, stop, recheck)
+  plus a managed port Hermes keeps alive and the `cdp` agent tool. Disclosure: launches
+  local Chrome on 127.0.0.1 only, with per-port profiles under the Hermes home directory
+  or a chosen personal Chrome profile (your cookies, when that Chrome is closed),
+  and closes it with a clean Browser.close; state lives in the plugin's own config file."
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2
