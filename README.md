@@ -71,6 +71,7 @@ Twelve plugins are pinned in `hermes-pack.yaml` (pack version 1.14.0). **reasoni
 | [intelligent-tool-break](personal/intelligent-tool-break/README.md) | `/break`, `/break {msg}`, and `/again`. Desktop strip. Turn stays alive. |
 | [memory-review](personal/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
 | [better-capabilities](personal/better-capabilities/README.md) | Delete plugins/skills. Zip a skill. On/off presets. |
+| [cdp-manager](personal/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar. The `cdp` tool does the same from chat, on your preferred port. |
 
 ### Sessions and Sidebar
 
@@ -145,6 +146,7 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [compact-reasoning-label](personal/compact-reasoning-label/README.md)
 - [memory-review](personal/memory-review/README.md)
 - [better-capabilities](personal/better-capabilities/README.md)
+- [cdp-manager](personal/cdp-manager/README.md)
 - [rss-reader](personal/rss-reader/README.md)
 - [Maintainer sync skill](skills/hermes-awesome-plugins-sync/SKILL.md)
 
