@@ -1,6 +1,0 @@
-name: cdp-port-panel
-version: 1.0.0
-description: "Statusbar dialog that shows which local Chrome CDP port is live, with copyable URLs and launch commands."
-author: Apostol Apostolov
-defaultEnabled: false
-manifest_version: 2
