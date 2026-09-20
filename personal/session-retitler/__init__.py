@@ -42,7 +42,7 @@ DEFAULTS = {
     "max_sessions": 60,   # counter cache bound
 }
 
-_MAX_TITLE_WORDS = 8
+_MAX_TITLE_WORDS = 8  # headroom above the 3-6 word prompt target; longer output is truncated, not dropped
 _MAX_TITLE_CHARS = 60
 _SNIPPET_CHARS = 500
 _DIGEST_CHARS = 7000
@@ -116,52 +116,58 @@ def _save_counts(ctx: Any, counts: Dict[str, Dict[str, float]]) -> None:
         logger.debug("session-retitler: counter write failed", exc_info=True)
 
 
-def _count_user_messages(history: List[Any], extra_text: Optional[str] = None) -> int:
-    """Titleable user messages in history, plus the incoming prompt if new."""
-    n = 0
+def _extra_counts(history: List[Any], extra_text: Optional[str]) -> bool:
+    """True when the incoming prompt adds one titleable user message."""
+    extra = (extra_text or "").strip()
+    if not extra or _is_machine_user_message(extra):
+        return False
     last = ""
     for msg in history or []:
         if _is_real_user_message(msg):
-            n += 1
             last = _text_of(msg).strip()
-    extra = (extra_text or "").strip()
-    if extra and extra != last and not _is_machine_user_message(extra):
-        try:
-            from agent.title_generator import is_titleable_user_message
+    if extra == last:
+        return False
+    try:
+        from agent.title_generator import is_titleable_user_message
 
-            if not is_titleable_user_message(extra):
-                return n
-        except Exception:
-            pass
+        return bool(is_titleable_user_message(extra))
+    except Exception:
+        return True
+
+
+def _count_user_messages(history: List[Any], extra_text: Optional[str] = None) -> int:
+    """Titleable user messages in history, plus the incoming prompt if new."""
+    n = 0
+    for msg in history or []:
+        if _is_real_user_message(msg):
+            n += 1
+    if _extra_counts(history, extra_text):
         n += 1
     return n
 
 
-def _sync_user_count(ctx: Any, session_id: str, n: int) -> int:
-    """Persist the user-message count. Return last_retitle_n."""
+def _record_count(ctx: Any, session_id: str, n: int, claim: bool = False) -> bool:
+    """Persist count n in one state round trip; claim the boundary when asked.
+
+    Returns True only when a fresh boundary was claimed (and the session
+    marked in flight). Plain syncs never touch last_retitle_n.
+    """
     with _counter_lock:
+        if claim and session_id in _inflight:
+            return False
         counts = _load_counts(ctx)
         entry = counts.get(session_id) or {}
         last = int(entry.get("last_retitle_n", 0))
+        if claim:
+            if n == last:
+                return False
+            counts[session_id] = {"n": n, "ts": time.time(), "last_retitle_n": n}
+            _save_counts(ctx, counts)
+            _inflight.add(session_id)
+            return True
         counts[session_id] = {"n": n, "ts": time.time(), "last_retitle_n": last}
         _save_counts(ctx, counts)
-        return last
-
-
-def _claim_retitle(ctx: Any, session_id: str, n: int) -> bool:
-    """Claim this user-message boundary. False if already claimed or in flight."""
-    with _counter_lock:
-        if session_id in _inflight:
-            return False
-        counts = _load_counts(ctx)
-        entry = counts.get(session_id) or {}
-        last = int(entry.get("last_retitle_n", 0))
-        if n == last:
-            return False
-        counts[session_id] = {"n": n, "ts": time.time(), "last_retitle_n": n}
-        _save_counts(ctx, counts)
-        _inflight.add(session_id)
-        return True
+        return False
 
 
 def _reset(ctx: Any, session_id: str) -> None:
@@ -247,8 +253,18 @@ def build_digest(history: List[Any], max_pairs: int) -> str:
         chunks.append(block)
     digest = "\n\n".join(chunks)
     if len(digest) > _DIGEST_CHARS:
-        digest = digest[-_DIGEST_CHARS:]
+        cut = digest[-_DIGEST_CHARS:]
+        sep = cut.find("\n\n")
+        digest = cut[sep + 2 :] if sep != -1 else cut
     return digest
+
+
+def build_snapshot(history: List[Any], extra_user: Optional[str] = None) -> List[Any]:
+    """History plus the triggering prompt, so the digest sees the boundary message."""
+    snapshot = list(history or [])
+    if _extra_counts(snapshot, extra_user):
+        snapshot.append({"role": "user", "content": (extra_user or "").strip()})
+    return snapshot
 
 
 # ---------------------------------------------------------------------------
@@ -263,8 +279,9 @@ def _clean_title(raw: Any) -> Optional[str]:
     title = re.sub(r"\s+", " ", title).strip()
     if not title:
         return None
-    if len(title.split()) > _MAX_TITLE_WORDS:
-        return None  # answer-shaped output, not a title
+    words = title.split()
+    if len(words) > _MAX_TITLE_WORDS:
+        title = " ".join(words[:_MAX_TITLE_WORDS])
     return title[:_MAX_TITLE_CHARS].rstrip(" .,-")
 
 
@@ -311,15 +328,9 @@ def _write_llm_title(db: Any, session_id: str, title: str) -> bool:
 # The retitle job
 # ---------------------------------------------------------------------------
 
-def _retitle(ctx: Any, session_id: str, history: List[Any], interval: int) -> None:
+def _retitle(ctx: Any, session_id: str, digest: str) -> None:
+    """Ask the aux tier for a title from a prebuilt digest; persist at llm rank."""
     try:
-        max_pairs = _cfg(ctx, "max_pairs")
-        digest = build_digest(history, max_pairs)
-        pairs = digest.count("USER: ")
-        if pairs < _cfg(ctx, "min_pairs"):
-            logger.debug("session-retitler: only %d pairs; skipping", pairs)
-            return
-
         from agent.plugin_llm import PluginLlmTextInput
 
         result = ctx.llm.complete_structured(
@@ -343,8 +354,6 @@ def _retitle(ctx: Any, session_id: str, history: List[Any], interval: int) -> No
 
         db = SessionDB()
         try:
-            if not db.get_session_title and False:  # noqa: SIM108 — clarity guard
-                return
             ok = _write_llm_title(db, session_id, title)
             if ok:
                 logger.info("session-retitler: renamed %s -> %r", session_id, title)
@@ -370,16 +379,29 @@ def _maybe_retitle(
     if not session_id:
         return
     interval = _cfg(ctx, "interval")
-    n = _count_user_messages(conversation_history, extra_user)
-    last = _sync_user_count(ctx, session_id, n)
-    if n < interval or n % interval != 0 or n == last:
+    history = conversation_history or []
+    n = _count_user_messages(history, extra_user)
+    if n < interval or n % interval != 0:
+        _record_count(ctx, session_id, n)
         return
-    if not _claim_retitle(ctx, session_id, n):
+    # Boundary reached: snapshot first (the triggering prompt counts, so the
+    # digest must see it), then gate on usable pairs BEFORE claiming, so a
+    # thin digest never burns the boundary.
+    snapshot = build_snapshot(history, extra_user)
+    digest = build_digest(snapshot, _cfg(ctx, "max_pairs"))
+    pairs = digest.count("USER: ")
+    if pairs < _cfg(ctx, "min_pairs"):
+        logger.debug("session-retitler: only %d pairs; skipping", pairs)
+        _record_count(ctx, session_id, n)
+        return
+    if not _record_count(ctx, session_id, n, claim=True):
         return
     try:
+        # Off-thread by design: hook callbacks must not block a turn. A
+        # failure here only logs; the turn is never disturbed.
         thread = threading.Thread(
             target=_retitle_and_release,
-            args=(ctx, session_id, list(conversation_history or []), interval),
+            args=(ctx, session_id, digest),
             daemon=True,
             name=f"session-retitle-{session_id[:12]}",
         )
@@ -403,9 +425,9 @@ def _on_post_llm_call(ctx: Any, session_id: str, conversation_history: List[Any]
     _maybe_retitle(ctx, session_id, conversation_history)
 
 
-def _retitle_and_release(ctx: Any, session_id: str, history: List[Any], interval: int) -> None:
+def _retitle_and_release(ctx: Any, session_id: str, digest: str) -> None:
     try:
-        _retitle(ctx, session_id, history, interval)
+        _retitle(ctx, session_id, digest)
     finally:
         with _counter_lock:
             _inflight.discard(session_id)

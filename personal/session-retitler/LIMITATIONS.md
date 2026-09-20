@@ -17,7 +17,7 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 
 - **Personal behavior:** imports `agent.title_generator` and `hermes_state.SessionDB` directly, and calls the private-ish `_persist_session_title` helper.
 - **Why it fails:** touching core internals outside the plugin SDK contract. A core rename or refactor silently breaks title persistence, and a listing cannot carry that coupling.
-- **Needed hook:** a public, SDK-level way to write an `llm`-rank session title (the plugin genuinely needs an llm rank write plus llm-to-llm rewrite). Until that exists, the public copy stays a no-surface snapshot held in public/.
+- **Needed hook:** a public, SDK-level way to write an `llm`-rank session title (the plugin genuinely needs an llm rank write plus llm-to-llm rewrite). Until that exists, there is no public edition: `public/session-retitler/` does not exist and personal is held from the catalog.
 
 ### 2. Structured LLM call routed through an aux task
 
@@ -29,4 +29,4 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 
 - [ ] No direct `agent.*` / `hermes_state.SessionDB` imports; an SDK-level llm-rank title write exists and is used.
 - [ ] The `title_generation` aux route works without a per-plugin `llm.allow_task_override` config requirement, or the README's requirement is accepted by the catalog.
-- [ ] Re-pin the catalog `sha:` to the clean public tree.
+- [ ] Re-pin the catalog `sha:` to a clean public tree once one exists.
