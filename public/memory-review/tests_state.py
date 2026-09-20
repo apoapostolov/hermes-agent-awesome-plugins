@@ -83,7 +83,7 @@ def test_decide_rejects_ids_outside_pending_dir(tmp_path: Path) -> None:
     _write_pending(tmp_path, "abcd1234")
     outside = tmp_path / "victim.json"
     outside.write_text("{}", encoding="utf-8")
-    bad_ids = ["../../victim", "/etc/passwd", "abcd1234/../../victim", "ABCD1234", "", "abc"]
+    bad_ids = ["../../victim", "..\\..\\victim", "abcd1234/../../victim", "ABCD1234", "", "abc"]
 
     out = mod.decide("reject", bad_ids, home=tmp_path)
     assert out["ok"] is True
