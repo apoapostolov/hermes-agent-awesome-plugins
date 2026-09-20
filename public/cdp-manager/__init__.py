@@ -16,12 +16,12 @@ def register(ctx):
         schema=schemas.CDP,
         handler=cdp_tools.cdp,
         description=(
-            "Manage the local Chrome DevTools Protocol (CDP) server without "
-            "bash: status lists probed ports, launch starts Chrome with "
-            "--remote-debugging-port, stop closes the listener, recheck "
-            "re-probes, prefer marks the managed port that a backend "
-            "supervisor keeps up (auto-start when down, reboot when stuck). "
-            "Uses the managed port when none is given; port overrides."
+            "Manage local Chrome DevTools Protocol (CDP) servers without "
+            "bash: status (probes plus health, modes, selections), profiles "
+            "(launchable profiles with locked/served state), launch, restart "
+            "(the way to switch mode or profile), stop, recheck, prefer "
+            "(marks the managed port a backend supervisor keeps up). Uses "
+            "the managed port when none is given; port overrides."
         ),
         emoji="\U0001f50c",
         is_async=False,

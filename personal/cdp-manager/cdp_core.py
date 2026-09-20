@@ -302,6 +302,64 @@ def check_profile_dir(port: int, profile_id: str, cfg: dict | None = None) -> st
     return None
 
 
+def restart(port: int, mode: str | None = None, profile: str | None = None) -> dict:
+    """Stop the listener if live, then launch with the given (or remembered)
+    mode and profile. Switching profiles is a restart: there is no hot-swap.
+    A switch onto a locked or already-served profile is refused BEFORE the
+    running server is touched. Returns the confirmed launch result,
+    including the applied mode/profile."""
+    port = int(port)
+    cfg = load_config()
+    live = probe_port(port)
+    if live["state"] == "live":
+        want = resolve_profile(port, profile, cfg)
+        current = resolve_profile(port, None, cfg)
+        if want != current and want.startswith("chrome:"):
+            problem = check_profile_dir(port, want, cfg)
+            if problem:
+                return {"ok": False, "port": port, "error": problem}
+        out = stop(port)
+        if not out.get("ok"):
+            return {"ok": False, "port": port, "error": out.get("error") or "stop failed"}
+        stopped = True
+    else:
+        stopped = False
+    out = launch(port, mode=mode, profile=profile)
+    out["restarted"] = stopped
+    return out
+
+
+def profiles_overview(cfg: dict | None = None) -> dict:
+    """Every launchable profile with its live state: whether a running
+    Chrome holds it (locked) and which port serves it now (servedBy).
+    Per-port dirs (hermes/guest) are never locked and serve one port each,
+    so lock/serving is evaluated per chrome:* profile."""
+    cfg = cfg or load_config()
+    held = main_chrome_dirs() or []
+    results = {r["port"]: r for r in probe_all(cfg["ports"])}
+    serving: dict = {}
+    for p in cfg["ports"]:
+        r = results.get(p)
+        if r and r["state"] == "live":
+            prof = resolve_profile(p, None, cfg)
+            serving.setdefault(_norm_dir(profile_data_dir(prof, p, cfg)), p)
+    out = []
+    for o in available_profiles(cfg):
+        pid = o["id"]
+        if pid.startswith("chrome:"):
+            d = _norm_dir(profile_data_dir(pid, 0, cfg))
+            locked = d in held
+            served = serving.get(d)
+        else:
+            locked = False
+            served = None
+        out.append({**o, "locked": locked, "servedBy": served})
+    return {
+        "profiles": out,
+        "selections": {str(p): resolve_profile(p, None, cfg) for p in cfg["ports"]},
+    }
+
+
 def stop(port: int) -> dict:
     """Close the CDP listener cleanly via Browser.close (kills the browser we
     own on that debug port; never touches an arbitrary pid)."""

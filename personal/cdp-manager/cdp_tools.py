@@ -17,14 +17,36 @@ def cdp(args: dict, **kwargs) -> str:
         if action in ("status", "recheck"):
             results = cdp_core.probe_all()
             cfg = cdp_core.load_config()
+            h = cdp_core.health()
             return json.dumps({
                 "ok": True,
                 "action": action,
                 "ports": cfg["ports"],
                 "preferredPort": cfg.get("preferredPort"),
+                "health": h["health"],
+                "reason": h.get("reason"),
+                "supervisor": h.get("supervisor"),
+                "modes": {str(p): cfg.get(f"mode_{p}") or "headful" for p in cfg["ports"]},
+                "selections": {str(p): cdp_core.resolve_profile(p, None, cfg) for p in cfg["ports"]},
                 "results": results,
                 "live": [r["port"] for r in results if r["state"] == "live"],
             })
+
+        if action == "profiles":
+            return json.dumps({
+                "ok": True,
+                "action": "profiles",
+                **cdp_core.profiles_overview(),
+            })
+
+        if action == "restart":
+            target, err = cdp_core.resolve_port(port)
+            if err:
+                return json.dumps({"ok": False, "error": err, "action": action})
+            out = cdp_core.restart(target, mode=args.get("mode"), profile=args.get("profile"))
+            out["action"] = action
+            out["port"] = target
+            return json.dumps(out)
 
         if action == "prefer":
             target = port if port else None
