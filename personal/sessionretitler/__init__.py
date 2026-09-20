@@ -448,10 +448,13 @@ def register(ctx):  # noqa: ANN001 — host-defined PluginContext
     Hook callbacks receive only the fire-site kwargs (no ctx), so the real
     handlers are closures capturing the register-time PluginContext.
     """
-    state = ctx.state  # touch early: fail load loudly on a broken state store
+    try:
+        state_path = getattr(ctx.state, "path", "?")
+    except Exception:
+        state_path = "?"  # validate probe has no state store; callbacks get the real one
     logger.info(
         "sessionretitler: loading (state at %s, interval=%s, count=user_messages)",
-        getattr(state, "path", "?"),
+        state_path,
         _cfg(ctx, "interval"),
     )
 

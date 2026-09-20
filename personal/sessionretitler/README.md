@@ -34,7 +34,7 @@ Enable **Session Retitler** under **Capabilities → Plugins**.
 
 ## Requirements / Limits
 
-Backend-only (Python hooks). Needs `llm.allow_task_override: true` for this plugin so `ctx.llm.complete_structured(task="title_generation")` can route through the cheap aux tier; without it the built-in aux task is gated and renames silently no-op.
+Backend-only (Python hooks). Needs `plugins.entries.sessionretitler.llm.allow_task_override: true` in `config.yaml` so `ctx.llm.complete_structured(task="title_generation")` can route through the cheap aux tier; the key must sit nested under `llm.` (a flat key is silently ignored) and without it renames silently no-op.
 
 ## License
 
