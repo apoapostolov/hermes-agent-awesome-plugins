@@ -38,7 +38,7 @@ import { useEffect, useRef, useState } from 'react'
 let _rest = null // injected at register(ctx) — ctx.rest hits /api/plugins/cdp-manager
 let _openExternal = null // ctx.os.openExternal: target=_blank window.open is denied in-app
 
-const REPO_URL = 'https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/cdp-manager'
+const REPO_URL = 'https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/public/cdp-manager'
 const GLYPH_BTN = 'inline-flex size-6 shrink-0 items-center justify-center rounded-md border text-(--ui-text-secondary) hover:text-foreground hover:bg-(--chrome-action-hover)'
 const GLYPH_SIZE = '0.85rem'
 
