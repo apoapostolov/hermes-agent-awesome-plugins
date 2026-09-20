@@ -731,11 +731,115 @@ function pruneArticleCache(library) {
     if (!live.has(key)) delete library.articleCache[key];
   }
 }
+function folderContains(feedFolder, browseFolder) {
+  if (browseFolder == null) return true;
+  const key = String(feedFolder || "");
+  const want = String(browseFolder);
+  if (want === "") return key === "";
+  return key === want || key.startsWith(`${want}/`);
+}
+function feedTriState(value) {
+  if (value === true) return "on";
+  if (value === false) return "off";
+  return "default";
+}
+function parseTriState(value) {
+  if (value === "on") return true;
+  if (value === "off") return false;
+  return null;
+}
+function feedWantsCapture(feed, settings) {
+  if (feed?.fullCapture === true) return true;
+  if (feed?.fullCapture === false) return false;
+  return settings?.fullCapture === true;
+}
+function feedWantsPaywall(feed, settings) {
+  if (feed?.paywallServices === true) return true;
+  if (feed?.paywallServices === false) return false;
+  return settings?.paywallServices === true;
+}
+function feedShowsTicker(feed) {
+  return feed?.ticker !== false;
+}
+function feedRefreshMs(feed, settings) {
+  const minutes = Number.isFinite(Number(feed?.refreshMinutes)) ? normalizeRefreshMinutes(feed.refreshMinutes) : normalizeRefreshMinutes(settings?.refreshMinutes);
+  return minutes * 60000;
+}
+function filterCaptureFresh(fresh, feeds, settings) {
+  const byId = new Map((Array.isArray(feeds) ? feeds : []).map((feed) => [feed.id, feed]));
+  return (Array.isArray(fresh) ? fresh : []).filter((item) => feedWantsCapture(byId.get(item.feed_id), settings));
+}
+function youtubeFeedFromUrl(raw) {
+  try {
+    const url = new URL(String(raw || "").trim());
+    const host = url.hostname.replace(/^www\./i, "").replace(/^m\./i, "").toLowerCase();
+    if (host === "youtu.be") return "";
+    if (host !== "youtube.com") return "";
+    if (/\/feeds\/videos\.xml$/i.test(url.pathname)) return url.href;
+    const channel = url.pathname.match(/^\/channel\/(UC[\w-]+)/i);
+    if (channel) return `https://www.youtube.com/feeds/videos.xml?channel_id=${channel[1]}`;
+    const user = url.pathname.match(/^\/user\/([\w.-]+)/i);
+    if (user) return `https://www.youtube.com/feeds/videos.xml?user=${encodeURIComponent(user[1])}`;
+    const list = url.searchParams.get("list");
+    if (list) return `https://www.youtube.com/feeds/videos.xml?playlist_id=${encodeURIComponent(list)}`;
+    return "";
+  } catch {
+    return "";
+  }
+}
+function substackFeedFromUrl(raw) {
+  try {
+    const url = new URL(String(raw || "").trim());
+    const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+    if (!host.endsWith("substack.com")) return "";
+    if (host === "substack.com") return "";
+    if (/\/feed\/?$/i.test(url.pathname)) {
+      url.hash = "";
+      url.search = "";
+      return url.href;
+    }
+    url.pathname = "/feed";
+    url.hash = "";
+    url.search = "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+function youtubeChannelIdFromHtml(html) {
+  const text = String(html || "");
+  const match = text.match(/"channelId":"(UC[\w-]{20,})"/) || text.match(/channel_id=(UC[\w-]{20,})/) || text.match(/itemprop="channelId"\s+content="(UC[\w-]{20,})"/i);
+  return match ? match[1] : "";
+}
 function expandSubscribeUrl(raw) {
   const value = String(raw || "").trim();
   const shortcut = value.match(/^\/?r\/([A-Za-z0-9_]{2,50})\/?$/i);
   if (shortcut) return `https://www.reddit.com/r/${shortcut[1]}`;
+  const youtube = youtubeFeedFromUrl(value);
+  if (youtube) return youtube;
+  const substack = substackFeedFromUrl(value);
+  if (substack) return substack;
   return value;
+}
+async function resolveSubscribeUrl(raw) {
+  const expanded = expandSubscribeUrl(raw);
+  try {
+    const url = new URL(/^https?:\/\//i.test(expanded) ? expanded : `https://${expanded}`);
+    const host = url.hostname.replace(/^www\./i, "").replace(/^m\./i, "").toLowerCase();
+    if (host === "youtube.com") {
+      const direct = youtubeFeedFromUrl(url.href);
+      if (direct) return direct;
+      if (url.pathname.length > 1 && !/\/feeds\//i.test(url.pathname)) {
+        const page = await rssRest("/article", { method: "POST", body: { url: `https://www.youtube.com${url.pathname}` } });
+        const id = youtubeChannelIdFromHtml(page?.text);
+        if (id) return `https://www.youtube.com/feeds/videos.xml?channel_id=${id}`;
+        throw new Error("Could not find a YouTube channel feed for that URL.");
+      }
+    }
+  } catch (error) {
+    if (String(error?.message || "").includes("YouTube")) throw error;
+  }
+  return expanded;
 }
 function safeUrl(raw) {
   const url = new URL(expandSubscribeUrl(raw));
@@ -748,7 +852,7 @@ function safeUrl(raw) {
 function mergeFeed(library, feedId, parsed, keepDays) {
   const feed = library.feeds.find((f) => f.id === feedId);
   if (!feed) throw new Error("This subscription was removed while refreshing.");
-  feed.title = parsed.title;
+  feed.title = feed.titleUser ? feed.title : parsed.title;
   feed.error = null;
   feed.refreshed_at = (/* @__PURE__ */ new Date()).toISOString();
   const byIdentity = new Map();
@@ -814,7 +918,7 @@ function mergeFeed(library, feedId, parsed, keepDays) {
   library.articles = library.articles.filter((a) => !remove.has(a.id));
   pruneExpiredArticles(library, feedId, parsed.items.map((item) => item.identity), keepDays);
   pruneArticleCache(library);
-  return { added, fresh: fresh.map((a) => ({ id: a.id, url: a.url })) };
+  return { added, fresh: fresh.map((a) => ({ id: a.id, url: a.url, feed_id: a.feed_id })) };
 }
 function parseOpml(content) {
   if (content.length > 2e6 || /<!DOCTYPE|<!ENTITY/i.test(content))
@@ -961,6 +1065,25 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
           saved: saved.get(f.id) || 0
         }));
       }
+      if (method === "PATCH" && parts[1] && !parts[2])
+        return write((library) => {
+          const feed = library.feeds.find((item) => item.id === parts[1]);
+          if (!feed) throw new Error("Subscription not found.");
+          if (typeof body.title === "string") {
+            const title = body.title.trim().slice(0, 300);
+            if (!title) throw new Error("Enter a feed name.");
+            feed.title = title;
+            feed.titleUser = true;
+          }
+          if (body.fullCapture === null) delete feed.fullCapture;
+          else if (typeof body.fullCapture === "boolean") feed.fullCapture = body.fullCapture;
+          if (body.paywallServices === null) delete feed.paywallServices;
+          else if (typeof body.paywallServices === "boolean") feed.paywallServices = body.paywallServices;
+          if (typeof body.ticker === "boolean") feed.ticker = body.ticker;
+          if (body.refreshMinutes == null || body.refreshMinutes === "") delete feed.refreshMinutes;
+          else feed.refreshMinutes = normalizeRefreshMinutes(body.refreshMinutes);
+          return { ...feed };
+        });
       if (method === "DELETE")
         return write((library) => {
           library.feeds = library.feeds.filter((f) => f.id !== parts[1]);
@@ -1119,7 +1242,11 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
       }
       if (!parts[1] && url.searchParams.get("uncaptured") === "1") {
         const library = await read();
-        return library.articles.filter(articleNeedsCapture).slice(0, 200).map((a) => ({ id: a.id, url: a.url }));
+        return library.articles.filter((article) => {
+          if (!articleNeedsCapture(article)) return false;
+          const source = library.feeds.find((item) => item.id === article.feed_id);
+          return source?.fullCapture !== false;
+        }).slice(0, 200).map((a) => ({ id: a.id, url: a.url, feed_id: a.feed_id }));
       }
       const library = await read(), q = (url.searchParams.get("q") || "").trim().toLowerCase();
       const exclude = (url.searchParams.get("exclude") || "").trim().toLowerCase();
@@ -1128,7 +1255,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
       const savedExcludes = (library.filters?.searches || []).filter(search => search.enabled !== false).map(search => String(search.exclude || search.name || "").trim().toLowerCase()).filter(Boolean);
       let dirty = false;
       const rows = library.articles.filter((a) => {
-        if (feed && a.feed_id !== feed || folder !== null && !library.feeds.some(item => item.id === a.feed_id && item.folder === folder) || view === "unread" && a.is_read || view === "saved" && !a.is_saved) return false;
+        if (feed && a.feed_id !== feed || folder !== null && !library.feeds.some(item => item.id === a.feed_id && folderContains(item.folder, folder)) || view === "unread" && a.is_read || view === "saved" && !a.is_saved) return false;
         if (!q && !exclude && !rules.length && !savedExcludes.length) return true;
         const text = `${a.title}\n${a.body}`.toLowerCase();
         return (!q || text.includes(q)) && (!exclude || !text.includes(exclude)) &&
@@ -1412,7 +1539,7 @@ function feedsearchMeta(row) {
   return flags ? `${items} · ${updated} · ${pace} · ${flags}` : `${items} · ${updated} · ${pace}`;
 }
 async function discoverFeedsViaApi(input) {
-  const raw = String(input || "").trim();
+  const raw = await resolveSubscribeUrl(input);
   if (!raw) throw new Error("Give a site name, domain, or website URL.");
   const response = await rssRest("/discover", { method: "POST", body: { url: raw } });
   const rows = Array.isArray(response?.feeds) ? response.feeds : [];
@@ -1669,7 +1796,7 @@ async function executeRssCommand(ctx, host2, owner, command) {
   }
   if (command.action === "add") {
     const parts = commandSourceParts(payload.source);
-    const discovered = await discoverFeed(host2, parts.input);
+    const discovered = await discoverFeed(host2, await resolveSubscribeUrl(parts.input));
     const feed = await library("/feeds", { method: "POST", body: { url: discovered.url, title: parts.title || discovered.title, folder: String(payload.folder || "").trim().slice(0, 100) } });
     await library(`/feeds/${feed.id}/refresh`, { method: "POST", body: {} });
     publishLibraryChange(owner, `Added ${parts.title || discovered.title || discovered.url}${payload.folder ? ` to ${payload.folder}` : ""}.`);
@@ -1900,9 +2027,15 @@ function startRssCommandBridge(ctx, host2) {
   void poll();
   return () => { stopped = true; clearInterval(timer); };
 }
-async function refreshSubscriptions(library, { feedId = null, shouldContinue = () => true } = {}) {
+async function refreshSubscriptions(library, { feedId = null, shouldContinue = () => true, honorPeriod = false, now = Date.now, settings = null } = {}) {
   const feeds = await library("/feeds");
-  const targets = feeds.filter((feed) => !feedId || feed.id === feedId);
+  const targets = feeds.filter((feed) => {
+    if (feedId && feed.id !== feedId) return false;
+    if (!honorPeriod) return true;
+    const at = Date.parse(feed.refreshed_at || "");
+    if (!Number.isFinite(at)) return true;
+    return now() - at >= feedRefreshMs(feed, settings);
+  });
   let added = 0, failed = 0, cursor = 0;
   const fresh = [];
   const workers = Math.min(3, Math.max(1, targets.length));
@@ -1921,7 +2054,7 @@ async function refreshSubscriptions(library, { feedId = null, shouldContinue = (
       }
     }
   }));
-  return { added, failed, fresh };
+  return { added, failed, fresh, feeds };
 }
 var rssVisited = false;
 function markRssVisited() { rssVisited = true; }
@@ -1955,12 +2088,13 @@ function startAutoRefresh(ctx, host2, options = {}) {
       if (now() - Number(storageGet(ctx, "lastRefresh", owner, 0)) < period) return;
       const canContinue = () => !stopped && currentOwner(host2) === owner && readSettings(ctx, owner).autoRefresh;
       if (!canContinue()) return;
-      await refreshSubscriptions(makeLibrary(owner), { shouldContinue: canContinue }).then((result) => {
+      await refreshSubscriptions(makeLibrary(owner), { shouldContinue: canContinue, honorPeriod: true, settings: readSettings(ctx, owner), now }).then((result) => {
         const settings = readSettings(ctx, owner);
-        if (settings.fullCapture && result.fresh?.length) captureEnqueue(owner, result.fresh);
+        const jobs = filterCaptureFresh(result.fresh, result.feeds, settings);
+        if (jobs.length) captureEnqueue(owner, jobs);
         if (settings.aiGrading && result.fresh?.length) {
           const grade = () => startGrading(host2, makeLibrary, owner, { skill: settings.gradingSkill, ctx });
-          if (settings.fullCapture) waitCaptureIdleThen(owner, result.fresh, grade);
+          if (jobs.length) waitCaptureIdleThen(owner, jobs, grade);
           else grade();
         }
       });
@@ -2067,12 +2201,15 @@ function startCaptureWorker(ctx, host2) {
     const library = createLibrary(owner, (url2) => fetchFeed(host2, url2), transact);
     try {
       const article = await library(`/articles/${job.id}`);
-      if (!articleNeedsCapture(article)) {
+      const feeds = await library("/feeds");
+      const source = feeds.find((item) => item.id === article.feed_id);
+      const settings = readSettings(ctx, owner);
+      if (!articleNeedsCapture(article) || !feedWantsCapture(source, settings)) {
         save(owner, load(owner).filter((j) => j.id !== job.id));
         return;
       }
       const result = await captureArticle(host2, job.url, {
-        paywallServices: readSettings(ctx, owner).paywallServices,
+        paywallServices: feedWantsPaywall(source, settings),
         knownLength: (article.body || "").length
       });
       const fullBody = result.body;
@@ -2133,7 +2270,7 @@ function redditCommunityUrl(raw) {
   }
 }
 async function fetchFeedViaApi(rawUrl) {
-  const resolved = expandSubscribeUrl(rawUrl);
+  const resolved = await resolveSubscribeUrl(rawUrl);
   const redditUrl = redditCommunityUrl(resolved);
   const response = redditUrl
     ? await rssRest("/reddit", { method: "POST", body: { url: redditUrl } })
@@ -3147,7 +3284,7 @@ var styles = `
 .hermes-rss details{font-size:12px;color:var(--ui-text-secondary);margin-top:8px}.hermes-rss summary{cursor:pointer;color:var(--ui-accent)}
 .hermes-rss blockquote{margin:10px 0;padding-left:14px;border-left:2px solid var(--ui-stroke-secondary);white-space:pre-wrap}
 .hermes-rss .rss-form{padding:20px 28px;border-bottom:1px solid var(--ui-stroke-secondary);display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}.hermes-rss .rss-form label{display:grid;gap:7px;flex:1 1 auto;min-width:0}
-.hermes-rss .rss-form input,.hermes-rss .rss-form select{width:100%;box-sizing:border-box}.hermes-rss .rss-form select{height:26px;padding:2px 8px;line-height:20px}.hermes-rss .rss-subscribe-source{white-space:nowrap}.hermes-rss .rss-discover-trigger{display:flex;flex-direction:column;align-items:stretch;gap:1px;flex:0 0 auto;margin-top:24px}.hermes-rss .rss-discover-trigger button{white-space:nowrap}.hermes-rss .rss-discover-trigger .rss-muted{font-size:9px;line-height:1;width:100%;text-align:center;white-space:nowrap}.hermes-rss .rss-discover{flex:1 1 100%;display:grid;gap:6px}.hermes-rss .rss-discover-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:220px;overflow:auto}.hermes-rss .rss-discover-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--ui-stroke-secondary);background:transparent;color:inherit;padding:7px 9px;font:inherit;cursor:pointer}.hermes-rss .rss-discover-row:hover,.hermes-rss .rss-discover-row:focus-visible{border-color:var(--ui-accent)}.hermes-rss .rss-discover-row.is-stale{opacity:.55}.hermes-rss .rss-discover-meta{font-size:11px;color:var(--ui-text-tertiary);text-align:right;white-space:nowrap}.hermes-rss .rss-subscribe-starters{flex:1 1 100%;display:grid;gap:6px;padding-top:4px}.hermes-rss .rss-subscribe-starter-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hermes-rss .rss-subscribe-starter-group>.rss-small{min-width:112px}.hermes-rss .rss-subscribe-pills{display:flex;gap:6px;flex-wrap:wrap}.hermes-rss .rss-subscribe-pill{border:1px solid var(--ui-stroke-secondary);border-radius:999px;background:transparent;color:var(--ui-text-secondary);padding:3px 9px;font:inherit;font-size:11px;cursor:pointer}.hermes-rss .rss-subscribe-pill:hover{border-color:var(--ui-accent);color:var(--ui-text-primary)}.hermes-rss .rss-subscribe-pill:focus-visible{outline:1px solid var(--ui-accent);outline-offset:1px}.hermes-rss .rss-small{font-size:11px}.hermes-rss .rss-stack{display:grid;gap:12px}
+.hermes-rss .rss-form input,.hermes-rss .rss-form select{width:100%;box-sizing:border-box}.hermes-rss .rss-form select{height:26px;padding:2px 8px;line-height:20px}.hermes-rss .rss-subscribe-hint{flex:1 1 100%;display:block;line-height:1.35;margin:0}.hermes-rss .rss-subscribe-source{white-space:normal;min-width:220px}.hermes-rss .rss-discover-trigger{display:grid;gap:7px;align-content:start;flex:0 0 auto;margin:0}.hermes-rss .rss-discover-spacer{min-height:1em;line-height:inherit}.hermes-rss .rss-discover-trigger button{white-space:nowrap}.hermes-rss .rss-discover-trigger .rss-muted{font-size:9px;line-height:1;width:100%;text-align:center;white-space:nowrap}.hermes-rss .rss-discover{flex:1 1 100%;display:grid;gap:6px}.hermes-rss .rss-discover-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:220px;overflow:auto}.hermes-rss .rss-discover-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--ui-stroke-secondary);background:transparent;color:inherit;padding:7px 9px;font:inherit;cursor:pointer}.hermes-rss .rss-discover-row:hover,.hermes-rss .rss-discover-row:focus-visible{border-color:var(--ui-accent)}.hermes-rss .rss-discover-row.is-stale{opacity:.55}.hermes-rss .rss-discover-meta{font-size:11px;color:var(--ui-text-tertiary);text-align:right;white-space:nowrap}.hermes-rss .rss-subscribe-starters{flex:1 1 100%;display:grid;gap:6px;padding-top:4px}.hermes-rss .rss-subscribe-starter-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hermes-rss .rss-subscribe-starter-group>.rss-small{min-width:112px}.hermes-rss .rss-subscribe-pills{display:flex;gap:6px;flex-wrap:wrap}.hermes-rss .rss-subscribe-pill{border:1px solid var(--ui-stroke-secondary);border-radius:999px;background:transparent;color:var(--ui-text-secondary);padding:3px 9px;font:inherit;font-size:11px;cursor:pointer}.hermes-rss .rss-subscribe-pill:hover{border-color:var(--ui-accent);color:var(--ui-text-primary)}.hermes-rss .rss-subscribe-pill:focus-visible{outline:1px solid var(--ui-accent);outline-offset:1px}.hermes-rss .rss-small{font-size:11px}.hermes-rss .rss-stack{display:grid;gap:12px}
 .hermes-rss .rss-feed-row{display:flex;align-items:center;gap:2px}.hermes-rss .rss-nav .rss-feed-open{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:9px 10px;cursor:pointer}.hermes-rss .rss-nav .rss-unsubscribe{width:26px;flex-shrink:0;padding:7px;justify-content:center;color:var(--ui-text-tertiary)}
 .hermes-rss .rss-nav .rss-unsubscribe-edit{width:14px;height:18px;flex:0 0 14px;padding:0;margin:0 4px 0 6px;display:inline-flex;align-items:center;justify-content:center}
 .hermes-rss .rss-nav .rss-unsubscribe-edit .codicon{font-size:10px;line-height:1;display:block}
@@ -3249,6 +3386,11 @@ html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
 .hermes-rss .rss-filter-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;width:100%}.hermes-rss .rss-filter-chips button{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}.hermes-rss .rss-filter-chips .rss-learn-btn{margin-left:auto;white-space:nowrap;text-align:center;max-width:none}
 @media(max-width:760px){.hermes-rss .rss-mute-grid{grid-template-columns:1fr}}
 .hermes-rss .rss-confirm{padding:16px 28px;border-bottom:1px solid var(--ui-stroke-secondary)}.hermes-rss .rss-confirm h2{font-size:16px}.hermes-rss .rss-confirm .rss-tools{margin-top:12px}
+.hermes-rss .rss-modal-back{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,black 45%,transparent);padding:24px}
+.hermes-rss .rss-modal{width:min(440px,100%);max-height:90vh;overflow:auto;padding:18px 20px;border:1px solid var(--ui-stroke-secondary);border-radius:10px;background:var(--ui-bg-elevated,var(--ui-bg-primary,var(--background)));color:var(--ui-text-primary,var(--foreground));display:grid;gap:12px}
+.hermes-rss .rss-modal h2{margin:0;font-size:16px}
+.hermes-rss .rss-modal .rss-setting{display:grid;gap:6px}
+.hermes-rss .rss-nav .rss-feed-edit-btn{width:14px;height:18px;flex:0 0 14px;padding:0;margin:0 4px 0 0;display:inline-flex;align-items:center;justify-content:center}
 @media(max-width:1000px){.hermes-rss .rss-layout{grid-template-columns:145px minmax(210px,.85fr) minmax(260px,1fr)}.hermes-rss .rss-detail-inner{padding:22px 20px}.hermes-rss .rss-top{padding:12px 16px}}
 @media(max-width:760px){.hermes-rss .rss-layout{grid-template-columns:125px 1fr}.hermes-rss .rss-detail{display:none}.hermes-rss .rss-layout.has-selection .rss-list{display:none}.hermes-rss .rss-layout.has-selection .rss-detail{display:block}.hermes-rss .rss-top{align-items:flex-start}.hermes-rss .rss-top p{display:none}.hermes-rss .rss-article-actions{justify-content:flex-start;gap:6px;overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:4px;scrollbar-width:thin}}
 .hermes-rss .rss-ticker{display:flex;align-items:center;width:100%;height:100%;min-width:0;overflow:hidden;background:var(--ui-bg-sidebar,var(--ui-bg-secondary));border-top:1px solid var(--ui-stroke-secondary);grid-column:1 / -1;font-family:inherit}
@@ -3671,6 +3813,7 @@ function TickerPane() {
       let rows = (library.articles || []).slice();
       for (const article of rows) applyCachedGrade(library, article);
       if (onlyUnread) rows = rows.filter(isTickerUnread);
+      rows = rows.filter((article) => feedShowsTicker(byFeed.get(article.feed_id)));
       if (rules.length) rows = rows.filter((article) => !rules.some((rule) => muteHidesArticle(rule, article, feeds)));
       rows.sort(byTime);
       return rows.slice(0, 100).map((a) => {
@@ -3744,7 +3887,8 @@ function TickerPane() {
         const library = createLibrary(owner, (url) => fetchFeed(host, url), transact);
         const result = await refreshSubscriptions(library, { shouldContinue: () => tickerPaneOwner() === owner });
         const saved = readSettings(rssCtx, owner);
-        if (saved.fullCapture && result.fresh?.length) captureEnqueue(owner, result.fresh);
+        const jobs = filterCaptureFresh(result.fresh, result.feeds, saved);
+        if (jobs.length) captureEnqueue(owner, jobs);
         storageSet(rssCtx, "lastRefresh", owner, Date.now());
         publishLibraryChange(owner);
         await articles.refetch();
@@ -4202,6 +4346,8 @@ function ReaderProfile({ ctx, owner }) {
   };
   const [draft, setDraft] = useState(() => readSettings(ctx, owner));
   const [feedToRemove, setFeedToRemove] = useState(null);
+  const [feedToEdit, setFeedToEdit] = useState(null);
+  const [feedDraft, setFeedDraft] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
   const [folderCreate, setFolderCreate] = useState(null);
   const [folderCreateParent, setFolderCreateParent] = useState("");
@@ -4349,12 +4495,13 @@ function ReaderProfile({ ctx, owner }) {
     let cancelled = false;
     void (async () => {
       try {
-        const result = await refreshSubscriptions(libraryRequest, { shouldContinue: () => !cancelled && currentOwner(host) === owner });
+        const result = await refreshSubscriptions(libraryRequest, { shouldContinue: () => !cancelled && currentOwner(host) === owner, honorPeriod: true, settings: s });
         if (cancelled) return;
         const at = Date.now();
         storageSet(ctx, "lastRefresh", owner, at);
         setLastRefreshAt(at);
-        if (s.fullCapture && result.fresh?.length) captureEnqueue(owner, result.fresh);
+        const jobs = filterCaptureFresh(result.fresh, result.feeds, s);
+        if (jobs.length) captureEnqueue(owner, jobs);
         client.invalidateQueries({ queryKey: key });
       } catch {
         // Feed errors stay on the subscription rows.
@@ -4535,7 +4682,10 @@ function ReaderProfile({ ctx, owner }) {
       storageSet(ctx, "lastRefresh", owner, at);
       setLastRefreshAt(at);
     }
-    const queued = settings.fullCapture && result.fresh?.length ? captureEnqueue(owner, result.fresh) : 0;
+    const queued = (() => {
+      const jobs = filterCaptureFresh(result.fresh, result.feeds || feeds.data, settings);
+      return jobs.length ? captureEnqueue(owner, jobs) : 0;
+    })();
     if (settings.aiGrading && result.fresh?.length) {
       const grade = () => startGrading(host, () => library, owner, {
         skill: settings.gradingSkill,
@@ -4729,6 +4879,40 @@ function ReaderProfile({ ctx, owner }) {
     if (article?.feed_id === removed.id && !article.is_saved) setSelected(null);
     setFeedToRemove(null);
     setNotice(`Unsubscribed from ${removed.title}. Saved articles and chats were kept.`);
+  });
+  const openFeedEdit = feed => {
+    setFeedToEdit(feed);
+    setFeedDraft({
+      title: feed.title || "",
+      fullCapture: feedTriState(feed.fullCapture),
+      paywallServices: feedTriState(feed.paywallServices),
+      ticker: feed.ticker !== false,
+      override: Number.isFinite(Number(feed.refreshMinutes)),
+      refreshMinutes: normalizeRefreshMinutes(feed.refreshMinutes || settings.refreshMinutes)
+    });
+  };
+  const saveFeedEdit = () => act("Saving feed…", async () => {
+    const draftFeed = feedDraft;
+    const target = feedToEdit;
+    if (!draftFeed || !target) return;
+    await libraryRequest(`/feeds/${target.id}`, {
+      method: "PATCH",
+      body: {
+        title: draftFeed.title,
+        fullCapture: parseTriState(draftFeed.fullCapture),
+        paywallServices: parseTriState(draftFeed.paywallServices),
+        ticker: draftFeed.ticker !== false,
+        refreshMinutes: draftFeed.override ? draftFeed.refreshMinutes : null
+      }
+    });
+    if (feedWantsCapture({ fullCapture: parseTriState(draftFeed.fullCapture) }, settings)) {
+      const rows = await libraryRequest("/articles?uncaptured=1");
+      const jobs = (Array.isArray(rows) ? rows : []).filter((row) => row.feed_id === target.id);
+      if (jobs.length) captureEnqueue(owner, jobs);
+    }
+    setFeedToEdit(null);
+    setFeedDraft(null);
+    setNotice("Feed settings saved.");
   });
   const displayedFeeds = (feeds.data || []).map(feed => ({
     feed,
@@ -5291,6 +5475,34 @@ function ReaderProfile({ ctx, owner }) {
       jsx("p", { className: "rss-muted", children: "Unsaved articles from this feed will be removed. Your saved articles and existing Hermes chats will stay." }),
       jsxs("div", { className: "rss-tools", children: [jsx(Button, { disabled, onClick: unsubscribe, children: "Unsubscribe" }), jsx(Button, { variant: "ghost", disabled, onClick: () => setFeedToRemove(null), children: "Cancel" })] })
     ] }),
+    feedToEdit && feedDraft && jsx("div", { className: "rss-modal-back", onClick: event => { if (event.target === event.currentTarget) { setFeedToEdit(null); setFeedDraft(null); } }, children: jsxs("div", { className: "rss-modal", role: "dialog", "aria-labelledby": "rss-feed-edit-title", children: [
+      jsx("h2", { id: "rss-feed-edit-title", children: "Edit feed" }),
+      jsxs("label", { className: "rss-setting", children: [
+        jsx("span", { children: "Name" }),
+        jsx(Input, { value: feedDraft.title, maxLength: 300, onChange: event => setFeedDraft({ ...feedDraft, title: event.target.value }) })
+      ] }),
+      jsxs("div", { className: "rss-setting", children: [
+        jsx("span", { children: "Full article" }),
+        jsx(Segmented, { value: feedDraft.fullCapture, onChange: v => setFeedDraft({ ...feedDraft, fullCapture: v }), options: [{ id: "default", label: "Default" }, { id: "on", label: "On" }, { id: "off", label: "Off" }] })
+      ] }),
+      jsxs("div", { className: "rss-setting", children: [
+        jsx("span", { children: "Paywall checks" }),
+        jsx(Segmented, { value: feedDraft.paywallServices, onChange: v => setFeedDraft({ ...feedDraft, paywallServices: v }), options: [{ id: "default", label: "Default" }, { id: "on", label: "On" }, { id: "off", label: "Off" }] })
+      ] }),
+      jsxs("label", { className: "rss-setting", children: [
+        jsx("input", { type: "checkbox", checked: feedDraft.ticker, onChange: event => setFeedDraft({ ...feedDraft, ticker: event.target.checked }) }),
+        " Show on headline ticker"
+      ] }),
+      jsxs("label", { className: "rss-setting", children: [
+        jsx("input", { type: "checkbox", checked: feedDraft.override, onChange: event => setFeedDraft({ ...feedDraft, override: event.target.checked }) }),
+        " Override refresh period"
+      ] }),
+      feedDraft.override && jsx(Segmented, { value: String(normalizeRefreshMinutes(feedDraft.refreshMinutes)), onChange: v => setFeedDraft({ ...feedDraft, refreshMinutes: Number(v) }), options: REFRESH_MINUTES.map((n) => ({ id: String(n), label: String(n) })) }),
+      jsxs("div", { className: "rss-tools", children: [
+        jsx(Button, { disabled, onClick: saveFeedEdit, children: "Save" }),
+        jsx(Button, { variant: "ghost", disabled, onClick: () => { setFeedToEdit(null); setFeedDraft(null); }, children: "Cancel" })
+      ] })
+    ] }) }),
     folderToDelete && jsxs("div", { className: "rss-confirm", role: "alertdialog", tabIndex: -1, "aria-labelledby": "rss-folder-delete-title", children: [
       jsx("h2", { id: "rss-folder-delete-title", children: `Delete ${folderToDelete.title}?` }),
       jsx("p", { className: "rss-muted", children: folderToDelete.count ? `${folderToDelete.count} feed${folderToDelete.count === 1 ? "" : "s"} will move to the folder you pick.` : "This empty folder will be removed." }),
@@ -5315,7 +5527,7 @@ function ReaderProfile({ ctx, owner }) {
           act("Subscribing\u2026", async () => {
             const feed = await libraryRequest("/feeds", {
               method: "POST",
-              body: { url: expandSubscribeUrl(url), folder: String(folder || folderPick || "").trim().slice(0, 100) }
+              body: { url: await resolveSubscribeUrl(url), folder: String(folder || folderPick || "").trim().slice(0, 100) }
             });
             setAdding(false);
             setUrl("");
@@ -5326,7 +5538,10 @@ function ReaderProfile({ ctx, owner }) {
               const result = await libraryRequest(`/feeds/${feed.id}/refresh`, {
                 method: "POST"
               });
-              const queued = settings.fullCapture && result.fresh?.length ? captureEnqueue(owner, result.fresh) : 0;
+              const queued = (() => {
+                const jobs = filterCaptureFresh(result.fresh, [feed], settings);
+                return jobs.length ? captureEnqueue(owner, jobs) : 0;
+              })();
               setNotice(`Subscription saved.${queued ? ` Capturing ${queued} full article${queued === 1 ? "" : "s"} in the background.` : ""}`);
             } catch (error) {
               setNotice(`Subscription saved. ${error.message}`);
@@ -5334,8 +5549,13 @@ function ReaderProfile({ ctx, owner }) {
           });
         },
         children: [
-          /* @__PURE__ */ jsxs("label", { className: "rss-subscribe-source", children: [
+          jsxs("span", { className: "rss-subscribe-hint", children: [
             "Search, or provide RSS or Atom URL, or r/name Reddit community.",
+            jsx("br", {}),
+            "YouTube / Substack: paste a channel, @handle, /user/, playlist, or a Substack page."
+          ] }),
+          /* @__PURE__ */ jsxs("label", { className: "rss-subscribe-source", children: [
+            "Site or feed",
             /* @__PURE__ */ jsx(
               Input,
               {
@@ -5355,6 +5575,7 @@ function ReaderProfile({ ctx, owner }) {
             )
           ] }),
           jsxs("div", { className: "rss-discover-trigger", children: [
+            jsx("span", { className: "rss-discover-spacer", "aria-hidden": "true", children: "\u00a0" }),
             jsx(Button, { type: "button", disabled: disabled || !String(url || "").trim(), onClick: () => void findFeeds(), children: "Find Feeds" }),
             jsx("span", { className: "rss-muted", children: "by Feedsearch" })
           ] }),
@@ -5506,6 +5727,7 @@ function ReaderProfile({ ctx, owner }) {
                     ] }),
                     jsx("span", { className: "rss-count", children: feed.unread || "" })
                   ] }),
+                reorderMode && jsx("button", { type: "button", className: "rss-unsubscribe rss-unsubscribe-edit rss-feed-edit-btn", disabled, title: "Edit feed", "aria-label": `Edit ${feed.title}`, onClick: () => openFeedEdit(feed), children: jsx("i", { className: "codicon codicon-pencil", "aria-hidden": "true" }) }),
                 reorderMode && jsx("button", { className: "rss-unsubscribe rss-unsubscribe-edit", disabled, title: "Unsubscribe", "aria-label": `Unsubscribe from ${feed.title}`, onClick: () => setFeedToRemove(feed), children: jsx("i", { className: "codicon codicon-trash", "aria-hidden": "true" }) })
               ] }, feed.id)) })
             ]

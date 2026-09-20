@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFolderOrder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("pruneArticleCache"), grab("normalizeCacheKeepDays"), grab("pruneExpiredArticles"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta")].join("\n");
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFolderOrder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("pruneArticleCache"), grab("normalizeCacheKeepDays"), grab("pruneExpiredArticles"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta"), grab("folderContains"), grab("youtubeFeedFromUrl"), grab("substackFeedFromUrl"), grab("youtubeChannelIdFromHtml"), grab("expandSubscribeUrl"), grab("feedWantsCapture"), grab("feedShowsTicker"), grab("feedTriState"), grab("parseTriState")].join(String.fromCharCode(10));
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -74,6 +74,15 @@ exports.feedsearchCanonicalUrl = feedsearchCanonicalUrl;
 exports.feedsearchRank = feedsearchRank;
 exports.feedsearchVisible = feedsearchVisible;
 exports.feedsearchMeta = feedsearchMeta;
+exports.folderContains = folderContains;
+exports.youtubeFeedFromUrl = youtubeFeedFromUrl;
+exports.substackFeedFromUrl = substackFeedFromUrl;
+exports.youtubeChannelIdFromHtml = youtubeChannelIdFromHtml;
+exports.expandSubscribeUrl = expandSubscribeUrl;
+exports.feedWantsCapture = feedWantsCapture;
+exports.feedShowsTicker = feedShowsTicker;
+exports.feedTriState = feedTriState;
+exports.parseTriState = parseTriState;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -267,5 +276,18 @@ assert.equal(ranked[0].title, "New");
 assert.equal(fns.feedsearchVisible(ranked, false).map(row => row.title).join(","), "New");
 assert.equal(fns.feedsearchVisible(ranked, true).length, 3);
 assert.match(fns.feedsearchMeta(ranked[0]), /20 items/);
+assert.equal(fns.folderContains("News/AI", "News"), true);
+assert.equal(fns.folderContains("News", "News"), true);
+assert.equal(fns.folderContains("AI", "News"), false);
+assert.equal(fns.folderContains("", ""), true);
+assert.equal(fns.folderContains("News", ""), false);
+assert.equal(fns.youtubeFeedFromUrl("https://www.youtube.com/channel/UC1234567890abcdefghijk"), "https://www.youtube.com/feeds/videos.xml?channel_id=UC1234567890abcdefghijk");
+assert.equal(fns.substackFeedFromUrl("https://example.substack.com/p/hello"), "https://example.substack.com/feed");
+assert.equal(fns.expandSubscribeUrl("https://www.youtube.com/user/Veritasium"), "https://www.youtube.com/feeds/videos.xml?user=Veritasium");
+assert.equal(fns.youtubeChannelIdFromHtml('meta "channelId":"UC1234567890123456789012"'), "UC1234567890123456789012");
+assert.equal(fns.feedWantsCapture({ fullCapture: false }, { fullCapture: true }), false);
+assert.equal(fns.feedWantsCapture({ fullCapture: true }, { fullCapture: false }), true);
+assert.equal(fns.feedShowsTicker({ ticker: false }), false);
+assert.equal(fns.parseTriState(fns.feedTriState(undefined)), null);
 
-console.log("ok", 61);
+console.log("ok", 75);

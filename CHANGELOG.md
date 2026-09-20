@@ -8,11 +8,15 @@
 
 ## [rss-reader 1.0.7] - 2026-09-20
 
-Default View lives with the other reading controls.
+Subscribe accepts YouTube and Substack pages, a folder view includes nested feeds, and each feed has its own capture and ticker settings.
+
+### Added
+
+- **rss-reader:** version `1.0.7`. Paste a YouTube channel, `@handle`, `/user/`, playlist, or a Substack page into Subscribe. Opening a folder shows that folder and its children. Edit mode adds a pencil per feed: name, full-article download, paywall checks, ticker visibility, and an optional refresh override.
 
 ### Changed
 
-- **rss-reader:** version `1.0.7`. Settings Main **Default View** sits in Reading, above Mark Articles Read When Opened.
+- **rss-reader:** Settings Main **Default View** sits in Reading, above Mark Articles Read When Opened. The Subscribe hint is two lines, with Folder and New folder lined up to the URL field.
 
 ## [rss-reader 1.0.6] - 2026-09-20
 
