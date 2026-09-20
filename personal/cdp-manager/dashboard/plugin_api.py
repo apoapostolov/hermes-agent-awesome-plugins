@@ -12,7 +12,16 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-import cdp_core
+# Load the sibling cdp_core by path: this file is imported via
+# spec_from_file_location under a synthetic module name, so plain
+# `import cdp_core` would only work by sys.path luck.
+import importlib.util as _ilu
+
+_spec = _ilu.spec_from_file_location(
+    "cdp_manager_core", str(__import__("pathlib").Path(__file__).resolve().parent.parent / "cdp_core.py")
+)
+cdp_core = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(cdp_core)
 
 log = logging.getLogger(__name__)
 router = APIRouter()
