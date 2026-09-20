@@ -63,6 +63,47 @@ function GlyphButton({ glyph, label, onClick, busy, danger }) {
   })
 }
 
+// Segmented selector, same shape as the RSS Reader ticker speed control:
+// inline group of small buttons, aria-pressed marks the active segment.
+function Segmented({ value, onChange, options }) {
+  return jsx('span', {
+    className: 'cdp-segmented',
+    role: 'group',
+    style: {
+      display: 'inline-flex',
+      gap: '2px',
+      border: '1px solid var(--ui-stroke-secondary)',
+      borderRadius: '7px',
+      padding: '2px',
+    },
+    children: options.map(o =>
+      jsx(
+        'button',
+        {
+          type: 'button',
+          'aria-pressed': String(o.id) === String(value),
+          onClick: () => onChange(o.id),
+          style: {
+            background: String(o.id) === String(value)
+              ? 'color-mix(in srgb, var(--ui-accent) 16%, transparent)'
+              : 'none',
+            border: '0',
+            padding: '3px 9px',
+            font: 'inherit',
+            fontSize: '11px',
+            color: String(o.id) === String(value) ? 'var(--ui-accent)' : 'var(--ui-text-secondary)',
+            fontWeight: String(o.id) === String(value) ? 650 : 400,
+            cursor: 'pointer',
+            borderRadius: '5px',
+          },
+          children: o.label,
+        },
+        o.id,
+      ),
+    ),
+  })
+}
+
 // ── port row ──
 
 function PortRow({ port, result, preferred, onAction, onPrefer, onCopy }) {
@@ -78,6 +119,12 @@ function PortRow({ port, result, preferred, onAction, onPrefer, onCopy }) {
       setBusy(null)
     }
   }
+
+  // Show launch OR stop depending on confirmed state: a live port gets stop,
+  // a dead port gets launch. While an action runs the button reflects the
+  // state being reached, so it never flickers.
+  const confirming = busy === 'launch' || busy === 'stop'
+  const showStop = busy === 'stop' || (live && busy !== 'launch')
 
   return jsxs('div', {
     'data-cdp-row': String(port),
@@ -102,7 +149,7 @@ function PortRow({ port, result, preferred, onAction, onPrefer, onCopy }) {
       // preferred checkmark
       jsx(Tooltip, {
         label: preferred
-          ? `Port ${port} is the preferred default \\u00b7 click to clear`
+          ? `Port ${port} is the preferred default · click to clear`
           : `Mark port ${port} as preferred default`,
         children: jsx('button', {
           type: 'button',
@@ -126,9 +173,9 @@ function PortRow({ port, result, preferred, onAction, onPrefer, onCopy }) {
         className: 'min-w-0 flex-1 truncate',
         style: { color: 'var(--ui-text-secondary)' },
         children: !result
-          ? 'checking\\u2026'
+          ? 'checking…'
           : live
-            ? `${result.browser}${result.pid ? ` \\u00b7 pid ${result.pid}` : ''}${result.ms != null ? ` \\u00b7 ${result.ms}ms` : ''}`
+            ? `${result.browser}${result.pid ? ` · pid ${result.pid}` : ''}${result.ms != null ? ` · ${result.ms}ms` : ''}`
             : `no listener${result.reason && result.reason !== 'no listener' ? ` (${result.reason})` : ''}`,
       }),
       live && result.ws
@@ -153,19 +200,16 @@ function PortRow({ port, result, preferred, onAction, onPrefer, onCopy }) {
             }),
           })
         : null,
-      jsx(GlyphButton, {
-        glyph: 'play',
-        label: `Launch Chrome on port ${port}`,
-        busy: busy === 'launch',
-        onClick: () => run('launch'),
-      }),
-      jsx(GlyphButton, {
-        glyph: 'stop',
-        label: `Stop the listener on port ${port}`,
-        busy: busy === 'stop',
-        danger: true,
-        onClick: () => run('stop'),
-      }),
+      // launch OR stop, by confirmed state (consts computed above)
+      confirming || result
+        ? jsx(GlyphButton, {
+            glyph: showStop ? 'stop' : 'play',
+            label: showStop ? `Stop the listener on port ${port}` : `Launch Chrome on port ${port}`,
+            busy: confirming,
+            danger: showStop,
+            onClick: () => run(showStop ? 'stop' : 'launch'),
+          })
+        : null,
       jsx(GlyphButton, {
         glyph: 'refresh',
         label: `Recheck port ${port}`,
@@ -183,6 +227,9 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
   const [busy, setBusy] = useState(false)
   const [portsDraft, setPortsDraft] = useState('')
   const abortRef = useRef(null)
+  const busyRef = useRef(false)
+  const actionLockRef = useRef(false)
+  busyRef.current = busy
 
   // One probe sweep per open + manual Refresh; probes only while open.
   useEffect(() => {
@@ -232,7 +279,23 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
 
   const refresh = () => sweep(cfg.ports)
 
-  // Per-port action from the glyph buttons.
+  // Auto-refresh while the dialog is open, at the chosen interval. Interval 0
+  // (= Manual) disables the timer. Live timer turns off after a launch/stop
+  // action until the sweep confirms the new state, so the button never
+  // flips back mid-confirmation.
+  useEffect(() => {
+    if (!open) return undefined
+    if (!cfg.pollSeconds) return undefined
+    const id = setInterval(() => {
+      if (!busyRef.current && !actionLockRef.current) sweep(cfg.ports)
+    }, cfg.pollSeconds * 1000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cfg.pollSeconds, cfg.ports.join(',')])
+
+  // Per-port action from the glyph buttons. launch/stop hold an action lock
+  // so the auto-refresh timer cannot re-probe mid-confirmation and flip the
+  // button while Chrome is still settling.
   const act = async (kind, port) => {
     try {
       if (kind === 'probe') {
@@ -241,6 +304,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
         if (res) setResults(prev => ({ ...prev, [port]: res }))
         return
       }
+      actionLockRef.current = true
       const r = await api(`/${kind}`, { port })
       if (r?.error) {
         onNotify(`${kind} failed: ${r.error}`)
@@ -250,6 +314,8 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
       await sweep(cfg.ports)
     } catch {
       onNotify(`${kind} failed`)
+    } finally {
+      actionLockRef.current = false
     }
   }
 
@@ -281,6 +347,21 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
   }
 
   const liveCount = cfg.ports.filter(p => results[p]?.state === 'live').length
+
+  // Poll interval segmented selector, RSS Reader ticker style. Values are
+  // seconds; 0 = manual (no auto-refresh while the dialog is open).
+  const pollOptions = [
+    { id: '0', label: 'Manual' },
+    { id: '2', label: '2s' },
+    { id: '5', label: '5s' },
+    { id: '10', label: '10s' },
+    { id: '30', label: '30s' },
+  ]
+  const setPoll = v => {
+    const seconds = Number(v)
+    setCfg({ pollSeconds: seconds })
+    api('/poll', { seconds }).catch(() => {})
+  }
 
   return jsxs(Dialog, {
     open,
@@ -349,6 +430,22 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
               ],
             }),
             jsxs('div', {
+              className: 'flex items-center justify-between gap-3 rounded-md px-2 py-1.5',
+              style: { border: '1px solid var(--ui-stroke-secondary)' },
+              children: [
+                jsx('span', {
+                  className: 'text-xs shrink-0',
+                  style: { color: 'var(--ui-text-secondary)' },
+                  children: 'Auto-refresh',
+                }),
+                jsx(Segmented, {
+                  value: String(cfg.pollSeconds ?? 5),
+                  onChange: setPoll,
+                  options: pollOptions,
+                }),
+              ],
+            }),
+            jsxs('div', {
               className: 'flex items-center justify-between pt-1',
               children: [
                 jsxs('span', {
@@ -365,7 +462,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
                       className: 'inline-flex items-center text-(--ui-text-quaternary) hover:text-(--ui-text-tertiary)',
                       children: jsx(Codicon, { name: 'github', size: '0.75rem' }),
                     }),
-                    busy ? 'probing\\u2026' : `${liveCount} of ${cfg.ports.length} live`,
+                    busy ? 'probing…' : `${liveCount} of ${cfg.ports.length} live`,
                   ],
                 }),
                 jsx(Button, { size: 'sm', variant: 'outline', onClick: refresh, children: 'Refresh' }),
@@ -381,7 +478,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
 // ── root ──
 
 function Root() {
-  const [cfg, setCfg] = useState(() => ({ ports: [9222, 9333, 9335], preferredPort: null }))
+  const [cfg, setCfg] = useState(() => ({ ports: [9222, 9333, 9335], preferredPort: null, pollSeconds: 5 }))
   const [dialogOpen, setDialogOpen] = useState(false)
   const [ready, setReady] = useState(false)
   const [note, setNote] = useState('')
@@ -393,7 +490,7 @@ function Root() {
     api('/status')
       .then(r => {
         if (!r) return
-        setCfg({ ports: r.ports, preferredPort: r.preferredPort })
+        setCfg({ ports: r.ports, preferredPort: r.preferredPort, pollSeconds: r.pollSeconds })
         setReady(true)
       })
       .catch(() => setReady(true))
@@ -415,7 +512,7 @@ function Root() {
   return jsxs(Fragment, {
     children: [
       jsx(Tooltip, {
-        label: 'CDP Manager \\u00b7 which debug port is live',
+        label: 'CDP Manager · which debug port is live',
         children: jsx('span', {
           title: 'CDP Manager',
           onClick: () => setDialogOpen(true),

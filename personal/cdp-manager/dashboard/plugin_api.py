@@ -39,6 +39,10 @@ class PortBody(BaseModel):
     port: int
 
 
+class PollBody(BaseModel):
+    seconds: int
+
+
 @router.get("/status")
 def status():
     cfg = cdp_core.load_config()
@@ -47,8 +51,16 @@ def status():
         "preferredPort": cfg.get("preferredPort"),
         "chromePath": cfg["chromePath"],
         "userDataDir": cfg["userDataDir"],
+        "pollSeconds": int(cfg.get("pollSeconds") or 0),
         "results": cdp_core.probe_all(),
     }
+
+
+@router.post("/poll")
+def poll(body: PollBody):
+    seconds = max(0, min(3600, int(body.seconds)))
+    cdp_core.mutate_config(lambda c: c.update(pollSeconds=seconds))
+    return {"ok": True, "pollSeconds": seconds}
 
 
 @router.post("/probe")
