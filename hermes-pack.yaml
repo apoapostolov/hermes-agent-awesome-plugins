@@ -41,6 +41,6 @@ plugins:
     ref: b270520f14d5141c2ad686d7053907a341c8a46f
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/cdp-manager
-    ref: 5a7415e8aeef4e5b0500d47685d72e057f895ba9
+    ref: 3ebfe9109786e213861af8b2e16d2afa8b352bb9
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync
