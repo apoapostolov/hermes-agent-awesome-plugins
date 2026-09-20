@@ -44,6 +44,6 @@ plugins:
     ref: c7edbf8dd5a6a977531b04d9757b0c10a2c0f1a6
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/sessionretitler
-    ref: 6d690222f9102a13bbd6bdf38ae7c3998b065a97
+    ref: f2fb20737f844fd41d887291517ae54604901718
 # skills:  # not auto-installed yet (pack seam)
 #   - hermes-awesome-plugins-sync
