@@ -19,8 +19,9 @@ def register(ctx):
             "Manage the local Chrome DevTools Protocol (CDP) server without "
             "bash: status lists probed ports, launch starts Chrome with "
             "--remote-debugging-port, stop closes the listener, recheck "
-            "re-probes. Prefers the port marked preferred in the plugin "
-            "config; port overrides the choice."
+            "re-probes, prefer marks the managed port that a backend "
+            "supervisor keeps up (auto-start when down, reboot when stuck). "
+            "Uses the managed port when none is given; port overrides."
         ),
         emoji="\U0001f50c",
         is_async=False,

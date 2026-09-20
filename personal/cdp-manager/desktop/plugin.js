@@ -1,17 +1,19 @@
 /**
- * CDP Manager - statusbar gear + dialog + Python backend for local Chrome
+ * CDP Manager - statusbar chip + dialog + Python backend for local Chrome
  * DevTools Protocol ports (default 9222, 9333, 9335; editable in dialog).
  *
- * While the dialog is open each port is probed against /json/version via the
- * backend at /api/plugins/cdp-manager/. Per-port glyph buttons:
- *   play   launch Chrome on that port (backend spawn, no visible terminal)
- *   stop   close the listener cleanly (Browser.close over its WS)
- *   refresh  re-probe that port
- *   pass-filled checkmark marks the port preferred (the `cdp` agent tool and
- *   launch/stop default to it); one preferred port at a time.
+ * Statusbar chip reflects live health, polled every 5s from /health:
+ *   normal  CDP down        ·  bold  CDP up
+ *   amber   CDP has issues  ·  red   critical, needs a reboot
  *
- * The github glyph before the footer hint opens the plugin's repo.
- * Nothing probes while the dialog is closed: no background polling.
+ * The checkmarked port is the MANAGED port. A backend supervisor thread
+ * (started with the plugin API on Hermes launch) checks every port's health
+ * regularly, starts the managed port whenever it is down, and force-reboots
+ * it (stop + launch) after repeated failed launches.
+ *
+ * Per-port glyph buttons: launch / stop (state-aware, one at a time) and
+ * recheck. Segmented Auto-refresh selector (Manual/2s/5s/10s/30s) while the
+ * dialog is open. The github glyph before the footer hint opens the repo.
  */
 import {
   cn,
@@ -146,11 +148,11 @@ function PortRow({ port, result, preferred, onAction, onPrefer, onCopy }) {
               : 'color-mix(in srgb, var(--ui-text-quaternary) 60%, transparent)',
         },
       }),
-      // preferred checkmark
+      // managed checkmark (wire name stays preferredPort for the tool API)
       jsx(Tooltip, {
         label: preferred
-          ? `Port ${port} is the preferred default · click to clear`
-          : `Mark port ${port} as preferred default`,
+          ? `Port ${port} is managed · Hermes starts it when down · click to unmanage`
+          : `Manage port ${port}: Hermes keeps it up`,
         children: jsx('button', {
           type: 'button',
           'data-cdp-prefer': String(port),
@@ -229,6 +231,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
   const abortRef = useRef(null)
   const busyRef = useRef(false)
   const actionLockRef = useRef(false)
+  const sweepRef = useRef(null) // set below; the poll timer calls through it
   busyRef.current = busy
 
   // One probe sweep per open + manual Refresh; probes only while open.
@@ -261,6 +264,22 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
+  // Auto-refresh while the dialog is open, at the chosen interval. Interval 0
+  // (= Manual) disables the timer. Live timer turns off after a launch/stop
+  // action until the sweep confirms the new state, so the button never
+  // flips back mid-confirmation. Declared BEFORE the early return: a hook
+  // after `if (!open) return null` changes the hook count on open and kills
+  // the render with React error #310.
+  useEffect(() => {
+    if (!open) return undefined
+    if (!cfg.pollSeconds) return undefined
+    const id = setInterval(() => {
+      if (!busyRef.current && !actionLockRef.current) sweepRef.current(cfg.ports)
+    }, cfg.pollSeconds * 1000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cfg.pollSeconds, cfg.ports.join(',')])
+
   if (!open) return null
 
   const sweep = async ports => {
@@ -278,20 +297,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
   }
 
   const refresh = () => sweep(cfg.ports)
-
-  // Auto-refresh while the dialog is open, at the chosen interval. Interval 0
-  // (= Manual) disables the timer. Live timer turns off after a launch/stop
-  // action until the sweep confirms the new state, so the button never
-  // flips back mid-confirmation.
-  useEffect(() => {
-    if (!open) return undefined
-    if (!cfg.pollSeconds) return undefined
-    const id = setInterval(() => {
-      if (!busyRef.current && !actionLockRef.current) sweep(cfg.ports)
-    }, cfg.pollSeconds * 1000)
-    return () => clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, cfg.pollSeconds, cfg.ports.join(',')])
+  sweepRef.current = sweep
 
   // Per-port action from the glyph buttons. launch/stop hold an action lock
   // so the auto-refresh timer cannot re-probe mid-confirmation and flip the
@@ -324,7 +330,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
       const r = await api('/preferred', { port: port || null })
       if (r?.ok) {
         setCfg({ preferredPort: r.preferredPort })
-        onNotify(port ? `port ${port} is now the preferred default` : 'preferred port cleared')
+        onNotify(port ? `port ${port} is now managed` : 'port no longer managed')
       }
     } catch {
       onNotify('save failed')
@@ -475,6 +481,21 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
   })
 }
 
+// ── chip health states ──
+// normal = cdp down · bold+normal = up · amber = issues · red = critical
+const CHIP_COLORS = {
+  down: 'var(--ui-text-tertiary)',
+  ok: 'var(--foreground)',
+  warn: '#f59e0b',
+  critical: '#ef4444',
+}
+function chipStyle(health, bold) {
+  return {
+    color: CHIP_COLORS[health] || CHIP_COLORS.down,
+    fontWeight: health === 'ok' || bold ? 700 : 400,
+  }
+}
+
 // ── root ──
 
 function Root() {
@@ -482,6 +503,7 @@ function Root() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [ready, setReady] = useState(false)
   const [note, setNote] = useState('')
+  const [healthState, setHealthState] = useState({ health: 'down', reason: null })
   const noteTimer = useRef(null)
 
   // Hydrate config from the backend once mounted; the backend owns config.json
@@ -494,6 +516,26 @@ function Root() {
         setReady(true)
       })
       .catch(() => setReady(true))
+  }, [])
+
+  // Chip health: cheap cached /health poll every 5s, for the whole app
+  // lifetime (the backend supervisor does the actual port work; this only
+  // colors the glyph). Runs even while the dialog is closed.
+  useEffect(() => {
+    let alive = true
+    const tick = () => {
+      api('/health')
+        .then(r => {
+          if (alive && r) setHealthState({ health: r.health, reason: r.reason })
+        })
+        .catch(() => {})
+    }
+    tick()
+    const id = setInterval(tick, 5000)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
   }, [])
 
   // Transient action confirmation, in-dialog only.
@@ -509,15 +551,23 @@ function Root() {
     [],
   )
 
+  const healthLabel = {
+    down: 'CDP down',
+    ok: 'CDP up',
+    warn: `CDP issues${healthState.reason ? `: ${healthState.reason}` : ''}`,
+    critical: `CDP CRITICAL${healthState.reason ? `: ${healthState.reason}` : ''}`,
+  }[healthState.health] || 'CDP Manager'
+
   return jsxs(Fragment, {
     children: [
       jsx(Tooltip, {
-        label: 'CDP Manager · which debug port is live',
+        label: `${healthLabel} · manage debug ports`,
         children: jsx('span', {
           title: 'CDP Manager',
           onClick: () => setDialogOpen(true),
           className:
-            'inline-flex h-full cursor-pointer items-center px-1.5 text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground',
+            'inline-flex h-full cursor-pointer items-center px-1.5 hover:bg-(--chrome-action-hover)',
+          style: chipStyle(healthState.health, ready && healthState.health === 'ok'),
           children: jsx(Codicon, { name: 'plug', size: '0.7rem' }),
         }),
       }),
@@ -535,7 +585,7 @@ function Root() {
 export default {
   id: 'cdp-manager',
   name: 'CDP Manager',
-  description: 'Statusbar dialog + `cdp` agent tool for local Chrome CDP ports: probe, launch, stop, preferred default.',
+  description: 'Statusbar dialog + `cdp` agent tool for local Chrome CDP ports: probe, launch, stop, managed port with auto-start and reboot, health at a glance.',
 
   register(ctx) {
     _rest = ctx.rest // plugin-scoped REST door to /api/plugins/cdp-manager (auth handled)
