@@ -41,7 +41,7 @@ plugins:
     ref: b270520f14d5141c2ad686d7053907a341c8a46f
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/cdp-manager
-    ref: 7ab55282d5e534303f1fbe5c8369b672415f3fd8
+    ref: b364f8d5f015b9a9c10fb6af1d2d1112edc2af48
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/sessionretitler
     ref: c867ccb58c942181cdea17358006938f29df137b
