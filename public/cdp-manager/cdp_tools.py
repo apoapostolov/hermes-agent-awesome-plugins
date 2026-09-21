@@ -48,6 +48,22 @@ def cdp(args: dict, **kwargs) -> str:
             out["port"] = target
             return json.dumps(out)
 
+        if action == "unwedge":
+            target, err = cdp_core.resolve_port(port)
+            if err:
+                return json.dumps({"ok": False, "error": err, "action": action})
+            out = cdp_core.unwedge(target, mode=args.get("mode"), profile=args.get("profile"))
+            out["action"] = action
+            out["port"] = target
+            return json.dumps(out)
+
+        if action == "wedged":
+            target, err = cdp_core.resolve_port(port)
+            if err:
+                return json.dumps({"ok": False, "error": err, "action": action})
+            w = cdp_core.wedged(target)
+            return json.dumps({"ok": True, "action": action, "port": target, **w})
+
         if action == "prefer":
             target = port if port else None
             out = cdp_core.set_preferred(target)

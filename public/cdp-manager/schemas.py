@@ -21,8 +21,14 @@ CDP = {
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["status", "profiles", "launch", "restart", "stop", "recheck", "prefer"],
-                "description": "What to do. Default status.",
+                "enum": ["status", "profiles", "launch", "restart", "stop", "recheck", "prefer", "wedged", "unwedge"],
+                "description": (
+                    "What to do. Default status. wedged reports whether the "
+                    "live instance is stuck on the Chrome profile picker "
+                    "(no page target); unwedge stop+relaunches it. launch "
+                    "and restart now always pass a startup URL so a fresh "
+                    "instance never boots into the picker."
+                ),
             },
             "port": {
                 "type": "number",

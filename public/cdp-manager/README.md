@@ -13,7 +13,7 @@ Protocol (CDP) debug ports on 127.0.0.1.
 - Launch, stop, and recheck each port from the dialog, with a Windowed or Headless launch mode per port. Changing the mode on a live port restarts it in the new mode.
 - Mark one port as managed: a backend supervisor keeps it up, auto-starting it when down and force-rebooting it after repeated launch failures.
 - Pick a profile per port: Hermes (isolated), a personal Chrome profile (your cookies, when that Chrome is closed), or Guest (ephemeral). The choice is remembered and reused on restart.
-- Use the `cdp` agent tool from chat (`status`, `launch`, `stop`, `recheck`, `prefer`) with no shell. It targets the managed port when none is given.
+- Use the `cdp` agent tool from chat (`status`, `launch`, `stop`, `recheck`, `prefer`, `wedged`, `unwedge`) with no shell. It targets the managed port when none is given. Launches always pass a startup URL, so an isolated profile never boots into Chrome's profile picker; `wedged` detects that stuck state and `unwedge` repairs it with a stop and relaunch.
 
 ## Install
 

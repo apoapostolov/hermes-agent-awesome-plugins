@@ -15,19 +15,14 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# cdp_core.py sits at the plugin root, so one .parent is the plugin dir; two
-# would land config.json in the shared $HERMES_HOME/plugins/ directory.
-PLUGIN_ROOT = Path(__file__).resolve().parent
+PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PLUGIN_ROOT / "config.json"
 
 DEFAULT_PORTS = [9222, 9333, 9335]
 PROBE_TIMEOUT_S = 1.0
 
 DEFAULT_CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe"
-DEFAULT_PROFILE = str(
-    Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
-    / "hermes" / "chrome-profile"
-)
+DEFAULT_PROFILE = "C:/Users/theap/AppData/Local/hermes/chrome-profile"
 
 _lock = threading.RLock()
 
@@ -105,6 +100,57 @@ def probe_all(ports: list[int] | None = None) -> list[dict]:
 
 # ── mutations ─────────────────────────────────────────────────────────
 
+def _is_picker_target(t: dict) -> bool:
+    """A Chrome target that is browser chrome UI, not a real page: the
+    profile picker ('Who's using Chrome?'), omnibox popups, devtools UI."""
+    url = (t.get("url") or "")
+    return (
+        t.get("type") == "browser_ui"
+        or url.startswith("chrome://profile-picker")
+        or url.startswith("chrome://omnibox-popup")
+    )
+
+
+def list_targets(port: int) -> list[dict]:
+    """Every CDP target on the port (the /json/list endpoint)."""
+    try:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{int(port)}/json/list",
+            timeout=PROBE_TIMEOUT_S,
+        ) as res:
+            if res.status != 200:
+                return []
+            return json.loads(res.read().decode("utf-8", "replace")) or []
+    except Exception:
+        return []
+
+
+def wedged(port: int) -> dict:
+    """Detect the profile-picker trap: the listener answers but every target
+    is browser chrome UI (no real page). Chrome launched onto an isolated
+    profile without a startup URL lands here; Target.createTarget then fails
+    with 'Failed to open a new tab' and every CDP client is locked out.
+    Returns {'wedged': bool, 'targets': N}."""
+    targets = list_targets(port)
+    pages = [t for t in targets if not _is_picker_target(t)]
+    return {"wedged": bool(targets) and not pages, "targets": len(targets)}
+
+
+def unwedge(port: int, mode: str | None = None, profile: str | None = None) -> dict:
+    """Stop + relaunch a wedged (profile-picker) instance. No-op when the
+    instance has at least one real page target."""
+    w = wedged(port)
+    if not w["wedged"]:
+        return {"ok": True, "unwedged": False, "port": int(port), **w}
+    stopped = stop(port)
+    if not stopped.get("ok"):
+        return {"ok": False, "unwedged": False, "port": int(port),
+                "error": stopped.get("error") or "stop failed while unwedging"}
+    out = launch(port, mode=mode, profile=profile)
+    out["unwedged"] = True
+    return out
+
+
 def launch(port: int, mode: str | None = None, profile: str | None = None) -> dict:
     """Start Chrome with --remote-debugging-port on 127.0.0.1. DETACHED_PROCESS
     + CREATE_NO_WINDOW: no visible terminal (standing Apo rule).
@@ -122,6 +168,10 @@ def launch(port: int, mode: str | None = None, profile: str | None = None) -> di
                           dir joins the running instance instead of binding
                           its debug port (verified), so spawning would only
                           pop a stray window elsewhere.
+
+    A startup URL is always passed: without one, Chrome on an isolated
+    profile can boot into the profile picker, where no page target exists
+    and Target.createTarget fails with 'Failed to open a new tab'.
     """
     cfg = load_config()
     port = int(port)
@@ -145,11 +195,21 @@ def launch(port: int, mode: str | None = None, profile: str | None = None) -> di
         f"--remote-debugging-port={port}",
         f"--user-data-dir={profile_data_dir(prof, port, cfg)}",
         "--no-first-run",
+        # Startup URL: keeps Chrome off the profile picker. The picker is a
+        # browser_ui target with no real page, and then Target.createTarget
+        # fails with 'Failed to open a new tab' for every CDP client.
+        "--no-default-browser-check",
+        "chrome://newtab/",
     ]
     if prof == "guest":
         args.append("--guest")
     elif prof.startswith("chrome:"):
         args.append(f"--profile-directory={prof.split(':', 1)[1]}")
+    else:
+        # Isolated dirs have exactly one profile; pin it so a first-run
+        # picker cannot appear even when the dir was created by an older
+        # Chrome and later opened by a newer one.
+        args.append("--profile-directory=Default")
     if headless:
         args.append("--headless=new")
     # remember mode + profile so the supervisor auto-start reuses them
@@ -168,7 +228,9 @@ def launch(port: int, mode: str | None = None, profile: str | None = None) -> di
         )
     except Exception as e:
         return {"ok": False, "error": f"spawn failed: {e}"}
-    # Chrome needs a beat before /json/version answers.
+    # Chrome needs a beat before /json/version answers. Then confirm the
+    # instance is usable: a profile-picker boot answers probes but has no
+    # page target, which locks out every CDP client.
     deadline = time.monotonic() + 8.0
     result = None
     while time.monotonic() < deadline:
@@ -176,13 +238,25 @@ def launch(port: int, mode: str | None = None, profile: str | None = None) -> di
         result = probe_port(port)
         if result["state"] == "live":
             break
+    picker = {"wedged": False}
+    if result and result["state"] == "live":
+        # Give the picker a moment to appear before declaring the launch clean.
+        time.sleep(1.5)
+        picker = wedged(port)
+    err = None
+    if result and result["state"] == "live":
+        if picker["wedged"]:
+            err = "launched into the profile picker (no page target); run action=launch again to unwedge"
+    else:
+        err = "no listener after 8s"
     return {
-        "ok": bool(result and result["state"] == "live"),
+        "ok": bool(result and result["state"] == "live" and not picker["wedged"]),
         "port": port,
         "mode": "headless" if headless else "headful",
         "profile": prof,
         "result": result,
-        "error": None if result and result["state"] == "live" else "no listener after 8s",
+        "wedged": picker["wedged"],
+        "error": err,
     }
 
 
@@ -312,20 +386,33 @@ def restart(port: int, mode: str | None = None, profile: str | None = None) -> d
     mode and profile. Switching profiles is a restart: there is no hot-swap.
     A switch onto a locked or already-served profile is refused BEFORE the
     running server is touched. Returns the confirmed launch result,
-    including the applied mode/profile."""
+    including the applied mode/profile.
+
+    A live instance wedged on the profile picker (no page target) is treated
+    as needing the restart: stop + relaunch happens even though the probe
+    says live.
+    """
     port = int(port)
     cfg = load_config()
     live = probe_port(port)
     if live["state"] == "live":
+        w = wedged(port)
         want = resolve_profile(port, profile, cfg)
         current = resolve_profile(port, None, cfg)
         if want != current and want.startswith("chrome:"):
             problem = check_profile_dir(port, want, cfg)
             if problem:
                 return {"ok": False, "port": port, "error": problem}
-        out = stop(port)
-        if not out.get("ok"):
-            return {"ok": False, "port": port, "error": out.get("error") or "stop failed"}
+        if not (w["wedged"] and want == current):
+            # clean live instance (or no picker): nothing to do beyond a
+            # mode/profile change request, which still needs stop + launch
+            if not w["wedged"] and want == current and not mode:
+                out = dict(live)
+                out.update({"ok": True, "port": port, "already": True, "restarted": False})
+                return out
+        out_stop = stop(port)
+        if not out_stop.get("ok"):
+            return {"ok": False, "port": port, "error": out_stop.get("error") or "stop failed"}
         stopped = True
     else:
         stopped = False
