@@ -18,8 +18,8 @@ import {
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
 import { useEffect, useRef, useState } from 'react'
 
-const ID = 'prompt-enhancer'
-const STYLE_ID = 'prompt-enhancer-style'
+const ID = 'prompt-enhance'
+const STYLE_ID = 'prompt-enhance-style'
 const ENHANCERS = 'enhancers'
 const GHOST = 'inline-flex size-(--composer-control-size) shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground'
 const LIBRARY = {
@@ -900,7 +900,7 @@ const CSS = `
 
 export default {
   id: ID,
-  name: 'Prompt Enhancer',
+  name: 'Prompt Enhance',
   description: 'Send a saved prompt with the current draft as context. Folders, reorder, and a one-call model override that never writes the session.',
   defaultEnabled: true,
   register(ctx) {

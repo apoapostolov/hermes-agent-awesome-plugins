@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
-  <h1>Prompt Enhancer</h1>
+  <h1>Prompt Enhance</h1>
   <strong>Turn a rough composer draft into the prompt you meant.</strong>
   <p>Enhancers rewrite the draft outside the chat. The library keeps the prompts you reuse.</p>
   <p>
@@ -10,7 +10,7 @@
 </div>
 
 <div align="center">
-  <img src="docs/hero.png" width="100%" alt="Prompt Enhancer" />
+  <img src="docs/hero.png" width="100%" alt="Prompt Enhance" />
 </div>
 
 ## What You Can Do
@@ -25,10 +25,10 @@
 Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) **0.21.0 or newer**.
 
 ```bash
-hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/prompt-enhancer
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/prompt-enhance
 ```
 
-Enable **Prompt Enhancer** under **Capabilities → Plugins**. Reload desktop plugins from **Cmd+K** or **Ctrl+K** on Windows if needed.
+Enable **Prompt Enhance** under **Capabilities → Plugins**. Reload desktop plugins from **Cmd+K** or **Ctrl+K** on Windows if needed.
 
 ## Requirements / Limits
 

@@ -1,6 +1,6 @@
-name: prompt-enhancer
+name: prompt-enhance
 version: 1.0.0
-label: Prompt Enhancer
+label: Prompt Enhance
 description: >-
   Send a saved prompt with the current draft as context.
   Folders, reorder, and a one-call model override that never writes the session.
@@ -8,7 +8,7 @@ author: Apostol Apostolov
 license: MIT
 manifest_version: 2
 api_version: 1
-homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/prompt-enhancer
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/prompt-enhance
 tags:
   - desktop
   - composer
