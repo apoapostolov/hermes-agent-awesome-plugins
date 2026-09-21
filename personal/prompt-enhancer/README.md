@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Prompt Enhancer" />
+</div>
+
 ## What You Can Do
 
 - Rewrite the current draft with a saved enhancer. The call runs outside the chat, the composer icon spins while it works, and the result replaces the draft.
