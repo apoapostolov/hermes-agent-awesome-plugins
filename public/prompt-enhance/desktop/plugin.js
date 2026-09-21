@@ -61,12 +61,13 @@ const MENU_ROW = 'gap-2 rounded-none px-2.5 py-1 text-xs'
 const ICON = 'inline-flex size-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground'
 
 const DEFAULTS = [
-  ['Clarify', 'Make the ask unambiguous. Keep the intent. Do not add requirements.'],
-  ['Tighten', 'Cut fluff. Keep the ask and the constraints already in the draft.'],
-  ['Grammar', 'Fix grammar and style. Leave the meaning alone.'],
-  ['Expand', 'Turn the draft into an ordered plan. Keep it concrete.'],
-  ['Summarize', 'Summarize the draft. Keep the decisions.'],
+  ['Clarify', 'lightbulb', 'Make the ask unambiguous. Keep the intent. Do not add requirements.'],
+  ['Tighten', 'fold', 'Cut fluff. Keep the ask and the constraints already in the draft.'],
+  ['Grammar', 'edit', 'Fix grammar and style. Leave the meaning alone.'],
+  ['Expand', 'list-ordered', 'Turn the draft into an ordered plan. Keep it concrete.'],
+  ['Summarize', 'book', 'Summarize the draft. Keep the decisions.'],
 ]
+const CORE_GLYPHS = Object.fromEntries(DEFAULTS.map(([name, glyph]) => [name, glyph]))
 
 let storage = null
 let lib = null
@@ -75,7 +76,7 @@ const SOURCE_URL = 'https://github.com/apoapostolov/hermes-agent-awesome-plugins
 let openLibrary = null
 let openExternal = null
 let closeLibrary = null
-let priorDraft = null
+const priors = new Map()
 const priorListeners = new Set()
 let enhancing = false
 const enhanceListeners = new Set()
@@ -87,7 +88,7 @@ function uid() {
 function seed() {
   return {
     folders: [{ id: ENHANCERS, name: 'Enhancers', locked: true }],
-    prompts: DEFAULTS.map(([name, body]) => ({ id: uid(), folderId: ENHANCERS, name, body })),
+    prompts: DEFAULTS.map(([name, glyph, body]) => ({ id: uid(), folderId: ENHANCERS, name, glyph, body })),
     enhanceWith: { kind: 'session' },
   }
 }
@@ -101,6 +102,14 @@ function load() {
   lib = saved && saved.folders && saved.prompts ? saved : seed()
   if (!lib.folders.some(folder => folder.id === ENHANCERS)) {
     lib = { ...lib, folders: [{ id: ENHANCERS, name: 'Enhancers', locked: true }, ...lib.folders] }
+  }
+  const prompts = lib.prompts.map(prompt => {
+    const glyph = prompt.glyph || CORE_GLYPHS[prompt.name]
+    return glyph && glyph !== prompt.glyph ? { ...prompt, glyph } : prompt
+  })
+  if (prompts.some((prompt, index) => prompt !== lib.prompts[index])) {
+    lib = { ...lib, prompts }
+    if (storage) storage.set('library', lib)
   }
   return lib
 }
@@ -238,6 +247,23 @@ async function usePrompt(prompt, mode, { dismiss } = {}) {
   }
 }
 
+function methodLabel(prompt) {
+  const glyph = prompt.glyph || CORE_GLYPHS[prompt.name]
+  if (!glyph) return prompt.name
+  return jsxs('span', {
+    className: 'inline-flex min-w-0 items-center gap-1.5',
+    children: [
+      jsx(Codicon, { name: glyph, size: '0.85rem' }),
+      jsx('span', { className: 'truncate', children: prompt.name }),
+    ],
+  })
+}
+
+function currentSessionId() {
+  const id = host.state.focusedSessionId.get()
+  return id || 'draft'
+}
+
 function EnhanceMenu() {
   const data = useLib()
   const busy = useEnhancing()
@@ -269,7 +295,7 @@ function EnhanceMenu() {
           ...names.map(prompt => jsx(DropdownMenuItem, {
             className: MENU_ROW,
             onSelect: () => usePrompt(prompt, 'send'),
-            children: prompt.name,
+            children: methodLabel(prompt),
           }, prompt.id)),
           jsx(DropdownMenuSeparator, { className: 'mx-0' }),
           jsx(DropdownMenuItem, {
@@ -299,6 +325,7 @@ function useEnhancing() {
 
 async function enhanceDraft(prompt, { dismiss } = {}) {
   if (enhancing) return
+  const sessionId = currentSessionId()
   const editor = focusedEditor()
   const draft = readEditor(editor)
   if (!editor) {
@@ -322,8 +349,8 @@ async function enhanceDraft(prompt, { dismiss } = {}) {
     }, 70000)
     const text = String((result && result.text) || '').trim()
     if (!text) throw new Error('Enhancement returned nothing.')
-    setPrior(draft)
-    setEditorText(focusedEditor() || editor, text)
+    setPrior(sessionId, { original: draft, enhanced: text })
+    if (editor.isConnected && currentSessionId() === sessionId) setEditorText(editor, text)
   } catch (err) {
     host.notify({ kind: 'error', message: err && err.message ? err.message : 'Enhancement failed.' })
   } finally {
@@ -331,44 +358,72 @@ async function enhanceDraft(prompt, { dismiss } = {}) {
   }
 }
 
-function setPrior(text) {
-  priorDraft = text
-  priorListeners.forEach(fn => fn(text))
+function setPrior(sessionId, pair) {
+  if (pair) priors.set(sessionId, pair)
+  else priors.delete(sessionId)
+  priorListeners.forEach(fn => fn())
 }
 
-function usePrior() {
-  const [value, setValue] = useState(priorDraft)
+function useSessionPrior() {
+  const sessionId = useValue(host.state.focusedSessionId) || 'draft'
+  const [, bump] = useState(0)
   useEffect(() => {
-    priorListeners.add(setValue)
-    return () => priorListeners.delete(setValue)
+    const fn = () => bump(n => n + 1)
+    priorListeners.add(fn)
+    return () => priorListeners.delete(fn)
   }, [])
-  return value
+  return { sessionId, pair: priors.get(sessionId) || null }
 }
 
 function undoEnhancement() {
-  if (priorDraft == null) return
+  const sessionId = currentSessionId()
+  const pair = priors.get(sessionId)
+  if (!pair) return
   const editor = focusedEditor()
   if (!editor) {
     host.notify({ kind: 'error', message: 'No composer is focused.' })
     return
   }
-  setEditorText(editor, priorDraft)
-  setPrior(null)
+  setEditorText(editor, pair.original)
+  setPrior(sessionId, null)
 }
 
-function modelName(pick) {
-  if (!pick || pick.kind !== 'model') return 'Session'
-  return pick.model
+function providerRow(providers, slug) {
+  return (providers || []).find(provider => provider.slug === slug) || null
 }
 
-function EnhancePickLabel({ pick }) {
-  return jsxs('span', {
-    className: 'inline-flex max-w-44 items-center gap-1.5',
-    children: [
-      jsx('span', { className: 'shrink-0 text-(--ui-text-tertiary)', children: 'Enhance Model' }),
-      jsx('i', { 'aria-hidden': 'true', className: 'size-1 shrink-0 rounded-full bg-(--ui-accent)' }),
-      jsx('span', { className: 'truncate text-(--ui-accent)', children: modelName(pick) }),
-    ],
+function modelSlug(model) {
+  return typeof model === 'string' ? model : (model && (model.id || model.name)) || ''
+}
+
+function sessionPair(catalog, liveModel) {
+  const providers = (catalog && catalog.providers) || []
+  const model = liveModel || (catalog && catalog.model) || ''
+  let slug = (catalog && catalog.provider) || ''
+  if (model) {
+    const hit = providers.find(provider => (provider.models || []).some(item => modelSlug(item) === model))
+    if (hit) slug = hit.slug
+  }
+  const row = providerRow(providers, slug)
+  return { providerName: (row && (row.name || row.slug)) || slug, model }
+}
+
+function comboLabel(providerName, model) {
+  if (providerName && model) return `${providerName} * ${model}`
+  return model || providerName || ''
+}
+
+function EnhancePickLabel({ pick, catalog, liveModel }) {
+  const session = sessionPair(catalog, liveModel)
+  const picked = pick && pick.kind === 'model'
+  const row = picked ? providerRow(catalog && catalog.providers, pick.provider) : null
+  const providerName = picked ? ((row && (row.name || row.slug)) || pick.provider) : session.providerName
+  const model = picked ? pick.model : session.model
+  const label = comboLabel(providerName, model)
+  return jsx('span', {
+    className: 'block max-w-48 truncate text-xs text-(--ui-accent)',
+    title: label,
+    children: label,
   })
 }
 
@@ -420,24 +475,30 @@ function LibraryDialog({ open, folderId, onFolder, onClose, onEdit }) {
   const [confirmId, setConfirmId] = useState(null)
   const [renaming, setRenaming] = useState(null)
   const [renamingFolder, setRenamingFolder] = useState(null)
-  const [models, setModels] = useState(null)
+  const [catalog, setCatalog] = useState(null)
   const [drop, setDrop] = useState(null)
   const dragId = useRef(null)
   const folder = data.folders.find(item => item.id === folderId) || data.folders[0]
   const cards = promptsIn(data, folder.id)
 
+  const liveModel = useValue(host.state.model)
   useEffect(() => {
-    if (!open || models) return undefined
+    if (!open || catalog) return undefined
     let dead = false
     host.request('model.options', { explicit_only: true }).then(result => {
-      if (!dead) setModels((result && result.providers) || [])
+      if (dead) return
+      setCatalog({
+        providers: (result && result.providers) || [],
+        provider: (result && result.provider) || '',
+        model: (result && result.model) || '',
+      })
     }).catch(err => {
       if (dead) return
-      setModels([])
+      setCatalog({ providers: [], provider: '', model: '' })
       host.notify({ kind: 'error', message: err && err.message ? err.message : 'Model list failed.' })
     })
     return () => { dead = true }
-  }, [open, models])
+  }, [open, catalog])
 
   function updatePrompts(prompts) {
     save({ ...data, prompts })
@@ -497,7 +558,7 @@ function LibraryDialog({ open, folderId, onFolder, onClose, onEdit }) {
                   jsx(DropdownMenuTrigger, {
                     className: 'max-w-48 shrink border-0 bg-transparent p-0 text-xs',
                     style: { maxWidth: '14rem' },
-                    children: jsx(EnhancePickLabel, { pick: data.enhanceWith }),
+                    children: jsx(EnhancePickLabel, { pick: data.enhanceWith, catalog, liveModel }),
                   }),
                   jsx(DropdownMenuContent, {
                     align: 'end',
@@ -510,7 +571,7 @@ function LibraryDialog({ open, folderId, onFolder, onClose, onEdit }) {
                         onSelect: () => save({ ...data, enhanceWith: { kind: 'session' } }),
                         children: 'Session model',
                       }),
-                      ...(models || []).flatMap(provider => {
+                      ...(catalog && catalog.providers || []).flatMap(provider => {
                         const rows = [
                           jsx('div', {
                             className: 'px-2.5 pt-1.5 text-[0.625rem] text-(--ui-text-tertiary)',
@@ -761,7 +822,15 @@ function LibraryDialog({ open, folderId, onFolder, onClose, onEdit }) {
                                   setRenaming(null)
                                 },
                                 onKeyDown: event => { if (event.key === 'Enter') event.currentTarget.blur() },
-                              }) : jsx('b', { className: 'min-w-0 flex-1 truncate text-xs', children: prompt.name }),
+                              }) : jsxs('b', {
+                        className: 'inline-flex min-w-0 flex-1 items-center gap-1.5 truncate text-xs',
+                        children: [
+                          prompt.glyph || CORE_GLYPHS[prompt.name]
+                            ? jsx(Codicon, { name: prompt.glyph || CORE_GLYPHS[prompt.name], size: '0.85rem' })
+                            : null,
+                          jsx('span', { className: 'truncate', children: prompt.name }),
+                        ],
+                      }),
                               jsxs('div', {
                                 className: 'ml-auto flex shrink-0',
                                 children: [
@@ -842,7 +911,13 @@ function EditDialog({ prompt, onClose }) {
 
 function ComposerTools() {
   const view = useValue(host.state.viewport)
-  const prior = usePrior()
+  const { sessionId, pair } = useSessionPrior()
+  useEffect(() => {
+    if (!pair || currentSessionId() !== sessionId) return
+    const editor = focusedEditor()
+    if (!editor) return
+    if (readEditor(editor) === pair.original) setEditorText(editor, pair.enhanced)
+  }, [sessionId, pair])
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [folderId, setFolderId] = useState(ENHANCERS)
   const [editing, setEditing] = useState(null)
@@ -860,7 +935,7 @@ function ComposerTools() {
   if (view && view.narrow) return null
   return jsxs(Fragment, {
     children: [
-      prior == null ? null : jsx('button', {
+      pair == null ? null : jsx('button', {
         type: 'button',
         className: GHOST,
         'aria-label': 'Undo',
