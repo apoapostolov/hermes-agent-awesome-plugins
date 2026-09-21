@@ -15,14 +15,17 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-PLUGIN_ROOT = Path(__file__).resolve().parent.parent
+PLUGIN_ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = PLUGIN_ROOT / "config.json"
 
 DEFAULT_PORTS = [9222, 9333, 9335]
 PROBE_TIMEOUT_S = 1.0
 
 DEFAULT_CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe"
-DEFAULT_PROFILE = "C:/Users/theap/AppData/Local/hermes/chrome-profile"
+DEFAULT_PROFILE = str(
+    Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
+    / "hermes" / "chrome-profile"
+)
 
 _lock = threading.RLock()
 

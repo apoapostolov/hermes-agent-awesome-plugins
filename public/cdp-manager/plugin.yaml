@@ -3,7 +3,7 @@ version: 1.0.2
 description: "Local Chrome CDP debug ports in the status bar (probe, launch, stop, recheck)
   plus a managed port Hermes keeps alive and the `cdp` agent tool, which also detects and
   repairs a Chrome profile-picker launch (wedged/unwedge). Disclosure: launches local Chrome
-  on 127.0.0.1 only, with per-port profiles under the Hermes home directory or a chosen
+  on 127.0.0.1 only, with per-port profiles under the local app-data directory or a chosen
   personal Chrome profile (your cookies, when that Chrome is closed), and closes it with a
   clean Browser.close; state lives in the plugin's own config file."
 author: Apostol Apostolov
