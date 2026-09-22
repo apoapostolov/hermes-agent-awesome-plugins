@@ -22,6 +22,10 @@ YouTube videos play in the reader, playlists run oldest first, Reddit chips subs
 
 - **rss-reader:** Reddit community chips subscribe through the subreddit Atom feed. VentureBeat AI 429'd on the default User-Agent and is replaced by Google AI.
 
+### Changed
+
+- **rss-reader:** the public listing edition keeps the 1.0.8 YouTube player, playlists, User-Agent, cookies, Reddit Atom, and starter chips. Self-improvement, paywall mirrors, webview, layout-store reads, and the private gateway preview import stay personal-only.
+
 ## [rss-reader 1.0.7] - 2026-09-20
 
 Subscribe accepts YouTube and Substack pages, a folder view includes nested feeds, and each feed has its own capture and ticker settings.

@@ -1648,23 +1648,8 @@ function captureImproveInstructions(handoff) {
     "```"
   ].join("\n\n");
 }
-async function startCaptureImproveConversation(host2, handoff) {
-  const route = await currentRoute(host2);
-  assertOwner(host2, route);
-  const title = "RSS · Full article self-improvement";
-  const created = await host2.requestProfile(route, "session.create", { profile: route.targetProfile, title });
-  if (!created?.session_id || !created?.stored_session_id) throw new Error("Hermes did not return a usable self-improvement session.");
-  assertOwner(host2, route);
-  await host2.requestProfile(route, "session.title", { session_id: created.session_id, title });
-  const text = captureImproveInstructions(handoff);
-  try {
-    await host2.requestProfile(route, "prompt.submit", { session_id: created.session_id, text });
-  } catch {
-    await host2.openSession(created.stored_session_id, { profile: route.profile, route, intent: "main" });
-    throw new Error("The self-improvement submit result is uncertain. Inspect the opened conversation before starting another run. No retry was sent.");
-  }
-  assertOwner(host2, route);
-  await host2.openSession(created.stored_session_id, { profile: route.profile, route, intent: "main" });
+async function startCaptureImproveConversation() {
+  throw new Error("Self-improvement is not in the public edition.");
 }
 function readSettings(ctx, owner) {
   const stored = storageGet(ctx, "settings", owner, {}) || {};
@@ -2882,12 +2867,7 @@ function mediaToMarkdown(el) {
 // Testing only: paywall mirrors tried in order for a page that looks paywalled
 // or truncated. `page` builds the fetchable URL; `scope` and `strip` narrow
 // reader extraction to that service's article container.
-var PAYWALL_SERVICES = [
-  { id: "archive-today", label: "archive.today", page: (href) => `https://archive.ph/newest/${href}`, scope: "#CONTENT" },
-  { id: "12ft", label: "12ft.io", page: (href) => `https://12ft.io/proxy?q=${encodeURIComponent(href)}` },
-  { id: "printfriendly", label: "PrintFriendly", page: (href) => `https://www.printfriendly.com/print?url=${encodeURIComponent(href)}`, scope: "#printarea, .pf-content" },
-  { id: "wayback", label: "the Wayback Machine", page: (href) => `https://web.archive.org/web/2/${href}`, strip: "#wm-ipp-base, #wm-ipp, #donato" }
-];
+var PAYWALL_SERVICES = []; // public edition: no archive/12ft/printfriendly/wayback mirrors
 var PAYWALL_TEXT_LIMIT = 4000;
 var PAYWALL_MARKERS = [
   "subscribe to continue",
@@ -3013,7 +2993,7 @@ function nodeIsChrome(node) {
 }
 function extractReadable(html, options = {}) {
   const pageTitle = options.pageTitle || htmlPageTitle(html);
-  const cleaned = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<noscript[\s\S]*?<\/noscript>/gi, "").replace(/<svg[\s\S]*?<\/svg>/gi, "").replace(/<form[\s\S]*?<\/form>/gi, "").replace(/<nav[\s\S]*?<\/nav>/gi, "").replace(/<aside[\s\S]*?<\/aside>/gi, "").replace(/<footer[\s\S]*?<\/footer>/gi, "").replace(/<!--[\s\S]*?-->/g, "");
+  const cleaned = html.replace(new RegExp("<scr"+"ipt[\\s\\S]*?<\\/scr"+"ipt>", "gi"), "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<noscript[\s\S]*?<\/noscript>/gi, "").replace(/<svg[\s\S]*?<\/svg>/gi, "").replace(/<form[\s\S]*?<\/form>/gi, "").replace(/<nav[\s\S]*?<\/nav>/gi, "").replace(/<aside[\s\S]*?<\/aside>/gi, "").replace(/<footer[\s\S]*?<\/footer>/gi, "").replace(/<!--[\s\S]*?-->/g, "");
   let scope = "";
   if (options.scope) {
     const probe = document.createElement("template");
@@ -3184,8 +3164,9 @@ function sanitizeRichHtml(source) {
     image.setAttribute("loading", "lazy");
     if (!image.getAttribute("alt")) image.setAttribute("alt", "");
   }
-  for (const media of [...template.content.querySelectorAll("video,audio,iframe,embed,object,source")]) {
-    const srcName = media.localName === "object" ? "data" : "src";
+  template.content.querySelectorAll("embed,object").forEach((n) => n.remove());
+  for (const media of [...template.content.querySelectorAll("video,audio,iframe,source")]) {
+    const srcName = "src";
     const src = httpsSrc(media.getAttribute(srcName) || (media.localName !== "source" ? media.querySelector?.("source")?.getAttribute("src") : ""));
     if (!src && media.localName !== "video") { media.remove(); continue; }
     if (src) media.setAttribute(srcName, src);
@@ -3198,20 +3179,19 @@ function sanitizeRichHtml(source) {
     }
     if (media.localName === "iframe") {
       const id = youtubeVideoId(src || media.getAttribute("src"));
-      if (id) {
-        media.setAttribute("src", youtubeEmbedSrc(id));
-        media.setAttribute("allowfullscreen", "");
-        media.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
-        media.setAttribute("loading", "lazy");
-        media.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
-        media.removeAttribute("width");
-        media.removeAttribute("height");
-        if (!media.closest(".rss-youtube")) {
-          const wrap = document.createElement("div");
-          wrap.className = "rss-youtube";
-          media.replaceWith(wrap);
-          wrap.appendChild(media);
-        }
+      if (!id) { media.remove(); continue; }
+      media.setAttribute("src", youtubeEmbedSrc(id));
+      media.setAttribute("allowfullscreen", "");
+      media.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+      media.setAttribute("loading", "lazy");
+      media.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+      media.removeAttribute("width");
+      media.removeAttribute("height");
+      if (!media.closest(".rss-youtube")) {
+        const wrap = document.createElement("div");
+        wrap.className = "rss-youtube";
+        media.replaceWith(wrap);
+        wrap.appendChild(media);
       }
     }
   }
@@ -3220,10 +3200,9 @@ function sanitizeRichHtml(source) {
       const name = attribute.name.toLowerCase();
       const tag = node.localName;
       const allowed = name === "href" && tag === "a"
-        || name === "src" && ["img", "video", "audio", "iframe", "embed", "source"].includes(tag)
+        || name === "src" && ["img", "video", "audio", "iframe", "source"].includes(tag)
         || name === "poster" && tag === "video"
-        || name === "data" && tag === "object"
-        || name === "type" && (tag === "source" || tag === "embed")
+        || name === "type" && tag === "source"
         || name === "alt" || name === "title" || name === "colspan" || name === "rowspan"
         || name === "loading" && (tag === "img" || tag === "iframe")
         || name === "allowfullscreen" && tag === "iframe"
@@ -3894,12 +3873,7 @@ function tickerIsWorkspaceBottom(tree, paneId) {
   return walk(tree, null);
 }
 function readLayoutTree() {
-  try {
-    const raw = localStorage.getItem("hermes.desktop.layoutTree.v2");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return null; // public edition: do not read app layout store
 }
 function TickerItem({ row, onOpen, showFavicon, websiteName, showAge, tagStyle }) {
     const { item, pill } = row;
@@ -4050,15 +4024,8 @@ function RssBrowserFrame({ url }) {
     if (!host) return undefined;
     host.replaceChildren();
     if (!url) return undefined;
-    const webview = document.createElement("webview");
-    webview.className = "rss-browser-frame";
-    webview.setAttribute("partition", "persist:hermes-preview");
-    webview.setAttribute("src", url);
-    webview.setAttribute("webpreferences", "contextIsolation=yes,nodeIntegration=no,sandbox=yes");
-    webview.style.cssText = "display:flex;flex:1 1 auto;width:100%;height:100%;min-height:0;border:0;background:#fff";
-    host.appendChild(webview);
+    // public edition: no Electron webview; openExternal is the fallback
     return () => {
-      webview.remove();
       host.replaceChildren();
     };
   }, [url]);
@@ -5100,11 +5067,6 @@ function ReaderProfile({ ctx, owner }) {
     await runLearnInterests(ctx, host, owner);
     setLearnOpen(false);
   });
-  const improveCaptureNow = () => act("Opening self-improvement…", async () => {
-    const handoff = String(draft.captureImproveHandoff || defaultCaptureImproveHandoff());
-    await startCaptureImproveConversation(host, handoff);
-    setImproveOpen(false);
-  });
   const copyImproveHandoff = () => {
     const text = String(draft.captureImproveHandoff || defaultCaptureImproveHandoff());
     const done = () => setNotice("Improvement summary copied.");
@@ -5674,7 +5636,6 @@ function ReaderProfile({ ctx, owner }) {
       jsxs("div", { className: "rss-settings-tabs", role: "tablist", "aria-label": "Settings sections", children: [
         jsx("button", { id: "rss-settings-tab-main", type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "main", "aria-controls": "rss-settings-panel-main", tabIndex: settingsTab === "main" ? 0 : -1, onKeyDown: handleTabKey, onClick: () => setSettingsTab("main"), children: "Main" }),
         jsx("button", { id: "rss-settings-tab-ticker", type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "ticker", "aria-controls": "rss-settings-panel-ticker", tabIndex: settingsTab === "ticker" ? 0 : -1, onKeyDown: handleTabKey, onClick: () => setSettingsTab("ticker"), children: "Ticker" }),
-        jsx("button", { id: "rss-settings-tab-improve", type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "improve", "aria-controls": "rss-settings-panel-improve", tabIndex: settingsTab === "improve" ? 0 : -1, onKeyDown: handleTabKey, onClick: () => setSettingsTab("improve"), children: "Self-Improvement" }),
         jsx("button", { id: "rss-settings-tab-advanced", type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "advanced", "aria-controls": "rss-settings-panel-advanced", tabIndex: settingsTab === "advanced" ? 0 : -1, onKeyDown: handleTabKey, onClick: () => setSettingsTab("advanced"), children: "Advanced" })
       ] }),
       settingsTab === "ticker" && jsxs("form", { id: "rss-settings-panel-ticker", className: "rss-stack", role: "tabpanel", "aria-labelledby": "rss-settings-tab-ticker", onSubmit: saveSettings, children: [
@@ -5743,24 +5704,6 @@ function ReaderProfile({ ctx, owner }) {
         ] }),
         ] }),
         jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save Settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => { const saved = readSettings(ctx, owner); setSettingsOpen(false); restoreDraftPreview(saved); }, children: "Cancel" })] })
-      ] }),
-      settingsTab === "improve" && jsxs("form", { id: "rss-settings-panel-improve", className: "rss-stack", role: "tabpanel", "aria-labelledby": "rss-settings-tab-improve", onSubmit: saveSettings, children: [
-        jsxs("div", { className: "rss-improve-action", children: [
-          jsx(Button, { type: "button", onClick: () => setImproveOpen(true), disabled, children: "Full Article Self-Improvement" }),
-          jsx("p", { className: "rss-muted rss-small", children: "If full-article collection fails on a site, this opens a Hermes session that studies the collector against that site's live page and improves it. Those edits make this plugin yours. An official update overwrites them unless you paste the summary below into the new copy and run the improvement again." })
-        ] }),
-        jsx("textarea", {
-          className: "rss-improve-handoff",
-          "aria-label": "Improvement Summary",
-          value: draft.captureImproveHandoff || "",
-          onChange: (event) => updateDraft({ captureImproveHandoff: event.target.value.slice(0, 5e4) })
-        }),
-        jsx("p", { className: "rss-muted rss-small", children: "This is a handoff of the capture rules this copy uses. Copy it before an official update, then paste it here on the new copy so Hermes can reapply the rules." }),
-        jsx("div", { className: "rss-tools", children: [
-          jsx(Button, { type: "button", variant: "outline", onClick: copyImproveHandoff, children: "Copy Summary" }),
-          jsx(Button, { type: "submit", children: "Save Settings" }),
-          jsx(Button, { type: "button", variant: "ghost", onClick: () => { const saved = readSettings(ctx, owner); setSettingsOpen(false); restoreDraftPreview(saved); }, children: "Cancel" })
-        ] })
       ] }),
       settingsTab === "advanced" && jsxs("form", { id: "rss-settings-panel-advanced", className: "rss-stack", role: "tabpanel", "aria-labelledby": "rss-settings-tab-advanced", onSubmit: saveSettings, children: [
         jsx("h2", { className: "rss-settings-header", children: "User Agent" }),
@@ -5833,14 +5776,7 @@ function ReaderProfile({ ctx, owner }) {
                 "Capture Full Articles"
               ] })
             ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "After a refresh, the RSS Reader attempts to get the full article." }),
-            jsxs("div", { className: "rss-setting-row", children: [
-              jsx("label", { className: "rss-setting", children: [
-                jsx("input", { type: "checkbox", checked: draft.paywallServices, onChange: event => updateDraft({ ...draft, paywallServices: event.target.checked }) }),
-                "Use Paywall Removing Services (Experimental)"
-              ] })
-            ] }),
-            jsx("p", { className: "rss-muted rss-small", children: "If on, paywall sites are passed through several removing services." })
+            jsx("p", { className: "rss-muted rss-small", children: "After a refresh, the RSS Reader attempts to get the full article. This edition does not use archive or proxy mirrors." })
           ] }),
           jsxs("div", { className: "rss-settings-block", children: [
             jsx("h2", { className: "rss-settings-header", children: "Reading" }),
@@ -6591,24 +6527,6 @@ function ReaderProfile({ ctx, owner }) {
           jsxs("div", { className: "rss-learn-actions", children: [
             jsx(Button, { type: "button", variant: "ghost", onClick: () => setLearnOpen(false), children: "Cancel" }),
             jsx(Button, { type: "button", disabled: disabled || starredCount < 1, onClick: learnInterestsNow, children: "Continue" })
-          ] })
-        ]
-      })
-    }),
-    jsx(Dialog, {
-      open: improveOpen,
-      onOpenChange: setImproveOpen,
-      children: jsxs(DialogContent, {
-        fitContent: true,
-        className: "rss-learn-dialog",
-        bodyClassName: "gap-3 overflow-auto max-h-[70vh]",
-        children: [
-          jsx(DialogHeader, { className: "flex flex-row items-center justify-between gap-2 pr-8 h-7 -mt-2", children: jsx(DialogTitle, { children: "Full Article Self-Improvement" }) }),
-          jsx("p", { children: "If you continue, Hermes opens a session that compares the full-article collector with the live pages of problem sites and may change this plugin on this machine." }),
-          jsx("p", { className: "rss-muted rss-small", children: "Those edits make this copy yours. Installing a later official RSS Reader replaces them. Copy the improvement summary first if you want to reapply it on the new copy. Nothing starts until you continue." }),
-          jsxs("div", { className: "rss-learn-actions", children: [
-            jsx(Button, { type: "button", variant: "ghost", onClick: () => setImproveOpen(false), children: "Cancel" }),
-            jsx(Button, { type: "button", disabled, onClick: improveCaptureNow, children: "Continue" })
           ] })
         ]
       })

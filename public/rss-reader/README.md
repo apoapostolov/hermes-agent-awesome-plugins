@@ -2,10 +2,10 @@
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
   <h1>RSS Reader</h1>
   <strong>A three-column place for feeds you mean to finish.</strong>
-  <p>Folders, mute and search, reader-mode capture, optional Hermes tools, and an optional headline ticker.</p>
+  <p>Folders, mute and search, reader-mode capture, YouTube and Substack feeds, optional Hermes tools, and an optional headline ticker.</p>
   <p>
     <a href="https://github.com/NousResearch/hermes-agent"><img src="https://img.shields.io/badge/Hermes%20Desktop-plugin-6f42c1" alt="Hermes Desktop plugin" /></a>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.7-2ea44f" alt="Version 1.0.7" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.8-2ea44f" alt="Version 1.0.8" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -22,10 +22,12 @@
 
 ## What You Can Do
 
-- Subscribe to RSS 2.0 and Atom feeds, plus Reddit `r/...` communities. Starter pills help fill common sources.
+- Subscribe to RSS 2.0 and Atom feeds, plus Reddit `r/...` communities, YouTube channels and playlists, and Substack pages. Starter pills help fill common sources, including YouTube AI and AI Substack.
 - Organize with folders and nested folders. Move feeds between them.
 - Work from unread, saved, feed, folder, mute, and search views without losing the article you have open.
 - Capture full articles into reader mode (images and tables kept when useful).
+- Play YouTube posts in the reader with a 16:9 embed and chapter timestamps. Playlist feeds list oldest first.
+- Set a User-Agent and optional YouTube cookies under Settings → Advanced.
 - Ask Hermes for summaries, discussions, evidence checks, digests, and optional grading only when you choose.
 - Optionally register Hermes tools so the agent can read, find, tag, filter, and manage subscriptions.
 - Optionally show an animated headline ticker with grade colors and tag pills.

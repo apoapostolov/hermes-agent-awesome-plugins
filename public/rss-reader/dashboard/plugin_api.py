@@ -453,9 +453,8 @@ def open_in_preview(payload: PreviewRequest) -> dict[str, str]:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     label = (payload.label or url).strip()
-    try:
-        from tui_gateway.server import _broadcast_global_event
-        _broadcast_global_event("preview.open", {"url": url, "label": label})
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Preview pane unavailable: {exc}") from exc
-    return {"opened": url}
+    # Public edition: no private tui_gateway.server._broadcast_global_event import.
+    raise HTTPException(
+        status_code=501,
+        detail="In-app preview broadcast is not available in this edition. Open the URL in the system browser.",
+    )
