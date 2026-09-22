@@ -1,13 +1,13 @@
 # Changelog
 
-## [rss-reader 1.0.9] - 2026-09-23
+## [rss-reader 1.0.9] - Unreleased
 
-Tighter grading calibration, a reader-interests skill block, and a `reclassify` tool action that re-judges the whole library.
+Tighter grading calibration, a reader-interests skill block, and a `reclassify` action that re-judges up to 720 articles per run.
 
 ### Added
 
 - **rss-reader:** version `1.0.9` (both editions). The grading skill gains a Reader interests block: an editable ```interests fence where the reader lists their own topics, one per line. Grading treats a strong interest match carrying something usable (product, tool, opportunity, resource) as interesting; bare topic mentions stay normal and interests never escalate to important. The in-plugin scaffold that seeds a missing skill includes the same block.
-- **rss-reader:** `reclassify` Hermes tool action (both editions). Re-runs classification over every article in the library, already-tagged ones included, so rubric changes apply retroactively without a manual reset. The desktop command loops classification passes until the library is exhausted (12-pass cap at 60 per pass).
+- **rss-reader:** `reclassify` Hermes tool action (both editions). Re-runs classification across up to 720 articles, including already-tagged ones, so rubric changes apply retroactively. It processes distinct batches and reports when more articles remain for a later run.
 - **rss-reader:** the duplicate `mute` tool action is removed (both editions); `add_filter` is the single rule-creation path for keyword and tag mutes. The `/rss mute <keyword>` slash command is unchanged.
 - **sessionretitler** (formerly `session-retitler`): version `1.1.0`. Retitles the session every N titleable user messages from the latest exchanges (llm-rank rewrites, user titles untouchable). Now pinned in the pack (pack `1.16.0`).
 
@@ -17,7 +17,6 @@ Tighter grading calibration, a reader-interests skill block, and a `reclassify` 
 
 ### Fixed
 
-- **rss-reader:** `reclassify` now pages with an offset, so each of its 12 batches targets a distinct slice instead of repeating the newest 60 articles. Its query bypasses mute and saved-search exclusions; the result reports when the 720-article safety cap leaves anything unprocessed.
 
 - **cdp-manager:** version `1.0.0` (the pre-release `1.0.1` tag is retired, never shipped). `config.json` now writes inside the plugin directory instead of the shared `$HERMES_HOME/plugins/` folder, and the default Chrome profile path derives from `%LOCALAPPDATA%` instead of a hardcoded personal path. The public edition's repo link points at `public/cdp-manager`. Pack re-pinned to the fix commit (pack `1.17.0`); catalog entry updated with `platforms: [windows]` and corrected profile-path wording.
 
