@@ -624,7 +624,9 @@ async function gradingPass(host2, library, options) {
   const skillText = await readGradingSkill(host2, options.skill);
   const tags = parseGradingTags(skillText);
   const list = await library("/articles?limit=300");
-  const pending = (Array.isArray(list) ? list : []).filter((a) => a && a.id && a.title && !articleHasGrade(a)).slice(0, GRADING_BATCH);
+  // options.regrade: judge everything, including already-graded articles.
+  // Design-preview placeholder grades are always fair game.
+  const pending = (Array.isArray(list) ? list : []).filter((a) => a && a.id && a.title && (options.regrade || !articleHasGrade(a))).slice(0, GRADING_BATCH);
   if (!pending.length) return { graded: 0, tags, more: false };
   const response = await requestOneshot(host2, route, {
     instructions: gradingInstructions(skillText, tags),
@@ -2032,6 +2034,20 @@ async function executeRssCommand(ctx, host2, owner, command) {
     storageSet(ctx, "settings", owner, next);
     publishLibraryChange(owner, `Refresh period saved: every ${next.refreshMinutes} minutes.`);
     return;
+  }
+  if (command.action === "regrade-all") {
+    rssDebug("command-start", { action: command.action, id: command.id, owner });
+    // Keep the list fetch cheap: regrade passes page through /articles until exhausted.
+    const settings2 = readSettings(ctx, owner);
+    const report = { graded: 0, passes: 0 };
+    for (let pass = 0; pass < 12; pass++) {
+      const result = await gradingPass(host2, library, { skill: settings2.gradingSkill, ctx, regrade: true });
+      report.graded += result.graded;
+      report.passes++;
+      if (!result.more) break;
+    }
+    publishLibraryChange(owner, `Regraded ${report.graded} article${report.graded === 1 ? "" : "s"} across ${report.passes} pass${report.passes === 1 ? "" : "es"}.`);
+    return report;
   }
   if (command.action === "mute") {
     const phrase = String(payload.phrase || "").trim().slice(0, 200);

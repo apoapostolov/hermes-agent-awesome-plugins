@@ -25,6 +25,7 @@ _ACTIONS = (
     "mute",
     "tag_article",
     "untag_article",
+    "regrade_all",
     "list_filters",
     "add_filter",
     "remove_filter",
@@ -206,6 +207,8 @@ def handle_rss(args: dict[str, Any], **_extra: Any) -> str:
         return _run("tag", {"tag": tag, "id": ident, "title": title, "url": url})
     if action == "untag_article":
         return _run("untag", {"id": ident, "title": title, "url": url})
+    if action == "regrade_all":
+        return _run("regrade-all", {}, timeout=600.0)
     if action == "list_filters":
         return _run("list-filters", {})
     if action == "add_filter":
