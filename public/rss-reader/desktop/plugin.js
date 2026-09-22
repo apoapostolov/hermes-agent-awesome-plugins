@@ -921,12 +921,27 @@ function youtubeVideoId(value) {
 function isYoutubeArticle(article) {
   return !!(youtubeVideoId(article?.url) || youtubeVideoId(article?.identity));
 }
+function youtubePageOriginOk() {
+  try {
+    return typeof location !== "undefined" && (location.protocol === "http:" || location.protocol === "https:");
+  } catch {
+    return false;
+  }
+}
+function youtubeWatchUrl(id, start) {
+  if (!id) return "";
+  const base = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+  const seconds = Math.max(0, Math.floor(Number(start) || 0));
+  return seconds ? `${base}&t=${seconds}s` : base;
+}
 function youtubeEmbedSrc(id, start) {
   if (!id) return "";
-  const hostName = currentYoutubeCookies() ? "www.youtube.com" : "www.youtube-nocookie.com";
-  const base = `https://${hostName}/embed/${encodeURIComponent(id)}`;
+  const url = new URL(`https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}`);
+  url.searchParams.set("feature", "oembed");
+  url.searchParams.set("playsinline", "1");
   const seconds = Math.max(0, Math.floor(Number(start) || 0));
-  return seconds ? `${base}?start=${seconds}` : base;
+  if (seconds) url.searchParams.set("start", String(seconds));
+  return url.toString();
 }
 function youtubeTimeParam(value) {
   const raw = String(value || "").trim().toLowerCase();
@@ -977,22 +992,42 @@ function youtubeEmbedHtml(id, title) {
   const label = escapeHtml(title || "YouTube video");
   return `<div class="rss-youtube"><iframe src="${youtubeEmbedSrc(id, 0)}" title="${label}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen="" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
 }
+function isYoutubeThumbSrc(value) {
+  return /(?:^|\/\/)(?:i\d*\.)?ytimg\.com\/|youtube\.com\/vi\//i.test(String(value || ""));
+}
+function stripYoutubeFeedChrome(html) {
+  const source = String(html || "");
+  if (!source) return "";
+  const template = document.createElement("template");
+  template.innerHTML = source;
+  for (const node of [...template.content.querySelectorAll("iframe,object,embed")]) node.remove();
+  for (const image of [...template.content.querySelectorAll("img")]) {
+    const src = image.getAttribute("src") || "";
+    if (!isYoutubeThumbSrc(src)) continue;
+    const wrap = image.parentElement;
+    image.remove();
+    if (wrap && wrap.localName === "a" && !(wrap.textContent || "").trim() && !wrap.querySelector("img")) wrap.remove();
+  }
+  for (const link of [...template.content.querySelectorAll("a")]) {
+    const label = (link.textContent || "").replace(/\s+/g, " ").trim();
+    const href = link.getAttribute("href") || "";
+    if (/^embed$/i.test(label) || /youtube(?:-nocookie)?\.com\/embed\//i.test(href)) link.remove();
+  }
+  return template.innerHTML;
+}
+function stripYoutubePlayer(source) {
+  return String(source || "")
+    .replace(/<div class="rss-youtube(?:-fallback)?"[^>]*>[\s\S]*?<\/div>/gi, "")
+    .replace(/<iframe\b[^>]*\bsrc="https:\/\/www\.(?:youtube-nocookie|youtube)\.com\/embed\/[^"]*"[^>]*><\/iframe>/gi, "");
+}
 function withYoutubeEmbed(html, article) {
   const id = youtubeVideoId(article?.url) || youtubeVideoId(article?.identity);
-  if (!id) return String(html || "");
-  let source = String(html || "");
-  if (!/class="rss-youtube"|youtube-nocookie\.com\/embed\/|youtube\.com\/embed\//i.test(source)) {
-    source = youtubeEmbedHtml(id, article?.title) + source;
-  }
+  let source = stripYoutubeFeedChrome(stripYoutubePlayer(html));
+  if (!id) return source;
   if (/class="rss-yt-chapters"/.test(source)) return source;
   const chapters = parseYoutubeChapters(article?.body || source);
-  if (!chapters.length) return source;
-  const block = youtubeChaptersHtml(id, chapters);
-  const start = source.search(/class="rss-youtube"/i);
-  if (start < 0) return source + block;
-  const close = source.indexOf("</div>", start);
-  if (close < 0) return source + block;
-  return source.slice(0, close + 6) + block + source.slice(close + 6);
+  if (chapters.length < 2) return source;
+  return youtubeChaptersHtml(id, chapters) + source;
 }
 function youtubeSiteHost(host) {
   const name = String(host || "").replace(/^www\./i, "").replace(/^m\./i, "").toLowerCase();
@@ -2743,10 +2778,6 @@ function parseFeed(xml, base) {
     const image = enclosure?.getAttribute("url") || mediaNode?.getAttribute("url") || inlineImg || "";
     const body = feedItemBody(rawContent);
     const title2 = plainText(text(child(entry, "title"))).slice(0, 1e3) || "Untitled article";
-    const videoId = youtubeVideoId(url) || youtubeVideoId(text(child(entry, "videoid", "id")));
-    const youtubeBody = videoId && !/youtube-nocookie\.com\/embed\/|youtube\.com\/embed\//i.test(body)
-      ? `${youtubeEmbedHtml(videoId, title2)}${body ? `\n${body}` : ""}`
-      : body;
     const rawDate = text(
       child(entry, "published", "pubdate", "updated", "date")
     );
@@ -2755,7 +2786,7 @@ function parseFeed(xml, base) {
       identity: text(child(entry, "id", "guid")).slice(0, 2048) || url || title2 + "\n" + body,
       title: title2,
       url,
-      body: youtubeBody,
+      body,
       image,
       published_at: Number.isFinite(time) ? new Date(time).toISOString() : null
     };
@@ -3492,7 +3523,11 @@ var styles = `
 .hermes-rss .rss-detail .rss-body pre code{background:transparent;padding:0}
 .hermes-rss .rss-detail .rss-body img,.hermes-rss .rss-detail .rss-body video,.hermes-rss .rss-detail .rss-body iframe,.hermes-rss .rss-detail .rss-body audio{max-width:100%;height:auto;display:block;margin:1.1em 0;border-radius:8px}
 .hermes-rss .rss-youtube{position:relative;width:100%;aspect-ratio:16/9;margin:0 0 1.25em;border-radius:8px;overflow:hidden;background:color-mix(in srgb,var(--ui-text-secondary) 12%,transparent)}
-.hermes-rss .rss-youtube iframe{position:absolute;inset:0;width:100%;height:100%;max-width:none;margin:0;border:0;border-radius:0;display:block}
+.hermes-rss .rss-youtube iframe,.hermes-rss .rss-youtube-frame{position:absolute;inset:0;width:100%;height:100%;max-width:none;margin:0;border:0;border-radius:0;display:block}
+.hermes-rss .rss-youtube-fallback a.rss-yt-open{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:inherit;text-decoration:none;border:0}
+.hermes-rss .rss-youtube-fallback img{width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:0}
+.hermes-rss .rss-youtube-fallback .rss-yt-play{position:absolute;width:68px;height:48px;border-radius:12px;background:#f00;box-shadow:0 2px 10px color-mix(in srgb,#000 40%,transparent)}
+.hermes-rss .rss-youtube-fallback .rss-yt-play::after{content:"";position:absolute;left:26px;top:14px;border-style:solid;border-width:10px 0 10px 18px;border-color:transparent transparent transparent #fff}
 .hermes-rss .rss-yt-chapters{margin:0 0 1.2em}
 .hermes-rss .rss-yt-chapters .rss-eyebrow{margin:10px 0 6px}
 .hermes-rss .rss-yt-chapters ol{list-style:none;padding:0;margin:0;display:grid;gap:1px}
@@ -3528,7 +3563,7 @@ var styles = `
 .hermes-rss .rss-user-agent-row{flex-wrap:nowrap;gap:10px;min-width:0}
 .hermes-rss .rss-user-agent-row .rss-setting{flex:0 0 auto}
 .hermes-rss .rss-user-agent{flex:1 1 auto;min-width:0;width:auto;height:26px;padding:2px 8px;font-family:ui-monospace,Consolas,monospace;font-size:12px}
-.hermes-rss textarea.rss-youtube-cookies{display:block;width:100%;min-height:6rem;height:auto;box-sizing:border-box;padding:8px 10px;resize:vertical;line-height:1.45;font-family:ui-monospace,Consolas,monospace;font-size:12px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;background:transparent;color:inherit;box-shadow:none}
+.hermes-rss .rss-settings textarea.rss-youtube-cookies{display:block;width:100%;box-sizing:border-box;field-sizing:fixed;height:calc(5.8em + 18px);min-height:calc(5.8em + 18px);padding:8px 10px;resize:vertical;overflow:auto;line-height:1.45;font-family:ui-monospace,Consolas,monospace;font-size:12px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;background:transparent;color:inherit;box-shadow:none}
 .hermes-rss .rss-settings input:not([type=checkbox]),.hermes-rss .rss-filter-panel input:not([type=checkbox]){border:1px solid var(--ui-stroke-secondary);border-radius:5px;background:transparent;color:inherit;box-shadow:none}
 .hermes-rss .rss-article-tabs{display:inline-flex;gap:14px;margin:0;border:0;padding:0;justify-self:center;flex:0 0 auto}
 .hermes-rss .rss-article-tabs button{border:0;background:transparent;border-radius:0;padding:2px 0;font-size:12px;line-height:1.4;color:var(--ui-text-secondary)}
@@ -4030,6 +4065,22 @@ function RssBrowserFrame({ url }) {
     };
   }, [url]);
   return jsx("div", { ref: hostRef, className: "rss-browser-frame-host", "data-url": url || "", style: { display: "flex", flex: "1 1 auto", minHeight: 0, height: "100%", width: "100%" } });
+}
+function YoutubeFrame({ id, start }) {
+  const src = youtubeEmbedSrc(id, start);
+  if (!src) return null;
+  return jsx("div", {
+    className: "rss-youtube",
+    "data-yt-id": id || "",
+    children: jsx("iframe", {
+      className: "rss-youtube-frame",
+      src,
+      title: "YouTube video",
+      allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+      allowFullScreen: true,
+      referrerPolicy: "strict-origin-when-cross-origin"
+    })
+  });
 }
 function openHermesPreview(url, label) {
   if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
@@ -4573,6 +4624,7 @@ function ReaderProfile({ ctx, owner }) {
     updateSelected(value);
     storageSet(ctx, "selected", owner, value);
   };
+  const [youtubeStart, setYoutubeStart] = useState(0);
   const [query, setQuery] = useState("");
   const [exclude, setExclude] = useState("");
   const [showHidden, setShowHidden] = useState(false);
@@ -4644,11 +4696,10 @@ function ReaderProfile({ ctx, owner }) {
         start = youtubeTimeParam(parsed.searchParams.get("t") || parsed.searchParams.get("start") || "");
       } catch {
       }
-      const iframe = event.currentTarget.querySelector(".rss-youtube iframe");
-      if (iframe && id && youtubeVideoId(iframe.getAttribute("src")) === id && start >= 0) {
+      if (id && start >= 0) {
         event.preventDefault();
         event.stopPropagation();
-        iframe.src = youtubeEmbedSrc(id, start);
+        setYoutubeStart(start);
         return;
       }
     }
@@ -4734,16 +4785,18 @@ function ReaderProfile({ ctx, owner }) {
   });
   const article = detail.data;
   const articleRender = useMemo(() => {
-    if (!article) return { rich: { html: "", isHtml: false }, bodyHtml: "", youtube: false };
+    if (!article) return { rich: { html: "", isHtml: false }, bodyHtml: "", youtube: false, youtubeId: "" };
     const youtube = isYoutubeArticle(article);
+    const youtubeId = youtubeVideoId(article?.url) || youtubeVideoId(article?.identity) || "";
     const rich = bodyToRichHtml(article.body || "", youtube ? "" : article.image);
     const gradeTag = gradingTagFor(settings.gradingTags, article.grade?.level);
     const graded = gradeTag && gradeTag.label ? withGradeNote(rich.html, article.grade, gradeTag) : rich.html;
-    return { rich, bodyHtml: withYoutubeEmbed(graded, article), youtube };
+    return { rich, bodyHtml: withYoutubeEmbed(graded, article), youtube, youtubeId };
   }, [article?.id, article?.url, article?.identity, article?.body, article?.image, article?.grade?.level, article?.grade?.reason, settings.gradingTags]);
   useEffect(() => {
     setDiscussOpen(false);
     setDiscussNote("");
+    setYoutubeStart(0);
     const pane = detailRef.current;
     if (pane) pane.scrollTop = 0;
   }, [selected]);
@@ -6427,7 +6480,8 @@ function ReaderProfile({ ctx, owner }) {
           }
         ) }),
         tab === "article" && /* @__PURE__ */ jsxs("div", { id: "rss-article-panel-article", role: "tabpanel", "aria-labelledby": "rss-article-tab-article", children: [
-          articleRender.bodyHtml ? /* @__PURE__ */ jsx("div", { ref: richRef, className: "rss-body rss-rich", onClick: onRichLinkClick, onAuxClick: onRichLinkClick, dangerouslySetInnerHTML: { __html: articleRender.bodyHtml } }) : /* @__PURE__ */ jsx("p", { className: "rss-body", children: "This feed contains only a headline. Open the original article to read more." }),
+          articleRender.youtube && articleRender.youtubeId ? /* @__PURE__ */ jsx(YoutubeFrame, { id: articleRender.youtubeId, start: youtubeStart }) : null,
+          articleRender.bodyHtml ? /* @__PURE__ */ jsx("div", { ref: richRef, className: "rss-body rss-rich", onClick: onRichLinkClick, onAuxClick: onRichLinkClick, dangerouslySetInnerHTML: { __html: articleRender.bodyHtml } }) : articleRender.youtube ? null : /* @__PURE__ */ jsx("p", { className: "rss-body", children: "This feed contains only a headline. Open the original article to read more." }),
           !articleRender.youtube && /* @__PURE__ */ jsx("div", { className: "rss-note", children: article.captured ? "Scripts are stripped and only https links, images and embeds are shown." : articleRender.rich.isHtml ? "Rendered from the feed's own HTML. Scripts are stripped and only https links, images and embeds are shown." : "This is the text supplied by the feed. It may be an excerpt. Scripts are stripped; https images, tables and embeds are kept." })
         ] }),
         tab === "summary" && /* @__PURE__ */ jsxs("div", { id: "rss-article-panel-summary", role: "tabpanel", "aria-labelledby": "rss-article-tab-summary", children: [
