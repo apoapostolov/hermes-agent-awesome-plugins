@@ -6,10 +6,8 @@ import json
 import os
 import re
 import socket
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
-from email.utils import format_datetime
-from html import escape
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urljoin, urlparse
@@ -25,12 +23,14 @@ _TIMEOUT = 25
 _USER_AGENT = "HermesRSS/0.2"
 _ARTICLE_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
 )
 
 
 class FeedRequest(BaseModel):
     url: str
+    user_agent: str | None = None
+    cookie: str | None = None
 
 
 class GradingSkillRequest(BaseModel):
@@ -185,64 +185,109 @@ def read_commands() -> list[dict]:
     return commands
 
 
-def _reddit_api_url(raw: str) -> str | None:
+def _request_user_agent(payload: FeedRequest, fallback: str) -> str:
+    raw = str(payload.user_agent or "").strip()
+    if 1 <= len(raw) <= 512 and all(32 <= ord(ch) <= 126 for ch in raw):
+        return raw
+    return fallback
+
+
+def _is_youtube_url(raw: str) -> bool:
+    host = (urlparse(raw).hostname or "").lower()
+    return host.endswith("youtube.com") or host.endswith("youtu.be") or host.endswith("youtube-nocookie.com")
+
+
+def _cookie_header(raw: str) -> str:
+    value = str(raw or "").strip()
+    if not value:
+        return ""
+    if re.match(r"^[A-Za-z]:[\\/]", value) or value.startswith("/"):
+        path = Path(value)
+        try:
+            if path.is_file() and path.stat().st_size <= 400_000:
+                value = path.read_text(encoding="utf-8", errors="replace")
+            else:
+                return ""
+        except OSError:
+            return ""
+    if value.lower().startswith("cookie:"):
+        value = value[7:].strip()
+    if "\t" in value or value.lstrip().startswith("# Netscape"):
+        pairs: list[str] = []
+        for line in value.splitlines():
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) < 7:
+                continue
+            domain = parts[0].lower()
+            if "youtube.com" not in domain and "google.com" not in domain:
+                continue
+            name, cookie_value = parts[5], parts[6]
+            if name and "=" not in name:
+                pairs.append(f"{name}={cookie_value}")
+        return "; ".join(pairs)[:32000]
+    if "=" not in value:
+        return ""
+    return value.replace("\n", " ").strip()[:32000]
+
+
+def _headers_with_cookie(headers: dict[str, str], payload: FeedRequest, url: str) -> dict[str, str]:
+    if not _is_youtube_url(url):
+        return headers
+    cookie = _cookie_header(payload.cookie or "")
+    if not cookie:
+        return headers
+    return {**headers, "Cookie": cookie}
+
+
+def _reddit_subreddit(raw: str) -> str | None:
     parsed = urlparse(raw)
     if parsed.scheme not in {"http", "https"} or parsed.username or parsed.password:
         return None
     if (parsed.hostname or "").lower() not in {"reddit.com", "www.reddit.com", "old.reddit.com", "new.reddit.com"}:
         return None
-    match = re.fullmatch(r"/r/([A-Za-z0-9_]{2,50})(?:/.*)?", parsed.path.rstrip("/") or "/")
-    if not match:
+    match = re.fullmatch(
+        r"/r/([A-Za-z0-9_]{2,50})(?:/(?:hot|new|top|rising|\.rss))?",
+        (parsed.path or "/").rstrip("/") or "/",
+        flags=re.I,
+    )
+    return match.group(1) if match else None
+
+
+def _reddit_api_url(raw: str) -> str | None:
+    subreddit = _reddit_subreddit(raw)
+    if not subreddit:
         return None
-    subreddit = match.group(1)
-    return f"https://www.reddit.com/r/{subreddit}/new.json?raw_json=1&limit=50"
-
-
-def _reddit_feed_xml(payload: dict, source_url: str) -> str:
-    children = payload.get("data", {}).get("children", []) if isinstance(payload, dict) else []
-    items: list[str] = []
-    for child in children:
-        data = child.get("data", {}) if isinstance(child, dict) else {}
-        if not isinstance(data, dict) or not data.get("id") or not data.get("title"):
-            continue
-        permalink = str(data.get("permalink") or "")
-        link = urljoin("https://www.reddit.com", permalink) if permalink.startswith("/") else str(data.get("url") or source_url)
-        created = data.get("created_utc")
-        try:
-            published = format_datetime(datetime.fromtimestamp(float(created), tz=timezone.utc), usegmt=True)
-        except (TypeError, ValueError, OSError, OverflowError):
-            published = ""
-        title = escape(str(data.get("title") or ""))
-        body = escape(str(data.get("selftext") or ""))
-        author = escape(str(data.get("author") or "deleted"))
-        items.append(
-            "<item>"
-            f"<guid isPermaLink=\"true\">{escape(link)}</guid>"
-            f"<title>{title}</title>"
-            f"<link>{escape(link)}</link>"
-            f"<description>{body}</description>"
-            f"<author>{author}</author>"
-            f"<pubDate>{published}</pubDate>"
-            "</item>"
-        )
-    match = re.search(r"/r/([A-Za-z0-9_]{2,50})", source_url)
-    subreddit = escape(match.group(1) if match else "Reddit")
-    return f"<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Reddit r/{subreddit}</title><link>{escape(source_url)}</link><description>Reddit community feed</description>{''.join(items)}</channel></rss>"
+    return f"https://www.reddit.com/r/{subreddit}/.rss"
 
 
 def _fetch_reddit(payload: FeedRequest) -> dict[str, str | int]:
     api_url = _reddit_api_url(payload.url)
     if not api_url:
         raise ValueError("Use a Reddit community URL such as https://www.reddit.com/r/python.")
-    _public_addresses(urlparse(api_url).hostname or "")
-    request = Request(api_url, headers={"Accept": "application/json", "User-Agent": _USER_AGENT})
-    response = build_opener(_NoRedirect()).open(request, timeout=_TIMEOUT)
-    body = _read_response(response)
-    try:
-        data = json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError("Reddit returned invalid JSON.") from exc
-    return {"text": _reddit_feed_xml(data, payload.url), "url": payload.url, "status": response.status}
+    headers = {
+        "Accept": "application/atom+xml, application/rss+xml, application/xml;q=0.9, */*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "identity",
+        "User-Agent": _request_user_agent(payload, _USER_AGENT),
+    }
+    last_error: Exception | None = None
+    for attempt in range(4):
+        try:
+            return _download(api_url, headers)
+        except HTTPException as exc:
+            last_error = exc
+            detail = str(exc.detail or "")
+            if "HTTP 429" not in detail or attempt == 3:
+                if "HTTP 429" in detail:
+                    raise HTTPException(
+                        status_code=502,
+                        detail="Reddit rate-limited the feed. Wait a few seconds and try again.",
+                    ) from exc
+                raise
+            time.sleep(1.5 * (attempt + 1))
+    raise last_error or HTTPException(status_code=502, detail="Reddit download failed.")
 
 
 @router.post("/reddit")
@@ -259,11 +304,15 @@ def fetch_article(payload: FeedRequest) -> dict[str, str | int]:
         return fetch_reddit(payload)
     return _download(
         payload.url,
-        {
-            "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-            "Accept-Encoding": "identity",
-            "User-Agent": _ARTICLE_UA,
-        },
+        _headers_with_cookie(
+            {
+                "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+                "Accept-Encoding": "identity",
+                "User-Agent": _request_user_agent(payload, _ARTICLE_UA),
+            },
+            payload,
+            payload.url,
+        ),
     )
 
 
@@ -345,7 +394,11 @@ def fetch_feed(payload: FeedRequest) -> dict[str, str | int]:
         return fetch_reddit(payload)
     return _download(
         payload.url,
-        {"Accept-Encoding": "identity", "User-Agent": _USER_AGENT},
+        _headers_with_cookie(
+            {"Accept-Encoding": "identity", "User-Agent": _request_user_agent(payload, _USER_AGENT)},
+            payload,
+            payload.url,
+        ),
     )
 
 
@@ -356,6 +409,9 @@ def _download(source_url: str, headers: dict[str, str]) -> dict[str, str | int]:
         for _ in range(4):
             parsed = urlparse(url)
             _public_addresses(parsed.hostname or "")
+            host = (parsed.hostname or "").lower()
+            if "Cookie" in headers and "youtube.com" not in host and "youtu.be" not in host and "google.com" not in host:
+                headers = {key: value for key, value in headers.items() if key.lower() != "cookie"}
             request = Request(url, headers=headers)
             try:
                 response = opener.open(request, timeout=_TIMEOUT)
@@ -397,8 +453,9 @@ def open_in_preview(payload: PreviewRequest) -> dict[str, str]:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     label = (payload.label or url).strip()
-    # Public edition: no private tui_gateway.server._broadcast_global_event import.
-    raise HTTPException(
-        status_code=501,
-        detail="In-app preview broadcast is not available in this edition. Open the URL in the system browser.",
-    )
+    try:
+        from tui_gateway.server import _broadcast_global_event
+        _broadcast_global_event("preview.open", {"url": url, "label": label})
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Preview pane unavailable: {exc}") from exc
+    return {"opened": url}

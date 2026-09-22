@@ -225,14 +225,103 @@ var SUBSCRIBE_STARTERS = [
   { group: "Popular starters", name: "The Verge", url: "https://www.theverge.com/rss/index.xml" },
   { group: "Popular starters", name: "NASA News", url: "https://www.nasa.gov/news-release/feed/" },
   { group: "Popular starters", name: "TechCrunch", url: "https://techcrunch.com/feed/" },
-  { group: "Popular starters", name: "VentureBeat AI", url: "https://venturebeat.com/category/ai/feed/" },
+  { group: "Popular starters", name: "Google AI", url: "https://blog.google/technology/ai/rss/" },
   { group: "Popular Reddit", name: "r/technology", url: "https://www.reddit.com/r/technology" },
   { group: "Popular Reddit", name: "r/programming", url: "https://www.reddit.com/r/programming" },
   { group: "Popular Reddit", name: "r/science", url: "https://www.reddit.com/r/science" },
   { group: "Popular Reddit", name: "r/worldnews", url: "https://www.reddit.com/r/worldnews" },
   { group: "Popular Reddit", name: "r/gaming", url: "https://www.reddit.com/r/gaming" },
-  { group: "Popular Reddit", name: "r/LocalLLaMA", url: "https://www.reddit.com/r/LocalLLaMA" }
+  { group: "Popular Reddit", name: "r/LocalLLaMA", url: "https://www.reddit.com/r/LocalLLaMA" },
+  { group: "YouTube AI", name: "Theo", url: "https://www.youtube.com/channel/UCbRP3c757lWg9M-U7TyEkXA" },
+  { group: "YouTube AI", name: "Matthew Berman", url: "https://www.youtube.com/channel/UCawZsQWqfGSbCI5yjkdVkTA" },
+  { group: "YouTube AI", name: "Wes Roth", url: "https://www.youtube.com/channel/UCqcbQf6yw5KzRoDDcZ_wBSw" },
+  { group: "YouTube AI", name: "AI Explained", url: "https://www.youtube.com/channel/UCNJ1Ymd5yFuUPtn21xtRbbw" },
+  { group: "YouTube AI", name: "TheAIGRID", url: "https://www.youtube.com/channel/UCbY9xX3_jW5c2fjlZVBI4cg" },
+  { group: "AI Substack", name: "ChinAI", url: "https://chinai.substack.com" },
+  { group: "AI Substack", name: "Import AI", url: "https://importai.substack.com" },
+  { group: "AI Substack", name: "Recode China AI", url: "https://www.recodechinaai.com/feed" },
+  { group: "AI Substack", name: "ChinaTalk", url: "https://www.chinatalk.media/feed" },
+  { group: "AI Substack", name: "Interconnects", url: "https://www.interconnects.ai/feed" },
+  { group: "AI Substack", name: "Turing Post", url: "https://turingpost.substack.com" }
 ];
+var USER_AGENT_PRESETS = [
+  { id: "hermes", label: "Hermes RSS", value: "HermesRSS/0.2" },
+  { id: "chrome", label: "Chrome", value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36" },
+  { id: "firefox", label: "Firefox", value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0" },
+  { id: "atlas", label: "ChatGPT Atlas", value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36" },
+  { id: "chatgpt", label: "ChatGPT-User", value: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot" },
+  { id: "claude", label: "Claude-User", value: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +claude-user@anthropic.com)" }
+];
+var DEFAULT_USER_AGENT = USER_AGENT_PRESETS[0].value;
+function normalizeUserAgent(raw) {
+  const value = String(raw || "").trim().slice(0, 512);
+  if (!value) return DEFAULT_USER_AGENT;
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 32 || code > 126) return DEFAULT_USER_AGENT;
+  }
+  return value;
+}
+function userAgentPresetId(raw) {
+  const value = normalizeUserAgent(raw);
+  const hit = USER_AGENT_PRESETS.find((row) => row.value === value);
+  return hit ? hit.id : "custom";
+}
+function currentRequestUserAgent() {
+  try {
+    const owner = JSON.stringify([host.state.connectionId?.get() || "local", host.state.profile.get()]);
+    return rssCtx ? readSettings(rssCtx, owner).userAgent : DEFAULT_USER_AGENT;
+  } catch {
+    return DEFAULT_USER_AGENT;
+  }
+}
+function normalizeYoutubeCookies(raw) {
+  return String(raw || "").replace(/\r\n/g, "\n").trim().slice(0, 32000);
+}
+function youtubeCookieHeader(raw) {
+  const value = normalizeYoutubeCookies(raw);
+  if (!value) return "";
+  if (/^[A-Za-z]:[\\/]/.test(value) || value.startsWith("/")) return value;
+  const body = value.replace(/^cookie:\s*/i, "");
+  if (body.includes("\t") || /^\s*# Netscape/i.test(body)) {
+    const pairs = [];
+    for (const line of body.split("\n")) {
+      if (!line || line.startsWith("#")) continue;
+      const parts = line.split("\t");
+      if (parts.length < 7) continue;
+      const domain = parts[0].toLowerCase();
+      if (!/youtube\.com|google\.com/.test(domain)) continue;
+      if (!parts[5] || parts[5].includes("=")) continue;
+      pairs.push(`${parts[5]}=${parts[6]}`);
+    }
+    return pairs.join("; ");
+  }
+  return body.replace(/\n/g, " ").trim();
+}
+function currentYoutubeCookies() {
+  try {
+    const owner = JSON.stringify([host.state.connectionId?.get() || "local", host.state.profile.get()]);
+    return rssCtx ? youtubeCookieHeader(readSettings(rssCtx, owner).youtubeCookies) : "";
+  } catch {
+    return "";
+  }
+}
+function isYoutubeRequestUrl(raw) {
+  try {
+    const hostName = new URL(String(raw || "").trim()).hostname.replace(/^www\./i, "").toLowerCase();
+    return hostName === "youtube.com" || hostName === "youtu.be" || hostName === "music.youtube.com" || hostName === "youtube-nocookie.com";
+  } catch {
+    return false;
+  }
+}
+function feedRequestFields(url) {
+  const body = { url, user_agent: currentRequestUserAgent() };
+  if (isYoutubeRequestUrl(url)) {
+    const cookie = currentYoutubeCookies();
+    if (cookie) body.cookie = cookie;
+  }
+  return body;
+}
 // Every returned level is stored, "normal" included: it is what stops a later
 // pass from re-grading the same articles. The skill's tag table decides which
 // levels tint or carry a pill.
@@ -286,6 +375,15 @@ function tagRank(tags, level) {
   const fallback = gradingTagFor(DEFAULT_GRADING_TAGS, level);
   const raw = Number(fallback?.rank);
   return Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0;
+}
+function sortArticlesByTime(list, oldestFirst) {
+  const rows = Array.isArray(list) ? list.slice() : [];
+  rows.sort((a, b) => {
+    const left = String(a?.published_at || a?.received_at || "");
+    const right = String(b?.published_at || b?.received_at || "");
+    return oldestFirst ? left.localeCompare(right) : right.localeCompare(left);
+  });
+  return rows;
 }
 function sortArticlesByImportance(list, tags) {
   const rows = Array.isArray(list) ? list.slice() : [];
@@ -715,6 +813,7 @@ function applyCachedBody(library, article) {
 }
 function articleNeedsCapture(article) {
   if (!article?.url) return false;
+  if (isYoutubeArticle(article)) return false;
   if (article.captureGaveUp) return false;
   const body = String(article.body || "");
   if (article.captured && body.length >= 800) return false;
@@ -737,6 +836,33 @@ function folderContains(feedFolder, browseFolder) {
   const want = String(browseFolder);
   if (want === "") return key === "";
   return key === want || key.startsWith(`${want}/`);
+}
+function rememberUnreadTrail(trail, item) {
+  if (!item?.id) return Array.isArray(trail) ? trail : [];
+  const rows = Array.isArray(trail) ? trail : [];
+  if (rows[rows.length - 1]?.id === item.id) return rows;
+  const at = rows.findIndex((row) => row.id === item.id);
+  if (at >= 0) return rows.slice(0, at + 1);
+  return rows.concat([item]);
+}
+function unreadListWithTrail(live, trail) {
+  const rows = Array.isArray(live) ? live : [];
+  const held = Array.isArray(trail) ? trail : [];
+  if (!held.length) return rows;
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const seen = new Set();
+  const out = [];
+  for (const entry of held) {
+    if (!entry?.id || seen.has(entry.id)) continue;
+    out.push(byId.get(entry.id) || entry);
+    seen.add(entry.id);
+  }
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    out.push(row);
+    seen.add(row.id);
+  }
+  return out;
 }
 function feedTriState(value) {
   if (value === true) return "on";
@@ -769,22 +895,146 @@ function filterCaptureFresh(fresh, feeds, settings) {
   const byId = new Map((Array.isArray(feeds) ? feeds : []).map((feed) => [feed.id, feed]));
   return (Array.isArray(fresh) ? fresh : []).filter((item) => feedWantsCapture(byId.get(item.feed_id), settings));
 }
+function youtubeVideoId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const tagged = /(?:^|[/:])yt:video:([A-Za-z0-9_-]{11})(?:$|[/?:#\s])/i.exec(raw);
+  if (tagged) return tagged[1];
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    const host = url.hostname.replace(/^www\./i, "").replace(/^m\./i, "").toLowerCase();
+    if (host === "youtu.be") {
+      const id = url.pathname.split("/").filter(Boolean)[0] || "";
+      return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : "";
+    }
+    if (host === "youtube.com" || host === "music.youtube.com" || host === "youtube-nocookie.com") {
+      const v = url.searchParams.get("v");
+      if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+      const parts = url.pathname.split("/").filter(Boolean);
+      const kind = parts.findIndex((part) => ["embed", "shorts", "live", "v"].includes(part));
+      if (kind >= 0 && parts[kind + 1] && /^[A-Za-z0-9_-]{11}$/.test(parts[kind + 1])) return parts[kind + 1];
+    }
+  } catch {
+  }
+  return "";
+}
+function isYoutubeArticle(article) {
+  return !!(youtubeVideoId(article?.url) || youtubeVideoId(article?.identity));
+}
+function youtubeEmbedSrc(id, start) {
+  if (!id) return "";
+  const hostName = currentYoutubeCookies() ? "www.youtube.com" : "www.youtube-nocookie.com";
+  const base = `https://${hostName}/embed/${encodeURIComponent(id)}`;
+  const seconds = Math.max(0, Math.floor(Number(start) || 0));
+  return seconds ? `${base}?start=${seconds}` : base;
+}
+function youtubeTimeParam(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return -1;
+  if (/^\d+$/.test(raw)) return Number(raw);
+  const only = /^(\d+)s$/.exec(raw);
+  if (only) return Number(only[1]);
+  const parts = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(raw);
+  if (!parts || parts[0] === "") return -1;
+  return Number(parts[1] || 0) * 3600 + Number(parts[2] || 0) * 60 + Number(parts[3] || 0);
+}
+function parseYoutubeChapters(raw) {
+  const text = String(raw || "").replace(/<[^>]+>/g, "\n");
+  const re = /(?:^|\n)[ \t]*(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))(?:[ \t]+|[ \t]*[-:|]\s+)([^\n]+)/g;
+  const rows = [];
+  const seen = new Set();
+  let match;
+  while ((match = re.exec(text))) {
+    const hours = match[1] != null ? Number(match[1]) : 0;
+    const minutes = match[1] != null ? Number(match[2]) : Number(match[4]);
+    const seconds = match[1] != null ? Number(match[3]) : Number(match[5]);
+    if (minutes > 59 || seconds > 59) continue;
+    const total = hours * 3600 + minutes * 60 + seconds;
+    if (seen.has(total)) continue;
+    if (rows.length && total <= rows[rows.length - 1].seconds) continue;
+    let title = String(match[6] || "").replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
+    title = title.replace(/^[-*:.|]+\s*/, "").slice(0, 80).trim();
+    if (!title) continue;
+    seen.add(total);
+    const stamp = hours
+      ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+      : `${minutes}:${String(seconds).padStart(2, "0")}`;
+    rows.push({ seconds: total, stamp, title });
+    if (rows.length >= 40) break;
+  }
+  return rows.length >= 2 ? rows : [];
+}
+function youtubeChaptersHtml(id, chapters) {
+  if (!id || !chapters.length) return "";
+  const items = chapters.map((chapter) => {
+    const href = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}&t=${chapter.seconds}s`;
+    return `<li><a class="rss-yt-chapter" href="${escapeHtml(href)}"><span class="rss-yt-stamp">${escapeHtml(chapter.stamp)}</span>${escapeHtml(chapter.title)}</a></li>`;
+  }).join("");
+  return `<nav class="rss-yt-chapters" aria-label="Chapters"><p class="rss-eyebrow">Chapters</p><ol>${items}</ol></nav>`;
+}
+function youtubeEmbedHtml(id, title) {
+  if (!id) return "";
+  const label = escapeHtml(title || "YouTube video");
+  return `<div class="rss-youtube"><iframe src="${youtubeEmbedSrc(id, 0)}" title="${label}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen="" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
+}
+function withYoutubeEmbed(html, article) {
+  const id = youtubeVideoId(article?.url) || youtubeVideoId(article?.identity);
+  if (!id) return String(html || "");
+  let source = String(html || "");
+  if (!/class="rss-youtube"|youtube-nocookie\.com\/embed\/|youtube\.com\/embed\//i.test(source)) {
+    source = youtubeEmbedHtml(id, article?.title) + source;
+  }
+  if (/class="rss-yt-chapters"/.test(source)) return source;
+  const chapters = parseYoutubeChapters(article?.body || source);
+  if (!chapters.length) return source;
+  const block = youtubeChaptersHtml(id, chapters);
+  const start = source.search(/class="rss-youtube"/i);
+  if (start < 0) return source + block;
+  const close = source.indexOf("</div>", start);
+  if (close < 0) return source + block;
+  return source.slice(0, close + 6) + block + source.slice(close + 6);
+}
+function youtubeSiteHost(host) {
+  const name = String(host || "").replace(/^www\./i, "").replace(/^m\./i, "").toLowerCase();
+  if (name === "youtu.be" || name === "youtube.com" || name === "music.youtube.com") return name;
+  return "";
+}
 function youtubeFeedFromUrl(raw) {
   try {
     const url = new URL(String(raw || "").trim());
-    const host = url.hostname.replace(/^www\./i, "").replace(/^m\./i, "").toLowerCase();
-    if (host === "youtu.be") return "";
-    if (host !== "youtube.com") return "";
-    if (/\/feeds\/videos\.xml$/i.test(url.pathname)) return url.href;
+    const host = youtubeSiteHost(url.hostname);
+    const list = url.searchParams.get("list") || url.searchParams.get("playlist_id");
+    if (host === "youtu.be") {
+      if (list) return `https://www.youtube.com/feeds/videos.xml?playlist_id=${encodeURIComponent(list)}`;
+      return "";
+    }
+    if (!host) return "";
+    if (/\/feeds\/videos\.xml$/i.test(url.pathname)) {
+      url.hostname = "www.youtube.com";
+      url.protocol = "https:";
+      return url.href;
+    }
     const channel = url.pathname.match(/^\/channel\/(UC[\w-]+)/i);
-    if (channel) return `https://www.youtube.com/feeds/videos.xml?channel_id=${channel[1]}`;
+    if (channel && !list) return `https://www.youtube.com/feeds/videos.xml?channel_id=${channel[1]}`;
     const user = url.pathname.match(/^\/user\/([\w.-]+)/i);
-    if (user) return `https://www.youtube.com/feeds/videos.xml?user=${encodeURIComponent(user[1])}`;
-    const list = url.searchParams.get("list");
+    if (user && !list) return `https://www.youtube.com/feeds/videos.xml?user=${encodeURIComponent(user[1])}`;
     if (list) return `https://www.youtube.com/feeds/videos.xml?playlist_id=${encodeURIComponent(list)}`;
     return "";
   } catch {
     return "";
+  }
+}
+function isYoutubePlaylistFeed(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return false;
+  const atom = youtubeFeedFromUrl(value);
+  if (/[?&]playlist_id=/i.test(atom)) return true;
+  try {
+    const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+    if (!youtubeSiteHost(url.hostname)) return false;
+    return Boolean(url.searchParams.get("playlist_id") || url.searchParams.get("list"));
+  } catch {
+    return false;
   }
 }
 function substackFeedFromUrl(raw) {
@@ -825,12 +1075,11 @@ async function resolveSubscribeUrl(raw) {
   const expanded = expandSubscribeUrl(raw);
   try {
     const url = new URL(/^https?:\/\//i.test(expanded) ? expanded : `https://${expanded}`);
-    const host = url.hostname.replace(/^www\./i, "").replace(/^m\./i, "").toLowerCase();
-    if (host === "youtube.com") {
+    if (youtubeSiteHost(url.hostname)) {
       const direct = youtubeFeedFromUrl(url.href);
       if (direct) return direct;
       if (url.pathname.length > 1 && !/\/feeds\//i.test(url.pathname)) {
-        const page = await rssRest("/article", { method: "POST", body: { url: `https://www.youtube.com${url.pathname}` } });
+        const page = await rssRest("/article", { method: "POST", body: feedRequestFields(`https://www.youtube.com${url.pathname}`) });
         const id = youtubeChannelIdFromHtml(page?.text);
         if (id) return `https://www.youtube.com/feeds/videos.xml?channel_id=${id}`;
         throw new Error("Could not find a YouTube channel feed for that URL.");
@@ -1254,18 +1503,15 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
       const rules = url.searchParams.get("show_hidden") === "true" ? [] : (library.filters?.mutes || []).map(rule => ({ ...rule, phrase: rule.phrase.toLowerCase() }));
       const savedExcludes = (library.filters?.searches || []).filter(search => search.enabled !== false).map(search => String(search.exclude || search.name || "").trim().toLowerCase()).filter(Boolean);
       let dirty = false;
-      const rows = library.articles.filter((a) => {
+      const oldestFirst = Boolean(feed && library.feeds.some((item) => item.id === feed && isYoutubePlaylistFeed(item.url)));
+      const rows = sortArticlesByTime(library.articles.filter((a) => {
         if (feed && a.feed_id !== feed || folder !== null && !library.feeds.some(item => item.id === a.feed_id && folderContains(item.folder, folder)) || view === "unread" && a.is_read || view === "saved" && !a.is_saved) return false;
         if (!q && !exclude && !rules.length && !savedExcludes.length) return true;
         const text = `${a.title}\n${a.body}`.toLowerCase();
         return (!q || text.includes(q)) && (!exclude || !text.includes(exclude)) &&
           !savedExcludes.some(phrase => text.includes(phrase)) &&
           !rules.some(rule => muteHidesArticle(rule, a, library.feeds));
-      }      ).sort(
-        (a, b) => (b.published_at || b.received_at).localeCompare(
-          a.published_at || a.received_at
-        )
-      ).slice(0, Number(url.searchParams.get("limit")) || 100).map((a) => {
+      }), oldestFirst).slice(0, Number(url.searchParams.get("limit")) || 100).map((a) => {
         if (applyCachedBody(library, a)) dirty = true;
         if (applyCachedGrade(library, a)) dirty = true;
         return { ...a, excerpt: cheapExcerpt(a.body) };
@@ -1447,6 +1693,8 @@ function readSettings(ctx, owner) {
     tickerClickBehavior: ["reader", "browser", "external"].includes(stored.tickerClickBehavior) ? stored.tickerClickBehavior : "reader",
     openInExternalBrowser: stored.openInExternalBrowser === true,
     registerHermesTools: stored.registerHermesTools === true,
+    userAgent: normalizeUserAgent(stored.userAgent),
+    youtubeCookies: normalizeYoutubeCookies(stored.youtubeCookies),
     captureImproveHandoff: typeof stored.captureImproveHandoff === "string" ? stored.captureImproveHandoff : defaultCaptureImproveHandoff(),
     gradingSkill: gradingSkillName(typeof stored.gradingSkill === "string" ? stored.gradingSkill : ""),
     gradingTags: readGradingTags(ctx, owner)
@@ -2288,8 +2536,8 @@ async function fetchFeedViaApi(rawUrl) {
   const resolved = await resolveSubscribeUrl(rawUrl);
   const redditUrl = redditCommunityUrl(resolved);
   const response = redditUrl
-    ? await rssRest("/reddit", { method: "POST", body: { url: redditUrl } })
-    : await rssRest("/feed", { method: "POST", body: { url: publicUrl(resolved).href } });
+    ? await rssRest("/reddit", { method: "POST", body: feedRequestFields(redditUrl) })
+    : await rssRest("/feed", { method: "POST", body: feedRequestFields(publicUrl(resolved).href) });
   if (!response || typeof response.text !== "string")
     throw new Error("RSS backend returned an invalid feed response.");
   return parseFeed(response.text, response.url || redditUrl || publicUrl(resolved).href);
@@ -2510,6 +2758,10 @@ function parseFeed(xml, base) {
     const image = enclosure?.getAttribute("url") || mediaNode?.getAttribute("url") || inlineImg || "";
     const body = feedItemBody(rawContent);
     const title2 = plainText(text(child(entry, "title"))).slice(0, 1e3) || "Untitled article";
+    const videoId = youtubeVideoId(url) || youtubeVideoId(text(child(entry, "videoid", "id")));
+    const youtubeBody = videoId && !/youtube-nocookie\.com\/embed\/|youtube\.com\/embed\//i.test(body)
+      ? `${youtubeEmbedHtml(videoId, title2)}${body ? `\n${body}` : ""}`
+      : body;
     const rawDate = text(
       child(entry, "published", "pubdate", "updated", "date")
     );
@@ -2518,7 +2770,7 @@ function parseFeed(xml, base) {
       identity: text(child(entry, "id", "guid")).slice(0, 2048) || url || title2 + "\n" + body,
       title: title2,
       url,
-      body,
+      body: youtubeBody,
       image,
       published_at: Number.isFinite(time) ? new Date(time).toISOString() : null
     };
@@ -2617,6 +2869,8 @@ function mediaToMarkdown(el) {
   }
   if (name === "iframe" || name === "embed") {
     const src = httpsSrc(el.getAttribute("src"));
+    const id = youtubeVideoId(src);
+    if (id) return `!youtube[${title}](${id})`;
     return src ? `[Embed](${src})` : "";
   }
   if (name === "object") {
@@ -2851,7 +3105,7 @@ async function captureArticleNow(host2, rawUrl, route, owner, options = {}) {
     assertOwner(host2, route);
     const response = await rssRest("/article", {
       method: "POST",
-      body: { url: publicUrl(target).href }
+      body: feedRequestFields(publicUrl(target).href)
     });
     assertOwner(host2, route);
     if (!response || typeof response.text !== "string")
@@ -2942,6 +3196,24 @@ function sanitizeRichHtml(source) {
       media.setAttribute("controls", "");
       media.setAttribute("preload", "none");
     }
+    if (media.localName === "iframe") {
+      const id = youtubeVideoId(src || media.getAttribute("src"));
+      if (id) {
+        media.setAttribute("src", youtubeEmbedSrc(id));
+        media.setAttribute("allowfullscreen", "");
+        media.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+        media.setAttribute("loading", "lazy");
+        media.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+        media.removeAttribute("width");
+        media.removeAttribute("height");
+        if (!media.closest(".rss-youtube")) {
+          const wrap = document.createElement("div");
+          wrap.className = "rss-youtube";
+          media.replaceWith(wrap);
+          wrap.appendChild(media);
+        }
+      }
+    }
   }
   for (const node of template.content.querySelectorAll("*")) {
     for (const attribute of [...node.attributes]) {
@@ -2953,7 +3225,10 @@ function sanitizeRichHtml(source) {
         || name === "data" && tag === "object"
         || name === "type" && (tag === "source" || tag === "embed")
         || name === "alt" || name === "title" || name === "colspan" || name === "rowspan"
-        || name === "loading" && tag === "img"
+        || name === "loading" && (tag === "img" || tag === "iframe")
+        || name === "allowfullscreen" && tag === "iframe"
+        || name === "allow" && tag === "iframe"
+        || name === "referrerpolicy" && tag === "iframe"
         || ["controls", "loop", "muted", "playsinline", "preload", "width", "height"].includes(name) && ["video", "audio", "iframe", "embed"].includes(tag);
       if (!allowed || (name === "href" || name === "src" || name === "poster" || name === "data") && attribute.value && !/^https?:/i.test(attribute.value))
         node.removeAttribute(attribute.name);
@@ -3063,6 +3338,12 @@ function bodyToRichHtml(raw, lead) {
       flushParagraph(); closeList();
       const poster = mdVid[3] ? ` poster="${escapeHtml(mdVid[3])}"` : "";
       out.push(`<p class="rss-figure"><video src="${escapeHtml(mdVid[2])}"${poster} controls playsinline preload="none"></video></p>`);
+      continue;
+    }
+    const mdYt = /^!youtube\[(.*?)\]\(([A-Za-z0-9_-]{11})\)$/.exec(trimmed);
+    if (mdYt) {
+      flushParagraph(); closeList();
+      out.push(youtubeEmbedHtml(mdYt[2], mdYt[1]));
       continue;
     }
     if (/^\s*\|/.test(trimmed) && trimmed.indexOf("|", 1) !== -1) {
@@ -3231,6 +3512,15 @@ var styles = `
 .hermes-rss .rss-detail .rss-body pre{background:color-mix(in srgb,var(--ui-text-secondary) 8%,transparent);border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap}
 .hermes-rss .rss-detail .rss-body pre code{background:transparent;padding:0}
 .hermes-rss .rss-detail .rss-body img,.hermes-rss .rss-detail .rss-body video,.hermes-rss .rss-detail .rss-body iframe,.hermes-rss .rss-detail .rss-body audio{max-width:100%;height:auto;display:block;margin:1.1em 0;border-radius:8px}
+.hermes-rss .rss-youtube{position:relative;width:100%;aspect-ratio:16/9;margin:0 0 1.25em;border-radius:8px;overflow:hidden;background:color-mix(in srgb,var(--ui-text-secondary) 12%,transparent)}
+.hermes-rss .rss-youtube iframe{position:absolute;inset:0;width:100%;height:100%;max-width:none;margin:0;border:0;border-radius:0;display:block}
+.hermes-rss .rss-yt-chapters{margin:0 0 1.2em}
+.hermes-rss .rss-yt-chapters .rss-eyebrow{margin:10px 0 6px}
+.hermes-rss .rss-yt-chapters ol{list-style:none;padding:0;margin:0;display:grid;gap:1px}
+.hermes-rss .rss-yt-chapters li{margin:0;padding:0}
+.hermes-rss .rss-detail .rss-body a.rss-yt-chapter{display:flex;gap:10px;align-items:baseline;padding:5px 8px;border:0;border-radius:6px;text-decoration:none;color:inherit}
+.hermes-rss .rss-detail .rss-body a.rss-yt-chapter:hover{background:color-mix(in srgb,var(--ui-text-secondary) 10%,transparent)}
+.hermes-rss .rss-yt-stamp{flex:0 0 4.6em;font-variant-numeric:tabular-nums;font-size:12px;color:var(--ui-accent)}
 .hermes-rss .rss-detail .rss-body img.rss-small-image{float:right;width:min(42%,320px);max-width:320px;margin:0 0 12px 20px;image-rendering:auto}
 .hermes-rss .rss-detail .rss-body p:has(> img.rss-small-image){min-height:1px}
 .hermes-rss .rss-detail .rss-body hr{border:0;border-top:1px solid var(--ui-stroke-secondary);margin:1.6em 0}
@@ -3256,6 +3546,10 @@ var styles = `
 .hermes-rss .rss-skill-field{display:flex;flex-direction:row;align-items:center;gap:8px;flex-wrap:nowrap;flex:1;min-width:0}
 .hermes-rss .rss-skill-field span{flex:0 0 auto;white-space:nowrap}
 .hermes-rss .rss-skill-field input{flex:1;min-width:0;width:auto}
+.hermes-rss .rss-user-agent-row{flex-wrap:nowrap;gap:10px;min-width:0}
+.hermes-rss .rss-user-agent-row .rss-setting{flex:0 0 auto}
+.hermes-rss .rss-user-agent{flex:1 1 auto;min-width:0;width:auto;height:26px;padding:2px 8px;font-family:ui-monospace,Consolas,monospace;font-size:12px}
+.hermes-rss textarea.rss-youtube-cookies{display:block;width:100%;min-height:6rem;height:auto;box-sizing:border-box;padding:8px 10px;resize:vertical;line-height:1.45;font-family:ui-monospace,Consolas,monospace;font-size:12px;border:1px solid var(--ui-stroke-secondary);border-radius:5px;background:transparent;color:inherit;box-shadow:none}
 .hermes-rss .rss-settings input:not([type=checkbox]),.hermes-rss .rss-filter-panel input:not([type=checkbox]){border:1px solid var(--ui-stroke-secondary);border-radius:5px;background:transparent;color:inherit;box-shadow:none}
 .hermes-rss .rss-article-tabs{display:inline-flex;gap:14px;margin:0;border:0;padding:0;justify-self:center;flex:0 0 auto}
 .hermes-rss .rss-article-tabs button{border:0;background:transparent;border-radius:0;padding:2px 0;font-size:12px;line-height:1.4;color:var(--ui-text-secondary)}
@@ -3409,6 +3703,9 @@ html[data-hermes-mode="light"] .hermes-rss select{color-scheme:light}
 .hermes-rss .rss-modal{width:min(440px,100%);max-height:90vh;overflow:auto;padding:18px 20px;border:1px solid var(--ui-stroke-secondary);border-radius:10px;background:var(--ui-bg-elevated,var(--ui-bg-primary,var(--background)));color:var(--ui-text-primary,var(--foreground));display:grid;gap:12px}
 .hermes-rss .rss-modal h2{margin:0;font-size:16px}
 .hermes-rss .rss-modal .rss-setting{display:grid;gap:6px}
+.hermes-rss .rss-modal-checks{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;align-items:center}
+.hermes-rss .rss-modal-check{display:flex;align-items:center;gap:8px;margin:0;min-height:22px;line-height:1.2}
+.hermes-rss .rss-modal-check input{margin:0;flex:0 0 auto;align-self:center}
 .hermes-rss .rss-nav .rss-feed-edit-btn{width:14px;height:18px;flex:0 0 14px;padding:0;margin:0 4px 0 0;display:inline-flex;align-items:center;justify-content:center}
 @media(max-width:1000px){.hermes-rss .rss-layout{grid-template-columns:145px minmax(210px,.85fr) minmax(260px,1fr)}.hermes-rss .rss-detail-inner{padding:22px 20px}.hermes-rss .rss-top{padding:12px 16px}}
 @media(max-width:760px){.hermes-rss .rss-layout{grid-template-columns:125px 1fr}.hermes-rss .rss-detail{display:none}.hermes-rss .rss-layout.has-selection .rss-list{display:none}.hermes-rss .rss-layout.has-selection .rss-detail{display:block}.hermes-rss .rss-top{align-items:flex-start}.hermes-rss .rss-top p{display:none}.hermes-rss .rss-article-actions{justify-content:flex-start;gap:6px;overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:4px;scrollbar-width:thin}}
@@ -4371,14 +4668,32 @@ function ReaderProfile({ ctx, owner }) {
   const onRichLinkClick = (event) => {
     const a = event.target?.closest?.("a[href]");
     if (!a || !event.currentTarget.contains(a)) return;
+    const href = a.getAttribute("href");
+    if (a.classList.contains("rss-yt-chapter") && event.button !== 1 && !event.metaKey && !event.ctrlKey) {
+      const id = youtubeVideoId(href);
+      let start = -1;
+      try {
+        const parsed = new URL(href);
+        start = youtubeTimeParam(parsed.searchParams.get("t") || parsed.searchParams.get("start") || "");
+      } catch {
+      }
+      const iframe = event.currentTarget.querySelector(".rss-youtube iframe");
+      if (iframe && id && youtubeVideoId(iframe.getAttribute("src")) === id && start >= 0) {
+        event.preventDefault();
+        event.stopPropagation();
+        iframe.src = youtubeEmbedSrc(id, start);
+        return;
+      }
+    }
     event.preventDefault();
     event.stopPropagation();
-    openHttpLink(a.getAttribute("href"));
+    openHttpLink(href);
   };
   const [draft, setDraft] = useState(() => readSettings(ctx, owner));
   const [feedToRemove, setFeedToRemove] = useState(null);
   const [feedToEdit, setFeedToEdit] = useState(null);
   const [feedDraft, setFeedDraft] = useState(null);
+  const [unreadTrail, setUnreadTrail] = useState([]);
   const [reorderMode, setReorderMode] = useState(false);
   const [folderCreate, setFolderCreate] = useState(null);
   const [folderCreateParent, setFolderCreateParent] = useState("");
@@ -4452,12 +4767,13 @@ function ReaderProfile({ ctx, owner }) {
   });
   const article = detail.data;
   const articleRender = useMemo(() => {
-    if (!article) return { rich: { html: "", isHtml: false }, bodyHtml: "" };
-    const rich = bodyToRichHtml(article.body || "", article.image);
+    if (!article) return { rich: { html: "", isHtml: false }, bodyHtml: "", youtube: false };
+    const youtube = isYoutubeArticle(article);
+    const rich = bodyToRichHtml(article.body || "", youtube ? "" : article.image);
     const gradeTag = gradingTagFor(settings.gradingTags, article.grade?.level);
-    const bodyHtml = gradeTag && gradeTag.label ? withGradeNote(rich.html, article.grade, gradeTag) : rich.html;
-    return { rich, bodyHtml };
-  }, [article?.id, article?.body, article?.image, article?.grade?.level, article?.grade?.reason, settings.gradingTags]);
+    const graded = gradeTag && gradeTag.label ? withGradeNote(rich.html, article.grade, gradeTag) : rich.html;
+    return { rich, bodyHtml: withYoutubeEmbed(graded, article), youtube };
+  }, [article?.id, article?.url, article?.identity, article?.body, article?.image, article?.grade?.level, article?.grade?.reason, settings.gradingTags]);
   useEffect(() => {
     setDiscussOpen(false);
     setDiscussNote("");
@@ -4568,6 +4884,7 @@ function ReaderProfile({ ctx, owner }) {
     setFolderId(folder);
     setSelected(null);
     setLimit(100);
+    setUnreadTrail([]);
   };
   const browseFolder = folder => selectView(view, null, folder);
   const resetFilters = () => {
@@ -4670,9 +4987,11 @@ function ReaderProfile({ ctx, owner }) {
         window.clearTimeout(readTimerRef.current);
         readTimerRef.current = null;
       }
-      markArticleRead(displayedFeeds.find(row => row.id === selected), false);
+      const previous = (articles.data || []).find(row => row.id === selected) || unreadTrail.find(row => row.id === selected);
+      markArticleRead(previous, false);
       void refresh();
     }
+    if (view === "unread") setUnreadTrail(trail => rememberUnreadTrail(trail, item));
     setSelected(item.id);
     setBrowserUrl(item.url || "");
     setBrowserOpen(false);
@@ -4809,9 +5128,13 @@ function ReaderProfile({ ctx, owner }) {
       if (result.source) setNotice(`The full text came from ${result.source}.`);
     });
   };
-  const articleList = settings.orderByImportance
+  const playlistOldest = isYoutubePlaylistFeed((feeds.data || []).find((item) => item.id === feedId)?.url);
+  const liveArticles = playlistOldest
+    ? sortArticlesByTime(articles.data || [], true)
+    : settings.orderByImportance
     ? sortArticlesByImportance(articles.data || [], settings.gradingTags)
     : (articles.data || []);
+  const articleList = view === "unread" ? unreadListWithTrail(liveArticles, unreadTrail) : liveArticles;
   const selectedIndex = selected ? articleList.findIndex(a => a.id === selected) : -1;
   const listBeyondTop20 = scroller => {
     const cards = scroller?.querySelectorAll(".rss-card");
@@ -4920,8 +5243,8 @@ function ReaderProfile({ ctx, owner }) {
     setFeedToEdit(feed);
     setFeedDraft({
       title: feed.title || "",
-      fullCapture: feedTriState(feed.fullCapture),
-      paywallServices: feedTriState(feed.paywallServices),
+      fullCapture: feedWantsCapture(feed, settings),
+      paywallServices: feedWantsPaywall(feed, settings),
       ticker: feed.ticker !== false,
       override: Number.isFinite(Number(feed.refreshMinutes)),
       refreshMinutes: normalizeRefreshMinutes(feed.refreshMinutes || settings.refreshMinutes)
@@ -4935,13 +5258,13 @@ function ReaderProfile({ ctx, owner }) {
       method: "PATCH",
       body: {
         title: draftFeed.title,
-        fullCapture: parseTriState(draftFeed.fullCapture),
-        paywallServices: parseTriState(draftFeed.paywallServices),
+        fullCapture: draftFeed.fullCapture === !!settings.fullCapture ? null : !!draftFeed.fullCapture,
+        paywallServices: draftFeed.paywallServices === !!settings.paywallServices ? null : !!draftFeed.paywallServices,
         ticker: draftFeed.ticker !== false,
         refreshMinutes: draftFeed.override ? draftFeed.refreshMinutes : null
       }
     });
-    if (feedWantsCapture({ fullCapture: parseTriState(draftFeed.fullCapture) }, settings)) {
+    if (feedWantsCapture({ fullCapture: draftFeed.fullCapture === !!settings.fullCapture ? null : !!draftFeed.fullCapture }, settings)) {
       const rows = await libraryRequest("/articles?uncaptured=1");
       const jobs = (Array.isArray(rows) ? rows : []).filter((row) => row.feed_id === target.id);
       if (jobs.length) captureEnqueue(owner, jobs);
@@ -5121,11 +5444,13 @@ function ReaderProfile({ ctx, owner }) {
   const updateDraft = (patch) => {
     const next = { ...draft, ...patch };
     setDraft(next);
-    window.dispatchEvent(new CustomEvent("hermes-rss-ticker-preview", { detail: { owner, settings: next } }));
+    const { youtubeCookies, ...preview } = next;
+    window.dispatchEvent(new CustomEvent("hermes-rss-ticker-preview", { detail: { owner, settings: preview } }));
   };
   const restoreDraftPreview = (next) => {
     setDraft(next);
-    window.dispatchEvent(new CustomEvent("hermes-rss-ticker-preview", { detail: { owner, settings: next } }));
+    const { youtubeCookies, ...preview } = next;
+    window.dispatchEvent(new CustomEvent("hermes-rss-ticker-preview", { detail: { owner, settings: preview } }));
   };
   const saveSettings = event => {
     event.preventDefault();
@@ -5134,13 +5459,16 @@ function ReaderProfile({ ctx, owner }) {
     next.gradingSkill = gradingSkillName(next.gradingSkill);
     next.defaultView = normalizeDefaultView(next.defaultView);
     next.captureImproveHandoff = String(next.captureImproveHandoff || "").slice(0, 5e4);
+    next.userAgent = normalizeUserAgent(next.userAgent);
+    next.youtubeCookies = normalizeYoutubeCookies(next.youtubeCookies);
     // Tags are cached separately from settings; they come from the skill file.
     delete next.gradingTags;
     storageSet(ctx, "settings", owner, next);
     setSettings(next);
     setDraft(next);
     void rssRest("/tools-enabled", { method: "POST", body: { enabled: next.registerHermesTools === true } }).catch(() => {});
-    window.dispatchEvent(new CustomEvent("hermes-rss-ticker-preview", { detail: { owner, settings: next } }));
+    const { youtubeCookies, ...preview } = next;
+    window.dispatchEvent(new CustomEvent("hermes-rss-ticker-preview", { detail: { owner, settings: preview } }));
     if (next.fullCapture) {
       void libraryRequest("/articles?uncaptured=1").then((rows) => {
         if (Array.isArray(rows) && rows.length) captureEnqueue(owner, rows);
@@ -5346,7 +5674,8 @@ function ReaderProfile({ ctx, owner }) {
       jsxs("div", { className: "rss-settings-tabs", role: "tablist", "aria-label": "Settings sections", children: [
         jsx("button", { id: "rss-settings-tab-main", type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "main", "aria-controls": "rss-settings-panel-main", tabIndex: settingsTab === "main" ? 0 : -1, onKeyDown: handleTabKey, onClick: () => setSettingsTab("main"), children: "Main" }),
         jsx("button", { id: "rss-settings-tab-ticker", type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "ticker", "aria-controls": "rss-settings-panel-ticker", tabIndex: settingsTab === "ticker" ? 0 : -1, onKeyDown: handleTabKey, onClick: () => setSettingsTab("ticker"), children: "Ticker" }),
-        jsx("button", { id: "rss-settings-tab-improve", type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "improve", "aria-controls": "rss-settings-panel-improve", tabIndex: settingsTab === "improve" ? 0 : -1, onKeyDown: handleTabKey, onClick: () => setSettingsTab("improve"), children: "Self-Improvement" })
+        jsx("button", { id: "rss-settings-tab-improve", type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "improve", "aria-controls": "rss-settings-panel-improve", tabIndex: settingsTab === "improve" ? 0 : -1, onKeyDown: handleTabKey, onClick: () => setSettingsTab("improve"), children: "Self-Improvement" }),
+        jsx("button", { id: "rss-settings-tab-advanced", type: "button", className: "rss-settings-tab", role: "tab", "aria-selected": settingsTab === "advanced", "aria-controls": "rss-settings-panel-advanced", tabIndex: settingsTab === "advanced" ? 0 : -1, onKeyDown: handleTabKey, onClick: () => setSettingsTab("advanced"), children: "Advanced" })
       ] }),
       settingsTab === "ticker" && jsxs("form", { id: "rss-settings-panel-ticker", className: "rss-stack", role: "tabpanel", "aria-labelledby": "rss-settings-tab-ticker", onSubmit: saveSettings, children: [
         jsxs("div", { className: "rss-ticker-settings-grid", children: [
@@ -5432,6 +5761,46 @@ function ReaderProfile({ ctx, owner }) {
           jsx(Button, { type: "submit", children: "Save Settings" }),
           jsx(Button, { type: "button", variant: "ghost", onClick: () => { const saved = readSettings(ctx, owner); setSettingsOpen(false); restoreDraftPreview(saved); }, children: "Cancel" })
         ] })
+      ] }),
+      settingsTab === "advanced" && jsxs("form", { id: "rss-settings-panel-advanced", className: "rss-stack", role: "tabpanel", "aria-labelledby": "rss-settings-tab-advanced", onSubmit: saveSettings, children: [
+        jsx("h2", { className: "rss-settings-header", children: "User Agent" }),
+        jsxs("div", { className: "rss-setting-row rss-user-agent-row", children: [
+          jsxs("div", { className: "rss-setting", children: [
+            jsx("span", { children: "Preset" }),
+            jsxs("select", {
+              "aria-label": "User Agent Preset",
+              value: userAgentPresetId(draft.userAgent),
+              onChange: event => {
+                const hit = USER_AGENT_PRESETS.find(row => row.id === event.target.value);
+                if (hit) updateDraft({ userAgent: hit.value });
+              },
+              children: [
+                ...USER_AGENT_PRESETS.map(row => jsx("option", { value: row.id, children: row.label }, row.id)),
+                jsx("option", { value: "custom", children: "Custom" }, "custom")
+              ]
+            })
+          ] }),
+          jsx("input", {
+            className: "rss-user-agent",
+            "aria-label": "User Agent",
+            value: draft.userAgent || DEFAULT_USER_AGENT,
+            onChange: event => updateDraft({ userAgent: event.target.value.slice(0, 512) }),
+            spellCheck: false
+          })
+        ] }),
+        jsx("p", { className: "rss-muted rss-small", children: "The user agent string is sent to feeds and full-article downloads and represents a browser of your choice. AI Bot user agents get better experience on partner sites." }),
+        jsx("h2", { className: "rss-settings-header", children: "YouTube Cookies" }),
+        jsx("textarea", {
+          className: "rss-youtube-cookies",
+          "aria-label": "YouTube Cookies",
+          value: draft.youtubeCookies || "",
+          rows: 4,
+          spellCheck: false,
+          autoComplete: "off",
+          onChange: event => updateDraft({ youtubeCookies: event.target.value.slice(0, 32000) })
+        }),
+        jsx("p", { className: "rss-muted rss-small", children: "Paste a cookie header, Netscape cookies.txt, or a path to that file. Cookies let you tap in your existing YouTube Premium subscription for no-ad experience." }),
+        jsx("div", { className: "rss-tools", children: [jsx(Button, { type: "submit", children: "Save Settings" }), jsx(Button, { type: "button", variant: "ghost", onClick: () => { const saved = readSettings(ctx, owner); setSettingsOpen(false); restoreDraftPreview(saved); }, children: "Cancel" })] })
       ] }),
       settingsTab === "main" && jsxs("form", { id: "rss-settings-panel-main", className: "rss-stack", role: "tabpanel", "aria-labelledby": "rss-settings-tab-main", onSubmit: saveSettings, children: [
         jsxs("div", { className: "rss-settings-grid", children: [
@@ -5543,21 +5912,25 @@ function ReaderProfile({ ctx, owner }) {
         jsx("span", { children: "Name" }),
         jsx(Input, { value: feedDraft.title, maxLength: 300, onChange: event => setFeedDraft({ ...feedDraft, title: event.target.value }) })
       ] }),
-      jsxs("div", { className: "rss-setting", children: [
-        jsx("span", { children: "Full article" }),
-        jsx(Segmented, { value: feedDraft.fullCapture, onChange: v => setFeedDraft({ ...feedDraft, fullCapture: v }), options: [{ id: "default", label: "Default" }, { id: "on", label: "On" }, { id: "off", label: "Off" }] })
+      jsxs("div", { className: "rss-modal-checks", children: [
+        jsxs("label", { className: "rss-modal-check", children: [
+          jsx("input", { type: "checkbox", checked: !!feedDraft.fullCapture, onChange: event => setFeedDraft({ ...feedDraft, fullCapture: event.target.checked }) }),
+          " Full Article"
+        ] }),
+        jsxs("label", { className: "rss-modal-check", children: [
+          jsx("input", { type: "checkbox", checked: !!feedDraft.paywallServices, onChange: event => setFeedDraft({ ...feedDraft, paywallServices: event.target.checked }) }),
+          " Paywall Checks"
+        ] })
       ] }),
-      jsxs("div", { className: "rss-setting", children: [
-        jsx("span", { children: "Paywall checks" }),
-        jsx(Segmented, { value: feedDraft.paywallServices, onChange: v => setFeedDraft({ ...feedDraft, paywallServices: v }), options: [{ id: "default", label: "Default" }, { id: "on", label: "On" }, { id: "off", label: "Off" }] })
-      ] }),
-      jsxs("label", { className: "rss-setting", children: [
-        jsx("input", { type: "checkbox", checked: feedDraft.ticker, onChange: event => setFeedDraft({ ...feedDraft, ticker: event.target.checked }) }),
-        " Show on headline ticker"
-      ] }),
-      jsxs("label", { className: "rss-setting", children: [
-        jsx("input", { type: "checkbox", checked: feedDraft.override, onChange: event => setFeedDraft({ ...feedDraft, override: event.target.checked }) }),
-        " Override refresh period"
+      jsxs("div", { className: "rss-modal-checks", children: [
+        jsxs("label", { className: "rss-modal-check", children: [
+          jsx("input", { type: "checkbox", checked: feedDraft.ticker, onChange: event => setFeedDraft({ ...feedDraft, ticker: event.target.checked }) }),
+          " Show on News Ticker"
+        ] }),
+        jsxs("label", { className: "rss-modal-check", children: [
+          jsx("input", { type: "checkbox", checked: feedDraft.override, onChange: event => setFeedDraft({ ...feedDraft, override: event.target.checked }) }),
+          " Override Show Period"
+        ] })
       ] }),
       feedDraft.override && jsx(Segmented, { value: String(normalizeRefreshMinutes(feedDraft.refreshMinutes)), onChange: v => setFeedDraft({ ...feedDraft, refreshMinutes: Number(v) }), options: REFRESH_MINUTES.map((n) => ({ id: String(n), label: String(n) })) }),
       jsxs("div", { className: "rss-tools", children: [
@@ -5664,7 +6037,7 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           /* @__PURE__ */ jsxs("div", { className: "rss-subscribe-starters", children: [
             jsx("span", { className: "rss-muted rss-small", children: "Starter packs" }),
-            ["Popular starters", "Popular Reddit"].map(group => jsxs("div", { className: "rss-subscribe-starter-group", children: [
+            ["Popular starters", "Popular Reddit", "YouTube AI", "AI Substack"].map(group => jsxs("div", { className: "rss-subscribe-starter-group", children: [
               jsx("span", { className: "rss-muted rss-small", children: group }),
               jsx("div", { className: "rss-subscribe-pills", children: SUBSCRIBE_STARTERS.filter(item => item.group === group).map(item => jsx(
                 "button",
@@ -6043,7 +6416,7 @@ function ReaderProfile({ ctx, owner }) {
                 children: /* @__PURE__ */ jsx("i", { className: `codicon ${article.is_read ? "codicon-eye-closed" : "codicon-mail-read"}`, "aria-hidden": "true" })
               }
             ),
-            /* @__PURE__ */ jsx(
+            !articleRender.youtube && /* @__PURE__ */ jsx(
               "button",
               {
                 type: "button",
@@ -6119,7 +6492,7 @@ function ReaderProfile({ ctx, owner }) {
         ) }),
         tab === "article" && /* @__PURE__ */ jsxs("div", { id: "rss-article-panel-article", role: "tabpanel", "aria-labelledby": "rss-article-tab-article", children: [
           articleRender.bodyHtml ? /* @__PURE__ */ jsx("div", { ref: richRef, className: "rss-body rss-rich", onClick: onRichLinkClick, onAuxClick: onRichLinkClick, dangerouslySetInnerHTML: { __html: articleRender.bodyHtml } }) : /* @__PURE__ */ jsx("p", { className: "rss-body", children: "This feed contains only a headline. Open the original article to read more." }),
-          /* @__PURE__ */ jsx("div", { className: "rss-note", children: article.captured ? "Scripts are stripped and only https links, images and embeds are shown." : articleRender.rich.isHtml ? "Rendered from the feed's own HTML. Scripts are stripped and only https links, images and embeds are shown." : "This is the text supplied by the feed. It may be an excerpt. Scripts are stripped; https images, tables and embeds are kept." })
+          !articleRender.youtube && /* @__PURE__ */ jsx("div", { className: "rss-note", children: article.captured ? "Scripts are stripped and only https links, images and embeds are shown." : articleRender.rich.isHtml ? "Rendered from the feed's own HTML. Scripts are stripped and only https links, images and embeds are shown." : "This is the text supplied by the feed. It may be an excerpt. Scripts are stripped; https images, tables and embeds are kept." })
         ] }),
         tab === "summary" && /* @__PURE__ */ jsxs("div", { id: "rss-article-panel-summary", role: "tabpanel", "aria-labelledby": "rss-article-tab-summary", children: [
           summary ? /* @__PURE__ */ jsxs(Fragment, { children: [

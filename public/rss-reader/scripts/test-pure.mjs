@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFolderOrder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("pruneArticleCache"), grab("normalizeCacheKeepDays"), grab("pruneExpiredArticles"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta"), grab("folderContains"), grab("youtubeFeedFromUrl"), grab("substackFeedFromUrl"), grab("youtubeChannelIdFromHtml"), grab("expandSubscribeUrl"), grab("feedWantsCapture"), grab("feedShowsTicker"), grab("feedTriState"), grab("parseTriState")].join(String.fromCharCode(10));
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFolderOrder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("pruneArticleCache"), grab("normalizeCacheKeepDays"), grab("pruneExpiredArticles"), grab("youtubeVideoId"), grab("isYoutubeArticle"), grab("youtubeEmbedSrc"), grab("youtubeTimeParam"), grab("parseYoutubeChapters"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta"), grab("folderContains"), grab("rememberUnreadTrail"), grab("unreadListWithTrail"), grab("youtubeSiteHost"), grab("youtubeFeedFromUrl"), grab("isYoutubePlaylistFeed"), grab("sortArticlesByTime"), grab("substackFeedFromUrl"), grab("youtubeChannelIdFromHtml"), grab("expandSubscribeUrl"), grab("feedWantsCapture"), grab("feedShowsTicker"), grab("feedTriState"), grab("parseTriState"), grab("normalizeUserAgent"), grab("userAgentPresetId"), grab("normalizeYoutubeCookies"), grab("youtubeCookieHeader"), grab("isYoutubeRequestUrl")].join(String.fromCharCode(10));
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -28,6 +28,12 @@ new Function("exports", `const DEFAULT_GRADING_TAGS = [
 ];
 const REFRESH_MINUTES = [5, 10, 15, 30, 60, 120, 180];
 const CACHE_KEEP_DAYS = [7, 14, 30, 60, 90, 180, 365];
+const USER_AGENT_PRESETS = [
+  { id: "hermes", value: "HermesRSS/0.2" },
+  { id: "chrome", value: "Mozilla/5.0 Chrome" }
+];
+const DEFAULT_USER_AGENT = USER_AGENT_PRESETS[0].value;
+function currentYoutubeCookies() { return ""; }
 ${bundle}
 exports.profileFromOwner = profileFromOwner;
 exports.cheapExcerpt = cheapExcerpt;
@@ -61,6 +67,11 @@ exports.normalizeRefreshMinutes = normalizeRefreshMinutes;
 exports.normalizeCacheKeepDays = normalizeCacheKeepDays;
 exports.pruneExpiredArticles = pruneExpiredArticles;
 exports.articleNeedsCapture = articleNeedsCapture;
+exports.youtubeVideoId = youtubeVideoId;
+exports.isYoutubeArticle = isYoutubeArticle;
+exports.youtubeEmbedSrc = youtubeEmbedSrc;
+exports.youtubeTimeParam = youtubeTimeParam;
+exports.parseYoutubeChapters = parseYoutubeChapters;
 exports.healthAgeLabel = healthAgeLabel;
 exports.healthNotice = healthNotice;
 exports.isShareHref = isShareHref;
@@ -75,7 +86,12 @@ exports.feedsearchRank = feedsearchRank;
 exports.feedsearchVisible = feedsearchVisible;
 exports.feedsearchMeta = feedsearchMeta;
 exports.folderContains = folderContains;
+exports.rememberUnreadTrail = rememberUnreadTrail;
+exports.unreadListWithTrail = unreadListWithTrail;
+exports.youtubeSiteHost = youtubeSiteHost;
 exports.youtubeFeedFromUrl = youtubeFeedFromUrl;
+exports.isYoutubePlaylistFeed = isYoutubePlaylistFeed;
+exports.sortArticlesByTime = sortArticlesByTime;
 exports.substackFeedFromUrl = substackFeedFromUrl;
 exports.youtubeChannelIdFromHtml = youtubeChannelIdFromHtml;
 exports.expandSubscribeUrl = expandSubscribeUrl;
@@ -83,6 +99,11 @@ exports.feedWantsCapture = feedWantsCapture;
 exports.feedShowsTicker = feedShowsTicker;
 exports.feedTriState = feedTriState;
 exports.parseTriState = parseTriState;
+exports.normalizeUserAgent = normalizeUserAgent;
+exports.userAgentPresetId = userAgentPresetId;
+exports.normalizeYoutubeCookies = normalizeYoutubeCookies;
+exports.youtubeCookieHeader = youtubeCookieHeader;
+exports.isYoutubeRequestUrl = isYoutubeRequestUrl;
 `)(fns);
 
 assert.equal(fns.profileFromOwner(JSON.stringify(["abc", "apo"])), "apo");
@@ -236,6 +257,16 @@ assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: true, body: "
 assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: true, body: "short" }), true);
 assert.equal(fns.articleNeedsCapture({ url: "https://x", captured: true, body: "short", captureGaveUp: true }), false);
 assert.equal(fns.articleNeedsCapture({}), false);
+assert.equal(fns.youtubeVideoId("https://www.youtube.com/watch?v=abcdefghijk"), "abcdefghijk");
+assert.equal(fns.youtubeVideoId("https://youtu.be/abcdefghijk"), "abcdefghijk");
+assert.equal(fns.youtubeVideoId("yt:video:abcdefghijk"), "abcdefghijk");
+assert.equal(fns.isYoutubeArticle({ url: "https://www.youtube.com/watch?v=abcdefghijk" }), true);
+assert.equal(fns.articleNeedsCapture({ url: "https://www.youtube.com/watch?v=abcdefghijk", captured: false, body: "short" }), false);
+assert.equal(fns.youtubeTimeParam("125"), 125);
+assert.equal(fns.youtubeTimeParam("1h2m3s"), 3723);
+assert.equal(fns.youtubeEmbedSrc("abcdefghijk", 90), "https://www.youtube-nocookie.com/embed/abcdefghijk?start=90");
+assert.deepEqual(fns.parseYoutubeChapters("0:00 Intro\n1:53 Reading the essay\n4:46 Sponsor").map(row => [row.seconds, row.title]), [[0, "Intro"], [113, "Reading the essay"], [286, "Sponsor"]]);
+assert.deepEqual(fns.parseYoutubeChapters("no stamps here"), []);
 assert.equal(fns.healthAgeLabel(null, "m"), "never");
 const health = fns.healthNotice([
   { title: "Broken", error: "timeout", refresh_age_minutes: 5, newest_age_days: 1, unread: 1 },
@@ -282,6 +313,12 @@ assert.equal(fns.folderContains("AI", "News"), false);
 assert.equal(fns.folderContains("", ""), true);
 assert.equal(fns.folderContains("News", ""), false);
 assert.equal(fns.youtubeFeedFromUrl("https://www.youtube.com/channel/UC1234567890abcdefghijk"), "https://www.youtube.com/feeds/videos.xml?channel_id=UC1234567890abcdefghijk");
+assert.equal(fns.youtubeFeedFromUrl("https://www.youtube.com/playlist?list=PLabcdefghijk"), "https://www.youtube.com/feeds/videos.xml?playlist_id=PLabcdefghijk");
+assert.equal(fns.youtubeFeedFromUrl("https://www.youtube.com/watch?v=abcdefghijk&list=PLabcdefghijk"), "https://www.youtube.com/feeds/videos.xml?playlist_id=PLabcdefghijk");
+assert.equal(fns.isYoutubePlaylistFeed("https://www.youtube.com/feeds/videos.xml?playlist_id=PLabcdefghijk"), true);
+assert.equal(fns.isYoutubePlaylistFeed("https://www.youtube.com/feeds/videos.xml?channel_id=UC1234567890abcdefghijk"), false);
+assert.deepEqual(fns.sortArticlesByTime([{ id: "old", published_at: "2020-01-01T00:00:00Z" }, { id: "new", published_at: "2021-01-01T00:00:00Z" }], true).map((row) => row.id), ["old", "new"]);
+assert.deepEqual(fns.sortArticlesByTime([{ id: "old", published_at: "2020-01-01T00:00:00Z" }, { id: "new", published_at: "2021-01-01T00:00:00Z" }], false).map((row) => row.id), ["new", "old"]);
 assert.equal(fns.substackFeedFromUrl("https://example.substack.com/p/hello"), "https://example.substack.com/feed");
 assert.equal(fns.expandSubscribeUrl("https://www.youtube.com/user/Veritasium"), "https://www.youtube.com/feeds/videos.xml?user=Veritasium");
 assert.equal(fns.youtubeChannelIdFromHtml('meta "channelId":"UC1234567890123456789012"'), "UC1234567890123456789012");
@@ -289,5 +326,17 @@ assert.equal(fns.feedWantsCapture({ fullCapture: false }, { fullCapture: true })
 assert.equal(fns.feedWantsCapture({ fullCapture: true }, { fullCapture: false }), true);
 assert.equal(fns.feedShowsTicker({ ticker: false }), false);
 assert.equal(fns.parseTriState(fns.feedTriState(undefined)), null);
+assert.deepEqual(fns.rememberUnreadTrail(fns.rememberUnreadTrail(fns.rememberUnreadTrail([], { id: "a" }), { id: "b" }), { id: "c" }).map(row => row.id), ["a", "b", "c"]);
+assert.deepEqual(fns.rememberUnreadTrail([{ id: "a" }, { id: "b" }, { id: "c" }], { id: "b" }).map(row => row.id), ["a", "b"]);
+assert.deepEqual(fns.unreadListWithTrail([{ id: "c" }, { id: "d" }], [{ id: "a" }, { id: "b" }, { id: "c" }]).map(row => row.id), ["a", "b", "c", "d"]);
+assert.equal(fns.normalizeUserAgent(""), "HermesRSS/0.2");
+assert.equal(fns.normalizeUserAgent("Mozilla/5.0 Chrome"), "Mozilla/5.0 Chrome");
+assert.equal(fns.normalizeUserAgent("bad\nagent"), "HermesRSS/0.2");
+assert.equal(fns.userAgentPresetId("Mozilla/5.0 Chrome"), "chrome");
+assert.equal(fns.userAgentPresetId("MyBot/1.0"), "custom");
+assert.equal(fns.normalizeYoutubeCookies(""), "");
+assert.equal(fns.youtubeCookieHeader("LOGIN_INFO=abc"), "LOGIN_INFO=abc");
+assert.equal(fns.youtubeCookieHeader("# Netscape\n.youtube.com\tTRUE\t/\tTRUE\t0\tLOGIN_INFO\tabc"), "LOGIN_INFO=abc");
+assert.equal(fns.isYoutubeRequestUrl("https://www.youtube.com/watch?v=abcdefghijk"), true);
 
-console.log("ok", 75);
+console.log("ok", 104);

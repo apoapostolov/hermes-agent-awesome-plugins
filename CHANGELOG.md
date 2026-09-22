@@ -10,6 +10,18 @@
 
 - **cdp-manager:** version `1.0.0` (the pre-release `1.0.1` tag is retired, never shipped). `config.json` now writes inside the plugin directory instead of the shared `$HERMES_HOME/plugins/` folder, and the default Chrome profile path derives from `%LOCALAPPDATA%` instead of a hardcoded personal path. The public edition's repo link points at `public/cdp-manager`. Pack re-pinned to the fix commit (pack `1.17.0`); catalog entry updated with `platforms: [windows]` and corrected profile-path wording.
 
+## [rss-reader 1.0.8] - 2026-09-22
+
+YouTube videos play in the reader, playlists run oldest first, Reddit chips subscribe, and Settings Advanced covers User-Agent plus YouTube cookies.
+
+### Added
+
+- **rss-reader:** version `1.0.8`. YouTube posts open a 16:9 player with chapter timestamps when the feed description lists them. Playlist feeds list oldest first. Settings Advanced adds a User-Agent preset and a YouTube cookie field used on YouTube HTTP fetches. Subscribe chips include YouTube AI and AI Substack rows, plus Google AI in Popular starters.
+
+### Fixed
+
+- **rss-reader:** Reddit community chips subscribe through the subreddit Atom feed. VentureBeat AI 429'd on the default User-Agent and is replaced by Google AI.
+
 ## [rss-reader 1.0.7] - 2026-09-20
 
 Subscribe accepts YouTube and Substack pages, a folder view includes nested feeds, and each feed has its own capture and ticker settings.
