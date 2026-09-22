@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [rss-reader 1.0.9] - 2026-09-23
+
+Tighter grading calibration, a reader-interests skill block, and a `reclassify` tool action that re-judges the whole library.
 
 ### Added
 
