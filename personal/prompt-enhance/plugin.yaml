@@ -1,5 +1,5 @@
 name: prompt-enhance
-version: 1.0.0
+version: 1.1.0
 label: Prompt Enhance
 description: >-
   Send a saved prompt with the current draft as context.
