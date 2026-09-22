@@ -2035,18 +2035,18 @@ async function executeRssCommand(ctx, host2, owner, command) {
     publishLibraryChange(owner, `Refresh period saved: every ${next.refreshMinutes} minutes.`);
     return;
   }
-  if (command.action === "regrade-all") {
+  if (command.action === "reclassify") {
     rssDebug("command-start", { action: command.action, id: command.id, owner });
-    // Keep the list fetch cheap: regrade passes page through /articles until exhausted.
+    // Keep the list fetch cheap: classification passes page through /articles until exhausted.
     const settings2 = readSettings(ctx, owner);
-    const report = { graded: 0, passes: 0 };
+    const report = { classified: 0, passes: 0 };
     for (let pass = 0; pass < 12; pass++) {
       const result = await gradingPass(host2, library, { skill: settings2.gradingSkill, ctx, regrade: true });
-      report.graded += result.graded;
+      report.classified += result.graded;
       report.passes++;
       if (!result.more) break;
     }
-    publishLibraryChange(owner, `Regraded ${report.graded} article${report.graded === 1 ? "" : "s"} across ${report.passes} pass${report.passes === 1 ? "" : "es"}.`);
+    publishLibraryChange(owner, `Reclassified ${report.classified} article${report.classified === 1 ? "" : "s"} across ${report.passes} pass${report.passes === 1 ? "" : "es"}.`);
     return report;
   }
   if (command.action === "mute") {
