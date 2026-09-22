@@ -16,7 +16,7 @@ YouTube videos play in the reader, playlists run oldest first, Reddit chips subs
 
 ### Added
 
-- **rss-reader:** version `1.0.8`. YouTube posts play in a 16:9 pane with chapter timestamps when the feed description lists them. Playlist feeds list oldest first. Settings Advanced adds a User-Agent preset and a YouTube cookie field used on YouTube HTTP fetches. Subscribe chips include YouTube AI and AI Substack rows, plus Google AI in Popular starters.
+- **rss-reader:** version `1.0.8`. YouTube posts play in a 16:9 pane with chapter timestamps when the feed description lists them. Playlist feeds list oldest first. Settings Advanced adds a User-Agent preset and a YouTube cookie field used on YouTube HTTP fetches. Subscribe chips include YouTube and Substack rows, plus Google AI in Popular starters.
 
 ### Fixed
 

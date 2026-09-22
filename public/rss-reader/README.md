@@ -22,7 +22,7 @@
 
 ## What You Can Do
 
-- Subscribe to RSS 2.0 and Atom feeds, plus Reddit `r/...` communities, YouTube channels and playlists, and Substack pages. Starter pills help fill common sources, including YouTube AI and AI Substack.
+- Subscribe to RSS 2.0 and Atom feeds, plus Reddit `r/...` communities, YouTube channels and playlists, and Substack pages. Starter pills help fill common sources, including YouTube and Substack.
 - Organize with folders and nested folders. Move feeds between them.
 - Work from unread, saved, feed, folder, mute, and search views without losing the article you have open.
 - Capture full articles into reader mode (images and tables kept when useful).

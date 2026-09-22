@@ -232,17 +232,17 @@ var SUBSCRIBE_STARTERS = [
   { group: "Popular Reddit", name: "r/worldnews", url: "https://www.reddit.com/r/worldnews" },
   { group: "Popular Reddit", name: "r/gaming", url: "https://www.reddit.com/r/gaming" },
   { group: "Popular Reddit", name: "r/LocalLLaMA", url: "https://www.reddit.com/r/LocalLLaMA" },
-  { group: "YouTube AI", name: "Theo", url: "https://www.youtube.com/channel/UCbRP3c757lWg9M-U7TyEkXA" },
-  { group: "YouTube AI", name: "Matthew Berman", url: "https://www.youtube.com/channel/UCawZsQWqfGSbCI5yjkdVkTA" },
-  { group: "YouTube AI", name: "Wes Roth", url: "https://www.youtube.com/channel/UCqcbQf6yw5KzRoDDcZ_wBSw" },
-  { group: "YouTube AI", name: "AI Explained", url: "https://www.youtube.com/channel/UCNJ1Ymd5yFuUPtn21xtRbbw" },
-  { group: "YouTube AI", name: "TheAIGRID", url: "https://www.youtube.com/channel/UCbY9xX3_jW5c2fjlZVBI4cg" },
-  { group: "AI Substack", name: "ChinAI", url: "https://chinai.substack.com" },
-  { group: "AI Substack", name: "Import AI", url: "https://importai.substack.com" },
-  { group: "AI Substack", name: "Recode China AI", url: "https://www.recodechinaai.com/feed" },
-  { group: "AI Substack", name: "ChinaTalk", url: "https://www.chinatalk.media/feed" },
-  { group: "AI Substack", name: "Interconnects", url: "https://www.interconnects.ai/feed" },
-  { group: "AI Substack", name: "Turing Post", url: "https://turingpost.substack.com" }
+  { group: "YouTube", name: "Theo", url: "https://www.youtube.com/channel/UCbRP3c757lWg9M-U7TyEkXA" },
+  { group: "YouTube", name: "Matthew Berman", url: "https://www.youtube.com/channel/UCawZsQWqfGSbCI5yjkdVkTA" },
+  { group: "YouTube", name: "Wes Roth", url: "https://www.youtube.com/channel/UCqcbQf6yw5KzRoDDcZ_wBSw" },
+  { group: "YouTube", name: "AI Explained", url: "https://www.youtube.com/channel/UCNJ1Ymd5yFuUPtn21xtRbbw" },
+  { group: "YouTube", name: "TheAIGRID", url: "https://www.youtube.com/channel/UCbY9xX3_jW5c2fjlZVBI4cg" },
+  { group: "Substack", name: "ChinAI", url: "https://chinai.substack.com" },
+  { group: "Substack", name: "Import AI", url: "https://importai.substack.com" },
+  { group: "Substack", name: "Recode China AI", url: "https://www.recodechinaai.com/feed" },
+  { group: "Substack", name: "ChinaTalk", url: "https://www.chinatalk.media/feed" },
+  { group: "Substack", name: "Interconnects", url: "https://www.interconnects.ai/feed" },
+  { group: "Substack", name: "Turing Post", url: "https://turingpost.substack.com" }
 ];
 var USER_AGENT_PRESETS = [
   { id: "hermes", label: "Hermes RSS", value: "HermesRSS/0.2" },
@@ -6026,7 +6026,7 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           /* @__PURE__ */ jsxs("div", { className: "rss-subscribe-starters", children: [
             jsx("span", { className: "rss-muted rss-small", children: "Starter packs" }),
-            ["Popular starters", "Popular Reddit", "YouTube AI", "AI Substack"].map(group => jsxs("div", { className: "rss-subscribe-starter-group", children: [
+            ["Popular starters", "Popular Reddit", "YouTube", "Substack"].map(group => jsxs("div", { className: "rss-subscribe-starter-group", children: [
               jsx("span", { className: "rss-muted rss-small", children: group }),
               jsx("div", { className: "rss-subscribe-pills", children: SUBSCRIBE_STARTERS.filter(item => item.group === group).map(item => jsx(
                 "button",
