@@ -6,6 +6,7 @@
 
 - **rss-reader:** version `1.0.9` (both editions). The grading skill gains a Reader interests block: an editable ```interests fence where the reader lists their own topics, one per line. Grading treats a strong interest match carrying something usable (product, tool, opportunity, resource) as interesting; bare topic mentions stay normal and interests never escalate to important. The in-plugin scaffold that seeds a missing skill includes the same block.
 - **rss-reader:** `reclassify` Hermes tool action (both editions). Re-runs classification over every article in the library, already-tagged ones included, so rubric changes apply retroactively without a manual reset. The desktop command loops classification passes until the library is exhausted (12-pass cap at 60 per pass).
+- **rss-reader:** the duplicate `mute` tool action is removed (both editions); `add_filter` is the single rule-creation path for keyword and tag mutes. The `/rss mute <keyword>` slash command is unchanged.
 - **sessionretitler** (formerly `session-retitler`): version `1.1.0`. Retitles the session every N titleable user messages from the latest exchanges (llm-rank rewrites, user titles untouchable). Now pinned in the pack (pack `1.16.0`).
 
 ### Changed

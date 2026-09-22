@@ -22,7 +22,6 @@ _ACTIONS = (
     "add_folder",
     "refresh",
     "health",
-    "mute",
     "tag_article",
     "untag_article",
     "reclassify",
@@ -192,14 +191,6 @@ def handle_rss(args: dict[str, Any], **_extra: Any) -> str:
         return _run("refresh", payload, timeout=180.0)
     if action == "health":
         return _run("health", {})
-    if action == "mute":
-        if not phrase and not str(args.get("tag") or "").strip():
-            return "Give a mute phrase or tag."
-        kind = str(args.get("kind") or "").strip().lower()
-        tag = str(args.get("tag") or "").strip()
-        if kind == "tag" or (tag and not phrase):
-            return _run("add-filter", {"kind": "tag", "tag": tag or phrase})
-        return _run("mute", {"phrase": phrase})
     if action == "tag_article":
         tag = str(args.get("tag") or "").strip()
         if not tag:
