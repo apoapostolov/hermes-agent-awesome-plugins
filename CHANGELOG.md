@@ -4,7 +4,12 @@
 
 ### Added
 
+- **rss-reader:** version `1.0.9` (both editions). The grading skill gains a Reader interests block: an editable ```interests fence where the reader lists their own topics, one per line. Grading treats a strong interest match carrying something usable (product, tool, opportunity, resource) as interesting; bare topic mentions stay normal and interests never escalate to important. The in-plugin scaffold that seeds a missing skill includes the same block.
 - **sessionretitler** (formerly `session-retitler`): version `1.1.0`. Retitles the session every N titleable user messages from the latest exchanges (llm-rank rewrites, user titles untouchable). Now pinned in the pack (pack `1.16.0`).
+
+### Changed
+
+- **rss-reader:** tightened grading calibration against over-flagging. Important now requires a fact that changes the reader's own decision or action within days (direct security, privacy, legal, or financial threat, or first-party news about products they use); general money, law, and politics news without that tie is explicitly excluded. Interesting requires durable insight; ordinary coverage, opinion takes, and trend roundups excluded. New scarcity rule: roughly 1-2 important and 4-6 interesting per day, more than 2 or 6 in a batch means re-judge the weakest flags as normal. Applies to the skill, the scaffold, and the fallback rubric in both editions.
 
 ### Fixed
 
