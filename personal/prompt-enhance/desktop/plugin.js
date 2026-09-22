@@ -90,7 +90,24 @@ function seed() {
     folders: [{ id: ENHANCERS, name: 'Enhancers', locked: true }],
     prompts: DEFAULTS.map(([name, glyph, body]) => ({ id: uid(), folderId: ENHANCERS, name, glyph, body })),
     enhanceWith: { kind: 'session' },
+    thinking: null,
   }
+}
+
+const THINKING_LEVELS = [
+  ['Session', null],
+  ['None', 'none'],
+  ['Minimal', 'minimal'],
+  ['Low', 'low'],
+  ['Medium', 'medium'],
+  ['High', 'high'],
+  ['XHigh', 'xhigh'],
+  ['Max', 'max'],
+  ['Ultra', 'ultra'],
+]
+function thinkingLabel(level) {
+  const hit = THINKING_LEVELS.find(([, value]) => value === (level || null))
+  return hit ? hit[0] : 'Session'
 }
 
 function emit() {
@@ -339,6 +356,7 @@ async function enhanceDraft(prompt, { dismiss } = {}) {
   const instructions = `${(prompt.body || '').trim()}\n\nReturn only the rewritten prompt. No preamble and no code fence.`
   setEnhancing(true)
   if (dismiss && closeLibrary) closeLibrary()
+  const level = lib && lib.thinking
   try {
     const result = await host.request('llm.oneshot', {
       instructions,
@@ -346,6 +364,7 @@ async function enhanceDraft(prompt, { dismiss } = {}) {
       task: 'title_generation',
       max_tokens: 4096,
       temperature: 0.2,
+      ...(level ? { reasoning_effort: level } : {}),
     }, 70000)
     const text = String((result && result.text) || '').trim()
     if (!text) throw new Error('Enhancement returned nothing.')
@@ -424,6 +443,18 @@ function EnhancePickLabel({ pick, catalog, liveModel }) {
     className: 'block max-w-48 truncate text-xs text-(--ui-accent)',
     title: label,
     children: label,
+  })
+}
+
+function ThinkingPickLabel({ level }) {
+  const label = thinkingLabel(level)
+  return jsxs('span', {
+    className: 'inline-flex items-center gap-1 text-xs text-(--ui-accent)',
+    title: `Thinking level: ${label}`,
+    children: [
+      jsx('span', { className: 'max-w-24 truncate', children: label }),
+      jsx(Codicon, { name: 'chevron-down', size: '0.7rem' }),
+    ],
   })
 }
 
@@ -553,6 +584,9 @@ function LibraryDialog({ open, folderId, onFolder, onClose, onEdit }) {
                   }),
                 ],
               }),
+              jsxs('div', {
+                className: 'flex min-w-0 shrink items-center gap-3',
+                children: [
               jsxs(DropdownMenu, {
                 children: [
                   jsx(DropdownMenuTrigger, {
@@ -591,6 +625,30 @@ function LibraryDialog({ open, folderId, onFolder, onClose, onEdit }) {
                       }),
                     ],
                   }),
+                ],
+              }),
+              jsxs(DropdownMenu, {
+                children: [
+                  jsx(DropdownMenuTrigger, {
+                    className: 'shrink border-0 bg-transparent p-0 text-xs',
+                    children: jsx(ThinkingPickLabel, { level: data.thinking }),
+                  }),
+                  jsx(DropdownMenuContent, {
+                    align: 'end',
+                    className: 'max-h-64 w-40 overflow-auto rounded-none p-0 text-xs',
+                    side: 'bottom',
+                    sideOffset: 6,
+                    children: THINKING_LEVELS.map(([label, value]) => jsx(DropdownMenuItem, {
+                      className: MENU_ROW,
+                      onSelect: () => save({ ...data, thinking: value }),
+                      children: jsx('span', {
+                        className: value === (data.thinking || null) ? 'text-(--ui-accent)' : undefined,
+                        children: label,
+                      }),
+                    }, label)),
+                  }),
+                ],
+              }),
                 ],
               }),
             ],
