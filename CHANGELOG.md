@@ -17,6 +17,8 @@ Tighter grading calibration, a reader-interests skill block, and a `reclassify` 
 
 ### Fixed
 
+- **rss-reader:** `reclassify` now pages with an offset, so each of its 12 batches targets a distinct slice instead of repeating the newest 60 articles. Its query bypasses mute and saved-search exclusions; the result reports when the 720-article safety cap leaves anything unprocessed.
+
 - **cdp-manager:** version `1.0.0` (the pre-release `1.0.1` tag is retired, never shipped). `config.json` now writes inside the plugin directory instead of the shared `$HERMES_HOME/plugins/` folder, and the default Chrome profile path derives from `%LOCALAPPDATA%` instead of a hardcoded personal path. The public edition's repo link points at `public/cdp-manager`. Pack re-pinned to the fix commit (pack `1.17.0`); catalog entry updated with `platforms: [windows]` and corrected profile-path wording.
 
 ## [rss-reader 1.0.8] - 2026-09-22

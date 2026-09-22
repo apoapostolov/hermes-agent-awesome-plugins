@@ -376,6 +376,9 @@ function tagRank(tags, level) {
   const raw = Number(fallback?.rank);
   return Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0;
 }
+function pageSlice(rows, offset, limit) {
+  return rows.slice(offset, offset + limit);
+}
 function sortArticlesByTime(list, oldestFirst) {
   const rows = Array.isArray(list) ? list.slice() : [];
   rows.sort((a, b) => {
@@ -623,8 +626,12 @@ async function gradingPass(host2, library, options) {
   const route = await currentRoute(host2);
   const skillText = await readGradingSkill(host2, options.skill);
   const tags = parseGradingTags(skillText);
-  const list = await library("/articles?limit=300");
-  // options.regrade: judge everything, including already-graded articles.
+  const offset = Math.max(0, Number(options.offset) || 0);
+  const listPath = options.regrade
+    ? `/articles?view=all&show_hidden=true&limit=${GRADING_BATCH}&offset=${offset}`
+    : "/articles?limit=300";
+  const list = await library(listPath);
+  // options.regrade pages the entire library so each pass gets a new slice.
   // Design-preview placeholder grades are always fair game.
   const pending = (Array.isArray(list) ? list : []).filter((a) => a && a.id && a.title && (options.regrade || !articleHasGrade(a))).slice(0, GRADING_BATCH);
   if (!pending.length) return { graded: 0, tags, more: false };
@@ -1560,18 +1567,21 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
       const library = await read(), q = (url.searchParams.get("q") || "").trim().toLowerCase();
       const exclude = (url.searchParams.get("exclude") || "").trim().toLowerCase();
       const view = url.searchParams.get("view"), feed = url.searchParams.get("feed_id"), folder = url.searchParams.get("folder");
-      const rules = url.searchParams.get("show_hidden") === "true" ? [] : (library.filters?.mutes || []).map(rule => ({ ...rule, phrase: rule.phrase.toLowerCase() }));
-      const savedExcludes = (library.filters?.searches || []).filter(search => search.enabled !== false).map(search => String(search.exclude || search.name || "").trim().toLowerCase()).filter(Boolean);
+      const showHidden = url.searchParams.get("show_hidden") === "true";
+      const rules = showHidden ? [] : (library.filters?.mutes || []).map(rule => ({ ...rule, phrase: rule.phrase.toLowerCase() }));
+      const savedExcludes = showHidden ? [] : (library.filters?.searches || []).filter(search => search.enabled !== false).map(search => String(search.exclude || search.name || "").trim().toLowerCase()).filter(Boolean);
       let dirty = false;
       const oldestFirst = Boolean(feed && library.feeds.some((item) => item.id === feed && isYoutubePlaylistFeed(item.url)));
-      const rows = sortArticlesByTime(library.articles.filter((a) => {
+      const requestedLimit = Number(url.searchParams.get("limit")) || 100;
+      const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
+      const rows = pageSlice(sortArticlesByTime(library.articles.filter((a) => {
         if (feed && a.feed_id !== feed || folder !== null && !library.feeds.some(item => item.id === a.feed_id && folderContains(item.folder, folder)) || view === "unread" && a.is_read || view === "saved" && !a.is_saved) return false;
         if (!q && !exclude && !rules.length && !savedExcludes.length) return true;
         const text = `${a.title}\n${a.body}`.toLowerCase();
         return (!q || text.includes(q)) && (!exclude || !text.includes(exclude)) &&
           !savedExcludes.some(phrase => text.includes(phrase)) &&
           !rules.some(rule => muteHidesArticle(rule, a, library.feeds));
-      }), oldestFirst).slice(0, Number(url.searchParams.get("limit")) || 100).map((a) => {
+      }), oldestFirst), offset, requestedLimit).map((a) => {
         if (applyCachedBody(library, a)) dirty = true;
         if (applyCachedGrade(library, a)) dirty = true;
         return { ...a, excerpt: cheapExcerpt(a.body) };
@@ -2039,14 +2049,20 @@ async function executeRssCommand(ctx, host2, owner, command) {
     rssDebug("command-start", { action: command.action, id: command.id, owner });
     // Keep the list fetch cheap: classification passes page through /articles until exhausted.
     const settings2 = readSettings(ctx, owner);
-    const report = { classified: 0, passes: 0 };
+    const report = { classified: 0, passes: 0, more: false };
     for (let pass = 0; pass < 12; pass++) {
-      const result = await gradingPass(host2, library, { skill: settings2.gradingSkill, ctx, regrade: true });
+      const result = await gradingPass(host2, library, { skill: settings2.gradingSkill, ctx, regrade: true, offset: pass * GRADING_BATCH });
       report.classified += result.graded;
       report.passes++;
+      report.more = result.more;
       if (!result.more) break;
     }
-    publishLibraryChange(owner, `Reclassified ${report.classified} article${report.classified === 1 ? "" : "s"} across ${report.passes} pass${report.passes === 1 ? "" : "es"}.`);
+    if (report.passes === 12 && report.more) {
+      const remaining = await library("/articles?view=all&show_hidden=true&limit=1&offset=720");
+      report.more = Array.isArray(remaining) && remaining.length > 0;
+    }
+    const note = report.more ? " The 720-article safety cap was reached; some articles remain." : "";
+    publishLibraryChange(owner, `Reclassified ${report.classified} article${report.classified === 1 ? "" : "s"} across ${report.passes} pass${report.passes === 1 ? "" : "es"}.${note}`);
     return report;
   }
   if (command.action === "mute") {
