@@ -1,6 +1,6 @@
 # Changelog
 
-## [rss-reader 1.0.9] - Unreleased
+## [rss-reader 1.0.9] - 2026-09-23
 
 Tighter grading calibration, a reader-interests skill block, and a `reclassify` action that re-judges up to 720 articles per run.
 
