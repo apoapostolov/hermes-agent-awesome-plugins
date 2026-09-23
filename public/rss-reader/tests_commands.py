@@ -16,7 +16,7 @@ _SPEC.loader.exec_module(rss)
 class RssCommandTests(unittest.TestCase):
     def test_refresh_forms(self):
         self.assertEqual(rss._parse("refresh"), ("refresh", {}))
-        self.assertEqual(rss._parse("refresh 45m"), ("refresh-period", {"minutes": 45}))
+        self.assertEqual(rss._parse("refresh 30m"), ("refresh-period", {"minutes": 30}))
 
     def test_refine_defaults_and_bounds(self):
         self.assertEqual(rss._parse("refine"), ("refine", {"days": 30}))
@@ -67,11 +67,11 @@ class RssCommandTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             queue = Path(directory) / "commands.jsonl"
             with patch.object(rss, "_queue_path", return_value=queue):
-                message = rss._handle("refresh 20m")
-            self.assertIn("20 minutes", message)
+                message = rss._handle("refresh 30m")
+            self.assertIn("30 minutes", message)
             row = json.loads(queue.read_text(encoding="utf-8"))
             self.assertEqual(row["action"], "refresh-period")
-            self.assertEqual(row["payload"], {"minutes": 20})
+            self.assertEqual(row["payload"], {"minutes": 30})
             self.assertTrue(row["id"])
     def test_refresh_transport_avoids_python_exec_flags(self):
         plugin = (_ENTRYPOINT.parent / "desktop" / "plugin.js").read_text(encoding="utf-8")
@@ -85,7 +85,7 @@ class RssCommandTests(unittest.TestCase):
         self.assertIn("className: \"rss-subscribe-pill\"", plugin)
         self.assertIn("function expandSubscribeUrl", plugin)
         self.assertIn("async function runLearnInterests", plugin)
-        self.assertIn("RSS or Atom URL, or r/name of Reddit communities", plugin)
+        self.assertIn("Search, or provide RSS or Atom URL, or r/name Reddit community", plugin)
         self.assertIn("https://www.reddit.com/r/", plugin)
         self.assertNotIn("Test-Path -LiteralPath", plugin)
         self.assertNotIn("Get-Content -Raw -LiteralPath", plugin)

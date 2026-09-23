@@ -2090,7 +2090,7 @@ async function executeRssCommand(ctx, host2, owner, command) {
     publishLibraryChange(owner, `Reclassified ${report.classified} article${report.classified === 1 ? "" : "s"} across ${report.passes} pass${report.passes === 1 ? "" : "es"}.${note}`);
     return report;
   }
-  if (command.action === "mute") {
+  if (command.action === "add-filter") {
     const phrase = String(payload.phrase || "").trim().slice(0, 200);
     if (!phrase) throw new Error("Mute phrase is empty.");
     await library("/filters/mutes", { method: "POST", body: { phrase, folders: [], feed_ids: [] } });
@@ -4085,12 +4085,13 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
       jsx("button", { type: "button", className: "rss-ticker-brand", title: "RSS Reader headlines", onClick: () => onOpen(null), children: "RSS" }),
       jsx(TickerRefresh, { onRefresh }),
       jsx("div", { className: "rss-ticker-viewport", children: rows.length ?
-        jsx("div", { className: `rss-ticker-track${reduced ? "" : " rss-ticker-marquee"}`, children: reduced
-          ? rows.slice(0, 1).map(renderRow)
-          : [
+        jsx("div", {
+            className: "rss-ticker-track",
+            children: reduced ? rows.map(renderRow) : [
               jsx("div", { className: "rss-ticker-half", children: rows.map(renderRow) }, "a"),
               jsx("div", { className: "rss-ticker-half", "aria-hidden": "true", children: rows.map(renderRow) }, "b")
-            ] }, "rss-ticker-track")
+            ]
+          })
         : jsx("span", { className: "rss-ticker-empty", children: settings.tickerOnlyUnread === true ? "No unread headlines" : "No headlines" })
       })
     ]
@@ -6778,13 +6779,13 @@ var plugin_default = {
   id: ID,
   name: "RSS Reader",
   description: "RSS reader with reader-mode capture, edit-mode subscriptions, and keyboard shortcuts.",
-  version: "1.0.5",
+  version: "1.0.9",
   defaultEnabled: true,
   register(ctx) {
     rssRest = typeof ctx.rest === "function" ? ctx.rest : null;
     if (!rssRest) throw new Error("RSS Reader requires the plugin REST API.");
     rssCtx = ctx;
-    rssDebug("register", { id: ID, version: "1.0.5" });
+    rssDebug("register", { id: ID, version: "1.0.9" });
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
     if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
     ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);

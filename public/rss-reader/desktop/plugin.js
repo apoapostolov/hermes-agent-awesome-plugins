@@ -2065,7 +2065,7 @@ async function executeRssCommand(ctx, host2, owner, command) {
     publishLibraryChange(owner, `Reclassified ${report.classified} article${report.classified === 1 ? "" : "s"} across ${report.passes} pass${report.passes === 1 ? "" : "es"}.${note}`);
     return report;
   }
-  if (command.action === "mute") {
+  if (command.action === "add-filter") {
     const phrase = String(payload.phrase || "").trim().slice(0, 200);
     if (!phrase) throw new Error("Mute phrase is empty.");
     await library("/filters/mutes", { method: "POST", body: { phrase, folders: [], feed_ids: [] } });
@@ -4048,12 +4048,13 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
       jsx("button", { type: "button", className: "rss-ticker-brand", title: "RSS Reader headlines", onClick: () => onOpen(null), children: "RSS" }),
       jsx(TickerRefresh, { onRefresh }),
       jsx("div", { className: "rss-ticker-viewport", children: rows.length ?
-        jsx("div", { className: `rss-ticker-track${reduced ? "" : " rss-ticker-marquee"}`, children: reduced
-          ? rows.slice(0, 1).map(renderRow)
-          : [
+        jsx("div", {
+            className: "rss-ticker-track",
+            children: reduced ? rows.map(renderRow) : [
               jsx("div", { className: "rss-ticker-half", children: rows.map(renderRow) }, "a"),
               jsx("div", { className: "rss-ticker-half", "aria-hidden": "true", children: rows.map(renderRow) }, "b")
-            ] }, "rss-ticker-track")
+            ]
+          })
         : jsx("span", { className: "rss-ticker-empty", children: settings.tickerOnlyUnread === true ? "No unread headlines" : "No headlines" })
       })
     ]
@@ -4108,18 +4109,12 @@ function tickerRefreshMs(settings) {
 // IndexedDB; headline clicks navigate to /rss and hand the article id over
 // via a window event.
 function RssBrowserFrame({ url }) {
-  const hostRef = useRef(null);
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return undefined;
-    host.replaceChildren();
-    if (!url) return undefined;
-    // public edition: no Electron webview; openExternal is the fallback
-    return () => {
-      host.replaceChildren();
-    };
-  }, [url]);
-  return jsx("div", { ref: hostRef, className: "rss-browser-frame-host", "data-url": url || "", style: { display: "flex", flex: "1 1 auto", minHeight: 0, height: "100%", width: "100%" } });
+  return jsx("div", {
+    className: "rss-browser-frame-host",
+    "data-url": url || "",
+    "data-public-empty": "true",
+    style: { display: "flex", flex: "1 1 auto", minHeight: 0, height: "100%", width: "100%" }
+  });
 }
 function YoutubeFrame({ id, start }) {
   const src = youtubeEmbedSrc(id, start);
@@ -4141,13 +4136,9 @@ function openHermesPreview(url, label) {
   if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
   const title = String(label || url);
   const openWorkspaceBrowser = () => {
-    if (typeof host.openWorkspace !== "function") return false;
-    host.openWorkspace("rss-browser", {
-      title,
-      dock: { pane: "workspace", pos: "right" },
-      render: () => jsx(RssBrowserFrame, { url })
-    });
-    return true;
+    // Public builds do not render a webview, so workspace panes cannot
+    // display the page. Use the system browser directly.
+    return false;
   };
   void (async () => {
     let openedNative = false;
@@ -6646,13 +6637,13 @@ var plugin_default = {
   id: ID,
   name: "RSS Reader",
   description: "RSS reader with reader-mode capture, edit-mode subscriptions, and keyboard shortcuts.",
-  version: "1.0.5",
+  version: "1.0.9",
   defaultEnabled: true,
   register(ctx) {
     rssRest = typeof ctx.rest === "function" ? ctx.rest : null;
     if (!rssRest) throw new Error("RSS Reader requires the plugin REST API.");
     rssCtx = ctx;
-    rssDebug("register", { id: ID, version: "1.0.5" });
+    rssDebug("register", { id: ID, version: "1.0.9" });
     if (typeof ctx.onDispose === "function") ctx.onDispose(startAutoRefresh(ctx, host));
     if (typeof ctx.onDispose === "function") ctx.onDispose(startRssCommandBridge(ctx, host));
     ctx.onDispose ? ctx.onDispose(startCaptureWorker(ctx, host)) : startCaptureWorker(ctx, host);

@@ -265,7 +265,7 @@ assert.equal(fns.isYoutubeArticle({ url: "https://www.youtube.com/watch?v=abcdef
 assert.equal(fns.articleNeedsCapture({ url: "https://www.youtube.com/watch?v=abcdefghijk", captured: false, body: "short" }), false);
 assert.equal(fns.youtubeTimeParam("125"), 125);
 assert.equal(fns.youtubeTimeParam("1h2m3s"), 3723);
-assert.equal(fns.youtubeEmbedSrc("abcdefghijk", 90), "https://www.youtube-nocookie.com/embed/abcdefghijk?start=90");
+assert.equal(fns.youtubeEmbedSrc("abcdefghijk", 90), "https://www.youtube-nocookie.com/embed/abcdefghijk?feature=oembed&playsinline=1&start=90");
 assert.deepEqual(fns.parseYoutubeChapters("0:00 Intro\n1:53 Reading the essay\n4:46 Sponsor").map(row => [row.seconds, row.title]), [[0, "Intro"], [113, "Reading the essay"], [286, "Sponsor"]]);
 assert.deepEqual(fns.parseYoutubeChapters("no stamps here"), []);
 assert.equal(fns.healthAgeLabel(null, "m"), "never");

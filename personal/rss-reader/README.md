@@ -5,7 +5,7 @@
   <p>Folders, mute and search, reader-mode capture, optional Hermes tools, and an optional headline ticker.</p>
   <p>
     <a href="https://github.com/NousResearch/hermes-agent"><img src="https://img.shields.io/badge/Hermes%20Desktop-plugin-6f42c1" alt="Hermes Desktop plugin" /></a>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.7-2ea44f" alt="Version 1.0.7" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.9-2ea44f" alt="Version 1.0.9" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>

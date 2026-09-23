@@ -56,7 +56,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 ## What's in the Pack
 
-Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.15.0). **reasoning-switch** lives in this repo but is **not** in the pack and stays off by default, so install it separately if you want it.
+Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reasoning-switch** lives in this repo but is **not** in the pack and stays off by default, so install it separately if you want it.
 
 ### Status Bar
 

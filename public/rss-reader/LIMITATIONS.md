@@ -1,6 +1,6 @@
 # LIMITATIONS
 
-Personal edition of **RSS Reader** (`rss-reader`). This file is why that edition cannot be listed in the Hermes Plugin Catalog as-is.
+Public edition of **RSS Reader** (`rss-reader`). This file records the deliberate catalog-runtime cuts in this edition.
 
 Before you pin personal to the catalog, or copy a personal feature into `public/`, walk every blocker below. Either still comply, or confirm the linked Hermes issue or PR is resolved and the SDK hook exists in the Desktop build you target.
 
@@ -42,7 +42,7 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 
 - **Personal behavior:** `sanitizeRichHtml` lets https `iframe`/`object`/`embed` through unsandboxed. A raw Electron `<webview>` mounts on `persist:hermes-preview`. Ticker code reads `hermes.desktop.layoutTree.v2`.
 - **Why it fails:** rule 8 reach-in. Sandboxed embed primitive is item 9 in [#116305](https://github.com/NousResearch/hermes-agent/issues/116305).
-- **Public edition:** other `iframe`/`embed`/`object` tags are stripped. YouTube player iframes stay so 1.0.8 in-reader playback works. No webview. No layout-store read.
+- **Public edition:** other `iframe`/`embed`/`object` tags are stripped. YouTube player iframes stay so in-reader playback works. No webview. No layout-store read.
 
 ### 6. Script-strip regex (lint false positive)
 
