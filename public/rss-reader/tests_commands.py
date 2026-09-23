@@ -27,7 +27,7 @@ class RssCommandTests(unittest.TestCase):
             rss._parse("refine 366d")
 
     def test_mute_and_add_scope(self):
-        self.assertEqual(rss._parse("mute model spam"), ("mute", {"phrase": "model spam"}))
+        self.assertEqual(rss._parse("mute model spam"), ("add-filter", {"kind": "keyword", "phrase": "model spam"}))
         self.assertEqual(
             rss._parse("add example.com, Example to Research"),
             ("add", {"source": "example.com, Example", "folder": "Research"}),

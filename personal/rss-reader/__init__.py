@@ -69,7 +69,7 @@ def _parse(raw_args: str) -> tuple[str, dict[str, Any]] | None:
         phrase = rest[:_MAX_TEXT].strip()
         if not phrase:
             raise ValueError("Usage: /rss mute <keyword or phrase> | /rss mute tag <tag key>")
-        return "mute", {"phrase": phrase}
+        return "add-filter", {"kind": "keyword", "phrase": phrase}
 
     if action == "unmute":
         target = rest[:_MAX_TEXT].strip()
@@ -233,8 +233,6 @@ def _handle(raw_args: str) -> str:
         return "RSS Reader refresh queued."
     if action == "refresh-period":
         return f"RSS Reader refresh period change queued: every {payload['minutes']} minutes."
-    if action == "mute":
-        return f"RSS Reader mute queued for: {payload['phrase']}"
     if action == "refine":
         return f"RSS Reader refinement queued for the last {payload['days']} days."
     if action == "refine-starred":
