@@ -1301,6 +1301,8 @@ def fetch_codex(cfg: dict) -> dict:
                 "exhaust_percent": weekly,
                 "reset_after": int(resets_at - time.time()) if resets_at else 0,
                 "resets_at": resets_at,
+                "five_resets_at": five_reset,
+                "weekly_resets_at": weekly_reset,
                 "detail": " ".join(segs),
                 "email": email}
     except HTTPError as e:

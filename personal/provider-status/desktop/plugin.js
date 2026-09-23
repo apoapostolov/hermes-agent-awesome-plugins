@@ -122,12 +122,21 @@ function _fiveHText(unixSec) {
   return h + ':' + m + 'h'
 }
 
-// GLM + Codex carry a 5h refresh window; their hover is just the two facts.
+// GLM: single 5h window, hover is just the two facts. Codex carries a 5h
+// window AND a weekly budget; the backend ships them as five_resets_at /
+// weekly_resets_at (resets_at alone is min of both and can be the weekly one).
 function _chipTitle(id, status) {
-  const fiveH = id === 'glm' || id === 'codex'
-  if (fiveH) {
+  if (id === 'glm') {
     const p = []
     if (status?.resets_at) p.push('Refresh ' + _fiveHText(status.resets_at))
+    if (status?.fetched_at) p.push('Checked ' + _ageText(status.fetched_at) + ' ago')
+    return p.join(' · ')
+  }
+  if (id === 'codex') {
+    const p = []
+    const five = status?.five_resets_at || status?.resets_at
+    if (five) p.push('Refresh ' + _fiveHText(five))
+    if (status?.weekly_resets_at) p.push('Resets in ' + _countdownText(status.weekly_resets_at))
     if (status?.fetched_at) p.push('Checked ' + _ageText(status.fetched_at) + ' ago')
     return p.join(' · ')
   }
