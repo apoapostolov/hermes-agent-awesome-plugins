@@ -869,6 +869,13 @@ function folderContains(feedFolder, browseFolder) {
   if (want === "") return key === "";
   return key === want || key.startsWith(`${want}/`);
 }
+function articleMatchesReaderScope(article, feed, folder, view, feeds) {
+  if (feed && article?.feed_id !== feed) return false;
+  if (folder !== null && !feeds.some(item => item.id === article?.feed_id && folderContains(item.folder, folder))) return false;
+  if (view === "unread" && article?.is_read) return false;
+  if (view === "saved" && !article?.is_saved) return false;
+  return true;
+}
 function rememberUnreadTrail(trail, item) {
   if (!item?.id) return Array.isArray(trail) ? trail : [];
   const rows = Array.isArray(trail) ? trail : [];
@@ -1575,7 +1582,7 @@ function createLibrary(owner, fetchFeed2, transaction = transact) {
       const requestedLimit = Number(url.searchParams.get("limit")) || 100;
       const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
       const rows = pageSlice(sortArticlesByTime(library.articles.filter((a) => {
-        if (feed && a.feed_id !== feed || folder !== null && !library.feeds.some(item => item.id === a.feed_id && folderContains(item.folder, folder)) || view === "unread" && a.is_read || view === "saved" && !a.is_saved) return false;
+        if (!articleMatchesReaderScope(a, feed, folder, view, library.feeds)) return false;
         if (!q && !exclude && !rules.length && !savedExcludes.length) return true;
         const text = `${a.title}\n${a.body}`.toLowerCase();
         return (!q || text.includes(q)) && (!exclude || !text.includes(exclude)) &&
@@ -3488,6 +3495,7 @@ var styles = `
 .hermes-rss .rss-nav .rss-eyebrow{padding:0 10px;margin-top:20px}.hermes-rss .rss-count{font-size:11px;font-variant-numeric:tabular-nums}
 .hermes-rss .rss-folder{margin:0 0 4px}
 .hermes-rss .rss-nav .rss-folder-header{display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin:0 0 4px;padding:6px 8px;border:0;border-radius:6px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent);color:var(--ui-text-tertiary);font-size:10px;font-weight:650;letter-spacing:1.5px;text-transform:uppercase;gap:6px;cursor:pointer}
+.hermes-rss .rss-nav .rss-folder-header[aria-current=true]{background:color-mix(in srgb,var(--ui-accent) 18%,transparent);color:var(--ui-accent)}
 .hermes-rss .rss-nav .rss-folder-header:hover{background:color-mix(in srgb,var(--ui-accent) 16%,transparent);color:var(--ui-text-secondary)}
 .hermes-rss .rss-folder-drop .rss-folder-header,.hermes-rss .rss-nav .rss-folder-header[data-drop=true]{outline:1px dashed var(--ui-accent);outline-offset:-1px;background:color-mix(in srgb,var(--ui-accent) 10%,transparent)}
 .hermes-rss .rss-nav .rss-folder-drag-handle{width:14px;height:18px;flex:0 0 14px;margin:0 2px 0 0;padding:0;display:inline-flex;align-items:center;justify-content:center;color:var(--ui-text-tertiary);cursor:grab}
@@ -4944,21 +4952,31 @@ function ReaderProfile({ ctx, owner }) {
     if (!ranked.length) setNotice("No feeds found for that site.");
     else if (!live.length) setNotice("No current feeds found for that site.");
   });
-  const selectView = (next, feed = null, folder = null) => {
+  const selectView = (next, feed = feedId, folder = folderId) => {
+    const nextFeed = feed === undefined ? null : feed;
+    const nextFolder = folder === undefined ? null : folder;
+    const scopeChanged = nextFeed !== feedId || nextFolder !== folderId;
     setView(next);
-    setFeedId(feed);
-    setFolderId(folder);
+    setFeedId(nextFeed);
+    setFolderId(nextFolder);
     setSelected(null);
     setLimit(100);
     setUnreadTrail([]);
+    if (scopeChanged) {
+      const list = listRef.current;
+      if (list) list.scrollTop = 0;
+      savedListY.current = null;
+      setListFab(null);
+    }
   };
   const browseFolder = folder => selectView(view, null, folder);
+  const selectFeed = feed => selectView(view, feed, null);
   const resetFilters = () => {
-    selectView("all");
+    selectView("all", null, null);
     setQuery(""); setExclude(""); setShowHidden(false);
   };
   const openSearch = search => {
-    selectView(search.view, search.feed_id || null);
+    selectView(search.view, search.feed_id || null, null);
     setQuery(search.query); setExclude(search.exclude); setShowHidden(search.show_hidden);
   };
   const saveSearch = event => {
@@ -5295,7 +5313,7 @@ function ReaderProfile({ ctx, owner }) {
   const unsubscribe = () => act("Unsubscribing…", async () => {
     const removed = feedToRemove;
     await libraryRequest(`/feeds/${removed.id}`, { method: "DELETE" });
-    if (feedId === removed.id) selectView("all");
+    if (feedId === removed.id) selectView("all", null, null);
     if (article?.feed_id === removed.id && !article.is_saved) setSelected(null);
     setFeedToRemove(null);
     setNotice(`Unsubscribed from ${removed.title}. Saved articles and chats were kept.`);
@@ -6105,7 +6123,7 @@ function ReaderProfile({ ctx, owner }) {
           {
             type: "button",
             className: "rss-nav-view",
-            "aria-current": !feedId && view === id,
+            "aria-current": view === id,
             onClick: () => selectView(id),
             children: [
               jsx("span", { children: label }),
@@ -6149,6 +6167,7 @@ function ReaderProfile({ ctx, owner }) {
             children: [
               jsxs("div", {
                 className: "rss-folder-header",
+                "aria-current": folderId === group.key,
                 "data-drop": draggingId && dragTargetFolder === group.key ? "true" : undefined,
                 onClick: () => {
                   if (suppressFolderClick.current) { suppressFolderClick.current = false; return; }
@@ -6190,7 +6209,7 @@ function ReaderProfile({ ctx, owner }) {
                 }),
                 jsxs("button", { type: "button", className: "rss-feed-open", draggable: false, "aria-current": feedId === feed.id,
                   title: `${feed.folder ? feed.folder + " / " : ""}${feed.title}`,
-                  onClick: () => selectView("all", feed.id), children: [
+                  onClick: () => selectFeed(feed.id), children: [
                     jsxs("span", { className: "rss-feed-info", children: [
                       jsx("span", { className: "rss-feed-name", children: `${feed.error ? "! " : ""}${feed.title}` }),
                       jsx("span", { className: `rss-feed-status${feed.error ? " rss-feed-status-error" : ""}`, children: feed.error ? "Refresh failed" : refreshStatus(feed.refreshed_at) })
@@ -6262,10 +6281,11 @@ function ReaderProfile({ ctx, owner }) {
               }, children: "×" })
             ] }, search.id);
           }) }),
-          (query || feedId || view !== "all") && jsxs("div", { className: "rss-filter-chips", "aria-label": "Active filters", children: [
+          (query || feedId || folderId !== null || view !== "all") && jsxs("div", { className: "rss-filter-chips", "aria-label": "Active filters", children: [
             query && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear search phrase", onClick: () => { setQuery(""); setLimit(100); }, children: `Search: ${query} ×` }),
-            feedId && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear feed filter", onClick: () => selectView(view), children: `${chosenFeed?.title || "Removed feed"} ×` }),
-            view !== "all" && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear view filter", onClick: () => selectView("all", feedId), children: `${view === "saved" ? "Starred" : "Unread"} ×` }),
+            feedId && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear feed filter", onClick: () => selectView(view, null, folderId), children: `${chosenFeed?.title || "Removed feed"} ×` }),
+            folderId !== null && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear folder filter", onClick: () => selectView(view, feedId, null), children: `${folderTitle(folderId)} ×` }),
+            view !== "all" && jsx(Button, { size: "sm", variant: "outline", "aria-label": "Clear view filter", onClick: () => selectView("all", feedId, folderId), children: `${view === "saved" ? "Starred" : "Unread"} ×` }),
             jsx(Button, { size: "sm", variant: "ghost", "aria-label": "Reset filters", title: "Reset filters", onClick: resetFilters, children: jsx(Codicon, { name: "clear-all", size: "0.9rem" }) }),
             view === "saved" && jsx(Button, { type: "button", size: "sm", className: "rss-learn-btn", disabled, onClick: () => setLearnOpen(true), children: "Learn Interests" })
           ] }),
@@ -6278,13 +6298,13 @@ function ReaderProfile({ ctx, owner }) {
           ] }),
           !feeds.error && !articles.error && articles.isPending && !articles.data?.length && /* @__PURE__ */ jsx(Empty, { title: "Loading your library\u2026" }),
           !articles.isPending && !articles.error && !feeds.error && !articles.data?.length && jsxs(Empty, {
-            title: query || exclude || feedId || mutes.length && !showHidden ? "No Matching Articles" : view === "saved" ? "No Starred Articles" : view === "unread" ? "No Unread Articles" : feeds.data?.length ? "No Articles Yet" : "No Subscriptions Yet",
+            title: query || exclude || feedId || folderId !== null || mutes.length && !showHidden ? "No Matching Articles" : view === "saved" ? "No Starred Articles" : view === "unread" ? "No Unread Articles" : feeds.data?.length ? "No Articles Yet" : "No Subscriptions Yet",
             children: [
-              jsx("p", { children: query || exclude || feedId || mutes.length && !showHidden ? (mutes.length && !showHidden ? "Clear a filter, or show articles hidden by mute rules." : "Try a different phrase, or clear a filter.") : view === "saved" ? "Star an article to keep it in this view." : view === "unread" ? "There are no unread articles in this view." : feeds.data?.length ? "Refresh your feeds to fetch articles." : "Subscribe to a feed, or import subscriptions as OPML." }),
+              jsx("p", { children: query || exclude || feedId || folderId !== null || mutes.length && !showHidden ? (mutes.length && !showHidden ? "Clear a filter, or show articles hidden by mute rules." : "Try a different phrase, or clear a filter.") : view === "saved" ? "Star an article to keep it in this view." : view === "unread" ? "There are no unread articles in this view." : feeds.data?.length ? "Refresh your feeds to fetch articles." : "Subscribe to a feed, or import subscriptions as OPML." }),
               jsxs("div", { className: "rss-tools", style: { justifyContent: "center" }, children: [
-                (query || exclude || feedId || view !== "all") && jsx(Button, { variant: "outline", onClick: resetFilters, children: "Clear filters" }),
+                (query || exclude || feedId || folderId !== null || view !== "all") && jsx(Button, { variant: "outline", onClick: resetFilters, children: "Clear filters" }),
                 mutes.length > 0 && !showHidden && jsx(Button, { variant: "outline", onClick: () => { setShowHidden(true); setLimit(100); }, children: "Show hidden articles" }),
-                !feeds.data?.length && !query && !exclude && !feedId && view === "all" && jsxs(Fragment, { children: [
+                !feeds.data?.length && !query && !exclude && !feedId && folderId === null && view === "all" && jsxs(Fragment, { children: [
                   jsx(Button, { variant: "outline", onClick: () => setAdding(true), children: "Add your first feed" }),
                   jsx(Button, { variant: "ghost", disabled, onClick: chooseFile, children: "Import OPML" })
                 ] })
