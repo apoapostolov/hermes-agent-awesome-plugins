@@ -17,7 +17,7 @@ Tighter grading calibration, a reader-interests skill block, and a `reclassify` 
 
 ### Fixed
 
-
+- **rss-reader:** Unread or Starred can now be combined with a feed or folder. Switching views keeps the selected scope, and selecting a feed or folder keeps the current view. Feed and folder changes return the article list to the top.
 - **cdp-manager:** version `1.0.0` (the pre-release `1.0.1` tag is retired, never shipped). `config.json` now writes inside the plugin directory instead of the shared `$HERMES_HOME/plugins/` folder, and the default Chrome profile path derives from `%LOCALAPPDATA%` instead of a hardcoded personal path. The public edition's repo link points at `public/cdp-manager`. Pack re-pinned to the fix commit (pack `1.17.0`); catalog entry updated with `platforms: [windows]` and corrected profile-path wording.
 
 ## [rss-reader 1.0.8] - 2026-09-22
