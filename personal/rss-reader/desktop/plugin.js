@@ -14,7 +14,8 @@ import {
   useQueryClient,
   ROUTES_AREA,
   SIDEBAR_NAV_AREA,
-  PALETTE_AREA
+  PALETTE_AREA,
+  SandboxedFrame
 } from "@hermes/plugin-sdk";
 
 var RSS_DEBUG = false;
@@ -1790,13 +1791,6 @@ function publishTickerRefresh(owner) {
   window.dispatchEvent(new CustomEvent("hermes-rss-ticker-refresh", { detail: { owner } }));
 }
 var TICKER_READ_REFRESH_DEBOUNCE_MS = 1e3;
-var rssCommandBusy = false;
-async function rssCommandQueue(host2, route) {
-  assertOwner(host2, route);
-  const commands = await rssRest("/commands", { method: "GET" });
-  assertOwner(host2, route);
-  return Array.isArray(commands) ? commands.filter(command => command && command.id && command.action && command.payload && typeof command.payload === "object") : [];
-}
 function rssCommandSeen(ctx, owner) {
   const value = storageGet(ctx, "commandSeen", owner, []);
   return new Set(Array.isArray(value) ? value.filter(id => typeof id === "string") : []);
@@ -2355,40 +2349,49 @@ async function executeRssCommand(ctx, host2, owner, command) {
   throw new Error("Unknown RSS command.");
 }
 function startRssCommandBridge(ctx, host2) {
-  rssDebug("bridge-start", { plugin: "hermes-rss-reader" });
+  rssDebug("bridge-start", { plugin: "hermes-rss-reader", transport: "host.onEvent" });
+  // Commands arrive as plugin.rss-reader.command events from the backend
+  // (broadcast_plugin_event) — no commands.jsonl queue, no 3s poll.
+  // plugin.rss-reader.preview drives the workspace RSS browser from any
+  // window (the /preview route emits it;SandboxedFrame renders inside).
   let stopped = false;
-  const poll = async () => {
-    if (stopped || rssCommandBusy) return;
-    rssCommandBusy = true;
-    try {
+  if (typeof host2.onEvent === "function") {
+    host2.onEvent("plugin.rss-reader.preview", (frame) => {
+      const url = frame && frame.payload && frame.payload.url;
+      if (typeof url === "string" && /^https?:\/\//i.test(url)) {
+        openHermesPreview(url, (frame.payload && frame.payload.label) || url);
+      }
+    });
+  }
+  const off = typeof host2.onEvent === "function" ? host2.onEvent("plugin.rss-reader.command", (frame) => {
+    if (stopped) return;
+    const command = frame && frame.payload;
+    if (!command || !command.id || !command.action || !command.payload || typeof command.payload !== "object") return;
+    void (async () => {
       const route = await currentRoute(host2);
       const owner = JSON.stringify([route.connectionId, route.profile]);
       const seen = rssCommandSeen(ctx, owner);
-      const commands = await rssCommandQueue(host2, route);
-      for (const command of commands) {
-        if (seen.has(command.id)) continue;
-        let reply = { id: command.id, ok: true, result: null, error: "" };
-        try {
-          reply.result = await executeRssCommand(ctx, host2, owner, command) || { ok: true };
-          rememberRssCommand(ctx, owner, seen, command.id);
-        } catch (error) {
-          rssDebug("command-error", { id: command.id, action: command.action, message: error?.message || error, stack: error?.stack || "" });
-          rememberRssCommand(ctx, owner, seen, command.id);
-          reply.ok = false;
-          reply.error = String(error?.message || error).slice(0, 300);
-          publishLibraryChange(owner, `RSS command failed: ${reply.error}`);
-        }
-        if (command.reply) {
-          try { await rssRest("/command-result", { method: "POST", body: reply }); } catch {}
-        }
+      if (seen.has(command.id)) return;
+      let reply = { id: command.id, ok: true, result: null, error: "" };
+      try {
+        reply.result = await executeRssCommand(ctx, host2, owner, command) || { ok: true };
+        rememberRssCommand(ctx, owner, seen, command.id);
+      } catch (error) {
+        rssDebug("command-error", { id: command.id, action: command.action, message: error?.message || error, stack: error?.stack || "" });
+        rememberRssCommand(ctx, owner, seen, command.id);
+        reply.ok = false;
+        reply.error = String(error?.message || error).slice(0, 300);
+        publishLibraryChange(owner, `RSS command failed: ${reply.error}`);
       }
-    } catch (error) {
-      rssDebug("poll-error", { message: error?.message || error, stack: error?.stack || "" });
-    } finally { rssCommandBusy = false; }
+      if (command.reply) {
+        try { await rssRest("/command-result", { method: "POST", body: reply }); } catch {}
+      }
+    })();
+  }) : null;
+  return () => {
+    stopped = true;
+    if (typeof off === "function") off();
   };
-  const timer = setInterval(() => { void poll(); }, 3000);
-  void poll();
-  return () => { stopped = true; clearInterval(timer); };
 }
 async function refreshSubscriptions(library, { feedId = null, shouldContinue = () => true, honorPeriod = false, now = Date.now, settings = null } = {}) {
   const feeds = await library("/feeds");
@@ -3572,7 +3575,6 @@ var styles = `
 .hermes-rss .rss-browser-actions{display:inline-flex;align-items:center;gap:2px;margin-left:auto}
 .hermes-rss .rss-browser-frame{display:block;border:0;flex:1 1 auto;width:100%;min-height:0;height:100%;background:#fff}
 .hermes-rss .rss-browser-frame-host{display:flex;flex:1 1 auto;min-height:0;height:100%;width:100%}
-.hermes-rss .rss-browser-frame-host webview{flex:1 1 auto;width:100%;height:100%;min-height:0;border:0}
 .hermes-rss .rss-detail .rss-tools{margin:18px 0}
 .hermes-rss .rss-detail-inner{max-width:calc(70ch + 88px);margin:0 auto;padding:32px 44px 56px;width:100%;box-sizing:border-box}
 .hermes-rss .rss-detail h2{font-size:24px;letter-spacing:-.3px;line-height:1.3;margin:6px 0 22px;font-weight:700}
@@ -3610,7 +3612,7 @@ var styles = `
 .hermes-rss .rss-detail .rss-body pre code{background:transparent;padding:0}
 .hermes-rss .rss-detail .rss-body img,.hermes-rss .rss-detail .rss-body video,.hermes-rss .rss-detail .rss-body iframe,.hermes-rss .rss-detail .rss-body audio{max-width:100%;height:auto;display:block;margin:1.1em 0;border-radius:8px}
 .hermes-rss .rss-youtube{position:relative;width:100%;aspect-ratio:16/9;margin:0 0 1.25em;border-radius:8px;overflow:hidden;background:color-mix(in srgb,var(--ui-text-secondary) 12%,transparent)}
-.hermes-rss .rss-youtube iframe,.hermes-rss .rss-youtube webview,.hermes-rss .rss-youtube-frame{position:absolute;inset:0;width:100%;height:100%;max-width:none;margin:0;border:0;border-radius:0;display:block}
+.hermes-rss .rss-youtube iframe,.hermes-rss .rss-youtube-frame{position:absolute;inset:0;width:100%;height:100%;max-width:none;margin:0;border:0;border-radius:0;display:block}
 .hermes-rss .rss-youtube-fallback a.rss-yt-open{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:inherit;text-decoration:none;border:0}
 .hermes-rss .rss-youtube-fallback img{width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:0}
 .hermes-rss .rss-youtube-fallback .rss-yt-play{position:absolute;width:68px;height:48px;border-radius:12px;background:#f00;box-shadow:0 2px 10px color-mix(in srgb,#000 40%,transparent)}
@@ -3974,34 +3976,6 @@ function TickerFavicon({ urls }) {
     onError: () => setIndex((n) => n + 1)
   });
 }
-function tickerPaneInTree(node, paneId) {
-  if (!node || !paneId) return false;
-  if (node.type === "group") return (node.panes || []).includes(paneId);
-  return (node.children || []).some((child) => tickerPaneInTree(child, paneId));
-}
-function tickerIsWorkspaceBottom(tree, paneId) {
-  if (!tree || !paneId) return false;
-  const walk = (node, parent) => {
-    if (!node) return false;
-    if (node.type === "group") {
-      if (!(node.panes || []).includes(paneId)) return false;
-      if ((node.panes || []).length !== 1) return false;
-      if (!parent || parent.type !== "split" || parent.orientation !== "column") return false;
-      const kids = parent.children || [];
-      return kids[kids.length - 1] === node;
-    }
-    return (node.children || []).some((child) => walk(child, node));
-  };
-  return walk(tree, null);
-}
-function readLayoutTree() {
-  try {
-    const raw = localStorage.getItem("hermes.desktop.layoutTree.v2");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
 function TickerItem({ row, onOpen, showFavicon, websiteName, showAge, tagStyle }) {
     const { item, pill } = row;
   const showPill = pill && tagStyle === "pill";
@@ -4146,68 +4120,29 @@ function tickerRefreshMs(settings) {
 // IndexedDB; headline clicks navigate to /rss and hand the article id over
 // via a window event.
 function RssBrowserFrame({ url }) {
-  const hostRef = useRef(null);
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return undefined;
-    host.replaceChildren();
-    if (!url) return undefined;
-    const webview = document.createElement("webview");
-    webview.className = "rss-browser-frame";
-    webview.setAttribute("partition", "persist:hermes-preview");
-    webview.setAttribute("src", url);
-    webview.setAttribute("webpreferences", "contextIsolation=yes,nodeIntegration=no,sandbox=yes");
-    webview.style.cssText = "display:flex;flex:1 1 auto;width:100%;height:100%;min-height:0;border:0;background:#fff";
-    host.appendChild(webview);
-    return () => {
-      webview.remove();
-      host.replaceChildren();
-    };
-  }, [url]);
-  return jsx("div", { ref: hostRef, className: "rss-browser-frame-host", "data-url": url || "", style: { display: "flex", flex: "1 1 auto", minHeight: 0, height: "100%", width: "100%" } });
+  // SandboxedFrame (SDK, #116305 item 9): opaque-origin sandboxed iframe with
+  // the app's guest posture. No raw Electron webview, no persist: partition.
+  return jsx(SandboxedFrame, {
+    src: url || "",
+    title: "RSS browser",
+    className: "rss-browser-frame-host",
+    style: { display: "flex", flex: "1 1 auto", minHeight: 0, height: "100%", width: "100%", border: 0, background: "#fff" }
+  });
 }
 function youtubeEmbedReferrer() {
   return "https://hermes-agent.nousresearch.com/";
 }
-function loadYoutubeGuest(webview, src) {
-  if (!webview || !src) return;
-  const referrer = youtubeEmbedReferrer();
-  webview.setAttribute("httpreferrer", referrer);
-  if (typeof webview.loadURL === "function") {
-    try {
-      webview.loadURL(src, {
-        httpReferrer: referrer,
-        extraHeaders: "Referer: " + referrer + "\n"
-      });
-      return;
-    } catch {
-    }
-  }
-  webview.setAttribute("src", src);
-}
 function YoutubeFrame({ id, start }) {
-  const hostRef = useRef(null);
   const src = youtubeEmbedSrc(id, start);
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return undefined;
-    host.replaceChildren();
-    if (!src) return undefined;
-    const webview = document.createElement("webview");
-    webview.className = "rss-youtube-frame";
-    webview.setAttribute("partition", "persist:hermes-preview");
-    webview.setAttribute("httpreferrer", youtubeEmbedReferrer());
-    webview.setAttribute("allowpopups", "false");
-    webview.setAttribute("webpreferences", "contextIsolation=yes,nodeIntegration=no,sandbox=yes");
-    webview.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:0;display:flex;background:#000";
-    host.appendChild(webview);
-    loadYoutubeGuest(webview, src);
-    return () => {
-      webview.remove();
-      host.replaceChildren();
-    };
-  }, [src]);
-  return jsx("div", { ref: hostRef, className: "rss-youtube", "data-yt-id": id || "" });
+  // SandboxedFrame (SDK, #116305 item 9): replaces the raw webview on the
+  // app's persist: partition. The embed referrer rides the youtube-nocookie
+  // URL; the sandbox's opaque origin is the containment.
+  return jsx(SandboxedFrame, {
+    src,
+    title: "YouTube player",
+    className: "rss-youtube-frame",
+    style: { position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, display: "flex", background: "#000" }
+  });
 }
 function openHermesPreview(url, label) {
   if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
@@ -6863,19 +6798,8 @@ var plugin_default = {
     applyTickerPane();
     window.addEventListener("hermes-rss-ticker-preview", onTickerPreview);
     window.addEventListener("hermes-rss-library-changed", onTickerLibrary);
-    const tickerDockWatch = setInterval(() => {
-      if (Date.now() - lastTickerMountAt < 1600) return;
-      if (tickerSettingsNow()?.headlineTicker !== true) return;
-      if (tickerMountGen >= 8) return;
-      const tree = readLayoutTree();
-      if (!tree) return;
-      if (!tickerPaneInTree(tree, currentTickerId)) return;
-      if (tickerIsWorkspaceBottom(tree, currentTickerId)) return;
-      applyTickerPane({ bumpId: true });
-    }, 700);
     if (typeof ctx.onDispose === "function") {
       ctx.onDispose(() => {
-        clearInterval(tickerDockWatch);
         window.removeEventListener("hermes-rss-ticker-preview", onTickerPreview);
         window.removeEventListener("hermes-rss-library-changed", onTickerLibrary);
         unmountTickerPane();

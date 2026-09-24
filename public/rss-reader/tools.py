@@ -89,18 +89,23 @@ def tools_enabled() -> bool:
 
 
 def _enqueue(action: str, payload: dict[str, Any]) -> str:
-    path = _hermes_home() / "rss-reader" / "commands.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    """Push a command over the public plugin event bridge (no file queue)."""
+    try:
+        from hermes_cli.plugin_events import broadcast_plugin_event
+    except ImportError:
+        return f"offline-{uuid.uuid4()}"
+    command_id = str(uuid.uuid4())
     record = {
-        "id": str(uuid.uuid4()),
+        "id": command_id,
         "action": action,
         "payload": payload,
         "reply": True,
         "created_at": time.time(),
     }
-    with path.open("a", encoding="utf-8") as stream:
-        stream.write(json.dumps(record, separators=(",", ":")) + "\n")
-    return record["id"]
+    _LAST_EVENT.clear()
+    _LAST_EVENT.update({"event": "plugin.rss-reader.command", "payload": record})
+    broadcast_plugin_event("rss-reader", "command", record)
+    return command_id
 
 
 def _wait_result(command_id: str, timeout: float = 90.0) -> str:

@@ -165,11 +165,21 @@ async function breakNow(command) {
   }
 }
 
-function injectBreakMessage() {
-  host.notify({
-    kind: 'info',
-    message: 'Type /break and a note in the composer. This edition does not insert into the composer.',
-  })
+async function injectBreakMessage() {
+  // SDK composer draft API (#116305 item 1): seat /break as a prefix on the
+  // composer the user is typing in. Fail-closed on an unmounted address.
+  let ok = false
+  try {
+    ok = await host.composer.insertText(null, '/break', { mode: 'prefix' })
+  } catch (err) {
+    host.notify({ kind: 'error', message: err && err.message ? String(err.message) : 'composer insert failed' })
+    return
+  }
+  if (!ok) {
+    host.notify({ kind: 'info', message: 'No composer surface for /break' })
+    return
+  }
+  host.composer.focus(null)
 }
 
 function parseStatus(raw) {

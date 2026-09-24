@@ -64,20 +64,17 @@ class RssCommandTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             rss._parse("health now")
 
-        with tempfile.TemporaryDirectory() as directory:
-            queue = Path(directory) / "commands.jsonl"
-            with patch.object(rss, "_queue_path", return_value=queue):
-                message = rss._handle("refresh 30m")
-            self.assertIn("30 minutes", message)
-            row = json.loads(queue.read_text(encoding="utf-8"))
-            self.assertEqual(row["action"], "refresh-period")
-            self.assertEqual(row["payload"], {"minutes": 30})
-            self.assertTrue(row["id"])
+        message = rss._handle("refresh 30m")
+        self.assertIn("30 minutes", message)
+        self.assertEqual(rss._LAST_EVENT["event"], "plugin.rss-reader.command")
+        self.assertEqual(rss._LAST_EVENT["payload"]["action"], "refresh-period")
+        self.assertEqual(rss._LAST_EVENT["payload"]["payload"], {"minutes": 30})
+        self.assertTrue(rss._LAST_EVENT["payload"]["id"])
     def test_refresh_transport_avoids_python_exec_flags(self):
         plugin = (_ENTRYPOINT.parent / "desktop" / "plugin.js").read_text(encoding="utf-8")
         self.assertIn("var rssRest = null", plugin)
         self.assertIn("rssRest = typeof ctx.rest === \"function\" ? ctx.rest : null", plugin)
-        self.assertIn('rssRest("/commands"', plugin)
+        self.assertIn('onEvent("plugin.rss-reader.command"', plugin)
         self.assertIn('rssRest("/feed"', plugin)
         self.assertIn('rssRest("/reddit"', plugin)
         self.assertIn("Popular starters", plugin)
