@@ -194,11 +194,11 @@ function _scheduleDurationText(unixSec) {
 
 function SpeedGauge({ peak, color }) {
   return jsx('svg', {
-    width: '0.75rem', height: '0.55rem', viewBox: '0 0 12 8',
+    width: '0.9rem', height: '0.7rem', viewBox: '0 0 12 8',
     'aria-hidden': 'true', style: { color },
     children: [
-      jsx('path', { d: 'M1 7a5 5 0 0 1 10 0', fill: 'none', stroke: 'currentColor', strokeWidth: 1.35, strokeLinecap: 'round' }),
-      jsx('line', { x1: 6, y1: 7, x2: peak ? 9.5 : 2.5, y2: peak ? 2.7 : 2.7, stroke: 'currentColor', strokeWidth: 1.35, strokeLinecap: 'round' }),
+      jsx('path', { d: 'M1 7a5 5 0 0 1 10 0', fill: 'none', stroke: 'currentColor', strokeWidth: 0.9, strokeLinecap: 'round' }),
+      jsx('line', { x1: 6, y1: 7, x2: peak ? 9.5 : 2.5, y2: peak ? 2.7 : 2.7, stroke: 'currentColor', strokeWidth: 0.9, strokeLinecap: 'round' }),
       jsx('circle', { cx: 6, cy: 7, r: 0.7, fill: 'currentColor' }),
     ],
   })
@@ -226,7 +226,55 @@ function DeepSeekHours() {
 }
 // DEEPSEEK_HOURS_END
 
-// GLM: single 5h window, hover is just the two facts. Codex carries a 5h
+// GLM Coding Plan schedule, per https://docs.z.ai/devpack/overview.
+// Peak is Monday-Friday 14:00-18:00 Singapore time (UTC+8); all other times
+// are off-peak, with model use consuming half the standard credit rate.
+// GLM does not publish a public-holiday exception for this schedule.
+// GLM_HOURS_START
+const _GLM_UTC_OFFSET_MINUTES = 8 * 60
+const _GLM_PEAK_WINDOW = [14 * 60, 18 * 60]
+
+function _glmHoursAt(nowMs) {
+  const local = new Date(nowMs + _GLM_UTC_OFFSET_MINUTES * 60_000)
+  const minute = local.getUTCHours() * 60 + local.getUTCMinutes() + local.getUTCSeconds() / 60
+  const weekday = local.getUTCDay()
+  const inPeak = weekday >= 1 && weekday <= 5 && minute >= _GLM_PEAK_WINDOW[0] && minute < _GLM_PEAK_WINDOW[1]
+  return { mode: inPeak ? 'peak' : 'off-peak' }
+}
+
+function _glmNextChange(nowMs, currentMode) {
+  const minuteMs = 60_000
+  let cursor = Math.ceil((nowMs + 1) / minuteMs) * minuteMs
+  const limit = 8 * 24 * 60
+  for (let i = 0; i < limit; i++) {
+    if (_glmHoursAt(cursor).mode !== currentMode) return cursor
+    cursor += minuteMs
+  }
+  return 0
+}
+
+function GLMHours() {
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+  const state = _glmHoursAt(nowMs)
+  const peak = state.mode === 'peak'
+  const next = _glmNextChange(nowMs, state.mode)
+  const color = peak ? '#f59e0b' : 'var(--ui-text-tertiary)'
+  const title = next ? (peak ? 'Off-peak in ' : 'Peak in ') + _scheduleDurationText(next / 1000 - nowMs / 1000) : ''
+  return jsx('span', {
+    title,
+    children: jsx('span', {
+      className: 'inline-flex shrink-0 items-center gap-0.5 align-middle',
+      children: jsx(SpeedGauge, { peak, color }),
+    }),
+  })
+}
+// GLM_HOURS_END
+
+// GLM: single 5h window, hover is just the two facts.
 // window AND a weekly budget; the backend ships them as five_resets_at /
 // weekly_resets_at (resets_at alone is min of both and can be the weekly one).
 function _chipTitle(id, status) {
@@ -388,8 +436,9 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
             jsx('span', { className: valueCls, style: valueStyle, children: valueText || '—' }),
             valueText ? jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: tag }) : null,
           ]),
-      // DeepSeek price-window indicator, immediately after its value and arrow.
+      // Provider-specific price-window indicators follow the status value/arrow.
       id === 'deepseek' ? jsx(DeepSeekHours, {}) : null,
+      id === 'glm' ? jsx(GLMHours, {}) : null,
       status?.stale ? jsx(Codicon, { name: 'warning', size: '0.6rem', style: { color: 'var(--ui-accent-secondary)' } }) : null,
       // Multi-key providers always show the active slot (#1 included) so the
       // bar reads which key is in use; single-key providers stay clean.

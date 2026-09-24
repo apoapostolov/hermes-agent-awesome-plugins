@@ -25,7 +25,8 @@
 - Keep multiple accounts per provider and inspect their status.
 - Use an access token that is already configured in the plugin. Expired OAuth tokens require a new login.
 - Provider polling does not read vendor CLI auth files, refresh vendor tokens, write Hermes `.env` or `config.yaml`, or copy secrets into a plugin-owned `library.env`.
-- See DeepSeek's current peak/off-peak pricing window beside its name, including full-day Chinese public-holiday overrides. The plugin applies the official 2025 and 2026 State Council holiday dates. The built-in calendar ends on 2026-12-31; later dates need a calendar update.
+- See [DeepSeek's pricing window](https://api-docs.deepseek.com/quick_start/pricing) beside its name, including full-day Chinese public-holiday overrides. The plugin applies official 2025 and 2026 State Council holiday dates; the built-in calendar ends on 2026-12-31.
+- The GLM chip shows its peak/off-peak speedometer even when the quota response omits a weekly window. Z.AI lists Coding Plan peak hours as Monday-Friday 14:00-18:00 Singapore time (UTC+8); off-peak use consumes half the standard credit rate. See [Z.AI Coding Plan usage](https://docs.z.ai/devpack/overview).
 
 **Disclosure:** quota checks for Codex and Grok use the documented client identity and user-agent expected by their CLI-compatible endpoints. The public edition sends keys only to their own provider endpoints and does not collect telemetry.
 

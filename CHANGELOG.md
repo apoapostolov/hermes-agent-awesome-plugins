@@ -2,11 +2,12 @@
 
 ## [provider-status 1.5.9] - 2026-09-24
 
-DeepSeek's current pricing period is now visible in the status bar, with a countdown to the next change.
+DeepSeek's pricing period and GLM's peak/off-peak schedule now appear beside their status values, each with a countdown to the next change.
 
 ### Added
 
 - **provider-status:** A color-coded speedometer shows whether DeepSeek is in peak hours. Its native hover shows the time until the next period change. Peak hours are 01:00–04:00 and 06:00–10:00 UTC on weekdays. Weekends and listed 2025 and 2026 Chinese public holidays are off-peak. The built-in holiday calendar ends on 2026-12-31.
+- **provider-status:** GLM chips show a peak/off-peak speedometer and countdown based on Z.AI's documented Coding Plan schedule, even when the quota response omits a weekly window. Peak hours are Monday-Friday 14:00-18:00 Singapore time (UTC+8); off-peak model use consumes half the standard credit rate.
 
 ### Changed
 

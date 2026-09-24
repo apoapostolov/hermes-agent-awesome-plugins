@@ -25,7 +25,8 @@
 - Keep multiple accounts per provider, reorder them, and set a reset day per key.
 - Rotate to the next healthy key when remaining quota hits your threshold or a renewal day passes.
 - Start Grok and Codex OAuth from the setup dialog.
-- See DeepSeek's current peak/off-peak pricing window beside its name, including full-day Chinese public-holiday overrides. The plugin applies the official 2025 and 2026 State Council holiday dates. The built-in calendar ends on 2026-12-31; later dates need a calendar update.
+- See [DeepSeek's pricing window](https://api-docs.deepseek.com/quick_start/pricing) beside its name, including full-day Chinese public-holiday overrides. The plugin applies official 2025 and 2026 State Council holiday dates; the built-in calendar ends on 2026-12-31.
+- The GLM chip shows its peak/off-peak speedometer even when the quota response omits a weekly window. Z.AI lists Coding Plan peak hours as Monday-Friday 14:00-18:00 Singapore time (UTC+8); off-peak use consumes half the standard credit rate. See [Z.AI Coding Plan usage](https://docs.z.ai/devpack/overview).
 
 Supported providers: Tavily, OpenCode Go, DeepSeek, GLM (z.ai), OpenRouter, Grok (xAI), Codex (OpenAI), OpenAI, Anthropic, Groq, Cerebras, Moonshot Kimi, MiniMax, Google Gemini, Hugging Face, Mistral, and Qwen.
 
