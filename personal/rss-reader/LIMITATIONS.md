@@ -50,6 +50,11 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 - **Why it fails:** catalog `desktop surface` lint treats it as script injection. Item 10 is a lint fix on their side.
 - **Public edition:** the literal is split so pinned-source-validate can pass before item 10 lands.
 
+### 7. YouTube cookies must be pasted (security limitation)
+
+- **Behavior:** YouTube cookies accept pasted header text or Netscape cookie-export text in Settings → Advanced.
+- **Limitation:** Cookie-file paths are rejected. The dashboard no longer reads local files or forwards file contents to YouTube.
+
 ## Checklist before listing personal
 
 - [ ] Adolanium MIT notice still in LICENSE and README.

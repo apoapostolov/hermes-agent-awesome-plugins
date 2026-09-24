@@ -202,14 +202,7 @@ def _cookie_header(raw: str) -> str:
     if not value:
         return ""
     if re.match(r"^[A-Za-z]:[\\/]", value) or value.startswith("/"):
-        path = Path(value)
-        try:
-            if path.is_file() and path.stat().st_size <= 400_000:
-                value = path.read_text(encoding="utf-8", errors="replace")
-            else:
-                return ""
-        except OSError:
-            return ""
+        return ""
     if value.lower().startswith("cookie:"):
         value = value[7:].strip()
     if "\t" in value or value.lstrip().startswith("# Netscape"):

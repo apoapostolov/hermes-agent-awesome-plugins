@@ -109,5 +109,22 @@ class RssCommandTests(unittest.TestCase):
         self.assertNotIn("echo %TEMP%", plugin)
 
 
+class RssCookieTests(unittest.TestCase):
+    def test_youtube_cookie_text_rejects_file_paths(self):
+        api_file = Path(__file__).parent / "dashboard" / "plugin_api.py"
+        spec = importlib.util.spec_from_file_location("rss_reader_plugin_api", api_file)
+        plugin_api = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(plugin_api)
+
+        self.assertEqual(plugin_api._cookie_header("/tmp/cookies=secret.txt"), "")
+        self.assertEqual(plugin_api._cookie_header("C:/Users/Apo/cookies=secret.txt"), "")
+        self.assertEqual(plugin_api._cookie_header("Cookie: SID=abc; HSID=def"), "SID=abc; HSID=def")
+        netscape = "# Netscape HTTP Cookie File" + chr(10) + chr(9).join(
+            [".youtube.com", "TRUE", "/", "TRUE", "0", "SID", "secret"]
+        )
+        self.assertEqual(plugin_api._cookie_header(netscape), "SID=secret")
+
+
 if __name__ == "__main__":
     unittest.main()

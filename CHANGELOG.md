@@ -1,5 +1,11 @@
 # Changelog
 
+## [rss-reader 1.1.0] - Unreleased
+
+### Security
+
+- **rss-reader:** YouTube cookie settings accept pasted header or Netscape export text. Unix-rooted and Windows drive-rooted paths are rejected, so the dashboard no longer reads local files or forwards their contents to YouTube.
+
 ## [provider-status 1.5.9] - 2026-09-24
 
 DeepSeek's pricing period and GLM's peak/off-peak schedule now appear beside their status values, each with a countdown to the next change.
