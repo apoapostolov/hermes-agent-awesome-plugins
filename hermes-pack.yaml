@@ -5,7 +5,7 @@ author: Apostol Apostolov
 plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/provider-status
-    ref: 62771adb10710e11cc203fced3a87f59ec016fa7
+    ref: 5994db2e4e7212b073e9017a73e2dc1093b9865d
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/intelligent-tool-break
     ref: b270520f14d5141c2ad686d7053907a341c8a46f
