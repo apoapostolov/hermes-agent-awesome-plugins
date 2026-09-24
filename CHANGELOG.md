@@ -2,6 +2,10 @@
 
 ## [rss-reader 1.1.0] - Unreleased
 
+### Fixed
+
+- **rss-reader:** Restore the marquee class on the ticker track when reduced motion is off, so headlines scroll at launch.
+
 ### Security
 
 - **rss-reader:** YouTube cookie settings accept pasted header or Netscape export text. Unix-rooted and Windows drive-rooted paths are rejected, so the dashboard no longer reads local files or forwards their contents to YouTube.

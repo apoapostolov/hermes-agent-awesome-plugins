@@ -4086,7 +4086,7 @@ function HeadlineTicker({ articles, tags, settings, onOpen, onRefresh }) {
       jsx(TickerRefresh, { onRefresh }),
       jsx("div", { className: "rss-ticker-viewport", children: rows.length ?
         jsx("div", {
-            className: "rss-ticker-track",
+            className: `rss-ticker-track${reduced ? "" : " rss-ticker-marquee"}`,
             children: reduced ? rows.map(renderRow) : [
               jsx("div", { className: "rss-ticker-half", children: rows.map(renderRow) }, "a"),
               jsx("div", { className: "rss-ticker-half", "aria-hidden": "true", children: rows.map(renderRow) }, "b")
