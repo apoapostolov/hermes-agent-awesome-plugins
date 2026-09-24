@@ -1,6 +1,12 @@
 # Changelog
 
-## [rss-reader 1.1.0] - Unreleased
+## [rss-reader 1.1.0] - 2026-09-24
+
+RSS Reader moves browser frames and ticker events onto the desktop SDK, restores the headline ticker at launch, and tightens YouTube cookie handling.
+
+### Changed
+
+- **rss-reader:** Use the desktop plugin event bridge instead of a commands-file poll, and the sandboxed frame API for the browser and YouTube player.
 
 ### Fixed
 
