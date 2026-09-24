@@ -11,7 +11,7 @@ import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
 import * as React from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-const _PS_BUILD = 'v12-delete-race'
+const _PS_BUILD = 'v13-deepseek-hours'
 const STALE_MS = 0 // always refetch on mount — cheap endpoint
 const MANUAL_REFRESH_MS = 60_000 // min spacing between click-triggered refetches
 
@@ -121,6 +121,110 @@ function _fiveHText(unixSec) {
   const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
   return h + ':' + m + 'h'
 }
+
+// DEEPSEEK_HOURS_START
+// Official schedule: https://api-docs.deepseek.com/quick_start/pricing
+// Peak: 01:00-04:00 and 06:00-10:00 UTC, Mon-Fri, excluding Chinese public
+// holidays. DeepSeek says weekends and Chinese public holidays are fully
+// off-peak. Ranges below follow State Council notices for the general public:
+// https://www.gov.cn/zhengce/zhengceku/202411/content_6986383.htm
+// http://big5.www.gov.cn/gate/big5/www.gov.cn/gongbao/2025/issue_12406/202511/content_7048922.html
+// Make-up workdays are outside these ranges and remain off-peak under DeepSeek's
+// UTC Monday-Friday rule.
+const _DEEPSEEK_PEAK_WINDOWS = [[60, 240], [360, 600]]
+const _DEEPSEEK_HOLIDAY_CALENDAR_END = '2026-12-31'
+const _CN_HOLIDAY_RANGES = [
+  { start: '2025-01-01', end: '2025-01-01', name: "New Year's Day" },
+  { start: '2025-01-28', end: '2025-02-04', name: 'Spring Festival' },
+  { start: '2025-04-04', end: '2025-04-06', name: 'Qingming Festival' },
+  { start: '2025-05-01', end: '2025-05-05', name: 'Labour Day' },
+  { start: '2025-05-31', end: '2025-06-02', name: 'Dragon Boat Festival' },
+  { start: '2025-10-01', end: '2025-10-08', name: 'National Day and Mid-Autumn Festival' },
+  { start: '2026-01-01', end: '2026-01-03', name: "New Year's Day" },
+  { start: '2026-02-15', end: '2026-02-23', name: 'Spring Festival' },
+  { start: '2026-04-04', end: '2026-04-06', name: 'Qingming Festival' },
+  { start: '2026-05-01', end: '2026-05-05', name: 'Labour Day' },
+  { start: '2026-06-19', end: '2026-06-21', name: 'Dragon Boat Festival' },
+  { start: '2026-09-25', end: '2026-09-27', name: 'Mid-Autumn Festival' },
+  { start: '2026-10-01', end: '2026-10-07', name: 'National Day' },
+]
+
+function _chinaDateKey(nowMs) {
+  // China Standard Time is UTC+8 year-round. The holiday date follows China's
+  // calendar even though the peak windows are expressed in UTC.
+  return new Date(nowMs + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+function _chinaHolidayAt(dateKey) {
+  for (const h of _CN_HOLIDAY_RANGES) {
+    if (dateKey >= h.start && dateKey <= h.end) return h
+  }
+  return null
+}
+
+function _deepseekHoursAt(nowMs) {
+  const now = new Date(nowMs)
+  const dateKey = _chinaDateKey(nowMs)
+  const holiday = _chinaHolidayAt(dateKey)
+  const minute = now.getUTCHours() * 60 + now.getUTCMinutes() + now.getUTCSeconds() / 60
+  const weekday = now.getUTCDay()
+  const inPeak = weekday >= 1 && weekday <= 5 &&
+    _DEEPSEEK_PEAK_WINDOWS.some(([start, end]) => minute >= start && minute < end)
+  return { mode: !holiday && inPeak ? 'peak' : 'off-peak', holiday, chinaDate: dateKey }
+}
+
+function _deepseekNextChange(nowMs, currentMode) {
+  const minuteMs = 60_000
+  let cursor = Math.ceil((nowMs + 1) / minuteMs) * minuteMs
+  const limit = 15 * 24 * 60
+  for (let i = 0; i < limit; i++) {
+    if (_deepseekHoursAt(cursor).mode !== currentMode) return cursor
+    cursor += minuteMs
+  }
+  return 0
+}
+
+function _scheduleDurationText(unixSec) {
+  const s = Math.max(0, Math.floor(unixSec))
+  if (s < 60) return s + 's'
+  if (s < 3600) return Math.floor(s / 60) + 'm'
+  if (s < 86400) return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm'
+  return Math.floor(s / 86400) + 'd ' + Math.floor((s % 86400) / 3600) + 'h'
+}
+
+function SpeedGauge({ peak, color }) {
+  return jsx('svg', {
+    width: '0.75rem', height: '0.55rem', viewBox: '0 0 12 8',
+    'aria-hidden': 'true', style: { color },
+    children: [
+      jsx('path', { d: 'M1 7a5 5 0 0 1 10 0', fill: 'none', stroke: 'currentColor', strokeWidth: 1.35, strokeLinecap: 'round' }),
+      jsx('line', { x1: 6, y1: 7, x2: peak ? 9.5 : 2.5, y2: peak ? 2.7 : 2.7, stroke: 'currentColor', strokeWidth: 1.35, strokeLinecap: 'round' }),
+      jsx('circle', { cx: 6, cy: 7, r: 0.7, fill: 'currentColor' }),
+    ],
+  })
+}
+
+function DeepSeekHours() {
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+  const state = _deepseekHoursAt(nowMs)
+  const next = _deepseekNextChange(nowMs, state.mode)
+  const peak = state.mode === 'peak'
+  const gaugeColor = peak ? '#f59e0b' : 'var(--ui-text-tertiary)'
+  const change = next ? (peak ? 'Off-peak in ' : 'Peak in ') + _scheduleDurationText(next / 1000 - nowMs / 1000) : ''
+  const label = change
+  return jsx('span', {
+      title: label,
+      children: jsx('span', {
+      className: 'inline-flex shrink-0 items-center gap-0.5 align-middle',
+      children: [jsx(SpeedGauge, { peak, color: gaugeColor })],
+    }),
+  })
+}
+// DEEPSEEK_HOURS_END
 
 // GLM: single 5h window, hover is just the two facts. Codex carries a 5h
 // window AND a weekly budget; the backend ships them as five_resets_at /
@@ -284,6 +388,8 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
             jsx('span', { className: valueCls, style: valueStyle, children: valueText || '—' }),
             valueText ? jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: tag }) : null,
           ]),
+      // DeepSeek price-window indicator, immediately after its value and arrow.
+      id === 'deepseek' ? jsx(DeepSeekHours, {}) : null,
       status?.stale ? jsx(Codicon, { name: 'warning', size: '0.6rem', style: { color: 'var(--ui-accent-secondary)' } }) : null,
       // Multi-key providers always show the active slot (#1 included) so the
       // bar reads which key is in use; single-key providers stay clean.

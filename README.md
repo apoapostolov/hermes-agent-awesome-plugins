@@ -62,7 +62,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reaso
 
 | Plugin | What you get |
 | --- | --- |
-| [provider-status](personal/provider-status/README.md) | Status-bar quota used/remaining. Multi-account. Rotate on low quota or reset day. Grok/Codex OAuth. Providers: tavily, opencode, deepseek, glm, openrouter, grok, codex. |
+| [provider-status](personal/provider-status/README.md) | Status-bar quota used/remaining. Multi-account. Rotate on low quota or reset day. Grok/Codex OAuth. Providers: Tavily, OpenCode Go, DeepSeek, GLM (z.ai), OpenRouter, Grok (xAI), Codex (OpenAI), OpenAI, Anthropic, Groq, Cerebras, Moonshot Kimi, MiniMax, Google Gemini, Hugging Face, Mistral, Qwen. |
 | [iteration-budget-meter](personal/iteration-budget-meter/README.md) | Per-turn N/budget while work runs. Hover and click for request stats. |
 | [reasoning-switch](personal/reasoning-switch/README.md) | Cycle reasoning effort from the status bar, with colors and per-level prompt demote. **Not in the pack; enable separately.** |
 

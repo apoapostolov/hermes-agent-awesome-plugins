@@ -4,7 +4,7 @@
   <strong>See provider quota without leaving Hermes.</strong>
   <p>Status-bar used/remaining, multi-account pools, and rotation when a key runs low or hits its reset day.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.5.8-2ea44f" alt="Version 1.5.8" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.5.9-2ea44f" alt="Version 1.5.9" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -25,8 +25,9 @@
 - Keep multiple accounts per provider, reorder them, and set a reset day per key.
 - Rotate to the next healthy key when remaining quota hits your threshold or a renewal day passes.
 - Start Grok and Codex OAuth from the setup dialog.
+- See DeepSeek's current peak/off-peak pricing window beside its name, including full-day Chinese public-holiday overrides. The plugin applies the official 2025 and 2026 State Council holiday dates. The built-in calendar ends on 2026-12-31; later dates need a calendar update.
 
-Supported providers: `tavily`, `opencode`, `deepseek`, `glm`, `openrouter`, `grok`, `codex`.
+Supported providers: Tavily, OpenCode Go, DeepSeek, GLM (z.ai), OpenRouter, Grok (xAI), Codex (OpenAI), OpenAI, Anthropic, Groq, Cerebras, Moonshot Kimi, MiniMax, Google Gemini, Hugging Face, Mistral, and Qwen.
 
 ## Install
 

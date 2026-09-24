@@ -1,5 +1,17 @@
 # Changelog
 
+## [provider-status 1.5.9] - 2026-09-24
+
+DeepSeek's current pricing period is now visible in the status bar, with a countdown to the next change.
+
+### Added
+
+- **provider-status:** A color-coded speedometer shows whether DeepSeek is in peak hours. Its native hover shows the time until the next period change. Peak hours are 01:00–04:00 and 06:00–10:00 UTC on weekdays. Weekends and listed 2025 and 2026 Chinese public holidays are off-peak. The built-in holiday calendar ends on 2026-12-31.
+
+### Changed
+
+- **provider-status:** Personal, public, and pack overview documentation now lists all 17 registered providers.
+
 ## [rss-reader 1.0.9] - 2026-09-23
 
 Tighter grading calibration, a reader-interests skill block, and a `reclassify` action that re-judges up to 720 articles per run.
