@@ -279,9 +279,11 @@ function onPointerUp(event) {
 
   if (!pin && !unpin) return
 
+  const index = pin ? dropIndex(secs.pinned, y) : undefined
+
   try {
     if (pin) {
-      host.sessions.pin(finished.id, true, dropIndex(secs.pinned, y))
+      host.sessions.pin(finished.id, true, index)
     } else {
       host.sessions.pin(finished.id, false)
     }
@@ -306,7 +308,7 @@ function onPointerUp(event) {
       }
 
       try {
-        host.sessions.pin(finished.id, true, dropIndex(secs.pinned, y))
+        host.sessions.pin(finished.id, true, index)
       } catch {
         /* store call may have gone */
       }

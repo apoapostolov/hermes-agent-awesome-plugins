@@ -319,22 +319,8 @@ function ReviewDialog({ open, onOpenChange }) {
       setNote('No composer for a consolidation round')
       return
     }
-    setBusy(true)
-    setNote('Consolidation running')
-    let left = 8
-    const tick = () => {
-      refreshState().then(data => {
-        if (data) setState(data)
-        left -= 1
-        if (left <= 0) {
-          setBusy(false)
-          setNote('Consolidation round sent')
-          return
-        }
-        window.setTimeout(tick, 2500)
-      })
-    }
-    window.setTimeout(tick, 1500)
+    setBusy(false)
+    setNote('Prompt ready in the composer. Send it to start consolidation.')
   }
 
   const run = action => {

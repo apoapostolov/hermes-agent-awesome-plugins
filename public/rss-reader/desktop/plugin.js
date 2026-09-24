@@ -1772,6 +1772,7 @@ function publishTickerRefresh(owner) {
   window.dispatchEvent(new CustomEvent("hermes-rss-ticker-refresh", { detail: { owner } }));
 }
 var TICKER_READ_REFRESH_DEBOUNCE_MS = 1e3;
+const rssCommandReservations = new Set();
 function rssCommandSeen(ctx, owner) {
   const value = storageGet(ctx, "commandSeen", owner, []);
   return new Set(Array.isArray(value) ? value.filter(id => typeof id === "string") : []);
@@ -2336,30 +2337,28 @@ function startRssCommandBridge(ctx, host2) {
   // plugin.rss-reader.preview drives the workspace RSS browser from any
   // window (the /preview route emits it;SandboxedFrame renders inside).
   let stopped = false;
-  if (typeof host2.onEvent === "function") {
-    host2.onEvent("plugin.rss-reader.preview", (frame) => {
+  const previewOff = typeof host2.onEvent === "function"
+    ? host2.onEvent("plugin.rss-reader.preview", (frame) => {
       const url = frame && frame.payload && frame.payload.url;
       if (typeof url === "string" && /^https?:\/\//i.test(url)) {
-        openHermesPreview(url, (frame.payload && frame.payload.label) || url);
+        openHermesPreview(url, (frame.payload && frame.payload.label) || url, { emitPreview: false });
       }
-    });
-  }
+    }) : null;
   const off = typeof host2.onEvent === "function" ? host2.onEvent("plugin.rss-reader.command", (frame) => {
     if (stopped) return;
     const command = frame && frame.payload;
     if (!command || !command.id || !command.action || !command.payload || typeof command.payload !== "object") return;
+    const owner = currentOwner(host2);
+    const seen = rssCommandSeen(ctx, owner);
+    if (seen.has(command.id) || rssCommandReservations.has(command.id)) return;
+    rssCommandReservations.add(command.id);
+    rememberRssCommand(ctx, owner, seen, command.id);
     void (async () => {
-      const route = await currentRoute(host2);
-      const owner = JSON.stringify([route.connectionId, route.profile]);
-      const seen = rssCommandSeen(ctx, owner);
-      if (seen.has(command.id)) return;
       let reply = { id: command.id, ok: true, result: null, error: "" };
       try {
         reply.result = await executeRssCommand(ctx, host2, owner, command) || { ok: true };
-        rememberRssCommand(ctx, owner, seen, command.id);
       } catch (error) {
         rssDebug("command-error", { id: command.id, action: command.action, message: error?.message || error, stack: error?.stack || "" });
-        rememberRssCommand(ctx, owner, seen, command.id);
         reply.ok = false;
         reply.error = String(error?.message || error).slice(0, 300);
         publishLibraryChange(owner, `RSS command failed: ${reply.error}`);
@@ -2367,10 +2366,12 @@ function startRssCommandBridge(ctx, host2) {
       if (command.reply) {
         try { await rssRest("/command-result", { method: "POST", body: reply }); } catch {}
       }
+      rssCommandReservations.delete(command.id);
     })();
   }) : null;
   return () => {
     stopped = true;
+    if (typeof previewOff === "function") previewOff();
     if (typeof off === "function") off();
   };
 }
@@ -4117,7 +4118,7 @@ function YoutubeFrame({ id, start }) {
     style: { position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, display: "flex", background: "#000" }
   });
 }
-function openHermesPreview(url, label) {
+function openHermesPreview(url, label, { emitPreview = true } = {}) {
   if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
   const title = String(label || url);
   const openWorkspaceBrowser = () => {
@@ -4130,6 +4131,12 @@ function openHermesPreview(url, label) {
     return true;
   };
   void (async () => {
+    if (!emitPreview) {
+      if (!openWorkspaceBrowser() && rssCtx?.os?.openExternal) {
+        void rssCtx.os.openExternal(url);
+      }
+      return;
+    }
     let openedNative = false;
     try {
       if (typeof rssRest === "function") {

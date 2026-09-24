@@ -161,7 +161,7 @@ def _enqueue(action: str, payload: dict[str, Any], reply: bool = False) -> str:
     try:
         from hermes_cli.plugin_events import broadcast_plugin_event
     except ImportError:
-        return f"offline-{uuid.uuid4()}"
+        raise RuntimeError("RSS Reader command bridge is unavailable; no command was sent.") from None
     command_id = str(uuid.uuid4())
     record = {
         "id": command_id,
@@ -235,6 +235,8 @@ def _handle(raw_args: str) -> str:
         if action == "find":
             return _wait_result(_enqueue(action, payload, reply=True))
         _enqueue(action, payload)
+    except RuntimeError as exc:
+        return f"RSS Reader could not send the command: {exc}"
     except ValueError as exc:
         return f"RSS Reader: {exc}"
     except OSError as exc:

@@ -19,7 +19,7 @@ import {
   host,
 } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 const ID = 'better-session-appearance'
 
@@ -31,6 +31,22 @@ const GLYPHS = [
 ]
 
 let storageApi = null
+let storeVersion = 0
+const storeListeners = new Set()
+
+function subscribeStore(listener) {
+  storeListeners.add(listener)
+  return () => storeListeners.delete(listener)
+}
+
+function notifyStore() {
+  storeVersion += 1
+  for (const listener of storeListeners) listener()
+}
+
+function useStoreVersion() {
+  return useSyncExternalStore(subscribeStore, () => storeVersion)
+}
 
 function loadMap(key) {
   try {
@@ -47,6 +63,7 @@ function saveMap(key, next) {
   } catch {
     /* storage unavailable: change stays session-local */
   }
+  notifyStore()
 }
 
 function getColor(sid) {
@@ -118,6 +135,7 @@ function adaptColor(color) {
 }
 
 function ColorPopover({ sid, anchor, onClose }) {
+  useStoreVersion()
   const [pos, setPos] = useState(null)
   const panelRef = useRef(null)
 
@@ -210,6 +228,7 @@ function ColorPopover({ sid, anchor, onClose }) {
 }
 
 function ColorDot({ sessionId }) {
+  useStoreVersion()
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
   const color = getColor(sessionId)
@@ -256,6 +275,7 @@ function ColorDot({ sessionId }) {
 }
 
 function GlyphPicker({ sid, anchor, onClose }) {
+  useStoreVersion()
   const [pos, setPos] = useState(null)
   const panelRef = useRef(null)
 
@@ -368,6 +388,7 @@ function GlyphPicker({ sid, anchor, onClose }) {
 }
 
 function GlyphButton({ sessionId }) {
+  useStoreVersion()
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
   const glyph = getGlyph(sessionId)
@@ -423,6 +444,7 @@ export default {
   defaultEnabled: false,
   register(ctx) {
     storageApi = ctx.storage
+    notifyStore()
 
     ctx.register({
       id: 'glyph',
@@ -442,6 +464,7 @@ export default {
 
     ctx.onDispose(() => {
       storageApi = null
+      notifyStore()
     })
   },
 }
