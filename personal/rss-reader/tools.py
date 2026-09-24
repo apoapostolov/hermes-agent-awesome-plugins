@@ -9,6 +9,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+_LAST_EVENT: dict[str, Any] = {}
+
 _ACTIONS = (
     "list_feeds",
     "list_articles",
@@ -89,18 +91,23 @@ def tools_enabled() -> bool:
 
 
 def _enqueue(action: str, payload: dict[str, Any]) -> str:
-    path = _hermes_home() / "rss-reader" / "commands.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    """Push a command over the public plugin event bridge (no file queue)."""
+    try:
+        from hermes_cli.plugin_events import broadcast_plugin_event
+    except ImportError:
+        raise RuntimeError("RSS Reader command bridge is unavailable; no command was sent.") from None
+    command_id = str(uuid.uuid4())
     record = {
-        "id": str(uuid.uuid4()),
+        "id": command_id,
         "action": action,
         "payload": payload,
         "reply": True,
         "created_at": time.time(),
     }
-    with path.open("a", encoding="utf-8") as stream:
-        stream.write(json.dumps(record, separators=(",", ":")) + "\n")
-    return record["id"]
+    _LAST_EVENT.clear()
+    _LAST_EVENT.update({"event": "plugin.rss-reader.command", "payload": record})
+    broadcast_plugin_event("rss-reader", "command", record)
+    return command_id
 
 
 def _wait_result(command_id: str, timeout: float = 90.0) -> str:
@@ -134,7 +141,11 @@ def _wait_result(command_id: str, timeout: float = 90.0) -> str:
 def _run(action: str, payload: dict[str, Any], timeout: float = 90.0) -> str:
     if not tools_enabled():
         return "RSS tools are off. Turn on Register Hermes Tools in RSS Reader settings."
-    return _wait_result(_enqueue(action, payload), timeout)
+    try:
+        command_id = _enqueue(action, payload)
+    except RuntimeError as exc:
+        return f"RSS Reader could not send the command: {exc}"
+    return _wait_result(command_id, timeout)
 
 
 def handle_rss(args: dict[str, Any], **_extra: Any) -> str:

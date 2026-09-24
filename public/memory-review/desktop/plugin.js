@@ -3,7 +3,8 @@
  *
  * Palette command opens a dialog: checkbox each staged write, select all,
  * approve or reject the selection. Never applies a write without that click.
- * Does not inject into the app shell menu or submit a hidden composer prompt.
+ * Does not inject into the app shell menu. Consolidate seats a VISIBLE prompt
+ * in the composer via the SDK composer draft API; the user reads and sends it.
  */
 
 import {
@@ -84,6 +85,32 @@ function runSlash(command) {
 
 function overLimit(err) {
   return /over the limit/i.test(String(err || ''))
+}
+
+async function seatPrompt(text) {
+  // SDK composer draft API (#116305 item 1): seat the prompt as a prefix so
+  // the user sees and sends it. Fail-closed when no visible surface answers.
+  let ok = false
+  try {
+    ok = await host.composer.insertText(null, text, { mode: 'prefix' })
+  } catch {
+    ok = false
+  }
+  if (ok) host.composer.focus(null)
+  return ok
+}
+
+function compactPrompt(target) {
+  const file = target === 'user' ? 'USER.md' : 'MEMORY.md'
+  return [
+    'The user clicked Consolidate in Memory-Review.',
+    'Run one memory consolidation round on ' + file + '.',
+    'Follow the memory-compaction skill.',
+    'Target at most 70% of that store char cap.',
+    'Merge overlapping entries and drop only ephemeral facts.',
+    'Never touch skills, identity, credentials, or hard rules.',
+    'Use one memory tool batch. This click is the approval to apply it.',
+  ].join(' ')
 }
 
 function parsePendingOutput(text) {
@@ -285,8 +312,15 @@ function ReviewDialog({ open, onOpenChange }) {
     setPicked(next)
   }
 
-  const compact = () => {
-    setNote('Run memory-compaction from the session. This edition does not submit a prompt.')
+  const compact = async () => {
+    if (busy) return
+    const target = fitFail && displayParts(fitFail).target === 'user' ? 'user' : 'memory'
+    if (!(await seatPrompt(compactPrompt(target)))) {
+      setNote('No composer for a consolidation round')
+      return
+    }
+    setBusy(false)
+    setNote('Prompt ready in the composer. Send it to start consolidation.')
   }
 
   const run = action => {

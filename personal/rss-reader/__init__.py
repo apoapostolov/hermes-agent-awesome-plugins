@@ -17,6 +17,10 @@ _ALLOWED_MINUTES = {5, 10, 15, 30, 60, 120, 180}
 _MAX_DAYS = 365
 _MAX_TEXT = 200
 
+#: Last frame handed to ``broadcast_plugin_event``. Test seam: the bridge is a
+#: fire-and-forget transport with no delivery receipt in a bare process.
+_LAST_EVENT: dict[str, Any] = {}
+
 
 def _hermes_home() -> Path:
     configured = os.environ.get("HERMES_HOME")
@@ -26,10 +30,6 @@ def _hermes_home() -> Path:
     if local_app_data:
         return Path(local_app_data) / "hermes"
     return Path.home() / ".hermes"
-
-
-def _queue_path() -> Path:
-    return _hermes_home() / "rss-reader" / "commands.jsonl"
 
 
 def _usage() -> str:
@@ -151,18 +151,29 @@ def _parse(raw_args: str) -> tuple[str, dict[str, Any]] | None:
 
 
 def _enqueue(action: str, payload: dict[str, Any], reply: bool = False) -> str:
-    path = _queue_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
+    """Push a command to the desktop half over the public plugin event bridge.
+
+    Replaces the legacy ``rss-reader/commands.jsonl`` file queue: the frame
+    lands in every connected desktop window, where ``host.onEvent`` runs the
+    command handler. ``reply=True`` commands still write result files that
+    ``_wait_result`` consumes.
+    """
+    try:
+        from hermes_cli.plugin_events import broadcast_plugin_event
+    except ImportError:
+        raise RuntimeError("RSS Reader command bridge is unavailable; no command was sent.") from None
+    command_id = str(uuid.uuid4())
     record = {
-        "id": str(uuid.uuid4()),
+        "id": command_id,
         "action": action,
         "payload": payload,
         "reply": bool(reply),
         "created_at": time.time(),
     }
-    with path.open("a", encoding="utf-8") as stream:
-        stream.write(json.dumps(record, separators=(",", ":")) + "\n")
-    return record["id"]
+    _LAST_EVENT.clear()
+    _LAST_EVENT.update({"event": "plugin.rss-reader.command", "payload": record})
+    broadcast_plugin_event("rss-reader", "command", record)
+    return command_id
 
 
 def _wait_result(command_id: str, timeout: float = 45.0) -> str:
@@ -224,6 +235,8 @@ def _handle(raw_args: str) -> str:
         if action == "find":
             return _wait_result(_enqueue(action, payload, reply=True))
         _enqueue(action, payload)
+    except RuntimeError as exc:
+        return f"RSS Reader could not send the command: {exc}"
     except ValueError as exc:
         return f"RSS Reader: {exc}"
     except OSError as exc:

@@ -1,44 +1,36 @@
 # LIMITATIONS
 
-Personal edition of **Better Session Appearance** (`better-session-appearance`). This file is why that edition cannot be listed in the Hermes Plugin Catalog as-is.
+Public edition of **Better Session Appearance** (`better-session-appearance`). This file records where the listed edition stops short of the personal edition and why. Both editions carry the same copy.
 
-Before you pin personal to the catalog, or copy a personal feature into `public/`, walk every blocker below. Either still comply, or confirm the linked Hermes issue or PR is resolved and the SDK hook exists in the Desktop build you target.
+Catalog intake PR: [NousResearch/hermes-agent#115961](https://github.com/NousResearch/hermes-agent/pull/115961). Shared hook wishlist: [#116305](https://github.com/NousResearch/hermes-agent/issues/116305).
 
-## Catalog bar
+## Edition split (post-migration 2026-09-24)
 
-- Admission rule: catalog README [rule 8](https://github.com/NousResearch/hermes-agent/blob/main/plugin-catalog/README.md). A listed Desktop bundle stays inside `ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`.
-- The `desktop surface` lint is the floor. Reviewers also reject app-owned DOM selectors, React fiber props, app `localStorage` keys, and raw bridge calls (`apps/desktop/src/contrib/runtime-loader.ts`).
-- Shared hook wishlist: [NousResearch/hermes-agent#116305](https://github.com/NousResearch/hermes-agent/issues/116305)
-- Catalog intake PR: [NousResearch/hermes-agent#115961](https://github.com/NousResearch/hermes-agent/pull/115961)
+The SDK hooks this plugin was held on shipped: `host.sessions.setColor` +
+`SESSION_ROW_AREAS` (item 3) and `APPEARANCE_AREAS.extra` + `ColorSwatches`
+(item 7), both merged 2026-09-24. The public edition now uses them:
 
-## Blockers
+- Per-session **color** goes through `host.sessions.setColor(sid, hex | null)`,
+  picked from the app's own `ColorSwatches` grid (plus a custom picker) inside
+  a per-row popover. No writes to `hermes.desktop.sessionColors`, no fiber
+  walks, no harvested `onChange`.
+- Per-session **idle glyph** renders through a `SESSION_ROW_AREAS.leading`
+  contribution with the slot's durable `sessionId`. Plugin state (colors,
+  glyphs) lives in `ctx.storage`.
 
-### 1. Direct write to the app session-color store
+**The two editions differ in implementation:**
 
-- **Personal behavior:** writes the app's persisted key `hermes.desktop.sessionColors`, bypassing the store atom.
-- **Why it fails:** races with the app's own writer. App keys are not a plugin contract.
-- **Needed hook:** session-row decoration / `setColor` ([#116305](https://github.com/NousResearch/hermes-agent/issues/116305) item 3). Plugin-owned extras stay in `ctx.storage`.
-- **Public edition:** held snapshot.
+- **Personal** keeps the original DOM implementation: full-name repaint with
+  lightness adaptation, bold titles (marquee-state removal included), auto
+  rules matched on title text, presets, and the injected Appearance-submenu
+  panel with the full 300-glyph gallery. Title restyling and menu injection
+  are app-DOM reach-ins; the SDK has no hook that repaints the row title.
+- **Public** covers color and glyph only, entirely through SDK row slots.
+  It does not repaint the session title, does not bold, and has no auto
+  rules or Appearance-submenu extras.
 
-### 2. Fiber-driven ColorPicker and marquee state
+## If further hooks land
 
-- **Personal behavior:** walks fiber to the app `ColorPicker` and calls its `onChange`. Removes the app's marquee state.
-- **Why it fails:** React internals and app component props are not a contract.
-- **Needed hook:** same `setColor` / decoration API. Do not drive app components through fiber.
-- **Public edition:** held snapshot.
-
-### 3. Controls injected into the Appearance dropdown
-
-- **Personal behavior:** injects plugin controls into the app's Appearance menu.
-- **Why it fails:** app-owned chrome. Slot names can change in any release.
-- **Needed hook:** Appearance-menu slot ([#116305](https://github.com/NousResearch/hermes-agent/issues/116305) item 7).
-- **Public edition:** held snapshot.
-
-## Checklist before listing personal
-
-- [ ] No writes to `hermes.desktop.sessionColors` or other `hermes.desktop.*` keys.
-- [ ] No fiber walks, no app `ColorPicker.onChange`, no marquee-state removal.
-- [ ] No inject into the Appearance dropdown unless item 7 in #116305 is merged and used.
-- [ ] Color / decoration goes through the session-row API (item 3 in #116305 is merged).
-- [ ] Plugin extras live in `ctx.storage`.
-- [ ] Re-pin catalog `sha:` to the clean tree and comment on #115961.
+A row-title decoration area or an Appearance-menu slot could let the public
+edition converge with personal. Track
+[#116305](https://github.com/NousResearch/hermes-agent/issues/116305).

@@ -100,32 +100,17 @@ function overLimit(err) {
   return /over the limit/i.test(String(err || ''))
 }
 
-function visibleComposer() {
-  const nodes = Array.from(document.querySelectorAll('[data-composer-target]'))
-  const el = nodes.find(n => !n.closest('[data-pane-hidden]'))
-  if (!el) return null
-  const surfaceId = el.getAttribute('data-composer-surface-id')
-  if (!surfaceId) return null
-  return {
-    target: el.getAttribute('data-composer-target') || 'main',
-    surfaceId,
+async function seatPrompt(text) {
+  // SDK composer draft API (#116305 item 1): seat the prompt as a prefix so
+  // the user sees and sends it. Fail-closed when no visible surface answers.
+  let ok = false
+  try {
+    ok = await host.composer.insertText(null, text, { mode: 'prefix' })
+  } catch {
+    ok = false
   }
-}
-
-function sendHiddenPrompt(text) {
-  const composer = visibleComposer()
-  if (!composer) return false
-  window.dispatchEvent(
-    new CustomEvent('hermes:composer-submit', {
-      detail: {
-        text,
-        target: composer.target,
-        surfaceId: composer.surfaceId,
-        displayKind: 'hidden',
-      },
-    })
-  )
-  return true
+  if (ok) host.composer.focus(null)
+  return ok
 }
 
 function compactPrompt(target) {
@@ -460,29 +445,15 @@ function ReviewDialog({ open, onOpenChange }) {
     setPicked(next)
   }
 
-  const compact = () => {
+  const compact = async () => {
     if (busy) return
     const target = fitFail && displayParts(fitFail).target === 'user' ? 'user' : 'memory'
-    if (!sendHiddenPrompt(compactPrompt(target))) {
+    if (!(await seatPrompt(compactPrompt(target)))) {
       setNote('No composer for a consolidation round')
       return
     }
-    setBusy(true)
-    setNote('Consolidation running')
-    let left = 8
-    const tick = () => {
-      refreshState().then(data => {
-        if (data) setState(data)
-        left -= 1
-        if (left <= 0) {
-          setBusy(false)
-          setNote('Consolidation round sent')
-          return
-        }
-        window.setTimeout(tick, 2500)
-      })
-    }
-    window.setTimeout(tick, 1500)
+    setBusy(false)
+    setNote('Prompt ready in the composer. Send it to start consolidation.')
   }
 
   const run = action => {

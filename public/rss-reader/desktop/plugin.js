@@ -1772,13 +1772,7 @@ function publishTickerRefresh(owner) {
   window.dispatchEvent(new CustomEvent("hermes-rss-ticker-refresh", { detail: { owner } }));
 }
 var TICKER_READ_REFRESH_DEBOUNCE_MS = 1e3;
-var rssCommandBusy = false;
-async function rssCommandQueue(host2, route) {
-  assertOwner(host2, route);
-  const commands = await rssRest("/commands", { method: "GET" });
-  assertOwner(host2, route);
-  return Array.isArray(commands) ? commands.filter(command => command && command.id && command.action && command.payload && typeof command.payload === "object") : [];
-}
+const rssCommandReservations = new Set();
 function rssCommandSeen(ctx, owner) {
   const value = storageGet(ctx, "commandSeen", owner, []);
   return new Set(Array.isArray(value) ? value.filter(id => typeof id === "string") : []);
@@ -2337,40 +2331,49 @@ async function executeRssCommand(ctx, host2, owner, command) {
   throw new Error("Unknown RSS command.");
 }
 function startRssCommandBridge(ctx, host2) {
-  rssDebug("bridge-start", { plugin: "hermes-rss-reader" });
+  rssDebug("bridge-start", { plugin: "hermes-rss-reader", transport: "host.onEvent" });
+  // Commands arrive as plugin.rss-reader.command events from the backend
+  // (broadcast_plugin_event) — no commands.jsonl queue, no 3s poll.
+  // plugin.rss-reader.preview drives the workspace RSS browser from any
+  // window (the /preview route emits it;SandboxedFrame renders inside).
   let stopped = false;
-  const poll = async () => {
-    if (stopped || rssCommandBusy) return;
-    rssCommandBusy = true;
-    try {
-      const route = await currentRoute(host2);
-      const owner = JSON.stringify([route.connectionId, route.profile]);
-      const seen = rssCommandSeen(ctx, owner);
-      const commands = await rssCommandQueue(host2, route);
-      for (const command of commands) {
-        if (seen.has(command.id)) continue;
-        let reply = { id: command.id, ok: true, result: null, error: "" };
-        try {
-          reply.result = await executeRssCommand(ctx, host2, owner, command) || { ok: true };
-          rememberRssCommand(ctx, owner, seen, command.id);
-        } catch (error) {
-          rssDebug("command-error", { id: command.id, action: command.action, message: error?.message || error, stack: error?.stack || "" });
-          rememberRssCommand(ctx, owner, seen, command.id);
-          reply.ok = false;
-          reply.error = String(error?.message || error).slice(0, 300);
-          publishLibraryChange(owner, `RSS command failed: ${reply.error}`);
-        }
-        if (command.reply) {
-          try { await rssRest("/command-result", { method: "POST", body: reply }); } catch {}
-        }
+  const previewOff = typeof host2.onEvent === "function"
+    ? host2.onEvent("plugin.rss-reader.preview", (frame) => {
+      const url = frame && frame.payload && frame.payload.url;
+      if (typeof url === "string" && /^https?:\/\//i.test(url)) {
+        openHermesPreview(url, (frame.payload && frame.payload.label) || url, { emitPreview: false });
       }
-    } catch (error) {
-      rssDebug("poll-error", { message: error?.message || error, stack: error?.stack || "" });
-    } finally { rssCommandBusy = false; }
+    }) : null;
+  const off = typeof host2.onEvent === "function" ? host2.onEvent("plugin.rss-reader.command", (frame) => {
+    if (stopped) return;
+    const command = frame && frame.payload;
+    if (!command || !command.id || !command.action || !command.payload || typeof command.payload !== "object") return;
+    const owner = currentOwner(host2);
+    const seen = rssCommandSeen(ctx, owner);
+    if (seen.has(command.id) || rssCommandReservations.has(command.id)) return;
+    rssCommandReservations.add(command.id);
+    rememberRssCommand(ctx, owner, seen, command.id);
+    void (async () => {
+      let reply = { id: command.id, ok: true, result: null, error: "" };
+      try {
+        reply.result = await executeRssCommand(ctx, host2, owner, command) || { ok: true };
+      } catch (error) {
+        rssDebug("command-error", { id: command.id, action: command.action, message: error?.message || error, stack: error?.stack || "" });
+        reply.ok = false;
+        reply.error = String(error?.message || error).slice(0, 300);
+        publishLibraryChange(owner, `RSS command failed: ${reply.error}`);
+      }
+      if (command.reply) {
+        try { await rssRest("/command-result", { method: "POST", body: reply }); } catch {}
+      }
+      rssCommandReservations.delete(command.id);
+    })();
+  }) : null;
+  return () => {
+    stopped = true;
+    if (typeof previewOff === "function") previewOff();
+    if (typeof off === "function") off();
   };
-  const timer = setInterval(() => { void poll(); }, 3000);
-  void poll();
-  return () => { stopped = true; clearInterval(timer); };
 }
 async function refreshSubscriptions(library, { feedId = null, shouldContinue = () => true, honorPeriod = false, now = Date.now, settings = null } = {}) {
   const feeds = await library("/feeds");
@@ -3950,29 +3953,6 @@ function TickerFavicon({ urls }) {
     onError: () => setIndex((n) => n + 1)
   });
 }
-function tickerPaneInTree(node, paneId) {
-  if (!node || !paneId) return false;
-  if (node.type === "group") return (node.panes || []).includes(paneId);
-  return (node.children || []).some((child) => tickerPaneInTree(child, paneId));
-}
-function tickerIsWorkspaceBottom(tree, paneId) {
-  if (!tree || !paneId) return false;
-  const walk = (node, parent) => {
-    if (!node) return false;
-    if (node.type === "group") {
-      if (!(node.panes || []).includes(paneId)) return false;
-      if ((node.panes || []).length !== 1) return false;
-      if (!parent || parent.type !== "split" || parent.orientation !== "column") return false;
-      const kids = parent.children || [];
-      return kids[kids.length - 1] === node;
-    }
-    return (node.children || []).some((child) => walk(child, node));
-  };
-  return walk(tree, null);
-}
-function readLayoutTree() {
-  return null; // public edition: do not read app layout store
-}
 function TickerItem({ row, onOpen, showFavicon, websiteName, showAge, tagStyle }) {
     const { item, pill } = row;
   const showPill = pill && tagStyle === "pill";
@@ -4117,38 +4097,46 @@ function tickerRefreshMs(settings) {
 // IndexedDB; headline clicks navigate to /rss and hand the article id over
 // via a window event.
 function RssBrowserFrame({ url }) {
-  return jsx("div", {
+  // SandboxedFrame (SDK, #116305 item 9): opaque-origin sandboxed iframe with
+  // the app's guest posture. No raw Electron webview, no persist: partition.
+  return jsx(SandboxedFrame, {
+    src: url || "",
+    title: "RSS browser",
     className: "rss-browser-frame-host",
-    "data-url": url || "",
-    "data-public-empty": "true",
-    style: { display: "flex", flex: "1 1 auto", minHeight: 0, height: "100%", width: "100%" }
+    style: { display: "flex", flex: "1 1 auto", minHeight: 0, height: "100%", width: "100%", border: 0, background: "#fff" }
   });
 }
 function YoutubeFrame({ id, start }) {
   const src = youtubeEmbedSrc(id, start);
-  if (!src) return null;
-  return jsx("div", {
-    className: "rss-youtube",
-    "data-yt-id": id || "",
-    children: jsx("iframe", {
-      className: "rss-youtube-frame",
-      src,
-      title: "YouTube video",
-      allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
-      allowFullScreen: true,
-      referrerPolicy: "strict-origin-when-cross-origin"
-    })
+  // SandboxedFrame (SDK, #116305 item 9): replaces the raw webview on the
+  // app's persist: partition. The embed referrer rides the youtube-nocookie
+  // URL; the sandbox's opaque origin is the containment.
+  return jsx(SandboxedFrame, {
+    src,
+    title: "YouTube player",
+    className: "rss-youtube-frame",
+    style: { position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, display: "flex", background: "#000" }
   });
 }
-function openHermesPreview(url, label) {
+function openHermesPreview(url, label, { emitPreview = true } = {}) {
   if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
   const title = String(label || url);
   const openWorkspaceBrowser = () => {
-    // Public builds do not render a webview, so workspace panes cannot
-    // display the page. Use the system browser directly.
-    return false;
+    if (typeof host.openWorkspace !== "function") return false;
+    host.openWorkspace("rss-browser", {
+      title,
+      dock: { pane: "workspace", pos: "right" },
+      render: () => jsx(RssBrowserFrame, { url })
+    });
+    return true;
   };
   void (async () => {
+    if (!emitPreview) {
+      if (!openWorkspaceBrowser() && rssCtx?.os?.openExternal) {
+        void rssCtx.os.openExternal(url);
+      }
+      return;
+    }
     let openedNative = false;
     try {
       if (typeof rssRest === "function") {
@@ -6741,19 +6729,8 @@ var plugin_default = {
     applyTickerPane();
     window.addEventListener("hermes-rss-ticker-preview", onTickerPreview);
     window.addEventListener("hermes-rss-library-changed", onTickerLibrary);
-    const tickerDockWatch = setInterval(() => {
-      if (Date.now() - lastTickerMountAt < 1600) return;
-      if (tickerSettingsNow()?.headlineTicker !== true) return;
-      if (tickerMountGen >= 8) return;
-      const tree = readLayoutTree();
-      if (!tree) return;
-      if (!tickerPaneInTree(tree, currentTickerId)) return;
-      if (tickerIsWorkspaceBottom(tree, currentTickerId)) return;
-      applyTickerPane({ bumpId: true });
-    }, 700);
     if (typeof ctx.onDispose === "function") {
       ctx.onDispose(() => {
-        clearInterval(tickerDockWatch);
         window.removeEventListener("hermes-rss-ticker-preview", onTickerPreview);
         window.removeEventListener("hermes-rss-library-changed", onTickerLibrary);
         unmountTickerPane();

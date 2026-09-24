@@ -6,9 +6,6 @@
  *   drag a session row into Pinned    -> pin it at the drop slot
  *   drag a pinned row out to Sessions -> unpin it
  *
- * Hot-loads, no rebuild, no restart. LIVE door:
- *   desktop-plugins/drag-to-pin-session/plugin.js
- *
  * Why it rides the app's own pointer drag instead of native HTML5 DnD: the
  * session row already runs two gestures off one press — dnd-kit's
  * PointerSensor reorder (listeners spread on the row shell) and the pane
@@ -18,13 +15,17 @@
  * The grabber ([data-reorder-handle]) is deliberately left alone: it stays
  * pure reorder. Dragging the row BODY is what pins/unpins.
  *
- * Incoming pins use the app's pinSession(id, index). The row's onPin wrapper
- * always appends; walking the recents section fiber for onTogglePin reaches
- * the real store call, which takes an insert index.
+ * Row identity and store writes go through the SDK session-list API
+ * (#116305 item 3): a SESSION_ROW_AREAS.leading marker carries the durable
+ * session id, and pin/unpin/reset go through host.sessions. No fiber walks.
  */
+
+import { host, SESSION_ROW_AREAS } from '@hermes/plugin-sdk'
+import { jsx } from 'react/jsx-runtime'
 
 const ID = 'drag-to-pin-session'
 const ROW = '.row-hover'
+const MARKER = '[data-dtp-session]'
 const SKIP = '[data-row-actions], [data-reorder-handle]'
 const OVER_ATTR = 'data-dtp-over'
 const STYLE_ID = 'drag-to-pin-style'
@@ -52,47 +53,6 @@ const CSS = `
   display: none;
 }
 `
-
-// ── React fiber access ───────────────────────────────────────────────────────
-// The compiled sidebar exposes no data attributes carrying a session id, so the
-// row's identity is read off the component props the row was rendered with.
-// Read-only: nothing here mutates React state.
-
-function fiberOf(el) {
-  if (!el) return null
-
-  for (const key of Object.keys(el)) {
-    if (key.startsWith('__reactFiber$') || key.startsWith('__reactInternalInstance$')) {
-      return el[key]
-    }
-  }
-
-  return null
-}
-
-function findProps(el, test, cap = 120) {
-  const root = fiberOf(el)
-  if (!root) return null
-
-  const seen = new Set()
-  const queue = [root]
-  let n = 0
-
-  while (queue.length && n < cap) {
-    const fiber = queue.pop()
-    n += 1
-
-    if (!fiber || seen.has(fiber)) continue
-    seen.add(fiber)
-
-    const props = fiber.memoizedProps || fiber.pendingProps
-    if (props && test(props)) return props
-
-    if (fiber.return) queue.push(fiber.return)
-  }
-
-  return null
-}
 
 // ── Sidebar geometry ─────────────────────────────────────────────────────────
 
@@ -207,39 +167,14 @@ function clearMarks() {
 // ── Row identity ─────────────────────────────────────────────────────────────
 
 /**
- * The row's own props. `onPin` is the section's toggle wired to the right
- * store call for wherever the row lives: pinSession in Sessions, unpinSession
- * in Pinned. Going through it means the real atom updates, the backend
- * `pinned` mirror PATCHes, and the sidebar re-renders — no localStorage
- * poking that the in-memory store would never see.
+ * The durable session id of a row, published by this plugin's own
+ * SESSION_ROW_AREAS.leading marker. The id is the STORED (lineage root) id —
+ * the one host.sessions.* addresses — so pins survive compression id rotation.
  */
-function rowProps(row) {
-  return findProps(row, p => p.session && typeof p.session.id === 'string' && typeof p.onPin === 'function')
-}
+function rowId(row) {
+  const marker = row && row.querySelector(MARKER)
 
-/** Durable pin key: lineage root when present, else the live session id. */
-function pinIdOf(session) {
-  if (!session) return null
-
-  return session._lineage_root_id || session.id
-}
-
-/**
- * Recents section's onTogglePin is the store's pinSession(id, index?).
- * The row's onPin wrapper drops the index, so incoming pins would always
- * append without this.
- */
-function pinCall(row) {
-  const props = findProps(row, p => typeof p.onTogglePin === 'function' && p.pinned === false)
-
-  return props ? props.onTogglePin : null
-}
-
-/** The section's reorder callback, needed to undo dnd-kit's reorder below. */
-function reorderFn(row) {
-  const props = findProps(row, p => typeof p.onReorderSessions === 'function')
-
-  return props ? props.onReorderSessions : null
+  return marker ? marker.getAttribute('data-dtp-session') || null : null
 }
 
 function sectionOf(secs, row) {
@@ -271,15 +206,13 @@ function onPointerDown(event) {
   const source = sectionOf(secs, row)
   if (!source) return
 
-  const props = rowProps(row)
-  if (!props) return
+  const id = rowId(row)
+  if (!id) return
 
   drag = {
     row,
-    props,
+    id,
     source,
-    reorder: reorderFn(row),
-    pin: source === 'recents' ? pinCall(row) : null,
     x0: event.clientX,
     y0: event.clientY,
     engaged: false
@@ -346,15 +279,13 @@ function onPointerUp(event) {
 
   if (!pin && !unpin) return
 
-  const id = pin ? pinIdOf(finished.props.session) : null
-  const index = pin ? dropIndex(secs.pinned, y) : 0
-  const indexed = pin && typeof finished.pin === 'function' && id
+  const index = pin ? dropIndex(secs.pinned, y) : undefined
 
   try {
-    if (indexed) {
-      finished.pin(id, index)
+    if (pin) {
+      host.sessions.pin(finished.id, true, index)
     } else {
-      finished.props.onPin()
+      host.sessions.pin(finished.id, false)
     }
   } catch (err) {
     console.warn(`[${ID}] pin toggle failed`, err)
@@ -371,15 +302,15 @@ function onPointerUp(event) {
   if (pin) {
     setTimeout(() => {
       try {
-        if (indexed) finished.pin(id, index)
+        host.sessions.reorder([])
       } catch {
-        /* store call may have gone */
+        /* list may have unmounted */
       }
 
       try {
-        finished.reorder?.([])
+        host.sessions.pin(finished.id, true, index)
       } catch {
-        /* list may have unmounted */
+        /* store call may have gone */
       }
     }, 0)
   }
@@ -443,6 +374,20 @@ export default {
   description: 'Drag a session into Pinned to pin it at the drop slot, drag it out to unpin.',
   defaultEnabled: true,
   register(ctx) {
+    // Publishes the durable session id onto every row so the pointer gesture
+    // can name rows without reading React internals.
+    ctx.register({
+      id: 'id-marker',
+      area: SESSION_ROW_AREAS.leading,
+      data: {
+        render: ({ sessionId }) =>
+          jsx('span', {
+            'data-dtp-session': sessionId,
+            style: { display: 'none' },
+          }),
+      },
+    })
+
     ctx.onDispose(start())
-  }
+  },
 }

@@ -168,23 +168,6 @@ def write_command_result(payload: CommandResultRequest) -> dict[str, str]:
     return {"path": str(path)}
 
 
-@router.get("/commands")
-def read_commands() -> list[dict]:
-    home = Path(os.environ.get("HERMES_HOME") or Path(os.environ.get("LOCALAPPDATA", Path.home())) / "hermes")
-    path = home / "rss-reader" / "commands.jsonl"
-    if not path.exists():
-        return []
-    commands = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            value = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(value, dict):
-            commands.append(value)
-    return commands
-
-
 def _request_user_agent(payload: FeedRequest, fallback: str) -> str:
     raw = str(payload.user_agent or "").strip()
     if 1 <= len(raw) <= 512 and all(32 <= ord(ch) <= 126 for ch in raw):
@@ -437,9 +420,10 @@ class PreviewRequest(BaseModel):
 
 @router.post("/preview")
 def open_in_preview(payload: PreviewRequest) -> dict[str, str]:
-    """Open an article in the desktop in-app preview pane.
+    """Open an article in the desktop RSS browser pane.
 
-    Emits the preview.open gateway event used by the in-app preview pane.
+    Emits a ``plugin.rss-reader.preview`` event; the desktop half renders the
+    page in a SandboxedFrame workspace pane.
     """
     try:
         url = _validate_url(payload.url)
@@ -447,8 +431,8 @@ def open_in_preview(payload: PreviewRequest) -> dict[str, str]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     label = (payload.label or url).strip()
     try:
-        from tui_gateway.server import _broadcast_global_event
-        _broadcast_global_event("preview.open", {"url": url, "label": label})
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Preview pane unavailable: {exc}") from exc
+        from hermes_cli.plugin_events import broadcast_plugin_event
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail=f"Preview unavailable: {exc}") from exc
+    broadcast_plugin_event("rss-reader", "preview", {"url": url, "label": label})
     return {"opened": url}

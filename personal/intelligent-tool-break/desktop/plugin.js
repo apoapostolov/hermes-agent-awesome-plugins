@@ -164,66 +164,21 @@ async function breakNow(command) {
   }
 }
 
-function visibleComposerTarget() {
-  const nodes = document.querySelectorAll('[data-composer-target]')
-  for (const node of nodes) {
-    if (node.closest('[data-pane-hidden]')) {
-      continue
-    }
-    if (node.dataset.composerTarget) {
-      return node.dataset.composerTarget
-    }
-  }
-  return 'main'
-}
-
-function ensureBreakTrailingSpace() {
-  const roots = document.querySelectorAll('[data-composer-target]')
-  let editor = null
-  for (const root of roots) {
-    if (root.closest('[data-pane-hidden]')) {
-      continue
-    }
-    editor = root.querySelector('[contenteditable="true"]')
-    if (editor) {
-      break
-    }
-  }
-  if (!editor) {
+async function injectBreakMessage() {
+  // SDK composer draft API (#116305 item 1): seat /break as a prefix on the
+  // composer the user is typing in. Fail-closed on an unmounted address.
+  let ok = false
+  try {
+    ok = await host.composer.insertText(null, '/break', { mode: 'prefix' })
+  } catch (err) {
+    host.notify({ kind: 'error', message: err && err.message ? String(err.message) : 'composer insert failed' })
     return
   }
-  const text = (editor.innerText || editor.textContent || '').replace(/\u00a0/g, ' ')
-  if (text === '/break' || text.startsWith('/break\n')) {
-    editor.focus()
-    const sel = window.getSelection()
-    if (sel) {
-      const range = document.createRange()
-      range.selectNodeContents(editor)
-      range.collapse(false)
-      sel.removeAllRanges()
-      sel.addRange(range)
-    }
-    document.execCommand('insertText', false, ' ')
-  } else {
-    editor.focus()
+  if (!ok) {
+    host.notify({ kind: 'info', message: 'No composer surface for /break' })
+    return
   }
-}
-
-function injectBreakMessage() {
-  const target = visibleComposerTarget()
-  window.setTimeout(() => {
-    window.dispatchEvent(
-      new CustomEvent('hermes:composer-insert', {
-        detail: { mode: 'prefix', target, text: '/break' }
-      })
-    )
-    window.dispatchEvent(
-      new CustomEvent('hermes:composer-focus', {
-        detail: { target }
-      })
-    )
-  }, 0)
-  window.setTimeout(ensureBreakTrailingSpace, 40)
+  host.composer.focus(null)
 }
 
 function parseStatus(raw) {
