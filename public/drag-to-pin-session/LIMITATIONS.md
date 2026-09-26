@@ -1,26 +1,11 @@
 # LIMITATIONS
 
-**Drag to Pin Session** (`drag-to-pin-session`). This file records the blocker history and the current state. Both editions carry the same copy.
+**Drag to Pin Session** (`drag-to-pin-session`). This file records the catalog-safe edition's current feature boundary.
 
-Catalog intake PR: [NousResearch/hermes-agent#115963](https://github.com/NousResearch/hermes-agent/pull/115963). Shared hook wishlist: [#116305](https://github.com/NousResearch/hermes-agent/issues/116305).
+Catalog intake PR: [NousResearch/hermes-agent#115963](https://github.com/NousResearch/hermes-agent/pull/115963). Shared SDK hook wishlist: [#116305](https://github.com/NousResearch/hermes-agent/issues/116305).
 
-## Resolved 2026-09-24: React fiber walk to pin and reorder
+## Current catalog-safe behavior
 
-The plugin used to walk `__reactFiber$` on session rows to harvest
-`onTogglePin` / `onReorderSessions` and call those props on drop. Fiber
-internals are not a contract; rule 8 treats that as reaching into internal
-stores.
+The Desktop SDK now provides `host.sessions.pin()` and the `SESSION_ROW_AREAS` row slots. It does not provide a supported drag/drop target for the Pinned section. The public edition therefore exposes explicit Pin and Unpin actions in the trailing row slot. These use the durable `sessionId` supplied by the SDK and write through `host.sessions.pin()`.
 
-The needed hook shipped: `host.sessions.pin/reorder` +
-`SESSION_ROW_AREAS` ([#116305 item 3](https://github.com/NousResearch/hermes-agent/issues/116305),
-merged 2026-09-24). Both editions now:
-
-- publish the durable session id through a `SESSION_ROW_AREAS.leading`
-  marker (read-only span; core keeps row ownership),
-- pin with `host.sessions.pin(id, true, dropIndex)`, unpin with
-  `host.sessions.pin(id, false)`,
-- reset the manual order with `host.sessions.reorder([])` instead of the
-  harvested `onReorderSessions`.
-
-The fiber helpers are gone. Personal and public are byte-identical; there is
-no longer an edition split for this plugin.
+The public edition does not inspect app-owned DOM, install global pointer or click listeners, simulate clicks, or depend on React internals or app storage. Dragging rows to pin or unpin them is unavailable in this edition until the SDK exposes a supported drop-target hook.
