@@ -1,20 +1,24 @@
-<div align="center">
+<!-- markdownlint-disable MD033 -->
 
+<div align="center">
   <a href="https://github.com/NousResearch/hermes-agent">
     <img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" />
   </a>
+</div>
+
+<div align="center">
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <strong>Give Hermes Desktop a few tools you will actually notice.</strong>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, and memory.</p>
 
-  See provider limits, manage long sessions, read feeds, review memory, and tidy the interface. Each plugin owns one job.
-
-  [![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-0.21.0%2B-6f42c1)](https://github.com/NousResearch/hermes-agent)
-  [![Plugins](https://img.shields.io/badge/plugins-14-2ea44f)](#whats-in-the-pack)
-  [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-
-  [Install the pack](#install) &nbsp;·&nbsp; [Explore the plugins](#whats-in-the-pack) &nbsp;·&nbsp; [Personal and public](#personal-and-public) &nbsp;·&nbsp; [Pinning model](#how-it-works)
+  <p>
+    <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
+    <a href="./package.json"><img src="https://img.shields.io/badge/Language-JavaScript-555" alt="Language: JavaScript"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases/tag/v1.22.0"><img src="https://img.shields.io/badge/Version-v1.22.0-blue" alt="Version: v1.22.0"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases/tag/v1.22.0"><img src="https://img.shields.io/badge/Last%20release-2026--09--24-blue" alt="Last release: 2026-09-24"></a>
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a>
+  </p>
 
 </div>
 
