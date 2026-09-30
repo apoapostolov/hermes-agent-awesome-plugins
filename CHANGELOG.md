@@ -1,5 +1,26 @@
 # Changelog
 
+The pack and its plugins have separate version numbers. Entries below name
+the component that changed; a plugin patch does not imply a new pack release.
+
+## [provider-status 1.5.10] - 2026-09-30
+
+Deleting a saved key in the personal Providers dialog now stays deleted. The
+next status poll no longer restores it from the local credential files.
+
+### Fixed
+
+- Personal edition: a removed key is cleared from the library and Hermes
+  carriers. A fingerprint prevents a stale file from importing it again,
+  without storing the raw key in the removal record.
+- The active key and numbered slots stay valid after a deletion, including
+  when a middle key is removed.
+- Public edition: the per-key delete control is gone because this build cannot
+  update the personal credential files. Removing a whole provider row remains
+  available.
+
+Restart Hermes Desktop after updating; the Python component does not hot-reload.
+
 ## [rss-reader 1.1.0] - 2026-09-24
 
 RSS Reader moves browser frames and ticker events onto the desktop SDK, restores the headline ticker at launch, and tightens YouTube cookie handling.

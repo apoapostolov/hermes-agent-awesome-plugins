@@ -6,9 +6,9 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <strong>Focused plugins for a more capable Hermes Desktop.</strong>
+  <strong>Give Hermes Desktop a few tools you will actually notice.</strong>
 
-  Provider visibility, session control, reading, memory review, and interface polish, with each plugin owning one job.
+  See provider limits, manage long sessions, read feeds, review memory, and tidy the interface. Each plugin owns one job.
 
   [![Hermes Agent](https://img.shields.io/badge/Hermes%20Agent-0.21.0%2B-6f42c1)](https://github.com/NousResearch/hermes-agent)
   [![Plugins](https://img.shields.io/badge/plugins-14-2ea44f)](#whats-in-the-pack)
@@ -21,6 +21,16 @@
 <div align="center">
   <img src="docs/hero.png" width="100%" alt="Hermes Agent Awesome Plugins" />
 </div>
+
+## Latest plugin update
+
+Provider Status 1.5.10 fixes a frustrating loop: deleting a saved key in the
+personal edition now keeps it deleted after the next status poll. The public
+edition no longer shows a per-key delete control it cannot safely honor. Restart
+Hermes Desktop after updating; the Python side does not reload in place.
+
+The pack remains at 1.22.0. See the [changelog](CHANGELOG.md) for plugin-level
+updates and the distinction between personal and public builds.
 
 ## Personal and public
 
