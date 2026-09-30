@@ -4,7 +4,7 @@
   <strong>See provider quota without leaving Hermes.</strong>
   <p>Status-bar used/remaining, multi-account pools, and rotation when a key runs low or hits its reset day.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.5.9-2ea44f" alt="Version 1.5.9" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.6.0-5d54c9" alt="Version 1.6.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -23,6 +23,7 @@
 
 - Read used and remaining quota in the status bar for each enabled provider.
 - Keep multiple accounts per provider, reorder them, and set a reset day per key.
+- Delete a key you no longer use. The removal clears the key library entry and the Hermes `.env` carriers, and a later poll will not bring it back.
 - Rotate to the next healthy key when remaining quota hits your threshold or a renewal day passes.
 - Start Grok and Codex OAuth from the setup dialog.
 - See [DeepSeek's pricing window](https://api-docs.deepseek.com/quick_start/pricing) beside its name, including full-day Chinese public-holiday overrides. The plugin applies official 2025 and 2026 State Council holiday dates; the built-in calendar ends on 2026-12-31.
