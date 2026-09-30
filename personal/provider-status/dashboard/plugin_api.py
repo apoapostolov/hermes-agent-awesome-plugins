@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -186,6 +187,53 @@ _SKIP_ENV = (
     "_LEFT_SLOT1", "_LEFT_SLOT_2",
 )
 
+# ── Deletion tombstones ────────────────────────────────────────────
+# A key the user deleted must never come back. library.env and the Hermes
+# .env are both append-only feeds into _ingest_library(), so without a
+# durable "this one is gone" record every poll resurrects the key (the pool
+# is rebuilt as `old + every library value`). Tombstones close that loop.
+#
+# Fingerprints, not keys: sha256 of the raw value, truncated. A leaked
+# tombstone file then reveals nothing about the credentials it covers.
+TOMBSTONE_PATH = PLUGIN_ROOT / "removed.json"
+_TOMBSTONES_MAX = 200
+
+
+def _fingerprint(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def _load_tombstones() -> set[str]:
+    try:
+        data = json.loads(TOMBSTONE_PATH.read_text("utf-8"))
+        items = data.get("removed") if isinstance(data, dict) else data
+        return {str(x) for x in items} if isinstance(items, list) else set()
+    except Exception:
+        return set()
+
+
+def _save_tombstones(tombs: set[str]) -> None:
+    """Bounded write; oldest entries are dropped past _TOMBSTONES_MAX."""
+    try:
+        kept = sorted(tombs)[:_TOMBSTONES_MAX]
+        tmp = TOMBSTONE_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"removed": kept}, indent=2), "utf-8")
+        os.replace(tmp, TOMBSTONE_PATH)
+    except Exception as e:
+        log.warning("provider-status tombstone write failed: %s", e)
+
+
+def _tombstone_keys(values: list[str]) -> None:
+    """Record these raw key values as user-deleted."""
+    if not values:
+        return
+    with _library_lock:
+        tombs = _load_tombstones()
+        before = len(tombs)
+        tombs.update(_fingerprint(v) for v in values if v)
+        if len(tombs) != before:
+            _save_tombstones(tombs)
+
 
 def _parse_env_map(path: Path) -> dict[str, str]:
     out: dict[str, str] = {}
@@ -237,6 +285,53 @@ def _library_values() -> list[str]:
     return list(_parse_env_map(LIBRARY_PATH).values())
 
 
+def _library_slots_for_value(value: str) -> list[str]:
+    """Library slot NAMES (e.g. OPENCODE_GO_API_KEY_2) holding this value."""
+    return [k for k, v in _parse_env_map(LIBRARY_PATH).items() if v == value]
+
+
+def _delete_from_library(value: str) -> list[str]:
+    """Remove every library slot holding `value`. Returns the slot names
+    removed. The library used to be copy-in only, which is why a key the user
+    deleted in the dialog came straight back on the next poll."""
+    if not value:
+        return []
+    with _library_lock:
+        removed = []
+        for slot in _library_slots_for_value(value):
+            _remove_env_key(LIBRARY_PATH, slot)
+            removed.append(slot)
+        if removed:
+            log.info("provider-status library removed slots %s", removed)
+        return removed
+
+
+def _prune_env_for_provider(pid: str, live_values: list[str]) -> list[str]:
+    """Drop numbered HERMES_ENV siblings for `pid` that no longer carry a live
+    key. Discovery needs contiguous numbering, so a gap is worse than the
+    removed entry. Returns the env var names removed."""
+    spec = ROTATABLE.get(pid)
+    if not spec:
+        return []
+    primary = spec["primary"]
+    live = {v for v in live_values if v}
+    with _library_lock:
+        existing = _parse_env_map(HERMES_ENV)
+        dropped: set[str] = set()
+        for name, val in existing.items():
+            if name == primary or not name.startswith(primary + "_"):
+                continue
+            if not name[len(primary) + 1:].isdigit():
+                continue
+            if not val or val in live:
+                continue
+            _remove_env_key(HERMES_ENV, name)
+            dropped.add(name)
+        if dropped:
+            log.info("provider-status %s: env dropped stale carriers %s", pid, sorted(dropped))
+        return sorted(dropped)
+
+
 def _library_has_value(value: str) -> bool:
     return value in set(_library_values())
 
@@ -267,6 +362,7 @@ def _ingest_library(cfg: dict) -> dict:
     hermes = _parse_env_map(HERMES_ENV)
     with _library_lock:
         lib = _parse_env_map(LIBRARY_PATH)
+        tombs = _load_tombstones()
         added = 0
         for pid, spec in ROTATABLE.items():
             stems = tuple(spec["match"])
@@ -279,6 +375,11 @@ def _ingest_library(cfg: dict) -> dict:
                 if val and val not in candidates:
                     candidates.append(val)
             for val in candidates:
+                # A tombstoned key is never re-ingested and never re-added to a
+                # pool, even if a stale library.env or Hermes .env still lists
+                # it. This is what makes a dialog delete stick.
+                if _fingerprint(val) in tombs:
+                    continue
                 if val in lib.values():
                     continue
                 slot = _next_library_name(spec["primary"], lib)
@@ -292,7 +393,8 @@ def _ingest_library(cfg: dict) -> dict:
         dirty = False
         for pid, spec in ROTATABLE.items():
             stems = tuple(spec["match"])
-            values = [v for k, v in lib.items() if _is_key_name(k, stems)]
+            values = [v for k, v in lib.items()
+                      if _is_key_name(k, stems) and _fingerprint(v) not in tombs]
             # keep first-seen order from current pool then library extras
             pconf = providers.get(pid)
             if pconf is None:
@@ -1624,6 +1726,10 @@ class ConfigUpdate(BaseModel):
     poll_minutes: int | None = None
     apply_hermes_env: bool | None = None
     remove: list[str] = []   # provider ids to delete entirely (rows + order)
+    # Key VALUES (not slot names) the user deleted in the dialog. The backend
+    # maps each to its library slot(s) and the Hermes .env carriers, then
+    # tombstones it so no later poll re-ingests it.
+    remove_keys: dict[str, list[str]] = {}
 
 @router.get("/status")
 def get_status(only: set | None = None):
@@ -1899,6 +2005,12 @@ def update_config(body: ConfigUpdate):
                              pid, new_idx + 1)
             providers[pid] = merged
         cfg["providers"] = providers
+        # Tombstone FIRST, before anything else can re-read the stale value:
+        # a poll already in flight would otherwise re-ingest the key we are
+        # about to delete and re-commit it after this save.
+        for pid, values in (body.remove_keys or {}).items():
+            if pid in ROTATABLE:
+                _tombstone_keys([v for v in (values or []) if v])
         if body.remove:
             rm = [p for p in body.remove if p in providers]
             for p in rm:
@@ -1912,6 +2024,19 @@ def update_config(body: ConfigUpdate):
         if body.apply_hermes_env is not None:
             cfg["apply_hermes_env"] = bool(body.apply_hermes_env)
     mutate_config(_m)
+    # Purge the deleted key from the library and the Hermes .env, and only
+    # from providers the caller named. Hermes .env is touched regardless of
+    # apply_hermes_env: a stale carrier would keep feeding the library.
+    try:
+        for pid, values in (body.remove_keys or {}).items():
+            if pid not in ROTATABLE:
+                continue
+            for val in [v for v in (values or []) if v]:
+                _delete_from_library(val)
+            live = [k for k in ((load_config().get("providers") or {}).get(pid) or {}).get("pool") or [] if k]
+            _prune_env_for_provider(pid, live)
+    except Exception as e:
+        log.warning("provider-status key removal failed: %s", e)
     # Applying the switch also materializes every existing non-Tavily pool,
     # including the provider that triggered this save.
     try:

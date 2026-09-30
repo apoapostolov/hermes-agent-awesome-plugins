@@ -1060,13 +1060,14 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
     setKeys(pc.pool?.length ? [...pc.pool] : [''])
   }, [pc.enabled, (pc.pool || []).join('\n')])
 
-  const persist = async (nextEnabled, nextKeys, updates) => {
+  const persist = async (nextEnabled, nextKeys, updates, removed) => {
     const pool = (nextKeys ?? keys).map(s => s.trim()).filter(Boolean)
-    await onSave(pid, { ...pc, enabled: nextEnabled ?? enabled, pool, ...updates })
+    await onSave(pid, { ...pc, enabled: nextEnabled ?? enabled, pool, ...updates }, removed)
   }
   const setKeyAt = (i, v) => { const n = [...keys]; n[i] = v; setKeys(n) }
   const addKey = () => { setKeys([...keys, '']) }
   const delKey = (i) => {
+    const removed = [keys[i]].map(s => s.trim()).filter(Boolean)
     const n = keys.filter((_, j) => j !== i)
     setKeys(n.length ? n : [''])
     // keep the radio honest: deleting the active key falls back to #1; deleting
@@ -1075,7 +1076,10 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
     if (i === activeIdx) nextIdx = 0
     else if (i < activeIdx) nextIdx = activeIdx - 1
     setActiveIdx(nextIdx)
-    persist(undefined, n.length ? n : [''], { pool_index: nextIdx })
+    // The removed VALUE travels with the save: the backend needs it to purge
+    // the library slot and the Hermes .env carrier. Without it the pool shrinks
+    // here and the next poll re-adds the key from library.env.
+    persist(undefined, n.length ? n : [''], { pool_index: nextIdx }, removed)
   }
 
   const [activeIdx, setActiveIdx] = useState(() => {
@@ -1549,8 +1553,11 @@ function SetupBody({ variant } = {}) {
     ],
   }) : null
 
-  const saveProvider = async (pid, next) => {
-    await postJson('config', { providers: { ...provCfg, [pid]: next }, order: pids, poll_minutes: cfg.poll_minutes || undefined, apply_hermes_env: applyHermesEnv })
+  const saveProvider = async (pid, next, removedKeys) => {
+    // removedKeys: the key VALUES just deleted for this provider. The backend
+    // purges the library slot + Hermes .env carrier and tombstones them.
+    const remove_keys = removedKeys?.length ? { [pid]: removedKeys } : undefined
+    await postJson('config', { providers: { ...provCfg, [pid]: next }, order: pids, poll_minutes: cfg.poll_minutes || undefined, apply_hermes_env: applyHermesEnv, remove_keys })
     postJson('refresh')
     refetchCfg()
   }
