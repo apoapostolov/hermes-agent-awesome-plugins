@@ -1066,17 +1066,6 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
   }
   const setKeyAt = (i, v) => { const n = [...keys]; n[i] = v; setKeys(n) }
   const addKey = () => { setKeys([...keys, '']) }
-  const delKey = (i) => {
-    const n = keys.filter((_, j) => j !== i)
-    setKeys(n.length ? n : [''])
-    // keep the radio honest: deleting the active key falls back to #1; deleting
-    // one before it shifts the active index up by one
-    let nextIdx = activeIdx
-    if (i === activeIdx) nextIdx = 0
-    else if (i < activeIdx) nextIdx = activeIdx - 1
-    setActiveIdx(nextIdx)
-    persist(undefined, n.length ? n : [''], { pool_index: nextIdx })
-  }
 
   const [activeIdx, setActiveIdx] = useState(() => {
     const n = Math.max(1, (pc.pool || []).filter(Boolean).length)
@@ -1291,7 +1280,6 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
         jsx(Input, { type: 'password', value: k, onChange: e => setKeyAt(i + 1, e.target.value), onBlur: () => persist(), placeholder: `Key #${i + 2}`, size: 'sm', className: 'flex-1 h-6 font-mono text-[0.7rem]' }),
         resetDaySelect(i + 1),
         jsx(SignalDot, { pid, tone: (probe?.keys || []).find(row => row.index === i + 1)?.tone, reason: (probe?.keys || []).find(row => row.index === i + 1)?.reason, quotas: (probe?.keys || []).find(row => row.index === i + 1)?.quotas, age: probeAge, onCheck: c => checkProbe(pid, false, i + 1) }),
-        jsx(Button, { variant: 'ghost', size: 'icon-xs', className: 'text-destructive', onClick: () => delKey(i + 1), title: 'remove', children: jsx(Codicon, { name: 'close', size: '0.7rem' }) }),
       ]}, i + 1)),
       poolStrategyFooter,
     ],
