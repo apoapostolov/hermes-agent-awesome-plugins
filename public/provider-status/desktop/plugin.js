@@ -693,24 +693,40 @@ function ExpGearMenu() {
 
   // House dialog overlay is bg-black/22 — that kills glass. Thin it only while
   // this experimental dialog is open AND Glass is on.
+  //
+  // The house overlay is a SIBLING of the dialog content inside the Radix
+  // portal, not a descendant of anything this plugin renders, so a descendant
+  // selector cannot scope it. Our own content node below carries our own
+  // data-ps-dialog attribute, and the Radix portal wrapper around it holds
+  // exactly our overlay plus our content, so OUR overlay is the one sitting in
+  // that wrapper. Every other dialog portals elsewhere and is unreachable from
+  // here. Cleanup clears the exact element reference we stored and re-queries
+  // nothing.
   useEffect(() => {
     if (!open || !glass) return
+    let mine = null
+    const clear = el => {
+      el.style.background = ''
+      el.style.backdropFilter = ''
+      el.style.webkitBackdropFilter = ''
+    }
     const apply = () => {
-      document.querySelectorAll('[data-slot="dialog-overlay"]').forEach(el => {
-        el.style.background = 'rgb(0 0 0 / 0.06)'
-        el.style.backdropFilter = 'blur(10px)'
-        el.style.webkitBackdropFilter = 'blur(10px)'
-      })
+      const content = document.querySelector('[data-ps-dialog]')
+      const scope = content && content.parentElement
+      if (!scope) return
+      const found = scope.querySelector('[data-slot="dialog-overlay"]')
+      if (!found || found === mine) return
+      if (mine) clear(mine) // React re-created the node; drop the old one
+      mine = found
+      mine.style.background = 'rgb(0 0 0 / 0.06)'
+      mine.style.backdropFilter = 'blur(10px)'
+      mine.style.webkitBackdropFilter = 'blur(10px)'
     }
     apply()
     const id = requestAnimationFrame(apply)
     return () => {
       cancelAnimationFrame(id)
-      document.querySelectorAll('[data-slot="dialog-overlay"]').forEach(el => {
-        el.style.background = ''
-        el.style.backdropFilter = ''
-        el.style.webkitBackdropFilter = ''
-      })
+      if (mine) { clear(mine); mine = null }
     }
   }, [open, glass])
 
@@ -730,6 +746,7 @@ function ExpGearMenu() {
         open,
         onOpenChange: setOpen,
         children: jsx(DialogContent, {
+          'data-ps-dialog': '',
           onOpenAutoFocus: e => e.preventDefault(),
           className: cn(
             'max-w-lg rounded-xl shadow-nous border-(--ui-accent)',
@@ -1217,6 +1234,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
   const hermes = variant === 'hermes'
   return jsxs('div', {
     'data-pid': pid,
+    'data-ps-row': '',
     className: cn(
       hermes ? 'px-3 py-2.5 flex flex-col gap-2' : 'rounded-lg p-2.5 flex flex-col gap-2',
       dragging && 'opacity-40',
@@ -1614,7 +1632,10 @@ export default {
 
   // Theme fixes: native <select> popups ignore inherited colors and render
   // light-on-light in dark mode; the SDK checkbox checked fill (bg-primary) is
-  // near-white in dark mode and reads harsh. Both are scoped to this plugin.
+  // near-white in dark mode and reads harsh. Both stay inside this plugin: the
+  // select by its own data-ps-select, the checkbox by the data-ps-row attribute
+  // this plugin puts on its provider rows, so a checkbox anywhere else in the
+  // app is never restyled.
   const STYLE_ID = 'provider-status-theme-fix'
   const style = document.createElement('style')
   style.id = STYLE_ID
@@ -1623,8 +1644,8 @@ export default {
       background: var(--ui-bg-elevated, var(--background, inherit));
       color: var(--ui-text-secondary, var(--foreground));
     }
-    [data-slot="checkbox"][data-state="checked"],
-    [data-slot="checkbox"][data-state="indeterminate"] {
+    [data-ps-row] [data-slot="checkbox"][data-state="checked"],
+    [data-ps-row] [data-slot="checkbox"][data-state="indeterminate"] {
       background: color-mix(in srgb, var(--ui-accent, var(--foreground)) 55%, transparent) !important;
       border-color: color-mix(in srgb, var(--ui-accent, var(--foreground)) 70%, transparent) !important;
       color: var(--ui-text-primary, var(--foreground)) !important;
