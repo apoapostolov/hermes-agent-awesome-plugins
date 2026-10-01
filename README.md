@@ -104,7 +104,6 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reaso
 | Plugin | What you get |
 | --- | --- |
 | [opaque-composer](personal/opaque-composer/README.md) | Solid composer while the transcript scrolls behind it. |
-| [compact-reasoning-label](personal/compact-reasoning-label/README.md) | Model pill shows the name only. Effort stays in the reasoning pill. |
 
 ### Reading
 
@@ -160,7 +159,6 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [drag-to-pin-session](personal/drag-to-pin-session/README.md)
 - [scroll-on-switch](personal/scroll-on-switch/README.md)
 - [opaque-composer](personal/opaque-composer/README.md)
-- [compact-reasoning-label](personal/compact-reasoning-label/README.md)
 - [memory-review](personal/memory-review/README.md)
 - [better-capabilities](personal/better-capabilities/README.md)
 - [cdp-manager](personal/cdp-manager/README.md)

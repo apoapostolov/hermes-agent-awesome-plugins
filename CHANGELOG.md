@@ -3,6 +3,13 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [Unreleased]
+
+### Removed
+
+- **compact-reasoning-label:** removed from personal and public. The Desktop model pill no longer includes the reasoning effort. That word lives on the reasoning pill, so the plugin's strip did nothing on current builds. The old trees stay in git history.
+- **prompt-enhance:** public edition removed. The draft API can read and replace a composer draft, and it can append text, but Add on a saved prompt inserts at the caret. There is no public hook for that, so the listed edition is gone. The personal edition is unchanged.
+
 ## [better-session-appearance 1.2.2] - 2026-10-01
 
 Saved Auto Rules now reach the sessions they were written for.
