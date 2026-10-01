@@ -14,6 +14,13 @@ const KEY = 'hermes.sidebar-manager.v1'
 const STYLE_ID = 'sidebar-manager-style'
 const MIME = 'application/x-sbm-id'
 const NEW_TOUR = 'sidebar-nav-new-session'
+// Every nav row wraps its button in <ContextMenuTrigger asChild>, and Slot
+// merges the trigger's props last — that overwrites `data-slot` with
+// `context-menu-trigger`, so `data-slot="sidebar-menu-button"` no longer matches
+// anything. `data-sidebar` is set by SidebarMenuButton itself and is not
+// claimed by the trigger, so it survives the merge. Keep both for the case where
+// a row renders without the context-menu wrapper.
+const NAV_BUTTON = '[data-sidebar="menu-button"], [data-slot="sidebar-menu-button"]'
 const PINNED_LABELS = new Set(['Pinned', 'المثبتة', 'ピン留め', '已置顶', '已釘選'])
 
 const CSS = `
@@ -157,7 +164,8 @@ function setEdit(on) {
 
 function newSessionButton() {
   const tour = document.querySelector(`[data-tour="${NEW_TOUR}"]`)
-  return tour ? tour.closest('[data-slot="sidebar-menu-button"]') || tour.closest('button') : null
+  if (!tour) return null
+  return tour.closest(NAV_BUTTON) || tour.closest('button')
 }
 
 function ensureEditBtn(button) {
@@ -253,7 +261,7 @@ function ensureGrip(host) {
 }
 
 function navGripHost(li) {
-  return li.querySelector('[data-slot="sidebar-menu-button"]') || li.querySelector('button')
+  return li.querySelector(NAV_BUTTON) || li.querySelector('button')
 }
 
 function secGripHost(group) {
