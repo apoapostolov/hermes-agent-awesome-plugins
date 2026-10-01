@@ -268,7 +268,10 @@ function matchRule(title, rules) {
   return null
 }
 
-const knownTitles = new Map()
+// Last rule applied per session. Keyed off the MATCHED rule id, not a title
+// diff: a rule has to reach a session the moment its row exists, otherwise
+// existing and freshly listed sessions silently keep the stock look.
+const appliedRules = new Map()
 let rulesUi = null
 
 function holdMenu(el) {
@@ -348,15 +351,16 @@ function applyRuleToSession(sid, row, rule) {
 
 function applyAutoRules() {
   const rules = loadRules()
-  if (!rules.length) return
   document.querySelectorAll(ROW).forEach(row => {
     const sid = rowSessionId(row)
     if (!sid) return
-    const title = titleOf(row)
-    const prev = knownTitles.get(sid)
-    knownTitles.set(sid, title)
-    if (prev === undefined || prev === title) return
-    const rule = matchRule(title, rules)
+    const rule = matchRule(titleOf(row), rules)
+    const ruleId = rule?.id || null
+    const prev = appliedRules.get(sid)
+    // Already applied this exact rule: skip, so an idle observer does not
+    // rewrite storage on every frame.
+    if (prev && prev.ruleId === ruleId) return
+    appliedRules.set(sid, { ruleId, title: titleOf(row) })
     if (rule) applyRuleToSession(sid, row, rule)
   })
 }
@@ -453,6 +457,7 @@ function removeRule(rule) {
         rulesUi.input.value = ''
       }
       renderRulesList()
+      applyAutoRules()
     }
   })
 }
@@ -574,6 +579,7 @@ function openRulesPanel(host, sid) {
     rulesUi.editingId = null
     input.value = ''
     renderRulesList()
+    applyAutoRules()
   })
 
   renderRulesList()
