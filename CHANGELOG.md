@@ -3,6 +3,19 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [sidebar-manager 1.0.1] - 2026-10-01
+
+Sidebar Manager keeps working after a Hermes desktop update changed how the sidebar nav buttons are marked.
+
+### Fixed
+
+- Personal edition: the editor glyph reappears next to New session and nav rows become clickable again. Every nav row now wraps its button in a context-menu trigger, which replaced the button's own `data-slot` value, so the editor's selector matched nothing and the plugin did nothing at all. Nav buttons are now matched on the attribute that survives.
+- Personal edition: the README's nav row list named a row the app does not have.
+
+### Changed
+
+- Public edition: its README described the personal editor, including session-section hiding, drag grips and the edit-mode glyph. None of that is in the listed edition, which drives core nav rows through the SDK's sidebar prefs area from a statusbar dialog. The README now matches the shipped behavior and states the section limit.
+
 ## [provider-status 1.5.10] - 2026-09-30
 
 Deleting a saved key in the personal Providers dialog now stays deleted. The

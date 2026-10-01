@@ -4,7 +4,7 @@
   <strong>Hide and reorder sidebar nav and session sections.</strong>
   <p>Edit mode from a dim glyph next to New session. Drag grips to reorder; click rows to hide.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.1-blue" alt="Version 1.0.1" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -16,9 +16,9 @@
 ## What You Can Do
 
 - Enter edit mode from the dim list-ordered glyph next to New session. Escape or click again to leave.
-- Turn nav rows after New session (Skills, Messaging, Artifacts, Cron, plugin pages) and session sections (Pinned, Recents, messaging platforms, Cron jobs) on or off. Off items dim in edit mode and hide when you leave.
+- Turn nav rows after New session (Capabilities, Messaging, Artifacts, Cron jobs) and session sections (Pinned, Recents, messaging platforms, Cron jobs) on or off. Off items dim in edit mode and hide when you leave.
 - Drag the grip to reorder with a live gap. A grab that never moved is not saved.
-- New session stays first and cannot be hidden. Search results are left alone so a query cannot scramble your layout.
+- New session stays first and cannot be hidden. Plugin-contributed nav pages appear in the same list. Search results are left alone so a query cannot scramble your layout.
 - Order and hidden choices persist across reloads.
 
 ## Install
