@@ -11,7 +11,7 @@ plugins:
     ref: b270520f14d5141c2ad686d7053907a341c8a46f
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/better-session-appearance
-    ref: b270520f14d5141c2ad686d7053907a341c8a46f
+    ref: be83818df2edc27743e6ca2a2484081272976400
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/drag-to-pin-session
     ref: b270520f14d5141c2ad686d7053907a341c8a46f
