@@ -8,7 +8,19 @@ the component that changed; a plugin patch does not imply a new pack release.
 ### Removed
 
 - **compact-reasoning-label:** removed from personal and public. The Desktop model pill no longer includes the reasoning effort. That word lives on the reasoning pill, so the plugin's strip did nothing on current builds. The old trees stay in git history.
-- **prompt-enhance:** public edition is back on the composer draft API. Enhance, undo, and replace still work. Add on a saved prompt appends, because that API has no caret insert. Personal still inserts at the caret.
+
+## [prompt-enhance 1.1.1] - 2026-10-01
+
+The listed edition reads and writes the composer through the draft API, so enhance, undo, and replace keep working when the Desktop markup moves.
+
+### Changed
+
+- Public edition: enhance, undo, and replace use the composer draft API.
+- Public edition: Add on a saved prompt appends to the draft. Personal Add still inserts at the caret.
+
+## [prompt-enhance 1.1.0] - 2026-09-22
+
+The library header can set a thinking level for the enhance call. The session model stays as it is.
 
 ## [better-session-appearance 1.2.2] - 2026-10-01
 
