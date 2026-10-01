@@ -8,7 +8,9 @@
   </p>
 </div>
 
-
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Session Pin Controls" />
+</div>
 
 ## What You Can Do
 
