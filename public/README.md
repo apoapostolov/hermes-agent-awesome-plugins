@@ -25,6 +25,6 @@ Each public plugin that diverged from personal (or is held because of it) has `L
 | sidebar-manager | Snapshot. Held until `host.sidebar` exists. |
 | drag-to-pin-session | Snapshot. Held until `host.sessions.pin` / `reorder`. |
 | better-session-appearance | Snapshot. Held until session-row slot / `setColor`. |
-| prompt-enhance | Not in public. Add on a saved prompt inserts at the caret. `host.composer.insertText` only appends. |
+| prompt-enhance | Draft API. Enhance, undo, and replace stay. Add on a saved prompt appends. |
 | compact-reasoning-label | Removed from both editions. The model pill no longer includes the effort word. |
 | Other plugins | Identical to personal at the split. Review before a catalog pin. |

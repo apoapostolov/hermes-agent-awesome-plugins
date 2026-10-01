@@ -2,7 +2,7 @@
 
 Personal edition of **Prompt Enhance** (`prompt-enhance`). This file is why that edition cannot be listed in the Hermes Plugin Catalog as-is.
 
-The public edition was removed. Do not copy this tree back into `public/` until the missing hook exists.
+The public edition is on the composer draft API. Do not copy the caret path from this tree into `public/`.
 
 ## Catalog bar
 
@@ -15,11 +15,11 @@ The public edition was removed. Do not copy this tree back into `public/` until 
 ### Add on a saved prompt inserts at the caret
 
 - **Personal behavior:** a prompt outside the Enhancers folder is inserted at the current selection. Enhancer prompts replace the whole draft, which `setDraft` can do.
-- **Why a public port drops behavior:** append is not the same action when the caret is in the middle of a draft.
+- **Public behavior:** the same Add appends the prompt to the end of the draft. Enhance, undo, replace, import, and send use `getDraft` / `setDraft`.
 - **Needed hook:** a composer insert that writes at the selection, or a draft API that returns and restores the caret.
-- **Public edition:** omitted. A listed copy that appends instead would ship a smaller product under the same name.
+- **Do not** copy this file's DOM helpers into `public/` to get the caret back. That fails the desktop surface check.
 
-## Checklist before a public edition
+## Checklist before copying personal into public
 
 - [ ] Add at the caret goes through a public composer API.
 - [ ] No `document.querySelector` on app `data-slot` markup, no `execCommand`, no synthetic input events.
