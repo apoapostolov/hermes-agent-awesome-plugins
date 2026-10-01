@@ -3,6 +3,20 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [better-session-appearance 1.2.2] - 2026-10-01
+
+Saved Auto Rules now reach the sessions they were written for.
+
+### Fixed
+
+- Personal edition: a rule applied only when a session's title changed, so it
+  never reached the sessions already in the list. The applied-state check now
+  tracks the matched rule instead of a title diff, and a rule lands as soon as
+  its row exists. Saving or removing a rule in the panel applies it right away
+  instead of waiting for the title to change.
+- A session that already carried a rule is left alone on further observer
+  passes, so the sidebar list does not rewrite stored state while idle.
+
 ## [sidebar-manager 1.0.1] - 2026-10-01
 
 Sidebar Manager keeps working after a Hermes desktop update changed how the sidebar nav buttons are marked.
