@@ -13,12 +13,6 @@
   <img src="docs/hero.png" width="100%" alt="Better Session Appearance" />
 </div>
 
-## Screenshot
-
-<div align="center">
-  <img src="docs/screenshot.png" alt="Better Session Appearance session color picker and idle icon grid" />
-</div>
-
 ## What You Can Do
 
 - Give a session a color from the Appearance picker. It shows on that row’s dot.
