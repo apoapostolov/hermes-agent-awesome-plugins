@@ -215,18 +215,32 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
   // the level lands before that turn is built.
   useEffect(() => {
     if (!sessionId || !_pendingLevel) return
-    const wanted = _pendingLevel
-    _pendingLevel = null
     let alive = true
-    setEffort(sessionId, wanted).then(accepted => {
-      if (!alive || !accepted) return
-      setLive(accepted)
-      _syncCurrent(accepted)
-    })
+    let timer = null
+    const wanted = _pendingLevel
+    const attempt = async left => {
+      const accepted = await setEffort(sessionId, wanted)
+      if (!alive) return
+      if (accepted) {
+        // Only now is the pick safe: clearing it earlier lost it whenever the
+        // gateway answered 4001 because it did not hold the session yet.
+        if (_pendingLevel === wanted) _pendingLevel = null
+        setLive(accepted)
+        setRemaining(cfg.levels[accepted]?.maxPrompts ?? null)
+        _syncCurrent(accepted)
+        setFlash(true)
+        setTimeout(() => alive && setFlash(false), 400)
+        return
+      }
+      if (left <= 0) return // keep _pendingLevel: a later focus change retries
+      timer = setTimeout(() => attempt(left - 1), 500)
+    }
+    attempt(4)
     return () => {
       alive = false
+      if (timer) clearTimeout(timer)
     }
-  }, [sessionId])
+  }, [sessionId, cfg])
 
   // Live truth. The gateway emits session.info after every reasoning write and
   // on every turn; the payload carries the pick and the wire level. Polling
