@@ -152,7 +152,6 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [better-capabilities](personal/better-capabilities/README.md)
 - [cdp-manager](personal/cdp-manager/README.md)
 - [rss-reader](personal/rss-reader/README.md)
-- [Maintainer sync skill](skills/hermes-awesome-plugins-sync/SKILL.md)
 
 ## Support
 
