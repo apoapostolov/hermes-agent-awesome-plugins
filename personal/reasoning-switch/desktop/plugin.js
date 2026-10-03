@@ -4,15 +4,23 @@
  *
  * - Word + gear in the statusbar (right area). Click the word to rotate through
  *   the levels enabled in the dialog. Gear opens the config dialog.
- * - Dialog: the seven standardized levels (minimal..ultra) plus none; per-level
+ * - Dialog: the standardized levels (minimal..ultra) plus none; per-level
  *   color (theme-variable dropdown); checkbox = include in rotation; a prompt
  *   limit that auto-demotes to the next lower included level after N user
  *   prompts.
  *
- * Gateway contract (same calls the app's own model menu makes):
+ * Gateway contract (the same calls the app's own model/reasoning menu makes):
  *   host.request('config.get',  { key: 'reasoning', session_id }) -> { value }
  *   host.request('config.set',  { key: 'reasoning', session_id, value })
  * Session-scoped: never touches the global profile default.
+ *
+ * Live truth comes from the `session.info` event, which carries
+ * `reasoning_effort` (the pick) and `reasoning_effort_wire` (what the route
+ * actually sends). Polling `config.get` alone is not enough: the gateway
+ * resolves an unset session override down to the profile default, so a read
+ * cannot tell "this session pinned X" from "nothing pinned, default is X", and
+ * a refused write looks exactly like success. The event is the only frame that
+ * reports what the session is really running.
  */
 import {
   cn,
@@ -46,7 +54,8 @@ const LABEL = {
   max: 'Max',
   ultra: 'Ultra',
 }
-// Lowest -> highest ordering used for auto-demotion. 'none' is its own floor.
+// Lowest -> highest ordering used for rotation and auto-demotion. 'none' is
+// thinking-off, its own floor.
 const ASCENDING = [NONE, 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']
 
 // ── plugin-scoped persistence (survives restarts; namespaced by the host) ──
@@ -106,25 +115,47 @@ const COLOR_CHOICES = [
 
 // ── gateway helpers ──
 
-async function getEffort(sessionId) {
-  if (!sessionId) return null
-  try {
-    const res = await host.request('config.get', { key: 'reasoning', session_id: sessionId })
-    const v = String(res?.value ?? '').trim().toLowerCase()
-    if (v === 'false' || v === 'disabled') return NONE
-    return LEVELS.includes(v) ? v : null
-  } catch {
-    return null
-  }
+// One in-flight read per session. The chip re-reads on focus change, on every
+// session.info reconcile, and in the slow poll; without a shared promise those
+// overlap and the last arrival wins, so a slow pre-focus read can repaint a
+// level the user has already rotated away from.
+const inflight = new Map()
+
+function normalizeEffort(raw) {
+  const v = String(raw ?? '').trim().toLowerCase()
+  if (v === 'false' || v === 'disabled') return NONE
+  return LEVELS.includes(v) ? v : null
 }
 
+async function getEffort(sessionId) {
+  if (!sessionId) return null
+  const pending = inflight.get(sessionId)
+  if (pending) return pending
+  const p = (async () => {
+    try {
+      const res = await host.request('config.get', { key: 'reasoning', session_id: sessionId })
+      return normalizeEffort(res?.value)
+    } catch {
+      return null
+    } finally {
+      inflight.delete(sessionId)
+    }
+  })()
+  inflight.set(sessionId, p)
+  return p
+}
+
+// `config.set reasoning` answers the value the gateway ACCEPTED — the level
+// after parsing, not the string we asked for. Trust it over the optimistic local
+// guess; a null means the write was refused and the caller must keep the old
+// chip rather than pretend the rotation landed.
 async function setEffort(sessionId, level) {
-  if (!sessionId) return false
+  if (!sessionId) return null
   try {
-    await host.request('config.set', { key: 'reasoning', session_id: sessionId, value: level })
-    return true
+    const res = await host.request('config.set', { key: 'reasoning', session_id: sessionId, value: level })
+    return normalizeEffort(res?.value) ?? level
   } catch {
-    return false
+    return null
   }
 }
 
@@ -133,20 +164,50 @@ async function setEffort(sessionId, level) {
 function LevelChip({ cfg, storage, onOpenDialog }) {
   const [sessionId, setSessionId] = useState(() => host.state.focusedSessionId.get())
   const [live, setLive] = useState(null) // effort reported by the gateway
+  const [wire, setWire] = useState('') // level the route actually sends
   const [remaining, setRemaining] = useState(null) // prompts left at this level
   const [flash, setFlash] = useState(false)
 
   // Follow tile focus.
   useEffect(() => host.state.focusedSessionId.subscribe(id => setSessionId(id)), [])
 
-  // Seed + re-read whenever the focused session changes.
+  // Seed + re-read whenever the focused session changes. Clear the previous
+  // session's level on switch so the chip never shows the other chat's effort
+  // for a beat while the read is in flight.
   useEffect(() => {
     let alive = true
-    getEffort(sessionId).then(v => alive && setLive(v))
+    setLive(null)
+    setWire('')
+    getEffort(sessionId).then(v => {
+      if (alive && v) setLive(v)
+    })
     return () => {
       alive = false
     }
   }, [sessionId])
+
+  // Live truth. The gateway emits session.info after every reasoning write and
+  // on every turn; the payload carries the pick and the wire level. Polling
+  // cannot distinguish a pinned level from an inherited default and never
+  // reports a refused write; this event can. Other sessions' events are ignored.
+  useEffect(
+    () =>
+      _onSessionInfo(event => {
+        const sid = event?.session_id
+        if (!sid || sid !== sessionId) return
+        const payload = event?.payload ?? {}
+        const eff = normalizeEffort(payload.reasoning_effort)
+        if (eff) {
+          setLive(eff)
+          // Follow an external pick (composer menu, /reasoning) into local
+          // config so the chip, the dialog's marker, and the prompt-limit
+          // bookkeeping never disagree with the session.
+          _syncCurrent(eff)
+        }
+        setWire(normalizeEffort(payload.reasoning_effort_wire) ?? '')
+      }),
+    [sessionId],
+  )
 
   // Rotation prompt counter: a user prompt = awaitingResponse rising edge on
   // the focused session (send -> first assistant payload).
@@ -169,7 +230,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
       setRemaining(Number.isFinite(rem) ? rem : null)
     }, 500)
     return () => clearInterval(t)
-  }, [])
+  }, [storage])
 
   // Auto-demotion: when the counter hits 0 and the gateway-reported level is
   // still the limited one, drop to the next lower included level.
@@ -183,42 +244,49 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
     const lower = [...ASCENDING].reverse().slice(ASCENDING.indexOf(live) + 1)
     const next = lower.find(lv => cfg.levels[lv].included)
     if (!next) return
-    setEffort(sessionId, next).then(ok => {
-      if (!ok) return
+    setEffort(sessionId, next).then(accepted => {
+      if (!accepted) return
       const all = storage.get('remaining', {})
       delete all[sessionId]
       storage.set('remaining', all)
-      setLive(next)
+      setLive(accepted)
       setRemaining(null)
     })
-  }, [remaining, live, sessionId, cfg])
+  }, [remaining, live, sessionId, cfg, storage])
 
   const displayed = live || cfg.current
   const color = cfg.levels[displayed]?.color || null
   const limited = cfg.levels[displayed]?.maxPrompts != null
+  // A pick the route clamps down (ultra -> max) reads as the pair, so the chip
+  // never presents a Hermes-internal step as a wire level the route lacks.
+  const clamped = wire && wire !== displayed && LEVELS.includes(wire) ? wire : ''
+  const displayLabel = LABEL[displayed] || displayed
+  const label = clamped ? `${displayLabel}→${LABEL[clamped] || clamped}` : displayLabel
 
   const rotate = async () => {
     const included = ASCENDING.filter(lv => cfg.levels[lv].included)
     if (!included.length || !sessionId) return
     const idx = included.indexOf(displayed)
+    if (idx < 0) return // the running level is not in the rotation; do not guess
     const next = included[(idx + 1) % included.length] ?? included[0]
-    const ok = await setEffort(sessionId, next)
-    if (!ok) return
+    if (next === displayed) return
+    const accepted = await setEffort(sessionId, next)
+    if (!accepted) return // the write was refused; leave the chip on the truth
     const all = storage.get('remaining', {})
-    const maxP = cfg.levels[next].maxPrompts
+    const maxP = cfg.levels[accepted].maxPrompts
     if (maxP != null) all[sessionId] = maxP
     else delete all[sessionId]
     storage.set('remaining', all)
-    storage.set('config', { ...cfg, current: next })
-    setLive(next)
+    storage.set('config', { ...cfg, current: accepted })
+    setLive(accepted)
     setRemaining(maxP ?? null)
     setFlash(true)
     setTimeout(() => setFlash(false), 400)
   }
 
-  const label = LABEL[displayed] || displayed
   const tip = [
     `Reasoning: ${label}`,
+    clamped ? `This route sends ${LABEL[clamped] || clamped}` : null,
     limited && remaining != null ? `${remaining} prompt${remaining === 1 ? '' : 's'} left at this level` : null,
     'Click to rotate · gear to configure',
   ]
@@ -235,7 +303,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
           className: 'inline-flex items-center gap-1' + (flash ? ' opacity-60' : ''),
           children: [
             jsx(Codicon, { name: 'lightbulb', size: '0.6rem', style: { color: color || 'var(--ui-text-tertiary)' } }),
-            jsx('span', { style: { color: color || 'var(--ui-text-tertiary)' }, children: label + ':' }),
+            jsx('span', { style: { color: color || 'var(--ui-text-tertiary)' }, children: label }),
             jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: limited && remaining != null ? String(remaining) : '' }),
           ],
         }),
@@ -256,6 +324,21 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
 // Prompt tick shared with the subscriber above (module-level to avoid rebinds).
 let _tickPrompt = () => {}
 
+// Module-level session.info fan-in. ONE gateway listener is registered at load
+// (tracked, so unload/reload/disable removes it) and each mount adds its own
+// row to a Set; the focused-session filter stays in the row, because the
+// listener only knows that SOME session reported.
+const _sessionInfoRows = new Set()
+let _unsubSessionInfo = null
+
+function _onSessionInfo(row) {
+  _sessionInfoRows.add(row)
+  return () => _sessionInfoRows.delete(row)
+}
+
+// Mirror an external pick into local config. Owned by Root, called by the chip.
+let _syncCurrent = () => {}
+
 // The app's window-open policy denies every target=_blank window.open (CVE
 // hardening); the sanctioned external-link door is the OS bridge's
 // openExternal, handed to us at register() and stored here.
@@ -273,10 +356,16 @@ function tickPrompt(sid) {
 function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
   if (!open) return null
   const update = (lv, patch) => {
-    setCfg(prev => ({
-      ...prev,
-      levels: { ...prev.levels, [lv]: { ...prev.levels[lv], ...patch } },
-    }))
+    setCfg(prev => {
+      const next = { ...prev, levels: { ...prev.levels, [lv]: { ...prev.levels[lv], ...patch } } }
+      // Keep the rotation honest: the current level must stay in it, or the
+      // chip sits on a level the dialog says is not clickable.
+      if (next.current && !next.levels[next.current].included) {
+        const first = ASCENDING.find(lv => next.levels[lv].included)
+        if (first) next.current = first
+      }
+      return next
+    })
   }
 
   const includedCount = ASCENDING.filter(lv => cfg.levels[lv].included).length
@@ -293,7 +382,7 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
           children: [
             jsx(DialogTitle, { children: 'Reasoning Switch' }),
             jsx('a', {
-              href: 'https://github.com/apoapostolov/hermes-agent-awesome-plugins',
+              href: SOURCE_URL,
               title: 'Source on GitHub',
               target: '_blank',
               rel: 'noreferrer',
@@ -305,7 +394,7 @@ function ConfigDialog({ cfg, setCfg, open, onOpenChange }) {
         }),
         jsx('p', {
           className: 'text-xs text-(--ui-text-tertiary)',
-          children: ['Click of status bar to rotate reasoning levels.', jsx('br', {}), 'You can limit high reasoning to number of prompts.'],
+          children: ['Click the status bar word to rotate reasoning levels.', jsx('br', {}), 'Limit high reasoning to a number of prompts.'],
         }),
         jsx('div', {
           className: 'flex w-max flex-col gap-1.5 py-2',
@@ -414,16 +503,29 @@ function Root() {
     _storage.set('config', cfg)
   }, [cfg])
 
-  // Keep the gateway and local state in sync: poll the live effort lightly so
-  // external changes (slash command, model menu) still repaint the chip.
+  // Mirror an external pick (composer reasoning menu, /reasoning) into local
+  // config so the dialog's current marker and the prompt-limit bookkeeping
+  // follow the session instead of drifting from it.
+  useEffect(() => {
+    _syncCurrent = level => {
+      if (cfgRef.current.current === level) return
+      setCfg(prev => (prev.current === level ? prev : { ...prev, current: level }))
+    }
+    return () => {
+      _syncCurrent = () => {}
+    }
+  }, [])
+
+  // Slow reconciler. The gateway resolves an unset session override down to the
+  // profile default, so a periodic read cannot tell a pinned level from an
+  // inherited one — it exists for the case where no session.info has arrived
+  // yet (a session with no turn), not as the primary signal.
   useEffect(() => {
     let alive = true
     const poll = async () => {
       const sid = host.state.focusedSessionId.get()
       const v = await getEffort(sid)
-      if (alive && v && v !== cfgRef.current.current) {
-        setCfg(prev => (prev.current === v ? prev : { ...prev, current: v }))
-      }
+      if (alive && v) _syncCurrent(v)
     }
     const t = setInterval(poll, 4000)
     poll()
@@ -469,6 +571,19 @@ export default {
     _storage = ctx.storage
     _openExternal = ctx.os?.openExternal ?? null
 
+    // One gateway listener for every mount: the Set fan-out keeps each chip's
+    // row disposable on unmount without re-registering per mount, and tracking
+    // it through ctx.onEvent ties removal to unload/reload/disable.
+    _unsubSessionInfo = ctx.onEvent('session.info', event => {
+      for (const row of _sessionInfoRows) {
+        try {
+          row(event)
+        } catch {
+          // A throwing row must never break the others or the app's dispatch.
+        }
+      }
+    })
+
     // Native select popup: pin color-scheme to the app's resolved mode so the
     // dropdown list is not white-on-white in dark mode (OS may disagree).
     _styleEl = document.createElement('style')
@@ -495,6 +610,10 @@ export default {
       _styleEl?.remove()
       _styleEl = null
       _tickPrompt = () => {}
+      _syncCurrent = () => {}
+      _sessionInfoRows.clear()
+      _unsubSessionInfo?.()
+      _unsubSessionInfo = null
     })
 
     ctx.register({

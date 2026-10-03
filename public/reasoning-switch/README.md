@@ -4,7 +4,7 @@
   <strong>Cycle reasoning effort from the status bar.</strong>
   <p>Colors and per-level prompt demote make the current setting visible. Lives in the repo but is <strong>not</strong> in the pack and stays off by default.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.1-2ea44f" alt="Version 1.1.1" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.2-orange" alt="Version 1.1.2" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -19,6 +19,8 @@
 - Pick from `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`.
 - Demote a level after a chosen number of user prompts (for example High for three prompts, then Medium).
 - Change the focused session only. The global profile default stays put.
+- See a clamped pick as both ends (Ultra→Max) when the route sends something lower than you asked for.
+- Follow an external pick: change the level from the composer menu or `/reasoning` and the chip tracks it.
 
 ## Install
 
