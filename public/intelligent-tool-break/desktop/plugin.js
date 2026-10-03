@@ -19,11 +19,49 @@ import {
   Tip as Tooltip
 } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 const ID = 'intelligent-tool-break'
-const GRADE_KEY = 'intelligent-tool-break.grades'
-const HIDE_KEY = 'intelligent-tool-break.hide'
+const GRADE_KEY = 'grades'
+const HIDE_KEY = 'hide'
+
+// Plugin state lives in ctx.storage, not window.localStorage: a listed plugin
+// keeps its data behind the SDK instead of the app's own global store.
+let storageApi = null
+let storeVersion = 0
+const storeListeners = new Set()
+
+function subscribeStore(listener) {
+  storeListeners.add(listener)
+  return () => storeListeners.delete(listener)
+}
+
+function notifyStore() {
+  storeVersion += 1
+  for (const listener of storeListeners) listener()
+}
+
+function useStoreVersion() {
+  return useSyncExternalStore(subscribeStore, () => storeVersion)
+}
+
+function readValue(key, fallback) {
+  try {
+    const raw = storageApi ? storageApi.get(key, fallback) : fallback
+    return raw === undefined || raw === null ? fallback : raw
+  } catch {
+    return fallback
+  }
+}
+
+function writeValue(key, value) {
+  try {
+    if (storageApi) storageApi.set(key, value)
+  } catch {
+    /* storage unavailable: the change stays session-local */
+  }
+  notifyStore()
+}
 const DEFAULT_GRADES = {
   amber: 30,
   amberBold: 60,
@@ -90,39 +128,31 @@ function asBool(value, fallback) {
 }
 
 function loadGrades() {
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(GRADE_KEY) || '')
-    return {
-      amber: clampSec(raw.amber, DEFAULT_GRADES.amber),
-      amberBold: clampSec(raw.amberBold, DEFAULT_GRADES.amberBold),
-      redBold: clampSec(raw.redBold, DEFAULT_GRADES.redBold),
-      autoAmber: asBool(raw.autoAmber, false),
-      autoAmberBold: asBool(raw.autoAmberBold, false),
-      autoRedBold: asBool(raw.autoRedBold, false)
-    }
-  } catch {
-    return { ...DEFAULT_GRADES }
+  const raw = readValue(GRADE_KEY, null) || {}
+  return {
+    amber: clampSec(raw.amber, DEFAULT_GRADES.amber),
+    amberBold: clampSec(raw.amberBold, DEFAULT_GRADES.amberBold),
+    redBold: clampSec(raw.redBold, DEFAULT_GRADES.redBold),
+    autoAmber: asBool(raw.autoAmber, false),
+    autoAmberBold: asBool(raw.autoAmberBold, false),
+    autoRedBold: asBool(raw.autoRedBold, false)
   }
 }
 
 function saveGrades(grades) {
-  window.localStorage.setItem(GRADE_KEY, JSON.stringify(grades))
+  writeValue(GRADE_KEY, grades)
 }
 
 function loadHide() {
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(HIDE_KEY) || '')
-    if (!Array.isArray(raw)) {
-      return [...DEFAULT_HIDE]
-    }
-    return raw.map(name => String(name || '').trim().toLowerCase()).filter(Boolean)
-  } catch {
+  const raw = readValue(HIDE_KEY, null)
+  if (!Array.isArray(raw)) {
     return [...DEFAULT_HIDE]
   }
+  return raw.map(name => String(name || '').trim().toLowerCase()).filter(Boolean)
 }
 
 function saveHide(names) {
-  window.localStorage.setItem(HIDE_KEY, JSON.stringify(names))
+  writeValue(HIDE_KEY, names)
 }
 
 function gradeStyle(elapsedSec, grades) {
@@ -701,6 +731,9 @@ export default {
   id: ID,
   name: 'Intelligent Tool Break',
   register(ctx) {
+    storageApi = ctx.storage
+    notifyStore()
+
     ctx.register({
       id: 'break-bar',
       area: COMPOSER_AREAS.top,
@@ -742,6 +775,11 @@ export default {
           void breakNow('/again')
         }
       }
+    })
+
+    ctx.onDispose(() => {
+      storageApi = null
+      notifyStore()
     })
   }
 }

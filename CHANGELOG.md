@@ -9,6 +9,20 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **compact-reasoning-label:** removed from personal and public. The Desktop model pill no longer includes the reasoning effort. That word lives on the reasoning pill, so the plugin's strip did nothing on current builds. The old trees stay in git history.
 
+## [intelligent-tool-break 1.3.4] - 2026-10-03
+
+The public edition keeps its settings in `ctx.storage` instead of `window.localStorage`, so it stays inside the plugin SDK.
+
+### Changed
+
+- Public edition: color grades and the hidden-tools list read and write through `ctx.storage`, captured in `register(ctx)` and released in `ctx.onDispose`.
+- Public edition: the settings dialog subscribes to a store version counter, so a change made in one surface re-renders the others. `better-session-appearance` already used this pattern.
+- Personal edition is unchanged and keeps its `localStorage` behavior.
+
+Stored values are treated as untrusted: a wrong type, a null, an out-of-range number, or a storage backend that throws all fall back to the defaults instead of breaking the strip. When `ctx.storage` is unavailable the change stays session-local.
+
+Verified against the migrated helpers with a fake storage backend: defaults with no backend, round-trips for both keys, values stored as objects rather than JSON strings, five corrupt-input cases, the 3600-second clamp, a throwing backend, and the React subscriber notification. 18 checks, all passing.
+
 ## [provider-status 1.5.12] - 2026-10-03
 
 z.ai renamed the quota limit type to `CREDIT_LIMIT`, so the GLM fetcher stopped matching any window and the chip reported a full quota while the account was close to its weekly cap.
