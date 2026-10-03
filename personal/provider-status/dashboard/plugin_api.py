@@ -899,34 +899,49 @@ def fetch_glm(cfg: dict) -> dict:
         limits = data.get("limits") if isinstance(data, dict) else None
         limits = limits if isinstance(limits, list) else []
         session_pct = weekly_pct = monthly_pct = 0.0
+        # z.ai renamed the limit type to CREDIT_LIMIT (2026-10). The `unit`
+        # code still names the window: 3 = 5h, 6/4 = weekly, 5/7 = monthly.
+        # Presence flags, because a 0.0 default is indistinguishable from a
+        # reported window that happens to be unused.
+        has_session = has_weekly = has_monthly = False
         session_reset = 0.0
         for lim in limits:
             ltype = str(lim.get("type") or "").upper()
             unit = int(lim.get("unit") or -1)
             pct = float(lim.get("percentage") or 0)
-            if ltype == "TOKENS_LIMIT":
+            if ltype in ("TOKENS_LIMIT", "CREDIT_LIMIT"):
                 if unit == 3:
                     session_pct = pct
+                    has_session = True
                     session_reset = _next_reset_epoch(lim)
                 elif unit in (6, 4):
                     weekly_pct = pct
+                    has_weekly = True
             elif ltype == "TIME_LIMIT" and unit in (5, 7):
                 monthly_pct = pct
+                has_monthly = True
         # Headline is the 5h increase window (used %). Rotation uses
         # monthly/weekly exhaust, never the 5h burst.
         exhaust = monthly_pct or weekly_pct or None
         windows = []
-        if session_pct or session_pct == 0:
+        if has_session:
             windows.append({"label": "5h", "pct": session_pct, "direction": "increase"})
-        if weekly_pct is not None:
+        if has_weekly:
             windows.append({"label": "wk", "pct": weekly_pct, "direction": "exhaust"})
-        if monthly_pct is not None:
+        if has_monthly:
             windows.append({"label": "mo", "pct": monthly_pct, "direction": "exhaust"})
-        return {"ok": True, "percent": session_pct,
-                "exhaust_percent": exhaust,
-                "resets_at": session_reset,
-                "detail": "5h",
-                "windows": windows}
+        status = {"ok": True,
+                  "exhaust_percent": exhaust,
+                  "resets_at": session_reset,
+                  "detail": "5h",
+                  "windows": windows}
+        # The headline number is only meaningful once a burst window was
+        # actually reported. Omit the key rather than sending null: the
+        # desktop fallback reads Number(null) as 0 and would draw a full
+        # 5h window, while Number(undefined) is NaN and gets rejected.
+        if has_session:
+            status["percent"] = session_pct
+        return status
     except HTTPError as e:
         return {"ok": False, "error": f"HTTP {e.code}"}
     except Exception as e:

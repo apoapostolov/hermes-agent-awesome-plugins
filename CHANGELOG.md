@@ -9,6 +9,20 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **compact-reasoning-label:** removed from personal and public. The Desktop model pill no longer includes the reasoning effort. That word lives on the reasoning pill, so the plugin's strip did nothing on current builds. The old trees stay in git history.
 
+## [provider-status 1.5.12] - 2026-10-03
+
+z.ai renamed the quota limit type to `CREDIT_LIMIT`, so the GLM fetcher stopped matching any window and the chip reported a full quota while the account was close to its weekly cap.
+
+### Fixed
+
+- Both editions: `CREDIT_LIMIT` is accepted next to `TOKENS_LIMIT`, and `unit` still decides the window (3 = 5h, 6/4 = weekly, 5/7 = monthly).
+- Both editions: quota windows are emitted only when the API actually reported them. The `0.0` defaults used to append a phantom monthly row reading 100% remaining.
+- Both editions: the headline percentage is omitted when no burst window was reported. Sending `null` was the wrong fix, because the desktop fallback reads `Number(null)` as `0` and would have drawn a full 5h window.
+- Public edition: the weekly window reaches the status-bar chip. GLM now uses the multi-window renderer already used by OpenCode Go and Codex, so both the burst and the weekly allowance are visible.
+- Personal and public versions are aligned at 1.5.12. They had drifted (personal 1.5.10, public 1.5.11).
+
+Personal keeps its single-value GLM chip, so its chip still shows the 5-hour headline and the weekly allowance stays in the Providers dialog.
+
 ## [prompt-enhance 1.1.1] - 2026-10-01
 
 The listed edition reads and writes the composer through the draft API, so enhance, undo, and replace keep working when the Desktop markup moves.
