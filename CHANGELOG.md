@@ -5,6 +5,10 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ## [Unreleased]
 
+### Changed
+
+- **provider-status:** personal extra accounts live in plugin `library.env`. The plugin does not read or write lifestyle `.env`. Hermes `.env` still gets the active runtime key, and numbered siblings for native providers when Apply Changes is on. Tavily extras stay in the library; only the active Tavily key is written to Hermes `.env`.
+
 ### Removed
 
 - **compact-reasoning-label:** removed from personal and public. The Desktop model pill no longer includes the reasoning effort. That word lives on the reasoning pill, so the plugin's strip did nothing on current builds. The old trees stay in git history.

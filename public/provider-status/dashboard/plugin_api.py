@@ -113,13 +113,12 @@ def _load_env_files() -> None:
                 k, _, v = line.partition("=")
                 k = k.strip()
                 v = v.strip().strip("\"'")
-                # Hermes .env is loaded second and wins so a rotated
-                # runtime key beats the lifestyle original.
+                # Hermes .env is the only env file this edition reads.
                 if k:
                     _env_cache[k] = v
         except Exception:
             pass
-    # expand ${VAR} refs against the merged map (lifestyle numbered-pool layout uses them)
+    # expand ${VAR} refs against the merged map (numbered-pool layouts use them)
     for _ in range(4):  # bounded passes for chained refs
         changed = False
         for k, v in list(_env_cache.items()):

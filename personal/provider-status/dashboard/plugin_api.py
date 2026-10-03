@@ -41,6 +41,8 @@ def _default_hermes_home() -> Path:
 
 
 HERMES_HOME = _default_hermes_home()
+LIBRARY_PATH = PLUGIN_ROOT / "library.env"
+HERMES_ENV = HERMES_HOME / ".env"
 CACHE_TTL = 60  # 1 min — keep the bar fresh, APIs are cheap
 
 # ── Config ─────────────────────────────────────────────────────────
@@ -114,29 +116,34 @@ def _merge_pool_fields(fresh_cfg: dict, src_providers: dict, pids: list[str]) ->
 _env_cache: dict[str, str] = {}
 _env_loaded = False
 
+def _merge_env_file(path: Path) -> None:
+    """Load KEY=value lines into _env_cache. Later files overwrite."""
+    try:
+        if not path.exists():
+            return
+        for line in path.read_text("utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            k = k.strip()
+            v = v.strip().strip("\"'")
+            if k:
+                _env_cache[k] = v
+    except Exception:
+        pass
+
+
 def _load_env_files() -> None:
     global _env_loaded
     if _env_loaded:
         return
     _env_loaded = True
-    for p in [HERMES_HOME / ".env"]:
-        try:
-            if not p.exists():
-                continue
-            for line in p.read_text("utf-8").splitlines():
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                k, _, v = line.partition("=")
-                k = k.strip()
-                v = v.strip().strip("\"'")
-                # Hermes .env is loaded second and wins so a rotated
-                # runtime key beats the lifestyle original.
-                if k:
-                    _env_cache[k] = v
-        except Exception:
-            pass
-    # expand ${VAR} refs against the merged map (lifestyle numbered-pool layout uses them)
+    # Account store first (library.env). Hermes runtime .env wins on overlap.
+    # Never read C:/git/lifestyle/.env.
+    _merge_env_file(LIBRARY_PATH)
+    _merge_env_file(HERMES_ENV)
+    # expand ${VAR} refs against the merged map (numbered-pool layouts use them)
     for _ in range(4):  # bounded passes for chained refs
         changed = False
         for k, v in list(_env_cache.items()):
@@ -167,10 +174,9 @@ def resolve_key(env_names: list[str], pool: list[str] | None = None, pool_index:
 
 
 # ── Key library + rotation ─────────────────────────────────────────
-# Provider-status keeps its own env file so rotating the active Hermes
-# key never drops a previous subscription. Hermes .env is copy-in only.
-LIBRARY_PATH = PLUGIN_ROOT / "library.env"
-HERMES_ENV = HERMES_HOME / ".env"
+# library.env is the plugin-owned account store. Hermes .env holds the
+# active runtime key (and, when Apply Changes is on, native numbered
+# siblings). Lifestyle .env is never read or written.
 ROTATE_REMAINING = 2.0  # switch when displayed remaining is 2% or less
 _library_lock = threading.Lock()
 
@@ -358,7 +364,7 @@ def _is_key_name(name: str, stems: tuple[str, ...]) -> bool:
 
 
 def _ingest_library(cfg: dict) -> dict:
-    """Copy new keys from Hermes .env + current pools into library.env. Never delete."""
+    """Archive new keys from Hermes runtime .env + dialog pools into library.env."""
     hermes = _parse_env_map(HERMES_ENV)
     with _library_lock:
         lib = _parse_env_map(LIBRARY_PATH)
@@ -1919,7 +1925,7 @@ def get_meta():
 
 @router.get("/config")
 def get_config():
-    return load_config()
+    return _ingest_library(load_config())
 
 @router.post("/config")
 def update_config(body: ConfigUpdate):
@@ -2000,12 +2006,18 @@ def update_config(body: ConfigUpdate):
                 valid = ("fill_first", "round_robin", "least_used", "random")
                 if incoming.get("pool_strategy") not in valid:
                     merged["pool_strategy"] = "fill_first"
-            # "Apply Changes to Hermes .env": push the WHOLE pool into Hermes
-            # .env as PRIMARY, PRIMARY_2, PRIMARY_3 ... so the native credential
-            # pool seeds every key. Tavily stays manual (its rotation is skill-
-            # managed, not registry-native).
-            if pid in ROTATABLE and cfg.get("apply_hermes_env") and pid != "tavily":
-                _apply_hermes_pool(pid, [k for k in (merged.get("pool") or []) if k])
+            # "Apply Changes to Hermes .env": native providers seed PRIMARY,
+            # PRIMARY_2, ... so the credential pool can see every key. Tavily
+            # is not in that registry, so only the active scalar is written.
+            # Extra Tavily accounts stay in library.env.
+            if pid in ROTATABLE and cfg.get("apply_hermes_env"):
+                pool = [k for k in (merged.get("pool") or []) if k]
+                if pid == "tavily":
+                    if pool:
+                        idx = int(merged.get("pool_index") or 0) % len(pool)
+                        _apply_hermes_key(pid, pool[idx])
+                else:
+                    _apply_hermes_pool(pid, pool)
             if "pool_apply_env" in incoming and pid == "tavily":
                 merged["pool_apply_env"] = False
             # Manual active-key switch (dialog radio): push the chosen key into
@@ -2039,6 +2051,10 @@ def update_config(body: ConfigUpdate):
         if body.apply_hermes_env is not None:
             cfg["apply_hermes_env"] = bool(body.apply_hermes_env)
     mutate_config(_m)
+    try:
+        _ingest_library(load_config())
+    except Exception as e:
+        log.warning("provider-status library archive failed: %s", e)
     # Purge the deleted key from the library and the Hermes .env, and only
     # from providers the caller named. Hermes .env is touched regardless of
     # apply_hermes_env: a stale carrier would keep feeding the library.
@@ -2052,16 +2068,20 @@ def update_config(body: ConfigUpdate):
             _prune_env_for_provider(pid, live)
     except Exception as e:
         log.warning("provider-status key removal failed: %s", e)
-    # Applying the switch also materializes every existing non-Tavily pool,
-    # including the provider that triggered this save.
+    # Applying the switch materializes native pools, and Tavily's active key.
     try:
         saved = load_config()
         if saved.get("apply_hermes_env"):
-            for pid, spec in ROTATABLE.items():
-                if pid != "tavily":
-                    pool = [k for k in ((saved.get("providers") or {}).get(pid) or {}).get("pool") or [] if k]
-                    if pool:
-                        _apply_hermes_pool(pid, pool)
+            for pid in ROTATABLE:
+                pconf = (saved.get("providers") or {}).get(pid) or {}
+                pool = [k for k in (pconf.get("pool") or []) if k]
+                if not pool:
+                    continue
+                if pid == "tavily":
+                    idx = int(pconf.get("pool_index") or 0) % len(pool)
+                    _apply_hermes_key(pid, pool[idx])
+                else:
+                    _apply_hermes_pool(pid, pool)
     except Exception as e:
         log.warning("provider-status env pool apply failed: %s", e)
     # Mirror per-provider strategies into Hermes config.yaml
