@@ -349,7 +349,7 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
     : 'exhaust'                             // glm default (worst across windows)
 
   // codex: multi-window (↑5h · ↓weekly) rendered like opencode
-  const multi = (id === 'opencode' || id === 'codex') && status?.detail
+  const multi = (id === 'opencode' || id === 'codex' || id === 'glm') && status?.detail
 
   let valueCls = ''
   let valueStyle = { color: 'var(--ui-accent)' }

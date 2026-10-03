@@ -756,33 +756,51 @@ def fetch_glm(cfg: dict) -> dict:
         limits = data.get("limits") if isinstance(data, dict) else None
         limits = limits if isinstance(limits, list) else []
         session_pct = weekly_pct = monthly_pct = 0.0
+        has_session = has_weekly = has_monthly = False
         session_reset = 0.0
         for lim in limits:
             ltype = str(lim.get("type") or "").upper()
             unit = int(lim.get("unit") or -1)
             pct = float(lim.get("percentage") or 0)
-            if ltype == "TOKENS_LIMIT":
+            # z.ai moved to CREDIT_LIMIT (2026-10); keep TOKENS_LIMIT for older
+            # responses. `unit` still identifies the window: 3 = 5h, 6/4 = weekly.
+            if ltype in ("TOKENS_LIMIT", "CREDIT_LIMIT"):
                 if unit == 3:
                     session_pct = pct
+                    has_session = True
                     session_reset = _next_reset_epoch(lim)
                 elif unit in (6, 4):
                     weekly_pct = pct
+                    has_weekly = True
             elif ltype == "TIME_LIMIT" and unit in (5, 7):
                 monthly_pct = pct
+                has_monthly = True
         # Headline is the 5h increase window (used %). Rotation uses
         # monthly/weekly exhaust, never the 5h burst.
         exhaust = monthly_pct or weekly_pct or None
         windows = []
-        if session_pct or session_pct == 0:
+        # Only emit windows the API actually reported, so an absent window is
+        # not drawn as a bogus "100% remaining".
+        if has_session:
             windows.append({"label": "5h", "pct": session_pct, "direction": "increase"})
-        if weekly_pct is not None:
+        if has_weekly:
             windows.append({"label": "wk", "pct": weekly_pct, "direction": "exhaust"})
-        if monthly_pct is not None:
+        if has_monthly:
             windows.append({"label": "mo", "pct": monthly_pct, "direction": "exhaust"})
+        # Multi-window arrow detail, same convention as fetch_opencode: the
+        # backend sends REMAINING for every arrow; the desktop chip turns the
+        # leading ↑ back into a used% (burst window) and shows ↓ as remaining.
+        segs = []
+        if has_session:
+            segs.append(f"↑{max(0.0, 100 - session_pct):.0f}%")
+        if has_weekly:
+            segs.append(f"↓{max(0.0, 100 - weekly_pct):.0f}%")
+        if has_monthly:
+            segs.append(f"↓{max(0.0, 100 - monthly_pct):.0f}%")
         return {"ok": True, "percent": session_pct,
                 "exhaust_percent": exhaust,
                 "resets_at": session_reset,
-                "detail": "5h",
+                "detail": " ".join(segs) or "5h",
                 "windows": windows}
     except HTTPError as e:
         return {"ok": False, "error": f"HTTP {e.code}"}
