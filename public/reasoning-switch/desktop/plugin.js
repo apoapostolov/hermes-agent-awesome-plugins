@@ -211,36 +211,40 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
     }
   }, [sessionId])
 
-  // Flush a pick made on a fresh draft. The id appears on the first send, so
-  // the level lands before that turn is built.
-  useEffect(() => {
-    if (!sessionId || !_pendingLevel) return
-    let alive = true
-    let timer = null
-    const wanted = _pendingLevel
-    const attempt = async left => {
-      const accepted = await setEffort(sessionId, wanted)
-      if (!alive) return
-      if (accepted) {
-        // Only now is the pick safe: clearing it earlier lost it whenever the
-        // gateway answered 4001 because it did not hold the session yet.
-        if (_pendingLevel === wanted) _pendingLevel = null
-        setLive(accepted)
-        setRemaining(cfg.levels[accepted]?.maxPrompts ?? null)
-        _syncCurrent(accepted)
-        setFlash(true)
-        setTimeout(() => alive && setFlash(false), 400)
-        return
-      }
-      if (left <= 0) return // keep _pendingLevel: a later focus change retries
-      timer = setTimeout(() => attempt(left - 1), 500)
-    }
-    attempt(4)
-    return () => {
-      alive = false
-      if (timer) clearTimeout(timer)
-    }
-  }, [sessionId, cfg])
+  // The reliable trigger. session.info only arrives for a session the gateway
+  // actually holds and has finished building, so a pick made on a draft lands
+  // here even when the retry ladder above ran out. This is the channel the
+  // app's own composer uses; a bare config.set on a not-yet-minted session
+  // cannot work, because the desktop mints the session on the first send.
+  useEffect(
+    () =>
+      _onSessionInfo(event => {
+        if (!event?.session_id || event.session_id !== sessionId || !_pendingLevel) return
+        const wanted = _pendingLevel
+        const eff = normalizeEffort(event?.payload?.reasoning_effort)
+        console.error('[reasoning-switch] session.info arrived', sessionId, 'effort=', eff, 'pending=', wanted)
+        // The session already reports the wanted level: nothing to write.
+        if (eff === wanted) {
+          _pendingLevel = null
+          setLive(wanted)
+          setRemaining(cfg.levels[wanted]?.maxPrompts ?? null)
+          _syncCurrent(wanted)
+          return
+        }
+        // No reported level yet (the gateway may stamp it later in the frame
+        // set). Still write: a pending pick must not wait on a field that may
+        // never arrive for a session whose turn has not built.
+        setEffort(sessionId, wanted).then(accepted => {
+          console.error('[reasoning-switch] info-triggered flush', accepted)
+          if (!accepted || _pendingLevel !== wanted) return
+          _pendingLevel = null
+          setLive(accepted)
+          setRemaining(cfg.levels[accepted]?.maxPrompts ?? null)
+          _syncCurrent(accepted)
+        })
+      }),
+    [sessionId],
+  )
 
   // Live truth. The gateway emits session.info after every reasoning write and
   // on every turn; the payload carries the pick and the wire level. Polling
@@ -262,7 +266,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
         }
         setWire(normalizeEffort(payload.reasoning_effort_wire) ?? '')
       }),
-    [sessionId],
+    [sessionId, cfg],
   )
 
   // Rotation prompt counter: a user prompt = awaitingResponse rising edge on
@@ -339,6 +343,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
     // session. Remember the pick and flush it the moment an id exists, the
     // shape the app's own model menu uses for a preset with no session.
     if (!sessionId) {
+      console.error('[reasoning-switch] draft click -> pending', next)
       _pendingLevel = next
       // Mirror through the module hook into Root's config; there is no setCfg
       // in this component's scope (the pending branch threw a ReferenceError
@@ -351,6 +356,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
       return
     }
     const accepted = await setEffort(sessionId, next)
+    console.error('[reasoning-switch] rotate', sessionId, '->', next, 'accepted=', accepted)
     if (!accepted) return // the write was refused; leave the chip on the truth
     const all = storage.get('remaining', {})
     const maxP = cfg.levels[accepted].maxPrompts
