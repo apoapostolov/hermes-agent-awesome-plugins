@@ -10,7 +10,7 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, and memory.</p>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, and memory. Fifteen plugins, each in a full personal edition and a catalog-safe public edition.</p>
 
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
@@ -28,13 +28,11 @@
 
 ## Latest plugin update
 
-Provider Status 1.5.10 fixes a frustrating loop: deleting a saved key in the
-personal edition now keeps it deleted after the next status poll. The public
-edition no longer shows a per-key delete control it cannot safely honor. Restart
-Hermes Desktop after updating; the Python side does not reload in place.
+Provider Status 1.5.12 fixes GLM quota reporting. z.ai renamed its quota limit type, so the status bar showed a full quota while the account was at 82% of its weekly allowance. The public edition now shows both GLM windows in the bar. Intelligent Tool Break 1.3.4 moves the public edition's settings onto the plugin SDK storage hook.
 
-The pack remains at 1.22.0. See the [changelog](CHANGELOG.md) for plugin-level
-updates and the distinction between personal and public builds.
+Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
+
+The pack remains at 1.22.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
 ## Personal and public
 
@@ -53,24 +51,31 @@ The pack command in [Install](#install) pulls `personal/<id>`.
 
 ### Public listing status
 
-| Plugin | Public copy |
+Twelve of the fifteen plugins are in the [Hermes plugin catalog](https://github.com/NousResearch/hermes-agent/tree/main/plugin-catalog) today. Every catalog entry points at a `public/` copy, except three that still install from the repository's retired `plugins/` path and are awaiting a repin.
+
+| Plugin | Catalog state |
 | --- | --- |
-| [memory-review](public/memory-review) | Ready: pending-id gate, palette + dialog. No shell-menu inject, no hidden composer submit. |
-| [intelligent-tool-break](public/intelligent-tool-break) | Ready: hooks and slash commands. No process-wide Popen patch, no private CLI rebind, no descendant SIGKILL, no composer insert. |
-| [provider-status](public/provider-status) | Ready: quota chips, probes, plugin-owned config. No vendor CLI auth files, no token refresh on poll, no automatic Hermes `.env` / `config.yaml` writes, no `library.env` copy. |
-| [cdp-manager](public/cdp-manager) | Ready: port chips, launch/stop/recheck, managed port, `cdp` tool. Launches loopback-only Chrome the user asked it to manage; plugin-owned config only. |
-| better-capabilities | None. Kept in [personal](personal/better-capabilities) until a catalog hook exists. |
-| [sidebar-manager](public/sidebar-manager) | Held until a sidebar hide/reorder hook exists. |
-| [drag-to-pin-session](public/drag-to-pin-session) | Held until `host.sessions.pin` / reorder exists. |
-| [sessionretitler](personal/sessionretitler) | Not in public. Held until an SDK-level llm-rank title write / catalog-safe `title_generation` route exists (see [LIMITATIONS](personal/sessionretitler/LIMITATIONS.md)). |
-| [better-session-appearance](public/better-session-appearance) | Held until a session-row decoration / color hook exists. |
-| Remaining plugins | Same as personal at the split. Review before a catalog pin. |
+| [provider-status](public/provider-status) | Listed. Quota chips, probes, plugin-owned config. No vendor CLI auth files, no token refresh on poll, no automatic Hermes `.env` / `config.yaml` writes. |
+| [prompt-enhance](public/prompt-enhance) | Listed. Reads and writes the composer through the draft API. |
+| [intelligent-tool-break](public/intelligent-tool-break) | Listed. Settings live in `ctx.storage` since 1.3.4. No process-wide Popen patch, no private CLI rebind. |
+| [memory-review](public/memory-review) | Listed. Pending-id gate, palette + dialog. No shell-menu inject, no hidden composer submit. |
+| [cdp-manager](public/cdp-manager) | Listed. Port chips, launch/stop/recheck, managed port, `cdp` tool. Loopback-only Chrome, plugin-owned config only. |
+| [sidebar-manager](public/sidebar-manager) | Listed. |
+| [better-session-appearance](public/better-session-appearance) | Listed. |
+| [drag-to-pin-session](public/drag-to-pin-session) | Listed. |
+| [opaque-composer](public/opaque-composer) | Listed, still installing from the retired `plugins/` path. A repin moves it to `public/`. |
+| [iteration-budget-meter](public/iteration-budget-meter) | Listed, still installing from the retired `plugins/` path. A repin moves it to `public/`. |
+| [reasoning-switch](public/reasoning-switch) | Listed, still installing from the retired `plugins/` path. A repin moves it to `public/`. Not in the pack. |
+| [rss-reader](public/rss-reader) | Listed. |
+| scroll-on-switch | Not listed. |
+| better-capabilities | Not listed. Kept in [personal](personal/better-capabilities) until a catalog hook exists. |
+| sessionretitler | Not listed. Held until an SDK-level title write exists (see [LIMITATIONS](personal/sessionretitler/LIMITATIONS.md)). |
 
 Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for the personal editions live in each plugin's `LIMITATIONS.md`.
 
 ## What's in the Pack
 
-Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reasoning-switch** lives in this repo but is **not** in the pack and stays off by default, so install it separately if you want it.
+Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reasoning-switch** and **prompt-enhance** live in this repo but are **not** in the pack, so install either separately if you want it. The pack pins the personal tree for all thirteen.
 
 ### Status Bar
 
@@ -104,12 +109,15 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reaso
 | Plugin | What you get |
 | --- | --- |
 | [opaque-composer](personal/opaque-composer/README.md) | Solid composer while the transcript scrolls behind it. |
+| [prompt-enhance](personal/prompt-enhance/README.md) | Rewrite a composer draft from a saved prompt library and put the finished prompt back in the field. **Not in the pack; enable separately.** |
 
 ### Reading
 
 | Plugin | What you get |
 | --- | --- |
 | [rss-reader](personal/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
+
+Two plugins in this repo are outside the tables above because they are not in the pack: **reasoning-switch** (Status Bar table) and **prompt-enhance** (Composer table). `scroll-on-switch` is in the pack and listed in the Sessions and Sidebar table. **reasoning-switch** is also the only plugin with a catalog entry but no pack entry.
 
 ## Install
 
@@ -128,7 +136,7 @@ hermes plugins list
 hermes plugins pack show https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
 ```
 
-For a single plugin, follow that plugin's README. For **reasoning-switch**, use its README because the pack does not install it.
+For a single plugin, follow that plugin's README. For **reasoning-switch** and **prompt-enhance**, use the README because the pack does not install them.
 
 ## How It Works
 
@@ -159,6 +167,7 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [drag-to-pin-session](personal/drag-to-pin-session/README.md)
 - [scroll-on-switch](personal/scroll-on-switch/README.md)
 - [opaque-composer](personal/opaque-composer/README.md)
+- [prompt-enhance](personal/prompt-enhance/README.md) (not in the pack)
 - [memory-review](personal/memory-review/README.md)
 - [better-capabilities](personal/better-capabilities/README.md)
 - [cdp-manager](personal/cdp-manager/README.md)
