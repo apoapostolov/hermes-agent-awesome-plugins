@@ -51,7 +51,7 @@ The pack command in [Install](#install) pulls `personal/<id>`.
 
 ### Public listing status
 
-Twelve of the fifteen plugins are in the [Hermes plugin catalog](https://github.com/NousResearch/hermes-agent/tree/main/plugin-catalog) today. Every catalog entry points at a `public/` copy, except three that still install from the repository's retired `plugins/` path and are awaiting a repin.
+Twelve of the fifteen plugins are in the [Hermes plugin catalog](https://github.com/NousResearch/hermes-agent/tree/main/plugin-catalog) today. Nine entries already install from a `public/` copy; `opaque-composer`, `iteration-budget-meter`, and `reasoning-switch` still install from the repository's retired `plugins/` path and move to `public/` once [PR #130293](https://github.com/NousResearch/hermes-agent/pull/130293) merges.
 
 | Plugin | Catalog state |
 | --- | --- |
@@ -63,9 +63,9 @@ Twelve of the fifteen plugins are in the [Hermes plugin catalog](https://github.
 | [sidebar-manager](public/sidebar-manager) | Listed. |
 | [better-session-appearance](public/better-session-appearance) | Listed. |
 | [drag-to-pin-session](public/drag-to-pin-session) | Listed. |
-| [opaque-composer](public/opaque-composer) | Listed, still installing from the retired `plugins/` path. A repin moves it to `public/`. |
-| [iteration-budget-meter](public/iteration-budget-meter) | Listed, still installing from the retired `plugins/` path. A repin moves it to `public/`. |
-| [reasoning-switch](public/reasoning-switch) | Listed, still installing from the retired `plugins/` path. A repin moves it to `public/`. Not in the pack. |
+| [opaque-composer](public/opaque-composer) | Listed, still installing from the retired `plugins/` path. [#130293](https://github.com/NousResearch/hermes-agent/pull/130293) moves it to `public/`. |
+| [iteration-budget-meter](public/iteration-budget-meter) | Listed, still installing from the retired `plugins/` path. [#130293](https://github.com/NousResearch/hermes-agent/pull/130293) moves it to `public/`. |
+| [reasoning-switch](public/reasoning-switch) | Listed, still installing from the retired `plugins/` path. [#130293](https://github.com/NousResearch/hermes-agent/pull/130293) moves it to `public/`. Not in the pack. |
 | [rss-reader](public/rss-reader) | Listed. |
 | scroll-on-switch | Not listed. |
 | better-capabilities | Not listed. Kept in [personal](personal/better-capabilities) until a catalog hook exists. |
