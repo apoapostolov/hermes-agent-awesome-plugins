@@ -13,6 +13,9 @@ Two more defects from a live report.
 
 - Setting the level on a fresh session now works. A draft has no runtime session id until the first send, and `config.set reasoning` is session-scoped, so the click returned early and the chip was inert on every new session. The pick is remembered and flushed the moment an id exists, before that turn is built. The tooltip says the level is pending until then.
 - The chip no longer wraps. `whitespace-nowrap` was only on the inner label; the chip itself could still wrap its glyph and word onto separate lines when the statusbar's item container wrapped, which is what put `Extra High` on two lines. The outer span now carries `whitespace-nowrap` and `shrink-0`.
+- The pending branch on a fresh draft called `setCfg`, which is not in `LevelChip`'s scope, so the click threw a `ReferenceError` and did nothing. It now updates the chip's own state and mirrors through the module hook into the dialog's config.
+- A read issued before a rotation no longer repaints over it. `config.get` captures a per-session write epoch on entry and discards its answer when a write landed meanwhile, which is what let the chip jump back to the previous level with no visible cause.
+
 
 
 ## [reasoning-switch 1.1.3] - 2026-10-03

@@ -134,6 +134,13 @@ const COLOR_CHOICES = [
 // level the user has already rotated away from.
 const inflight = new Map()
 
+// Write epochs. A read captures the epoch when it starts and only repaints if
+// no write landed in between, so a config.get issued before a rotation cannot
+// resolve afterwards and undo it. The chip otherwise repaints to a stale level
+// with no way to tell the user why it went back.
+const writeEpoch = new Map()
+const epochOf = sid => writeEpoch.get(sid) ?? 0
+
 function normalizeEffort(raw) {
   const v = String(raw ?? '').trim().toLowerCase()
   if (v === 'false' || v === 'disabled') return NONE
@@ -144,10 +151,14 @@ async function getEffort(sessionId) {
   if (!sessionId) return null
   const pending = inflight.get(sessionId)
   if (pending) return pending
+  const epoch = epochOf(sessionId)
   const p = (async () => {
     try {
       const res = await host.request('config.get', { key: 'reasoning', session_id: sessionId })
-      return normalizeEffort(res?.value)
+      const level = normalizeEffort(res?.value)
+      // A write landed while this read was in flight: its answer is stale.
+      if (epoch !== epochOf(sessionId)) return null
+      return level
     } catch {
       return null
     } finally {
@@ -166,6 +177,7 @@ async function setEffort(sessionId, level) {
   if (!sessionId) return null
   try {
     const res = await host.request('config.set', { key: 'reasoning', session_id: sessionId, value: level })
+    writeEpoch.set(sessionId, epochOf(sessionId) + 1)
     return normalizeEffort(res?.value) ?? level
   } catch {
     return null
@@ -314,7 +326,12 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
     // shape the app's own model menu uses for a preset with no session.
     if (!sessionId) {
       _pendingLevel = next
-      setCfg(prev => (prev.current === next ? prev : { ...prev, current: next }))
+      // Mirror through the module hook into Root's config; there is no setCfg
+      // in this component's scope (the pending branch threw a ReferenceError
+      // and the click did nothing).
+      _syncCurrent(next)
+      setLive(next)
+      setRemaining(cfg.levels[next]?.maxPrompts ?? null)
       setFlash(true)
       setTimeout(() => setFlash(false), 400)
       return
