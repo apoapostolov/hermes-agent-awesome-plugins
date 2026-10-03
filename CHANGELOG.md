@@ -5,6 +5,16 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ## [Unreleased]
 
+## [reasoning-switch 1.1.4] - 2026-10-03
+
+Two more defects from a live report.
+
+### Fixed
+
+- Setting the level on a fresh session now works. A draft has no runtime session id until the first send, and `config.set reasoning` is session-scoped, so the click returned early and the chip was inert on every new session. The pick is remembered and flushed the moment an id exists, before that turn is built. The tooltip says the level is pending until then.
+- The chip no longer wraps. `whitespace-nowrap` was only on the inner label; the chip itself could still wrap its glyph and word onto separate lines when the statusbar's item container wrapped, which is what put `Extra High` on two lines. The outer span now carries `whitespace-nowrap` and `shrink-0`.
+
+
 ## [reasoning-switch 1.1.3] - 2026-10-03
 
 Two defects from a live report.

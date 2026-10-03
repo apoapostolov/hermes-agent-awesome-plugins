@@ -199,6 +199,23 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
     }
   }, [sessionId])
 
+  // Flush a pick made on a fresh draft. The id appears on the first send, so
+  // the level lands before that turn is built.
+  useEffect(() => {
+    if (!sessionId || !_pendingLevel) return
+    const wanted = _pendingLevel
+    _pendingLevel = null
+    let alive = true
+    setEffort(sessionId, wanted).then(accepted => {
+      if (!alive || !accepted) return
+      setLive(accepted)
+      _syncCurrent(accepted)
+    })
+    return () => {
+      alive = false
+    }
+  }, [sessionId])
+
   // Live truth. The gateway emits session.info after every reasoning write and
   // on every turn; the payload carries the pick and the wire level. Polling
   // cannot distinguish a pinned level from an inherited default and never
@@ -278,7 +295,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
 
   const rotate = async () => {
     const included = ASCENDING.filter(lv => cfg.levels[lv].included)
-    if (!included.length || !sessionId) return
+    if (!included.length) return
     const idx = included.indexOf(displayed)
     // A session can be running a level the rotation does not include: an
     // external pick (composer menu, /reasoning), or a level unchecked after
@@ -289,7 +306,19 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
     const next = idx >= 0
       ? included[(idx + 1) % included.length] ?? included[0]
       : included.find(lv => ASCENDING.indexOf(lv) > ASCENDING.indexOf(displayed)) ?? included[0]
-    if (next === displayed) return
+    if (next === displayed && sessionId) return
+    // A fresh draft has no runtime session id yet (the SDK's focusedSessionId
+    // stays null until the first send), and `config.set reasoning` is
+    // session-scoped, so returning early here left the chip inert on every new
+    // session. Remember the pick and flush it the moment an id exists, the
+    // shape the app's own model menu uses for a preset with no session.
+    if (!sessionId) {
+      _pendingLevel = next
+      setCfg(prev => (prev.current === next ? prev : { ...prev, current: next }))
+      setFlash(true)
+      setTimeout(() => setFlash(false), 400)
+      return
+    }
     const accepted = await setEffort(sessionId, next)
     if (!accepted) return // the write was refused; leave the chip on the truth
     const all = storage.get('remaining', {})
@@ -306,6 +335,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
 
   const tip = [
     `Reasoning: ${LABEL[displayed] || displayed}`,
+    !sessionId && _pendingLevel ? `Applies when this session starts (${LABEL[_pendingLevel] || _pendingLevel})` : null,
     clamped ? `This route sends ${LABEL[clamped] || clamped}` : null,
     limited && remaining != null ? `${remaining} prompt${remaining === 1 ? '' : 's'} left at this level` : null,
     'Click to rotate · gear to configure',
@@ -314,7 +344,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
     .join('  ·  ')
 
   return jsxs('span', {
-    className: 'inline-flex h-full items-center gap-1 px-1.5 text-[0.6875rem] tabular-nums cursor-pointer select-none',
+    className: 'inline-flex h-full shrink-0 items-center gap-1 px-1.5 text-[0.6875rem] tabular-nums whitespace-nowrap cursor-pointer select-none',
     onClick: rotate,
     children: [
       jsx(Tooltip, {
@@ -351,6 +381,10 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
 
 // Prompt tick shared with the subscriber above (module-level to avoid rebinds).
 let _tickPrompt = () => {}
+
+// A level picked while no runtime session existed (fresh draft). The chip
+// flushes it as soon as the session id arrives, so the first turn runs it.
+let _pendingLevel = null
 
 // Module-level session.info fan-in. ONE gateway listener is registered at load
 // (tracked, so unload/reload/disable removes it) and each mount adds its own
