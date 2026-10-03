@@ -5,6 +5,22 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ## [Unreleased]
 
+## [reasoning-switch 1.1.2] - 2026-10-03
+
+The chip now reads the level the session is actually running, instead of guessing it from a read it could not trust.
+
+### Fixed
+
+- Clicking the chip no longer looks like it worked when the gateway refused the write. `config.set` answers the value it accepted, so a refusal leaves the chip on the real level.
+- The 4-second reconciler no longer paints the profile default back over a pick the user just made. It cannot tell a pinned session override from an inherited default, so `session.info` is now the signal that repaints the chip.
+- A pick changed elsewhere (the composer reasoning menu, `/reasoning`) updates the chip and the dialog's current marker, so the prompt-limit bookkeeping follows the session.
+- Switching sessions clears the previous chat's level while the new read is in flight, so the chip never shows the other session's effort.
+- A clamped pick reads as both ends (`Ultra→Max`) and the tooltip names the wire level, so a Hermes-internal step is never presented as a wire level the route does not have.
+- Overlapping reads share one promise per session, so a slow read started before a click cannot repaint a level the user rotated away from.
+
+The auto-demote path settles on the accepted level for the same reason.
+
+
 ### Changed
 
 - **provider-status:** personal extra accounts live in plugin `library.env`. The plugin does not read or write lifestyle `.env`. Hermes `.env` still gets the active runtime key, and numbered siblings for native providers when Apply Changes is on. Tavily extras stay in the library; only the active Tavily key is written to Hermes `.env`.
