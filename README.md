@@ -40,7 +40,7 @@ This repository keeps two trees.
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
-**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. Not every personal plugin has a public copy: `better-capabilities` stays personal until a catalog hook exists.
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. Thirteen of the fifteen plugins have one; `better-capabilities` and `sessionretitler` stay personal until a catalog hook exists, and each table below marks those rows.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
@@ -49,31 +49,11 @@ hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/<id>
 
 The pack command in [Install](#install) pulls `personal/<id>`.
 
-### Public listing status
-
-Twelve of the fifteen plugins are in the [Hermes plugin catalog](https://github.com/NousResearch/hermes-agent/tree/main/plugin-catalog) today. Nine entries already install from a `public/` copy; `opaque-composer`, `iteration-budget-meter`, and `reasoning-switch` still install from the repository's retired `plugins/` path and move to `public/` once [PR #130293](https://github.com/NousResearch/hermes-agent/pull/130293) merges.
-
-| Plugin | Catalog state |
-| --- | --- |
-| [provider-status](public/provider-status) | Listed. Quota chips, probes, plugin-owned config. No vendor CLI auth files, no token refresh on poll, no automatic Hermes `.env` / `config.yaml` writes. |
-| [prompt-enhance](public/prompt-enhance) | Listed. Reads and writes the composer through the draft API. |
-| [intelligent-tool-break](public/intelligent-tool-break) | Listed. Settings live in `ctx.storage` since 1.3.4. No process-wide Popen patch, no private CLI rebind. |
-| [memory-review](public/memory-review) | Listed. Pending-id gate, palette + dialog. No shell-menu inject, no hidden composer submit. |
-| [cdp-manager](public/cdp-manager) | Listed. Port chips, launch/stop/recheck, managed port, `cdp` tool. Loopback-only Chrome, plugin-owned config only. |
-| [sidebar-manager](public/sidebar-manager) | Listed. |
-| [better-session-appearance](public/better-session-appearance) | Listed. |
-| [drag-to-pin-session](public/drag-to-pin-session) | Listed. |
-| [opaque-composer](public/opaque-composer) | Listed, still installing from the retired `plugins/` path. [#130293](https://github.com/NousResearch/hermes-agent/pull/130293) moves it to `public/`. |
-| [iteration-budget-meter](public/iteration-budget-meter) | Listed, still installing from the retired `plugins/` path. [#130293](https://github.com/NousResearch/hermes-agent/pull/130293) moves it to `public/`. |
-| [reasoning-switch](public/reasoning-switch) | Listed, still installing from the retired `plugins/` path. [#130293](https://github.com/NousResearch/hermes-agent/pull/130293) moves it to `public/`. Not in the pack. |
-| [rss-reader](public/rss-reader) | Listed. |
-| scroll-on-switch | Not listed. |
-| better-capabilities | Not listed. Kept in [personal](personal/better-capabilities) until a catalog hook exists. |
-| sessionretitler | Not listed. Held until an SDK-level title write exists (see [LIMITATIONS](personal/sessionretitler/LIMITATIONS.md)). |
-
 Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for the personal editions live in each plugin's `LIMITATIONS.md`.
 
 ## What's in the Pack
+
+Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
 Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reasoning-switch** and **prompt-enhance** live in this repo but are **not** in the pack, so install either separately if you want it. The pack pins the personal tree for all thirteen.
 
@@ -81,43 +61,43 @@ Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reaso
 
 | Plugin | What you get |
 | --- | --- |
-| [provider-status](personal/provider-status/README.md) | Status-bar quota used/remaining. DeepSeek and GLM peak/off-peak gauges with countdowns. Multi-account. Rotate on low quota or reset day. Grok/Codex OAuth. Providers: Tavily, OpenCode Go, DeepSeek, GLM (z.ai), OpenRouter, Grok (xAI), Codex (OpenAI), OpenAI, Anthropic, Groq, Cerebras, Moonshot Kimi, MiniMax, Google Gemini, Hugging Face, Mistral, Qwen. |
-| [iteration-budget-meter](personal/iteration-budget-meter/README.md) | Per-turn N/budget while work runs. Hover and click for request stats. |
-| [reasoning-switch](personal/reasoning-switch/README.md) | Cycle reasoning effort from the status bar, with colors and per-level prompt demote. **Not in the pack; enable separately.** |
+| [provider-status](personal/provider-status/README.md) · [public](public/provider-status/README.md) | Status-bar quota used/remaining. DeepSeek and GLM peak/off-peak gauges with countdowns. Multi-account. Rotate on low quota or reset day. Grok/Codex OAuth. Providers: Tavily, OpenCode Go, DeepSeek, GLM (z.ai), OpenRouter, Grok (xAI), Codex (OpenAI), OpenAI, Anthropic, Groq, Cerebras, Moonshot Kimi, MiniMax, Google Gemini, Hugging Face, Mistral, Qwen. |
+| [iteration-budget-meter](personal/iteration-budget-meter/README.md) · [public](public/iteration-budget-meter/README.md) | Per-turn N/budget while work runs. Hover and click for request stats. |
+| [reasoning-switch](personal/reasoning-switch/README.md) · [public](public/reasoning-switch/README.md) | Cycle reasoning effort from the status bar, with colors and per-level prompt demote. **Not in the pack; enable separately.** |
 
 ### Tools and Memory
 
 | Plugin | What you get |
 | --- | --- |
-| [intelligent-tool-break](personal/intelligent-tool-break/README.md) | `/break`, `/break {msg}`, and `/again`. Desktop strip. Turn stays alive. |
-| [memory-review](personal/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
-| [better-capabilities](personal/better-capabilities/README.md) | Delete plugins/skills. Zip a skill. On/off presets. |
-| [cdp-manager](personal/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar. The `cdp` tool does the same from chat, on your preferred port. |
+| [intelligent-tool-break](personal/intelligent-tool-break/README.md) · [public](public/intelligent-tool-break/README.md) | `/break`, `/break {msg}`, and `/again`. Desktop strip. Turn stays alive. |
+| [memory-review](personal/memory-review/README.md) · [public](public/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
+| [better-capabilities](personal/better-capabilities/README.md) (personal only) | Delete plugins/skills. Zip a skill. On/off presets. |
+| [cdp-manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar. The `cdp` tool does the same from chat, on your preferred port. |
 
 ### Sessions and Sidebar
 
 | Plugin | What you get |
 | --- | --- |
-| [better-session-appearance](personal/better-session-appearance/README.md) | Idle color, bold, and icon. Auto Rules by title keywords. |
-| [sidebar-manager](personal/sidebar-manager/README.md) | Hide and reorder nav rows and session sections. |
-| [drag-to-pin-session](personal/drag-to-pin-session/README.md) | Drag pin/unpin with lasting order. |
-| [sessionretitler](personal/sessionretitler/README.md) | Retitles the session every N titleable user messages, from the latest exchanges. A title you set yourself is never touched. |
-| [scroll-on-switch](personal/scroll-on-switch/README.md) | Snap to bottom on session switch. Does not fight streaming. |
+| [better-session-appearance](personal/better-session-appearance/README.md) · [public](public/better-session-appearance/README.md) | Idle color, bold, and icon. Auto Rules by title keywords. |
+| [sidebar-manager](personal/sidebar-manager/README.md) · [public](public/sidebar-manager/README.md) | Hide and reorder nav rows and session sections. |
+| [drag-to-pin-session](personal/drag-to-pin-session/README.md) · [public](public/drag-to-pin-session/README.md) | Drag pin/unpin with lasting order. |
+| [sessionretitler](personal/sessionretitler/README.md) (personal only) | Retitles the session every N titleable user messages, from the latest exchanges. A title you set yourself is never touched. |
+| [scroll-on-switch](personal/scroll-on-switch/README.md) · [public](public/scroll-on-switch/README.md) | Snap to bottom on session switch. Does not fight streaming. |
 
 ### Composer
 
 | Plugin | What you get |
 | --- | --- |
-| [opaque-composer](personal/opaque-composer/README.md) | Solid composer while the transcript scrolls behind it. |
-| [prompt-enhance](personal/prompt-enhance/README.md) | Rewrite a composer draft from a saved prompt library and put the finished prompt back in the field. **Not in the pack; enable separately.** |
+| [opaque-composer](personal/opaque-composer/README.md) · [public](public/opaque-composer/README.md) | Solid composer while the transcript scrolls behind it. |
+| [prompt-enhance](personal/prompt-enhance/README.md) · [public](public/prompt-enhance/README.md) | Rewrite a composer draft from a saved prompt library and put the finished prompt back in the field. **Not in the pack; enable separately.** |
 
 ### Reading
 
 | Plugin | What you get |
 | --- | --- |
-| [rss-reader](personal/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
+| [rss-reader](personal/rss-reader/README.md) · [public](public/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
 
-Two plugins in this repo are outside the tables above because they are not in the pack: **reasoning-switch** (Status Bar table) and **prompt-enhance** (Composer table). `scroll-on-switch` is in the pack and listed in the Sessions and Sidebar table. **reasoning-switch** is also the only plugin with a catalog entry but no pack entry.
+Two plugins in this repo are not in the pack and are installed separately: **reasoning-switch** (Status Bar table) and **prompt-enhance** (Composer table). Every other plugin above is pinned by the pack.
 
 ## Install
 
