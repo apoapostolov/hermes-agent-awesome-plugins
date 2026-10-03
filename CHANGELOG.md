@@ -5,6 +5,16 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ## [Unreleased]
 
+## [reasoning-switch 1.1.3] - 2026-10-03
+
+Two defects from a live report.
+
+### Fixed
+
+- Clicking the chip on a session running a level outside the rotation no longer does nothing. The session's level comes from the gateway, so an external pick (`/reasoning`, the composer menu) or a row unchecked in the dialog left `displayed` absent from the rotation; the old code bailed out and the chip was dead until the dialog was reopened. It now steps up to the nearest rotation entry, or to the bottom when the session sits above every entry, so there is always a way off.
+- The chip label no longer wraps on `Extra High`. The statusbar reuses the app's own compact spellings (`XHigh`, `Med`, `Min`, `Off`) and the label and counter carry `whitespace-nowrap`. The dialog keeps the full names.
+
+
 ## [reasoning-switch 1.1.2] - 2026-10-03
 
 The chip now reads the level the session is actually running, instead of guessing it from a read it could not trust.

@@ -57,6 +57,19 @@ const LABEL = {
 // Lowest -> highest ordering used for rotation and auto-demotion. 'none' is
 // thinking-off, its own floor.
 const ASCENDING = [NONE, 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']
+// The statusbar has no room for the full names ('Extra High' wrapped), so the
+// chip reuses the app's own compact spellings from lib/reasoning-effort.ts.
+// The dialog keeps LABEL, where the width is fixed per row.
+const CHIP_LABEL = {
+  none: 'Off',
+  minimal: 'Min',
+  low: 'Low',
+  medium: 'Med',
+  high: 'High',
+  xhigh: 'XHigh',
+  max: 'Max',
+  ultra: 'Ultra',
+}
 
 // ── plugin-scoped persistence (survives restarts; namespaced by the host) ──
 // Shape: { levels: {<level>: {included: bool, color: string|null, maxPrompts: int|null}},
@@ -260,15 +273,22 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
   // A pick the route clamps down (ultra -> max) reads as the pair, so the chip
   // never presents a Hermes-internal step as a wire level the route lacks.
   const clamped = wire && wire !== displayed && LEVELS.includes(wire) ? wire : ''
-  const displayLabel = LABEL[displayed] || displayed
-  const label = clamped ? `${displayLabel}→${LABEL[clamped] || clamped}` : displayLabel
+  const displayLabel = CHIP_LABEL[displayed] || displayed
+  const label = clamped ? `${displayLabel}→${CHIP_LABEL[clamped] || clamped}` : displayLabel
 
   const rotate = async () => {
     const included = ASCENDING.filter(lv => cfg.levels[lv].included)
     if (!included.length || !sessionId) return
     const idx = included.indexOf(displayed)
-    if (idx < 0) return // the running level is not in the rotation; do not guess
-    const next = included[(idx + 1) % included.length] ?? included[0]
+    // A session can be running a level the rotation does not include: an
+    // external pick (composer menu, /reasoning), or a level unchecked after
+    // the session started. Step UP to the nearest rotation entry so there is
+    // always a way off it; when the session already sits above every entry,
+    // start at the bottom. Bailing out here stranded the chip with no way to
+    // change the level at all, which is the whole point of the control.
+    const next = idx >= 0
+      ? included[(idx + 1) % included.length] ?? included[0]
+      : included.find(lv => ASCENDING.indexOf(lv) > ASCENDING.indexOf(displayed)) ?? included[0]
     if (next === displayed) return
     const accepted = await setEffort(sessionId, next)
     if (!accepted) return // the write was refused; leave the chip on the truth
@@ -285,7 +305,7 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
   }
 
   const tip = [
-    `Reasoning: ${label}`,
+    `Reasoning: ${LABEL[displayed] || displayed}`,
     clamped ? `This route sends ${LABEL[clamped] || clamped}` : null,
     limited && remaining != null ? `${remaining} prompt${remaining === 1 ? '' : 's'} left at this level` : null,
     'Click to rotate · gear to configure',
@@ -302,9 +322,17 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
         children: jsxs('span', {
           className: 'inline-flex items-center gap-1' + (flash ? ' opacity-60' : ''),
           children: [
-            jsx(Codicon, { name: 'lightbulb', size: '0.6rem', style: { color: color || 'var(--ui-text-tertiary)' } }),
-            jsx('span', { style: { color: color || 'var(--ui-text-tertiary)' }, children: label }),
-            jsx('span', { style: { color: 'var(--ui-text-quaternary)' }, children: limited && remaining != null ? String(remaining) : '' }),
+            jsx(Codicon, { name: 'lightbulb', size: '0.6rem', className: 'shrink-0', style: { color: color || 'var(--ui-text-tertiary)' } }),
+            jsx('span', {
+              className: 'whitespace-nowrap shrink-0',
+              style: { color: color || 'var(--ui-text-tertiary)' },
+              children: label,
+            }),
+            jsx('span', {
+              className: 'whitespace-nowrap shrink-0 tabular-nums',
+              style: { color: 'var(--ui-text-quaternary)' },
+              children: limited && remaining != null ? String(remaining) : '',
+            }),
           ],
         }),
       }),
