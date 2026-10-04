@@ -28,3 +28,4 @@ Each public plugin that diverged from personal (or is held because of it) has `L
 | prompt-enhance | Draft API. Enhance, undo, and replace stay. Add on a saved prompt appends. |
 | compact-reasoning-label | Removed from both editions. The model pill no longer includes the effort word. |
 | Other plugins | Identical to personal at the split. Review before a catalog pin. |
+| hermes-jev-routing | Classifies the turn. Rewrites the model only inside the bound provider. No agent-cache lookup and no session switch. |

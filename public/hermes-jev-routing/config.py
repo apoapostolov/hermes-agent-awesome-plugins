@@ -1,0 +1,140 @@
+"""Load a hermes-jev-routing JSON file.
+
+CamelCase keys are accepted. A tier the file leaves empty stays empty. The
+loader does not invent a default model list.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Mapping
+
+try:
+    from .decide import (
+        AvailableModel,
+        Budget,
+        Cache,
+        FreePool,
+        RouteTarget,
+        RouterConfig,
+    )
+except ImportError:
+    from decide import (
+        AvailableModel,
+        Budget,
+        Cache,
+        FreePool,
+        RouteTarget,
+        RouterConfig,
+    )
+
+TASK_KINDS = {
+    "plan": "Deciding what to build, sequencing work, or designing an approach before editing",
+    "implement": "Writing or changing code, scripts, or configuration to produce a concrete result",
+    "write": "Producing prose, documentation, comments, or other non-code content from scratch",
+    "debug": "Diagnosing a failure, error, or unexpected behavior and finding its root cause",
+    "refactor": "Restructuring existing code without changing intended behavior",
+    "review": "Auditing code, a diff, a document, or a plan for problems and risks",
+    "research": "Searching, reading, and synthesizing external information or unfamiliar APIs",
+    "explain": "Answering a question or explaining how something works",
+    "operate": "Running commands, tooling, git, deploys, or environment setup",
+    "chat": "Small talk, acknowledgements, or a request with no real work attached",
+}
+
+
+@dataclass
+class JevSettings:
+    endpoint: str = "https://api.typesafe.ai/v1/systemone"
+    endpoint_env: str = "TYPESAFE_API_URL"
+    api_key_env: str = "TYPESAFE_API_KEY"
+    jev_model: str = "jev-latest"
+    timeout_ms: int = 3500
+    history_turns: int = 4
+    task_kinds: dict[str, str] = field(default_factory=lambda: dict(TASK_KINDS))
+
+
+def _target(raw: Mapping[str, Any]) -> RouteTarget:
+    return RouteTarget(
+        provider=str(raw.get("provider") or ""),
+        model=str(raw.get("model") or ""),
+        thinking_level=raw.get("thinkingLevel") or raw.get("thinking_level"),
+        min_tier=raw.get("minTier") or raw.get("min_tier"),
+        priority=int(raw.get("priority") or 0),
+    )
+
+
+def _chain(raw: Any) -> tuple[RouteTarget, ...]:
+    if not isinstance(raw, list):
+        return ()
+    return tuple(_target(item) for item in raw if isinstance(item, Mapping) and item.get("model"))
+
+
+def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("router config must be a JSON object")
+    routes = data.get("routes") or {}
+    kinds = data.get("kindModels") or data.get("kind_models") or {}
+    floors = data.get("kindMinimumTier") or data.get("kind_minimum_tier") or {}
+    free = data.get("free") or {}
+    cache = data.get("cache") or {}
+    budget = data.get("budget") or {}
+    config = RouterConfig(
+        routes={tier: _chain(routes.get(tier)) for tier in ("quick", "standard", "high", "premium", "xpremium")},
+        kind_models={str(kind): _chain(chain) for kind, chain in kinds.items() if isinstance(chain, list)},
+        kind_minimum_tier={str(kind): str(tier) for kind, tier in floors.items()},
+        confidence_threshold=float(data.get("confidenceThreshold", data.get("confidence_threshold", 0.34))),
+        min_prompt_chars=int(data.get("minPromptChars", data.get("min_prompt_chars", 12))),
+        budget=Budget(
+            soft_ratio=float(budget.get("softRatio", budget.get("soft_ratio", 0.7))),
+            hard_ratio=float(budget.get("hardRatio", budget.get("hard_ratio", 0.9))),
+        ),
+        cache=Cache(
+            aware=bool(cache.get("aware", True)),
+            deadband=float(cache.get("deadband", 0.25)),
+            max_penalty_usd=float(cache.get("maxPenaltyUsd", cache.get("max_penalty_usd", 0.05))),
+            bypass_tier_delta=int(cache.get("bypassTierDelta", cache.get("bypass_tier_delta", 2))),
+        ),
+        free=FreePool(
+            enabled=bool(free.get("enabled", False)),
+            policy=str(free.get("policy") or "fallback-only"),
+            pool=_chain(free.get("pool")),
+        ),
+        confirm_tiers=tuple(
+            str(tier) for tier in ((data.get("confirm") or {}).get("tiers") or []) if tier
+        ),
+    )
+    kinds_raw = data.get("taskKinds") or data.get("task_kinds") or {}
+    task_kinds = dict(TASK_KINDS)
+    task_kinds.update({str(key): str(value) for key, value in kinds_raw.items() if value})
+    settings = JevSettings(
+        endpoint=str(data.get("endpoint") or JevSettings.endpoint),
+        endpoint_env=str(data.get("endpointEnv") or data.get("endpoint_env") or "TYPESAFE_API_URL"),
+        api_key_env=str(data.get("apiKeyEnv") or data.get("api_key_env") or "TYPESAFE_API_KEY"),
+        jev_model=str(data.get("jevModel") or data.get("jev_model") or "jev-latest"),
+        timeout_ms=int(data.get("timeoutMs", data.get("timeout_ms", 3500))),
+        history_turns=int(data.get("historyTurns", data.get("history_turns", 4))),
+        task_kinds=task_kinds,
+    )
+    return config, settings
+
+
+def models_from_config(config: RouterConfig) -> tuple[AvailableModel, ...]:
+    """Treat every configured target as available.
+
+    Hermes does not hand the plugin a priced catalogue. Unknown cost makes the
+    cache-penalty estimate return 0, so the hold gate does not block on a guess.
+    """
+    seen: set[tuple[str, str]] = set()
+    models: list[AvailableModel] = []
+    chains = [config.free.pool, *config.routes.values(), *config.kind_models.values()]
+    for chain in chains:
+        for target in chain:
+            key = (target.provider, target.model)
+            if not target.model or key in seen:
+                continue
+            seen.add(key)
+            models.append(AvailableModel(provider=target.provider, id=target.model))
+    return tuple(models)

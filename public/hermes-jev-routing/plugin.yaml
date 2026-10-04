@@ -1,0 +1,20 @@
+name: hermes-jev-routing
+version: 0.1.0
+description: "Per-turn Jev model routing. Shadow by default. Sends the current user message and a short excerpt to TypeSafe. Rewrites the model only inside the provider already bound to the turn."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+requires_hermes: ">=0.21.4"
+provides_hooks:
+  - pre_llm_call
+provides_middleware:
+  - llm_request
+config_schema:
+  mode:
+    type: str
+    default: shadow
+    description: "shadow logs the pick. auto rewrites the model when the pick stays on the bound provider. off does nothing."
+  config_path:
+    type: str
+    default: ""
+    description: "Path to a hermes-jev-routing JSON file. Empty leaves routing inert."

@@ -5,6 +5,10 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ## [Unreleased]
 
+### Added
+
+- hermes-jev-routing 0.1.0. Personal edition switches the live session before the client sends. Public edition rewrites the model only inside the provider already bound to the request. Neither edition is in the pack.
+
 ### Changed
 
 - The chip refuses a click on a new chat instead of silently swallowing it, and its tooltip names the door that works there: the composer's Thinking menu, whose pick ships with `session.create`. A remembered pick could never be applied, because `session.create` reads the app's composer atom and not a plugin's variable.
