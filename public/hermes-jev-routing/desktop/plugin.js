@@ -177,26 +177,24 @@ export default {
     })
     const style = document.createElement('style')
     style.textContent = `
-      [data-jev-routing] {
+      [data-jev-routing],
+      [data-jev-line],
+      [data-jev-status] {
         font-size: 0.6875rem;
         line-height: 1.25rem;
-        color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+        color: color-mix(in oklab, var(--color-muted-foreground) 60%, transparent);
         padding: 0 0.5rem;
-        white-space: pre-line;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       [data-jev-strip] { display: flex; align-items: baseline; white-space: nowrap; }
       [data-jev-strip] button {
         font: inherit; line-height: inherit; color: inherit;
         background: transparent; border: 0; padding: 0; cursor: pointer;
       }
-      [data-jev-strip] [data-strong] { font-weight: 600; color: var(--foreground); }
-      [data-jev-strip] [data-dot] { padding: 0 0.35rem; color: color-mix(in srgb, var(--muted-foreground) 35%, transparent); }
-      [data-jev-status] {
-        font-size: 0.6875rem;
-        line-height: 1.25rem;
-        color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
-        padding: 0 0.5rem;
-      }
+      [data-jev-strip] [data-strong] { font-weight: 600; color: var(--color-foreground, var(--foreground)); }
+      [data-jev-strip] [data-dot] { padding: 0 0.35rem; color: color-mix(in oklab, var(--color-muted-foreground) 35%, transparent); }
     `
     document.head.appendChild(style)
     reattach()

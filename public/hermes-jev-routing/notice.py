@@ -7,16 +7,14 @@ from typing import Optional
 
 def format_jev_line(decision, analysis=None) -> str:
     target = decision.target
-    head = f"{decision.tier} · {target.provider}/{target.model}"
+    parts = [str(decision.tier), f"{target.provider}/{target.model}"]
     if target.thinking_level:
-        head = f"{head} · {target.thinking_level}"
-    if analysis is None:
-        return head
-    detail = (
-        f"{analysis.kind} · complexity {analysis.complexity:.2f}/3 · "
-        f"capability {analysis.budget_intensity:.2f}/3 · reasoning {analysis.deep_reasoning:.2f}"
-    )
-    return f"{head}\n{detail}"
+        parts.append(str(target.thinking_level))
+    if analysis is not None:
+        parts.append(
+            f"{analysis.kind} {analysis.complexity:.2f}/{analysis.budget_intensity:.2f}/{analysis.deep_reasoning:.2f}"
+        )
+    return " · ".join(parts)
 
 
 def should_interrupt(decision, current, confirm_tiers, mode: str = "auto") -> bool:
