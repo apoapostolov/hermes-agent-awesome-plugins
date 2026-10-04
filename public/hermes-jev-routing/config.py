@@ -55,6 +55,16 @@ class JevSettings:
     task_kinds: dict[str, str] = field(default_factory=lambda: dict(TASK_KINDS))
 
 
+def _optional_float(value):
+    if value is None or value == "":
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
 def _floors(raw: Any) -> dict[str, float]:
     if not isinstance(raw, Mapping):
         return {}
@@ -130,6 +140,8 @@ def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
         budget=Budget(
             soft_ratio=float(budget.get("softRatio", budget.get("soft_ratio", 0.7))),
             hard_ratio=float(budget.get("hardRatio", budget.get("hard_ratio", 0.9))),
+            daily_usd=_optional_float(budget.get("dailyUsd", budget.get("daily_usd"))),
+            monthly_usd=_optional_float(budget.get("monthlyUsd", budget.get("monthly_usd"))),
         ),
         cache=Cache(
             aware=bool(cache.get("aware", True)),

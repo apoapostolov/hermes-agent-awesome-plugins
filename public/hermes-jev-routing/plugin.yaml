@@ -7,6 +7,7 @@ manifest_version: 2
 requires_hermes: ">=0.21.4"
 provides_hooks:
   - pre_llm_call
+  - post_api_request
 provides_middleware:
   - llm_request
 config_schema:

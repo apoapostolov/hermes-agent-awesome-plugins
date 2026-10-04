@@ -18,6 +18,8 @@ try:
     from .decide import Analysis, Decision, decide, same_provider_rewrite
     from .jev import JevError, classify
     from .choice import decision_for_target, parse_confirm_choice, target_for_choice
+    from .commands import explain, revert_target
+    from .ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_cost
     from .notice import publish_route, route_payload
     from .quota import codex_eligibility
     from .quota_live import read_codex_remaining
@@ -28,6 +30,8 @@ except ImportError:
     from decide import Analysis, Decision, decide, same_provider_rewrite
     from jev import JevError, classify
     from choice import decision_for_target, parse_confirm_choice, target_for_choice
+    from commands import explain, revert_target
+    from ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_cost
     from notice import publish_route, route_payload
     from quota import codex_eligibility
     from quota_live import read_codex_remaining
@@ -88,11 +92,64 @@ def _history(messages, turns: int) -> str:
     return "\n".join(lines)[-4000:]
 
 
+def _budget(config):
+    caps = _LAST.get("budget_caps")
+    if not isinstance(caps, dict) or not caps:
+        return config.budget
+    from dataclasses import replace
+    return replace(
+        config.budget,
+        daily_usd=caps.get("daily", config.budget.daily_usd),
+        monthly_usd=caps.get("monthly", config.budget.monthly_usd),
+    )
+
+
+def _spend(config):
+    path = str(_LAST.get("config_path") or "")
+    if not path:
+        return None
+    try:
+        from .decide import Spend
+    except ImportError:
+        from decide import Spend
+    snapshot = spend_snapshot(load_ledger(state_path(path)), _budget(config))
+    return Spend(pressure=snapshot.pressure, today=snapshot.today), snapshot
+
+
+def _remember_route(prompt: str, analysis, decision, notes) -> None:
+    _LAST["prompt"] = prompt
+    _LAST["analysis"] = analysis
+    _LAST["decision"] = decision
+    _LAST["notes"] = tuple(notes or ())
+
+
+def on_post_api_request(**kwargs):
+    path = str(_LAST.get("config_path") or "")
+    if not path:
+        return None
+    provider = str(kwargs.get("provider") or "")
+    model = str(kwargs.get("response_model") or kwargs.get("model") or "")
+    usd = usage_cost(kwargs.get("usage"))
+    if usd <= 0 or not model:
+        return None
+    file = state_path(path)
+    ledger = load_ledger(file)
+    record_cost(ledger, f"{provider}/{model}" if provider else model, usd)
+    save_ledger(file, ledger)
+    return None
+
+
 def on_pre_llm_call(**kwargs):
     if _CTX is not None:
         _LAST["mode"] = _mode(_CTX)
         _LAST["config_path"] = _config_path(_CTX)
     mode = str(_LAST.get("mode") or "shadow")
+    _LAST["session_id"] = str(kwargs.get("session_id") or "")
+    pending = _LAST.pop("pending_revert", None)
+    if isinstance(pending, dict):
+        target = revert_target(pending)
+        if target is not None:
+            maybe_switch(decision_for_target(target), _LAST["session_id"], "auto")
     previous = _LAST.get("decision")
     _LAST["blocked"] = ""
     _LAST["applied"] = ""
@@ -142,6 +199,11 @@ def on_pre_llm_call(**kwargs):
             history=_history(kwargs.get("conversation_history"), settings.history_turns),
             active_model=active,
         )
+        file = state_path(path)
+        ledger = load_ledger(file)
+        record_jev(ledger)
+        save_ledger(file, ledger)
+        spent = _spend(config)
         gate = codex_eligibility(config, read_codex_remaining(), now_ms=time.time() * 1000)
         decision = decide(
             analysis,
@@ -150,8 +212,9 @@ def on_pre_llm_call(**kwargs):
             current_index=tier_index_for(config, current.provider, current.id) if current else None,
             current_model=current,
             eligibility=gate,
+            spend=spent[0] if spent else None,
         )
-        _LAST["decision"] = decision
+        _remember_route(prompt, analysis, decision, getattr(decision, "notes", ()) if decision else ())
         _LAST["quota_notes"] = list(getattr(gate, "notes", ()))
         publish_route(route_payload(
             decision, current, config, str(kwargs.get("session_id") or ""), analysis, mode,
@@ -211,7 +274,8 @@ def on_llm_request(**kwargs):
 
 def _command(raw: str = "") -> str:
     parts = str(raw or "").split()
-    if parts[:1] == ["suggest"]:
+    head = parts[:1]
+    if head == ["suggest"]:
         path = str(_LAST.get("config_path") or "")
         if not path:
             return "hermes-jev-routing suggest: no config path"
@@ -220,7 +284,70 @@ def _command(raw: str = "") -> str:
         except ImportError:
             from ranking import suggestion_text
         return suggestion_text(path, write="--write" in parts)
+    if head == ["why"]:
+        return explain(_LAST.get("analysis"), _LAST.get("decision") if isinstance(_LAST.get("decision"), Decision) else None, tuple(_LAST.get("notes") or ()))
+    if head == ["route"]:
+        return _dry_route(" ".join(parts[1:]))
+    if head == ["revert"]:
+        return _revert()
+    if head == ["budget"]:
+        return _budget_command(parts[1:])
     return _status()
+
+
+def _dry_route(text: str) -> str:
+    prompt = text.strip() or str(_LAST.get("prompt") or "")
+    if not prompt:
+        return "usage: /jev-routing route <text>"
+    path = str(_LAST.get("config_path") or "")
+    loaded = _load(path) if path else (None, None)
+    config, settings = loaded
+    if config is None or settings is None:
+        return "hermes-jev-routing route: no config"
+    try:
+        key = os.environ.get(settings.api_key_env, "")
+        endpoint = os.environ.get(settings.endpoint_env, "") or settings.endpoint
+        analysis = classify(
+            prompt,
+            api_key=key,
+            endpoint=endpoint,
+            jev_model=settings.jev_model,
+            task_kinds=settings.task_kinds,
+            timeout_ms=settings.timeout_ms,
+        )
+    except (JevError, OSError, TimeoutError, ValueError) as exc:
+        return f"hermes-jev-routing route: {exc}"
+    spent = _spend(config)
+    decision = decide(analysis, config, models_from_config(config), spend=spent[0] if spent else None)
+    return explain(analysis, decision, tuple(getattr(decision, "notes", ()) or ()))
+
+
+def _revert() -> str:
+    target = revert_target(_LAST.get("previous"))
+    if target is None:
+        return "no previous model recorded"
+    picked = decision_for_target(target)
+    switched = maybe_switch(picked, str(_LAST.get("session_id") or ""), "auto")
+    if switched == "switched":
+        _LAST["applied"] = target.model
+        return f"reverted to {target.provider}/{target.model}"
+    _LAST["pending_revert"] = {"provider": target.provider, "model": target.model}
+    return f"revert to {target.provider}/{target.model} applies on the next send ({switched})"
+
+
+def _budget_command(parts) -> str:
+    if len(parts) < 2 or parts[0] not in {"daily", "monthly"}:
+        return "usage: /jev-routing budget daily|monthly <usd>"
+    try:
+        amount = float(parts[1])
+    except ValueError:
+        return "usage: /jev-routing budget daily|monthly <usd>"
+    if amount <= 0:
+        return "usage: /jev-routing budget daily|monthly <usd>"
+    caps = dict(_LAST.get("budget_caps") or {})
+    caps["daily" if parts[0] == "daily" else "monthly"] = amount
+    _LAST["budget_caps"] = caps
+    return f"budget {parts[0]} cap: ${amount:.2f} for this session"
 
 
 def _status() -> str:
@@ -253,6 +380,7 @@ def register(ctx):
     _LAST["mode"] = _mode(ctx)
     _LAST["config_path"] = _config_path(ctx)
     ctx.register_hook("pre_llm_call", on_pre_llm_call)
+    ctx.register_hook("post_api_request", on_post_api_request)
     ctx.register_middleware("llm_request", on_llm_request)
-    ctx.register_command("jev-routing", _command, description="Show the last decision, or suggest from a scores file")
+    ctx.register_command("jev-routing", _command, description="Status, why, route, revert, budget, or suggest")
     return None

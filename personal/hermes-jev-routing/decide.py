@@ -65,6 +65,8 @@ class Spend:
 class Budget:
     soft_ratio: float = 0.7
     hard_ratio: float = 0.9
+    daily_usd: float | None = None
+    monthly_usd: float | None = None
 
 
 @dataclass(frozen=True)
