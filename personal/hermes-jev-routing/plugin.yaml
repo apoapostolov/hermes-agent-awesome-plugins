@@ -13,8 +13,47 @@ config_schema:
   mode:
     type: str
     default: shadow
-    description: "shadow logs the pick. auto rewrites the model when the pick stays on the bound provider. off does nothing."
+    description: "off, shadow, notify, auto, or confirm. A set value overrides the JSON file."
   config_path:
     type: str
     default: ""
-    description: "Path to a hermes-jev-routing JSON file. Empty leaves routing inert."
+    description: "Path to the routing JSON. Empty leaves routing inert."
+  enabled:
+    type: bool
+    description: "When set, overrides enabled in the JSON file."
+  confidence_threshold:
+    type: float
+    description: "When set, overrides confidenceThreshold in the JSON file."
+  min_prompt_chars:
+    type: int
+    description: "When set, overrides minPromptChars in the JSON file."
+  timeout_ms:
+    type: int
+    description: "When set, overrides the TypeSafe timeout in the JSON file."
+  history_turns:
+    type: int
+    description: "When set, overrides historyTurns in the JSON file."
+  stickiness:
+    type: bool
+    description: "When set, overrides stickiness in the JSON file."
+  confirm_on_timeout:
+    type: str
+    description: "accept or reject. When set, overrides confirm.onTimeout."
+  confirm_tiers:
+    type: str
+    description: "Comma-separated tiers. When set, overrides confirm.tiers."
+  quota_on_unknown:
+    type: str
+    description: "use or skip. When set, overrides the Codex onUnknown policy."
+  quota_enabled:
+    type: bool
+    description: "When set, overrides the Codex quota enabled flag."
+  cache_aware:
+    type: bool
+    description: "When set, overrides cache.aware."
+  free_enabled:
+    type: bool
+    description: "When set, overrides free.enabled."
+  free_policy:
+    type: str
+    description: "prefer or fallback-only. When set, overrides free.policy."

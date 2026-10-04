@@ -5,26 +5,33 @@ from __future__ import annotations
 from typing import Optional
 
 
-def format_jev_line(decision) -> str:
+def format_jev_line(decision, analysis=None) -> str:
     target = decision.target
-    parts = [str(decision.tier), f"{target.provider}/{target.model}"]
+    head = f"{decision.tier} · {target.provider}/{target.model}"
     if target.thinking_level:
-        parts.append(str(target.thinking_level))
-    if decision.reason:
-        parts.append(str(decision.reason))
-    return " · ".join(parts)
+        head = f"{head} · {target.thinking_level}"
+    if analysis is None:
+        return head
+    detail = (
+        f"{analysis.kind} · complexity {analysis.complexity:.2f}/3 · "
+        f"capability {analysis.budget_intensity:.2f}/3 · reasoning {analysis.deep_reasoning:.2f}"
+    )
+    return f"{head}\n{detail}"
 
 
-def should_interrupt(decision, current, confirm_tiers) -> bool:
-    """The strip interrupts only when the weight wants a different model on a guarded tier."""
-    if decision is None or decision.tier not in set(confirm_tiers):
+def should_interrupt(decision, current, confirm_tiers, mode: str = "auto") -> bool:
+    """The strip interrupts when the weight wants a different model."""
+    if decision is None or mode in {"off", "shadow", "notify"}:
         return False
-    if current is None:
+    changed = current is None or current.provider != decision.target.provider or current.id != decision.target.model
+    if not changed:
+        return False
+    if mode == "confirm":
         return True
-    return current.provider != decision.target.provider or current.id != decision.target.model
+    return decision.tier in set(confirm_tiers)
 
 
-def route_payload(decision, current, config, session_id: str) -> Optional[dict]:
+def route_payload(decision, current, config, session_id: str, analysis=None, mode: str = "auto") -> Optional[dict]:
     if decision is None:
         return None
     heads = {}
@@ -43,8 +50,8 @@ def route_payload(decision, current, config, session_id: str) -> Optional[dict]:
         free = {"provider": row.provider, "model": row.model, "thinking": row.thinking_level}
     return {
         "session_id": session_id,
-        "line": format_jev_line(decision),
-        "interrupt": should_interrupt(decision, current, config.confirm_tiers),
+        "line": format_jev_line(decision, analysis),
+        "interrupt": should_interrupt(decision, current, config.confirm_tiers, mode),
         "offered_tier": decision.tier,
         "provider": decision.target.provider,
         "model": decision.target.model,

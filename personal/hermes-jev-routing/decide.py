@@ -85,6 +85,8 @@ class FreePool:
 @dataclass
 class RouterConfig:
     routes: Mapping[str, Sequence[RouteTarget]]
+    enabled: bool = True
+    stickiness: bool = True
     kind_models: Mapping[str, Sequence[RouteTarget]] = field(default_factory=dict)
     kind_minimum_tier: Mapping[str, str] = field(default_factory=dict)
     confidence_threshold: float = 0.34

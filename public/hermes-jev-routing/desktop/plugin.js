@@ -141,6 +141,7 @@ export default {
         line-height: 1.25rem;
         color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
         padding: 0 0.5rem;
+        white-space: pre-line;
       }
       [data-jev-strip] { display: flex; align-items: baseline; white-space: nowrap; }
       [data-jev-strip] button {

@@ -21,6 +21,7 @@ try:
     from .notice import publish_route, route_payload
     from .quota import codex_eligibility
     from .quota_live import read_codex_remaining
+    from .settings_override import apply_setting_overrides, present_settings
     from .switch import current_model, find_live_agent, maybe_switch, tier_index_for
 except ImportError:
     from config import load_router_config, models_from_config
@@ -30,12 +31,14 @@ except ImportError:
     from notice import publish_route, route_payload
     from quota import codex_eligibility
     from quota_live import read_codex_remaining
+    from settings_override import apply_setting_overrides, present_settings
     from switch import current_model, find_live_agent, maybe_switch, tier_index_for
 
 logger = logging.getLogger(__name__)
 
 _LAST: dict[str, object] = {"mode": "shadow"}
 _LOADED: dict[str, object] = {}
+_CTX = None
 
 
 def last_decision() -> dict[str, object]:
@@ -47,7 +50,7 @@ def _mode(ctx) -> str:
         mode = str(ctx.get_config("mode", "shadow") or "shadow").strip().lower()
     except Exception:
         mode = "shadow"
-    if mode not in {"off", "shadow", "auto"}:
+    if mode not in {"off", "shadow", "auto", "notify", "confirm"}:
         return "shadow"
     return mode
 
@@ -86,6 +89,9 @@ def _history(messages, turns: int) -> str:
 
 
 def on_pre_llm_call(**kwargs):
+    if _CTX is not None:
+        _LAST["mode"] = _mode(_CTX)
+        _LAST["config_path"] = _config_path(_CTX)
     mode = str(_LAST.get("mode") or "shadow")
     previous = _LAST.get("decision")
     _LAST["blocked"] = ""
@@ -100,6 +106,10 @@ def on_pre_llm_call(**kwargs):
     try:
         config, settings = _load(path)
         if config is None or settings is None:
+            return None
+        if _CTX is not None:
+            config, settings = apply_setting_overrides(config, settings, present_settings(_CTX))
+        if not getattr(config, "enabled", True):
             return None
         choice = parse_confirm_choice(prompt)
         if choice:
@@ -143,11 +153,21 @@ def on_pre_llm_call(**kwargs):
         )
         _LAST["decision"] = decision
         _LAST["quota_notes"] = list(getattr(gate, "notes", ()))
-        publish_route(route_payload(decision, current, config, str(kwargs.get("session_id") or "")))
+        publish_route(route_payload(
+            decision, current, config, str(kwargs.get("session_id") or ""), analysis, mode,
+        ))
+        changed = current is None or (
+            decision is not None
+            and (current.provider != decision.target.provider or current.id != decision.target.model)
+        )
         hold_confirm = (
             decision is not None
-            and decision.tier in set(config.confirm_tiers)
-            and config.confirm_on_timeout != "accept"
+            and changed
+            and (
+                mode == "confirm"
+                or (decision.tier in set(config.confirm_tiers) and config.confirm_on_timeout != "accept")
+            )
+            and mode not in {"shadow", "notify", "off"}
         )
         if hold_confirm:
             _LAST["blocked"] = "confirm"
@@ -155,6 +175,8 @@ def on_pre_llm_call(**kwargs):
         else:
             switched = maybe_switch(decision, str(kwargs.get("session_id") or ""), mode)
         if switched == "switched":
+            if current is not None:
+                _LAST["previous"] = {"provider": current.provider, "model": current.id}
             _LAST["applied"] = decision.target.model if decision else ""
         elif switched in {"missing-agent", "switch-failed"}:
             _LAST["blocked"] = switched
@@ -226,6 +248,8 @@ def classify_for_tests(analysis: Analysis, config, models, mode: str, **kwargs) 
 
 
 def register(ctx):
+    global _CTX
+    _CTX = ctx
     _LAST["mode"] = _mode(ctx)
     _LAST["config_path"] = _config_path(ctx)
     ctx.register_hook("pre_llm_call", on_pre_llm_call)
