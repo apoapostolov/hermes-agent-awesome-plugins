@@ -100,6 +100,8 @@ function reattach() {
     block.appendChild(line)
     user.insertAdjacentElement('afterend', block)
   })
+}
+
 function mount(payload) {
   const user = latestUserRoot()
   if (!user || !user.parentNode) return
