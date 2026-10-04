@@ -17,6 +17,7 @@ try:
     from .config import load_router_config, models_from_config
     from .decide import Analysis, Decision, decide, same_provider_rewrite
     from .jev import JevError, classify
+    from .choice import decision_for_target, parse_confirm_choice, target_for_choice
     from .quota import codex_eligibility
     from .quota_live import read_codex_remaining
     from .switch import current_model, find_live_agent, maybe_switch, tier_index_for
@@ -24,6 +25,7 @@ except ImportError:
     from config import load_router_config, models_from_config
     from decide import Analysis, Decision, decide, same_provider_rewrite
     from jev import JevError, classify
+    from choice import decision_for_target, parse_confirm_choice, target_for_choice
     from quota import codex_eligibility
     from quota_live import read_codex_remaining
     from switch import current_model, find_live_agent, maybe_switch, tier_index_for
@@ -83,6 +85,7 @@ def _history(messages, turns: int) -> str:
 
 def on_pre_llm_call(**kwargs):
     mode = str(_LAST.get("mode") or "shadow")
+    previous = _LAST.get("decision")
     _LAST["blocked"] = ""
     _LAST["applied"] = ""
     _LAST["decision"] = None
@@ -94,7 +97,23 @@ def on_pre_llm_call(**kwargs):
         return None
     try:
         config, settings = _load(path)
-        if config is None or settings is None or len(prompt) < config.min_prompt_chars:
+        if config is None or settings is None:
+            return None
+        choice = parse_confirm_choice(prompt)
+        if choice:
+            target = target_for_choice(config, choice, previous if isinstance(previous, Decision) else None)
+            if target is None:
+                _LAST["blocked"] = "kept"
+                return None
+            picked = decision_for_target(target)
+            _LAST["decision"] = picked
+            switched = maybe_switch(picked, str(kwargs.get("session_id") or ""), mode)
+            if switched == "switched":
+                _LAST["applied"] = target.model
+            elif switched in {"missing-agent", "switch-failed"}:
+                _LAST["blocked"] = switched
+            return None
+        if len(prompt) < config.min_prompt_chars:
             return None
         key = os.environ.get(settings.api_key_env, "")
         endpoint = os.environ.get(settings.endpoint_env, "") or settings.endpoint
