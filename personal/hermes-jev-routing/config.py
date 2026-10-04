@@ -84,10 +84,37 @@ def _chain(raw: Any) -> tuple[RouteTarget, ...]:
     return tuple(_target(item) for item in raw if isinstance(item, Mapping) and item.get("model"))
 
 
+def fill_from_generated(data: dict, path: str | Path) -> dict:
+    """A missing tier or kind may come from the generated file. A named hand chain wins."""
+    source = Path(path).with_name(Path(path).stem + ".generated.json")
+    if not source.is_file():
+        return data
+    try:
+        generated = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return data
+    if not isinstance(generated, dict):
+        return data
+    routes = dict(data.get("routes") or {})
+    for tier, chain in (generated.get("routes") or {}).items():
+        if tier == "xpremium" or tier in routes:
+            continue
+        routes[tier] = chain
+    kinds = dict(data.get("kindModels") or data.get("kind_models") or {})
+    for kind, chain in (generated.get("kindModels") or {}).items():
+        if kind not in kinds:
+            kinds[kind] = chain
+    merged = dict(data)
+    merged["routes"] = routes
+    merged["kindModels"] = kinds
+    return merged
+
+
 def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
+    hand = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(hand, dict):
         raise ValueError("router config must be a JSON object")
+    data = fill_from_generated(hand, path)
     routes = data.get("routes") or {}
     kinds = data.get("kindModels") or data.get("kind_models") or {}
     floors = data.get("kindMinimumTier") or data.get("kind_minimum_tier") or {}

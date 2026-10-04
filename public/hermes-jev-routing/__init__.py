@@ -165,7 +165,21 @@ def on_llm_request(**kwargs):
     }
 
 
-def _status(_raw: str = "") -> str:
+def _command(raw: str = "") -> str:
+    parts = str(raw or "").split()
+    if parts[:1] == ["suggest"]:
+        path = str(_LAST.get("config_path") or "")
+        if not path:
+            return "hermes-jev-routing suggest: no config path"
+        try:
+            from .ranking import suggestion_text
+        except ImportError:
+            from ranking import suggestion_text
+        return suggestion_text(path, write="--write" in parts)
+    return _status()
+
+
+def _status() -> str:
     decision = _LAST.get("decision")
     if not isinstance(decision, Decision):
         return f"hermes-jev-routing {_LAST.get('mode', 'shadow')}: no decision yet"
@@ -194,5 +208,5 @@ def register(ctx):
     _LAST["config_path"] = _config_path(ctx)
     ctx.register_hook("pre_llm_call", on_pre_llm_call)
     ctx.register_middleware("llm_request", on_llm_request)
-    ctx.register_command("jev-routing", _status, description="Show the last routing decision")
+    ctx.register_command("jev-routing", _command, description="Show the last decision, or suggest from a scores file")
     return None
