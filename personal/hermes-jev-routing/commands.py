@@ -24,16 +24,16 @@ def explain(analysis: Optional[Analysis], decision: Optional[Decision], notes: t
             f"{kind} {float(score) * 100:.0f}%"
             for kind, score in sorted(probs.items(), key=lambda item: float(item[1]), reverse=True)
         )
-        lines.append(f"kind: {analysis.kind} (confidence {analysis.kind_confidence:.2f})")
+        lines.append(f"kind: {analysis.kind} (confidence {analysis.kind_confidence:.2f}/1)")
         if ranked:
             lines.append(f"      {ranked}")
         lines.append(
-            f"complexity: {analysis.complexity:.2f}/3 (conf {getattr(analysis, 'complexity_confidence', 0):.2f})"
+            f"complexity: {analysis.complexity:.2f}/3 (conf {getattr(analysis, 'complexity_confidence', 0):.2f}/1)"
         )
         lines.append(
-            f"capability: {analysis.budget_intensity:.2f}/3 (conf {getattr(analysis, 'capability_confidence', 0):.2f})"
+            f"capability: {analysis.budget_intensity:.2f}/3 (conf {getattr(analysis, 'capability_confidence', 0):.2f}/1)"
         )
-        lines.append(f"reasoning: {analysis.deep_reasoning:.2f}")
+        lines.append(f"reasoning: {analysis.deep_reasoning:.2f}/1")
         if getattr(analysis, "latency_ms", 0):
             lines.append(f"jev latency: {analysis.latency_ms}ms")
     if decision is None:

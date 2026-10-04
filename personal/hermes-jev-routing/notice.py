@@ -7,13 +7,19 @@ from typing import Optional
 
 def format_jev_line(decision, analysis=None) -> str:
     target = decision.target
-    parts = [str(decision.tier), f"{target.provider}/{target.model}"]
+    parts = [f"tier {decision.tier}", f"{target.provider}/{target.model}"]
     if target.thinking_level:
-        parts.append(str(target.thinking_level))
-    if analysis is not None:
-        parts.append(
-            f"{analysis.kind} {analysis.complexity:.2f}/{analysis.budget_intensity:.2f}/{analysis.deep_reasoning:.2f}"
-        )
+        parts.append(f"thinking {target.thinking_level}")
+    if analysis is None:
+        return " · ".join(parts)
+    parts.extend(
+        [
+            f"kind {analysis.kind}",
+            f"complexity {analysis.complexity:.2f}/3",
+            f"capability {analysis.budget_intensity:.2f}/3",
+            f"reasoning {analysis.deep_reasoning:.2f}/1",
+        ]
+    )
     return " · ".join(parts)
 
 

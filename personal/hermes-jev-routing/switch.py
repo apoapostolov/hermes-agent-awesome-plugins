@@ -8,6 +8,7 @@ Hermes.
 
 from __future__ import annotations
 
+import logging
 import sys
 import threading
 from typing import Any, Mapping, Optional
@@ -16,6 +17,9 @@ try:
     from .decide import TIERS, AvailableModel, Decision
 except ImportError:
     from decide import TIERS, AvailableModel, Decision
+
+
+logger = logging.getLogger(__name__)
 
 
 def _lock(owner: Any):
@@ -107,14 +111,56 @@ def current_model(agent: Any) -> Optional[AvailableModel]:
 
 
 def apply_switch(agent: Any, decision: Decision) -> str:
-    """Call switch_model when the live agent is not already on the pick."""
+    """Call switch_model with the destination credentials, not the current provider's."""
     provider = str(getattr(agent, "provider", "") or "")
     model_id = str(getattr(agent, "model", "") or "")
     if provider == decision.target.provider and model_id == decision.target.model:
         return "same"
-    agent.switch_model(decision.target.model, decision.target.provider)
+    resolved = _resolve_destination(agent, decision)
+    agent.switch_model(
+        resolved["model"],
+        resolved["provider"],
+        api_key=resolved["api_key"],
+        base_url=resolved["base_url"],
+        api_mode=resolved["api_mode"],
+    )
     _apply_thinking(agent, decision.target.thinking_level)
     return "switched"
+
+
+def _resolve_destination(agent: Any, decision: Decision) -> dict:
+    model = decision.target.model
+    provider = decision.target.provider
+    resolved = {
+        "model": model,
+        "provider": provider,
+        "api_key": "",
+        "base_url": "",
+        "api_mode": "",
+    }
+    try:
+        from hermes_cli.model_switch import switch_model as resolve_switch
+    except Exception:
+        return resolved
+    try:
+        result = resolve_switch(
+            raw_input=model,
+            current_provider=str(getattr(agent, "provider", "") or ""),
+            current_model=str(getattr(agent, "model", "") or ""),
+            current_base_url=str(getattr(agent, "base_url", "") or ""),
+            current_api_key=str(getattr(agent, "api_key", "") or ""),
+            explicit_provider=provider,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"could not resolve {provider}/{model}: {exc}") from exc
+    if not getattr(result, "success", False):
+        raise RuntimeError(getattr(result, "error_message", "") or f"could not resolve {provider}/{model}")
+    resolved["model"] = getattr(result, "new_model", "") or model
+    resolved["provider"] = getattr(result, "target_provider", "") or provider
+    resolved["api_key"] = getattr(result, "api_key", "") or ""
+    resolved["base_url"] = getattr(result, "base_url", "") or ""
+    resolved["api_mode"] = getattr(result, "api_mode", "") or ""
+    return resolved
 
 
 def _apply_thinking(agent: Any, level: Optional[str]) -> None:
@@ -141,4 +187,5 @@ def maybe_switch(
     try:
         return apply_switch(agent, decision)
     except Exception:
+        logger.warning("hermes-jev-routing switch failed", exc_info=True)
         return "switch-failed"

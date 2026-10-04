@@ -42,8 +42,15 @@ function dot() {
   return el
 }
 
+function runtimeSessionId(payload) {
+  const focused = host.state && host.state.focusedSessionId && typeof host.state.focusedSessionId.get === 'function'
+    ? host.state.focusedSessionId.get()
+    : ''
+  return focused || payload.session_id || ''
+}
+
 async function applyChoice(payload, pick) {
-  const sessionId = payload.session_id || ''
+  const sessionId = runtimeSessionId(payload)
   if (!sessionId || !pick) return
   const request = (confirmExpensive) =>
     host.request('config.set', {
@@ -189,8 +196,7 @@ export default {
         color: color-mix(in oklab, var(--color-muted-foreground) 60%, transparent);
         padding: 0 0.5rem;
         white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        overflow: visible;
       }
       [data-jev-strip] { display: flex; align-items: baseline; white-space: nowrap; }
       [data-jev-strip] button {

@@ -34,7 +34,7 @@ class NoticeTests(unittest.TestCase):
     def test_line_carries_tier_model_thinking_and_reason(self):
         self.assertEqual(
             format_jev_line(_decision()),
-            "premium · openai-codex/gpt-6-sol · medium",
+            "tier premium · openai-codex/gpt-6-sol · thinking medium",
         )
 
     def test_same_model_does_not_interrupt(self):
