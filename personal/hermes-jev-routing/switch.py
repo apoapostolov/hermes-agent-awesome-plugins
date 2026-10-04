@@ -92,7 +92,18 @@ def apply_switch(agent: Any, decision: Decision) -> str:
     if provider == decision.target.provider and model_id == decision.target.model:
         return "same"
     agent.switch_model(decision.target.model, decision.target.provider)
+    _apply_thinking(agent, decision.target.thinking_level)
     return "switched"
+
+
+def _apply_thinking(agent: Any, level: Optional[str]) -> None:
+    if not level or not hasattr(agent, "reasoning_config"):
+        return
+    name = str(level).strip().lower()
+    if name in {"off", "none", "false", "disabled"}:
+        agent.reasoning_config = {"enabled": False}
+        return
+    agent.reasoning_config = {"enabled": True, "effort": name}
 
 
 def maybe_switch(

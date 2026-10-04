@@ -88,6 +88,28 @@ class SwitchTests(unittest.TestCase):
         self.assertEqual(apply_switch(live, _decision("xai-oauth", "grok-4.6")), "same")
         self.assertEqual(live.calls, [])
 
+    def test_switch_sets_reasoning_effort_from_the_row(self):
+        live = FakeAgent("sess-6", "opencode-go", "space-bunny-free")
+        live.reasoning_config = {"enabled": True, "effort": "low"}
+        decision = _decision("xai-oauth", "grok-4.6")
+        decision = Decision(
+            desired_tier=decision.desired_tier,
+            tier=decision.tier,
+            target=RouteTarget("xai-oauth", "grok-4.6", thinking_level="high"),
+            model=decision.model,
+            tier_index=decision.tier_index,
+            demand_score=decision.demand_score,
+            budget_pressure=decision.budget_pressure,
+            downgraded=decision.downgraded,
+            low_confidence_fallback=decision.low_confidence_fallback,
+            kind_specialised=decision.kind_specialised,
+            held=decision.held,
+            reason=decision.reason,
+            notes=decision.notes,
+        )
+        self.assertEqual(apply_switch(live, decision), "switched")
+        self.assertEqual(live.reasoning_config, {"enabled": True, "effort": "high"})
+
 
 if __name__ == "__main__":
     unittest.main()

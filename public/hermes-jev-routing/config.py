@@ -55,6 +55,18 @@ class JevSettings:
     task_kinds: dict[str, str] = field(default_factory=lambda: dict(TASK_KINDS))
 
 
+def _floors(raw: Any) -> dict[str, float]:
+    if not isinstance(raw, Mapping):
+        return {}
+    floors: dict[str, float] = {}
+    for key, value in raw.items():
+        try:
+            floors[str(key)] = float(value)
+        except (TypeError, ValueError):
+            continue
+    return floors
+
+
 def _target(raw: Mapping[str, Any]) -> RouteTarget:
     return RouteTarget(
         provider=str(raw.get("provider") or ""),
@@ -62,6 +74,7 @@ def _target(raw: Mapping[str, Any]) -> RouteTarget:
         thinking_level=raw.get("thinkingLevel") or raw.get("thinking_level"),
         min_tier=raw.get("minTier") or raw.get("min_tier"),
         priority=int(raw.get("priority") or 0),
+        min_quota=_floors(raw.get("minQuota") or raw.get("min_quota")) or None,
     )
 
 
@@ -105,6 +118,16 @@ def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
         confirm_tiers=tuple(
             str(tier) for tier in ((data.get("confirm") or {}).get("tiers") or []) if tier
         ),
+        quota_floors={
+            str(provider): _floors((block or {}).get("minQuota") or (block or {}).get("min_quota"))
+            for provider, block in (data.get("quota") or {}).items()
+            if isinstance(block, Mapping)
+        },
+        quota_on_unknown={
+            str(provider): str((block or {}).get("onUnknown") or (block or {}).get("on_unknown") or "use")
+            for provider, block in (data.get("quota") or {}).items()
+            if isinstance(block, Mapping)
+        },
     )
     kinds_raw = data.get("taskKinds") or data.get("task_kinds") or {}
     task_kinds = dict(TASK_KINDS)

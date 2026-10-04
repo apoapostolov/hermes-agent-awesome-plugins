@@ -36,6 +36,7 @@ class RouteTarget:
     thinking_level: Optional[str] = None
     min_tier: Optional[str] = None
     priority: int = 0
+    min_quota: Optional[Mapping[str, float]] = None
 
 
 @dataclass(frozen=True)
@@ -92,6 +93,8 @@ class RouterConfig:
     cache: Cache = field(default_factory=Cache)
     free: FreePool = field(default_factory=FreePool)
     confirm_tiers: tuple[str, ...] = ()
+    quota_floors: Mapping[str, Mapping[str, float]] = field(default_factory=dict)
+    quota_on_unknown: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

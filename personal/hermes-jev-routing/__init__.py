@@ -16,11 +16,15 @@ try:
     from .config import load_router_config, models_from_config
     from .decide import Analysis, Decision, decide, same_provider_rewrite
     from .jev import JevError, classify
+    from .quota import codex_eligibility
+    from .quota_live import read_codex_remaining
     from .switch import current_model, find_live_agent, maybe_switch, tier_index_for
 except ImportError:
     from config import load_router_config, models_from_config
     from decide import Analysis, Decision, decide, same_provider_rewrite
     from jev import JevError, classify
+    from quota import codex_eligibility
+    from quota_live import read_codex_remaining
     from switch import current_model, find_live_agent, maybe_switch, tier_index_for
 
 logger = logging.getLogger(__name__)
@@ -112,6 +116,7 @@ def on_pre_llm_call(**kwargs):
             models_from_config(config),
             current_index=tier_index_for(config, current.provider, current.id) if current else None,
             current_model=current,
+            eligibility=codex_eligibility(config, read_codex_remaining()),
         )
         _LAST["decision"] = decision
         if decision is not None and decision.tier in set(config.confirm_tiers):

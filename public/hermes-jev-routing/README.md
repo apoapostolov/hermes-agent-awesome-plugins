@@ -12,7 +12,7 @@ Shadow is the default. Off does nothing. An empty config_path leaves routing ine
 
 The current user message and up to four thousand characters of recent user and assistant text go to TypeSafe on your key. A missing key, a timeout, or a bad answer leaves the turn on the model you already had.
 
-A tier listed under confirm.tiers is not rewritten. Quota floors in the file are not enforced yet.
+A tier listed under confirm.tiers is not rewritten. A Codex quota floor is checked only when a reading is available. This edition does not fetch one, so an unknown reading admits the model.
 
 ## Install
 
