@@ -97,6 +97,15 @@ class SpendSnapshot:
     daily_cap: Optional[float] = None
     monthly_cap: Optional[float] = None
 
+    def as_state(self) -> dict:
+        return {
+            "today": self.today,
+            "month": self.month,
+            "pressure": self.pressure,
+            "daily_cap": self.daily_cap,
+            "monthly_cap": self.monthly_cap,
+        }
+
 
 def spend_snapshot(ledger: dict, budget, now: Optional[datetime] = None) -> SpendSnapshot:
     today = float((ledger.get("days") or {}).get(day_key(now), {}).get("total") or 0)

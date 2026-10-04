@@ -83,18 +83,30 @@ def build_questions(task_kinds: Mapping[str, str]) -> dict:
     }
 
 
-def build_state(prompt: str, history: str = "", active_model: str = "") -> dict:
+def build_state(
+    prompt: str,
+    history: str = "",
+    active_model: str = "",
+    cwd: str = "",
+    context_tokens: int | None = None,
+    spend: Mapping | None = None,
+) -> dict:
     excerpt = history[-4000:] if history else None
+    money = dict(spend or {})
     return {
         "request": prompt,
         "conversation_excerpt": excerpt,
-        "environment": {"active_model": active_model or None},
+        "environment": {
+            "cwd": cwd or None,
+            "active_model": active_model or None,
+            "context_tokens_used": context_tokens,
+        },
         "budget": {
-            "spent_today_usd": 0,
-            "spent_this_month_usd": 0,
-            "daily_cap_usd": None,
-            "monthly_cap_usd": None,
-            "fraction_of_budget_used": 0,
+            "spent_today_usd": float(money.get("today") or 0.0),
+            "spent_this_month_usd": float(money.get("month") or 0.0),
+            "daily_cap_usd": money.get("daily_cap"),
+            "monthly_cap_usd": money.get("monthly_cap"),
+            "fraction_of_budget_used": float(money.get("pressure") or 0.0),
         },
     }
 
@@ -162,11 +174,14 @@ def classify(
     history: str = "",
     active_model: str = "",
     transport: Transport = urllib_transport,
+    cwd: str = "",
+    context_tokens: int | None = None,
+    spend: Mapping | None = None,
 ) -> Analysis:
     if not api_key:
         raise JevError("missing TypeSafe key")
     body = {
-        "state": build_state(prompt, history, active_model),
+        "state": build_state(prompt, history, active_model, cwd, context_tokens, spend),
         "model": jev_model,
         "questions": build_questions(task_kinds),
     }

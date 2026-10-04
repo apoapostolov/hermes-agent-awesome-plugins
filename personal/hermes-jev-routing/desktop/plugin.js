@@ -70,16 +70,8 @@ async function applyChoice(payload, pick) {
   }
 }
 
-function mountStatus(payload) {
-  const stack = document.querySelector('[data-slot="composer-status-stack"]')
-  if (!stack || !payload.status) return
-  let chip = stack.querySelector('[data-jev-status]')
-  if (!chip) {
-    chip = document.createElement('span')
-    chip.dataset.jevStatus = '1'
-    stack.appendChild(chip)
-  }
-  chip.textContent = payload.status
+function mountStatus() {
+  document.querySelectorAll('[data-jev-status]').forEach((node) => node.remove())
 }
 
 function rememberLine(payload) {
@@ -174,7 +166,7 @@ export default {
           const payload = payloadOf(frame)
           if (!payload || typeof payload.line !== 'string') return
           mount(payload)
-          mountStatus(payload)
+          mountStatus()
           rememberLine(payload)
           if (payload.apply) {
             applyChoice(payload, { provider: payload.provider, model: payload.model, thinking: payload.thinking })
@@ -189,8 +181,7 @@ export default {
     const style = document.createElement('style')
     style.textContent = `
       [data-jev-routing],
-      [data-jev-line],
-      [data-jev-status] {
+      [data-jev-line] {
         font-size: 0.6875rem;
         line-height: 1.25rem;
         color: color-mix(in oklab, var(--color-muted-foreground) 60%, transparent);

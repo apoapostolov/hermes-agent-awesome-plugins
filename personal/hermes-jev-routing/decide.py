@@ -106,6 +106,9 @@ class RouterConfig:
     quota_on_unknown: Mapping[str, str] = field(default_factory=dict)
     quota_enabled: Mapping[str, bool] = field(default_factory=dict)
     quota_ttl_sec: Mapping[str, int] = field(default_factory=dict)
+    ranking_cutoffs: Mapping[str, float] = field(default_factory=dict)
+    ranking_spread: bool = True
+    ranking_scores_file: str = ""
 
 
 @dataclass(frozen=True)

@@ -131,6 +131,7 @@ def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
     free = data.get("free") or {}
     cache = data.get("cache") or {}
     budget = data.get("budget") or {}
+    ranking = data.get("ranking") or {}
     config = RouterConfig(
         routes={tier: _chain(routes.get(tier)) for tier in ("quick", "standard", "high", "premium", "xpremium")},
         kind_models={str(kind): _chain(chain) for kind, chain in kinds.items() if isinstance(chain, list)},
@@ -178,6 +179,13 @@ def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
             for provider, block in (data.get("quota") or {}).items()
             if isinstance(block, Mapping)
         },
+        ranking_cutoffs={
+            str(name): float(value)
+            for name, value in (ranking.get("cutoffs") or {}).items()
+            if isinstance(value, (int, float))
+        },
+        ranking_spread=bool(ranking.get("spreadProviders", ranking.get("spread_providers", True))),
+        ranking_scores_file=str(ranking.get("scoresFile") or ranking.get("scores_file") or ""),
     )
     kinds_raw = data.get("taskKinds") or data.get("task_kinds") or {}
     task_kinds = dict(TASK_KINDS)

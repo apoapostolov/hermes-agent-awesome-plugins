@@ -18,6 +18,7 @@ try:
     from .decide import Analysis, Decision, decide, same_provider_rewrite
     from .jev import JevError, classify
     from .choice import decision_for_target, parse_confirm_choice, target_for_choice
+    from .availability import live_models
     from .commands import explain, revert_target, spend_lines
     from .hold import action_glyph, request_hold, should_hold_send, sticky_keep
     from .ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_cost
@@ -25,12 +26,14 @@ try:
     from .quota import codex_eligibility
     from .quota_live import read_codex_remaining
     from .settings_override import apply_setting_overrides, present_settings
+    from .skip import should_skip
     from .switch import current_model, find_live_agent, maybe_switch, tier_index_for
 except ImportError:
     from config import load_router_config, models_from_config
     from decide import Analysis, Decision, decide, same_provider_rewrite
     from jev import JevError, classify
     from choice import decision_for_target, parse_confirm_choice, target_for_choice
+    from availability import live_models
     from commands import explain, revert_target, spend_lines
     from hold import action_glyph, request_hold, should_hold_send, sticky_keep
     from ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_cost
@@ -38,6 +41,7 @@ except ImportError:
     from quota import codex_eligibility
     from quota_live import read_codex_remaining
     from settings_override import apply_setting_overrides, present_settings
+    from skip import should_skip
     from switch import current_model, find_live_agent, maybe_switch, tier_index_for
 
 logger = logging.getLogger(__name__)
@@ -78,6 +82,33 @@ def _load(path: str):
     config, settings = load_router_config(file)
     _LOADED.update(path=path, mtime=stamp, config=config, settings=settings)
     return config, settings
+
+
+def _cwd(agent) -> str:
+    for attr in ("cwd", "working_dir", "workspace"):
+        value = str(getattr(agent, attr, "") or "") if agent is not None else ""
+        if value:
+            return value
+    return str(getattr(_CTX, "cwd", "") or "") if _CTX is not None else ""
+
+
+def _context_tokens(agent) -> int | None:
+    if agent is None:
+        return None
+    for attr in ("_last_context_tokens", "context_tokens", "_context_tokens_used"):
+        value = getattr(agent, attr, None)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+    try:
+        compressor = getattr(agent, "context_compressor", None)
+        if compressor is not None:
+            for attr in ("current_tokens", "tokens", "last_prompt_tokens"):
+                value = getattr(compressor, attr, None)
+                if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                    return value
+    except Exception:
+        return None
+    return None
 
 
 def _history(messages, turns: int) -> str:
@@ -184,13 +215,17 @@ def on_pre_llm_call(**kwargs):
             elif switched in {"missing-agent", "switch-failed"}:
                 _LAST["blocked"] = switched
             return None
-        if len(prompt) < config.min_prompt_chars:
+        history = _history(kwargs.get("conversation_history"), settings.history_turns)
+        skip = should_skip(prompt, config.min_prompt_chars, bool(history))
+        if skip:
+            _LAST["blocked"] = f"skip:{skip}"
             return None
         key = os.environ.get(settings.api_key_env, "")
         endpoint = os.environ.get(settings.endpoint_env, "") or settings.endpoint
         active = str(kwargs.get("model") or "")
         agent = find_live_agent(str(kwargs.get("session_id") or ""))
         current = current_model(agent) if agent is not None else None
+        spent = _spend(config)
         analysis = classify(
             prompt,
             api_key=key,
@@ -198,19 +233,21 @@ def on_pre_llm_call(**kwargs):
             jev_model=settings.jev_model,
             task_kinds=settings.task_kinds,
             timeout_ms=settings.timeout_ms,
-            history=_history(kwargs.get("conversation_history"), settings.history_turns),
+            history=history,
             active_model=active,
+            cwd=_cwd(agent),
+            context_tokens=_context_tokens(agent),
+            spend=spent[1].as_state() if spent is not None else None,
         )
         file = state_path(path)
         ledger = load_ledger(file)
         record_jev(ledger)
         save_ledger(file, ledger)
-        spent = _spend(config)
         gate = codex_eligibility(config, read_codex_remaining(), now_ms=time.time() * 1000)
         decision = decide(
             analysis,
             config,
-            models_from_config(config),
+            live_models(models_from_config(config)),
             current_index=tier_index_for(config, current.provider, current.id) if current else None,
             current_model=current,
             eligibility=gate,
