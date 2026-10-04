@@ -18,7 +18,8 @@ try:
     from .decide import Analysis, Decision, decide, same_provider_rewrite
     from .jev import JevError, classify
     from .choice import decision_for_target, parse_confirm_choice, target_for_choice
-    from .commands import explain, revert_target
+    from .commands import explain, revert_target, spend_lines
+    from .hold import action_glyph, request_hold, should_hold_send, sticky_keep
     from .ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_cost
     from .notice import publish_route, route_payload
     from .quota import codex_eligibility
@@ -30,7 +31,8 @@ except ImportError:
     from decide import Analysis, Decision, decide, same_provider_rewrite
     from jev import JevError, classify
     from choice import decision_for_target, parse_confirm_choice, target_for_choice
-    from commands import explain, revert_target
+    from commands import explain, revert_target, spend_lines
+    from hold import action_glyph, request_hold, should_hold_send, sticky_keep
     from ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_cost
     from notice import publish_route, route_payload
     from quota import codex_eligibility
@@ -216,9 +218,7 @@ def on_pre_llm_call(**kwargs):
         )
         _remember_route(prompt, analysis, decision, getattr(decision, "notes", ()) if decision else ())
         _LAST["quota_notes"] = list(getattr(gate, "notes", ()))
-        publish_route(route_payload(
-            decision, current, config, str(kwargs.get("session_id") or ""), analysis, mode,
-        ))
+        sticky = sticky_keep(config, current, decision)
         changed = current is None or (
             decision is not None
             and (current.provider != decision.target.provider or current.id != decision.target.model)
@@ -226,13 +226,17 @@ def on_pre_llm_call(**kwargs):
         hold_confirm = (
             decision is not None
             and changed
+            and not sticky
             and (
                 mode == "confirm"
                 or (decision.tier in set(config.confirm_tiers) and config.confirm_on_timeout != "accept")
             )
             and mode not in {"shadow", "notify", "off"}
         )
-        if hold_confirm:
+        if sticky:
+            switched = "same"
+            _LAST["blocked"] = "kept"
+        elif hold_confirm:
             _LAST["blocked"] = "confirm"
             switched = "skip"
         else:
@@ -243,6 +247,19 @@ def on_pre_llm_call(**kwargs):
             _LAST["applied"] = decision.target.model if decision else ""
         elif switched in {"missing-agent", "switch-failed"}:
             _LAST["blocked"] = switched
+        glyph = action_glyph(sticky=sticky, switched=switched, mode=mode)
+        status = f"jev {decision.tier}" if decision is not None else "jev"
+        if spent is not None and spent[1].pressure > 0:
+            status = f"{status} {spent[1].pressure * 100:.0f}%"
+        publish_route(route_payload(
+            decision, current, config, str(kwargs.get("session_id") or ""), analysis, mode,
+            glyph=glyph, prompt=prompt, status=status,
+        ))
+        if should_hold_send(decision, switched, current, gate) and agent is not None:
+            held = request_hold(agent, "prompt not sent; current model is quota-ineligible")
+            if held:
+                _LAST["blocked"] = "quota"
+                return None
     except (JevError, OSError, TimeoutError, ValueError):
         logger.warning("hermes-jev-routing left the turn unrouted", exc_info=True)
     return None
@@ -285,7 +302,7 @@ def _command(raw: str = "") -> str:
             from ranking import suggestion_text
         return suggestion_text(path, write="--write" in parts)
     if head == ["why"]:
-        return explain(_LAST.get("analysis"), _LAST.get("decision") if isinstance(_LAST.get("decision"), Decision) else None, tuple(_LAST.get("notes") or ()))
+        return _dry_route(str(_LAST.get("prompt") or ""))
     if head == ["route"]:
         return _dry_route(" ".join(parts[1:]))
     if head == ["revert"]:
@@ -352,13 +369,31 @@ def _budget_command(parts) -> str:
 
 def _status() -> str:
     decision = _LAST.get("decision")
-    if not isinstance(decision, Decision):
-        return f"hermes-jev-routing {_LAST.get('mode', 'shadow')}: no decision yet"
-    target = f"{decision.target.provider}/{decision.target.model}"
-    held = " held" if decision.held else ""
+    path = str(_LAST.get("config_path") or "")
+    loaded = _load(path) if path else (None, None)
+    config = loaded[0]
+    lines = [f"mode: {_LAST.get('mode', 'shadow')}"]
+    if config is not None:
+        spent = _spend(config)
+        if spent is not None:
+            lines.append(spend_lines(spent[1]))
+        lines.append("routes:")
+        for tier, chain in config.routes.items():
+            if not chain:
+                lines.append(f"  {tier}: (none)")
+                continue
+            head = chain[0]
+            extra = f" (+{len(chain) - 1})" if len(chain) > 1 else ""
+            lines.append(f"  {tier}: {head.provider}/{head.model}{extra}")
+    if isinstance(decision, Decision):
+        lines.append(f"last: {decision.reason} -> {decision.target.provider}/{decision.target.model}")
+    else:
+        lines.append("last: none")
     blocked = _LAST.get("blocked")
-    extra = f" blocked:{blocked}" if blocked else ""
-    return f"hermes-jev-routing {_LAST.get('mode', 'shadow')}{held}: {decision.reason} -> {target}{extra}"
+    if blocked:
+        lines.append(f"blocked: {blocked}")
+    lines.append("commands: why, route <text>, revert, budget daily|monthly <usd>, suggest [--write]")
+    return "\n".join(lines)
 
 
 def remember(decision: Decision | None, mode: str) -> None:
@@ -383,4 +418,19 @@ def register(ctx):
     ctx.register_hook("post_api_request", on_post_api_request)
     ctx.register_middleware("llm_request", on_llm_request)
     ctx.register_command("jev-routing", _command, description="Status, why, route, revert, budget, or suggest")
+    ctx.register_tool(
+        name="jev_route",
+        toolset="hermes-jev-routing",
+        schema={
+            "name": "jev_route",
+            "description": "Ask which model tier a request deserves. Does not switch the session.",
+            "parameters": {
+                "type": "object",
+                "properties": {"text": {"type": "string", "description": "The request to classify."}},
+                "required": ["text"],
+            },
+        },
+        handler=lambda args, **kwargs: _dry_route(str((args or {}).get("text") or "")),
+        description="Classify a request without switching.",
+    )
     return None

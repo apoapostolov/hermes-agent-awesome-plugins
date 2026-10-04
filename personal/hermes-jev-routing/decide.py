@@ -53,6 +53,10 @@ class Analysis:
     budget_intensity: float
     deep_reasoning: float
     kind_confidence: float = 1.0
+    kind_probabilities: dict = field(default_factory=dict)
+    complexity_confidence: float = 0.0
+    capability_confidence: float = 0.0
+    latency_ms: int = 0
 
 
 @dataclass(frozen=True)

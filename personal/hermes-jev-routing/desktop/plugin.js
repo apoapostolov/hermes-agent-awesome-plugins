@@ -63,6 +63,43 @@ async function applyChoice(payload, pick) {
   }
 }
 
+function mountStatus(payload) {
+  const stack = document.querySelector('[data-slot="composer-status-stack"]')
+  if (!stack || !payload.status) return
+  let chip = stack.querySelector('[data-jev-status]')
+  if (!chip) {
+    chip = document.createElement('span')
+    chip.dataset.jevStatus = '1'
+    stack.appendChild(chip)
+  }
+  chip.textContent = payload.status
+}
+
+function rememberLine(payload) {
+  if (!payload.prompt || !payload.line) return
+  const key = 'hermes-jev-routing-lines'
+  const rows = JSON.parse(sessionStorage.getItem(key) || '[]')
+  const next = [{ prompt: payload.prompt, line: payload.line }, ...rows.filter((row) => row.prompt !== payload.prompt)].slice(0, 20)
+  sessionStorage.setItem(key, JSON.stringify(next))
+}
+
+function reattach() {
+  const raw = sessionStorage.getItem('hermes-jev-routing-lines')
+  if (!raw) return
+  const rows = JSON.parse(raw)
+  document.querySelectorAll('[data-slot="aui_user-message-root"]').forEach((user) => {
+    const text = (user.textContent || '').slice(0, 80)
+    const row = rows.find((item) => text && item.prompt && text.includes(item.prompt.slice(0, 24)))
+    if (!row || user.parentNode.querySelector(':scope > [data-jev-routing]')) return
+    const block = document.createElement('div')
+    block.dataset.jevRouting = '1'
+    block.dataset.jevStored = '1'
+    const line = document.createElement('div')
+    line.dataset.jevLine = '1'
+    line.textContent = row.line
+    block.appendChild(line)
+    user.insertAdjacentElement('afterend', block)
+  })
 function mount(payload) {
   const user = latestUserRoot()
   if (!user || !user.parentNode) return
@@ -127,6 +164,8 @@ export default {
           const payload = payloadOf(frame)
           if (!payload || typeof payload.line !== 'string') return
           mount(payload)
+          mountStatus(payload)
+          rememberLine(payload)
         })
       : null
     ctx.onDispose(() => {
@@ -150,7 +189,17 @@ export default {
       }
       [data-jev-strip] [data-strong] { font-weight: 600; color: var(--foreground); }
       [data-jev-strip] [data-dot] { padding: 0 0.35rem; color: color-mix(in srgb, var(--muted-foreground) 35%, transparent); }
+      [data-jev-status] {
+        font-size: 0.6875rem;
+        line-height: 1.25rem;
+        color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+        padding: 0 0.5rem;
+      }
     `
     document.head.appendChild(style)
+    reattach()
+    const observer = new MutationObserver(() => reattach())
+    observer.observe(document.body, { childList: true, subtree: true })
+    ctx.onDispose(() => observer.disconnect())
   },
 }

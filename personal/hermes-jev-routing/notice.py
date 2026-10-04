@@ -31,7 +31,7 @@ def should_interrupt(decision, current, confirm_tiers, mode: str = "auto") -> bo
     return decision.tier in set(confirm_tiers)
 
 
-def route_payload(decision, current, config, session_id: str, analysis=None, mode: str = "auto") -> Optional[dict]:
+def route_payload(decision, current, config, session_id: str, analysis=None, mode: str = "auto", glyph: str = "", prompt: str = "", status: str = "") -> Optional[dict]:
     if decision is None:
         return None
     heads = {}
@@ -50,7 +50,10 @@ def route_payload(decision, current, config, session_id: str, analysis=None, mod
         free = {"provider": row.provider, "model": row.model, "thinking": row.thinking_level}
     return {
         "session_id": session_id,
-        "line": format_jev_line(decision, analysis),
+        "line": f"{glyph} {format_jev_line(decision, analysis)}".strip(),
+        "glyph": glyph,
+        "prompt": prompt[:80],
+        "status": status,
         "interrupt": should_interrupt(decision, current, config.confirm_tiers, mode),
         "offered_tier": decision.tier,
         "provider": decision.target.provider,

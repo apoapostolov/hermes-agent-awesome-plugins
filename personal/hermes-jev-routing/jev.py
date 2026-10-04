@@ -119,12 +119,20 @@ def parse_analysis(payload: Mapping[str, object], task_kinds: Mapping[str, str])
     deep = _num(reasoning.get("noul"))
     if deep is None:
         deep = _num(reasoning.get("noul_score")) or 0.0
+    probs = kind.get("probabilities") if isinstance(kind.get("probabilities"), Mapping) else {}
+    latency = _num(payload.get("latency_ms"))
+    if latency is None:
+        latency = _num(payload.get("latencyMs")) or 0.0
     return Analysis(
         kind=chosen,
         complexity=_num(complexity.get("score")) if _num(complexity.get("score")) is not None else 1.0,
         budget_intensity=_num(capability.get("score")) if _num(capability.get("score")) is not None else 1.0,
         deep_reasoning=deep,
         kind_confidence=_num(kind.get("confidence")) or 0.0,
+        kind_probabilities={str(key): float(value) for key, value in probs.items() if _num(value) is not None},
+        complexity_confidence=_num(complexity.get("confidence")) or 0.0,
+        capability_confidence=_num(capability.get("confidence")) or 0.0,
+        latency_ms=int(latency),
     )
 
 

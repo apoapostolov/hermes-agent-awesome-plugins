@@ -19,14 +19,23 @@ def explain(analysis: Optional[Analysis], decision: Optional[Decision], notes: t
         return "no routed prompt yet in this session"
     lines = []
     if analysis is not None:
-        lines.extend(
-            [
-                f"kind: {analysis.kind} (confidence {analysis.kind_confidence:.2f})",
-                f"complexity: {analysis.complexity:.2f}/3",
-                f"capability: {analysis.budget_intensity:.2f}/3",
-                f"reasoning: {analysis.deep_reasoning:.2f}",
-            ]
+        probs = getattr(analysis, "kind_probabilities", None) or {}
+        ranked = ", ".join(
+            f"{kind} {float(score) * 100:.0f}%"
+            for kind, score in sorted(probs.items(), key=lambda item: float(item[1]), reverse=True)
         )
+        lines.append(f"kind: {analysis.kind} (confidence {analysis.kind_confidence:.2f})")
+        if ranked:
+            lines.append(f"      {ranked}")
+        lines.append(
+            f"complexity: {analysis.complexity:.2f}/3 (conf {getattr(analysis, 'complexity_confidence', 0):.2f})"
+        )
+        lines.append(
+            f"capability: {analysis.budget_intensity:.2f}/3 (conf {getattr(analysis, 'capability_confidence', 0):.2f})"
+        )
+        lines.append(f"reasoning: {analysis.deep_reasoning:.2f}")
+        if getattr(analysis, "latency_ms", 0):
+            lines.append(f"jev latency: {analysis.latency_ms}ms")
     if decision is None:
         lines.append("no route available")
     else:
