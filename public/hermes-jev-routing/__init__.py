@@ -156,7 +156,7 @@ def on_pre_llm_call(**kwargs):
     _LAST["blocked"] = ""
     _LAST["applied"] = ""
     _LAST["decision"] = None
-    if mode == "off":
+    if mode == "off" or _LAST.get("enabled") is False:
         return None
     path = str(_LAST.get("config_path") or "")
     prompt = str(kwargs.get("user_message") or "").strip()
@@ -241,6 +241,11 @@ def on_pre_llm_call(**kwargs):
             switched = "skip"
         else:
             switched = maybe_switch(decision, str(kwargs.get("session_id") or ""), mode)
+        logger.info(
+            "hermes-jev-routing pick %s status=%s",
+            getattr(getattr(decision, "target", None), "model", ""),
+            switched,
+        )
         if switched == "switched":
             if current is not None:
                 _LAST["previous"] = {"provider": current.provider, "model": current.id}
@@ -301,6 +306,18 @@ def _command(raw: str = "") -> str:
         except ImportError:
             from ranking import suggestion_text
         return suggestion_text(path, write="--write" in parts)
+    if head == ["on"]:
+        _LAST["enabled"] = True
+        return "jev-routing enabled for this session"
+    if head == ["off"]:
+        _LAST["enabled"] = False
+        return "jev-routing disabled for this session"
+    if head == ["mode"]:
+        name = (parts[1] if len(parts) > 1 else "").lower()
+        if name not in {"auto", "confirm", "notify", "shadow", "off"}:
+            return "usage: /jev-routing mode auto|confirm|notify"
+        _LAST["mode"] = name
+        return f"jev-routing mode: {name} for this session"
     if head == ["why"]:
         return _dry_route(str(_LAST.get("prompt") or ""))
     if head == ["route"]:

@@ -78,13 +78,14 @@ function mountStatus(payload) {
 function rememberLine(payload) {
   if (!payload.prompt || !payload.line) return
   const key = 'hermes-jev-routing-lines'
-  const rows = JSON.parse(sessionStorage.getItem(key) || '[]')
+  const rows = JSON.parse(localStorage.getItem(key) || '[]')
   const next = [{ prompt: payload.prompt, line: payload.line }, ...rows.filter((row) => row.prompt !== payload.prompt)].slice(0, 20)
   sessionStorage.setItem(key, JSON.stringify(next))
+  localStorage.setItem(key, JSON.stringify(next))
 }
 
 function reattach() {
-  const raw = sessionStorage.getItem('hermes-jev-routing-lines')
+  const raw = localStorage.getItem('hermes-jev-routing-lines') || sessionStorage.getItem('hermes-jev-routing-lines')
   if (!raw) return
   const rows = JSON.parse(raw)
   document.querySelectorAll('[data-slot="aui_user-message-root"]').forEach((user) => {
@@ -168,6 +169,9 @@ export default {
           mount(payload)
           mountStatus(payload)
           rememberLine(payload)
+          if (payload.apply) {
+            applyChoice(payload, { provider: payload.provider, model: payload.model, thinking: payload.thinking })
+          }
         })
       : null
     ctx.onDispose(() => {

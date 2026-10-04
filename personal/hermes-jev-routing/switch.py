@@ -42,10 +42,31 @@ def _cache_hit(owner: Any, session_id: str) -> Any:
     if not isinstance(cache, Mapping):
         return None
     with _lock(owner):
-        for entry in list(cache.values()):
+        for key, entry in list(cache.items()):
             agent = _agent_from_cache_entry(entry)
             if _matches(agent, session_id):
                 return agent
+            if session_id and session_id in str(key) and callable(getattr(agent, "switch_model", None)):
+                return agent
+    return None
+
+
+def _gc_agent(session_id: str) -> Any:
+    try:
+        import gc
+    except Exception:
+        return None
+    try:
+        objects = gc.get_objects()
+    except Exception:
+        return None
+    for obj in objects:
+        try:
+            hit = _cache_hit(obj, session_id)
+        except Exception:
+            continue
+        if hit is not None:
+            return hit
     return None
 
 
@@ -66,7 +87,7 @@ def find_live_agent(session_id: str, frames: Optional[Mapping[int, Any]] = None)
                 if _matches(value, session_id):
                     return value
             current = getattr(current, "f_back", None)
-    return None
+    return _gc_agent(session_id)
 
 
 def tier_index_for(config: Any, provider: str, model_id: str) -> Optional[int]:

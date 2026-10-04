@@ -46,12 +46,14 @@ def route_payload(decision, current, config, session_id: str, analysis=None, mod
     if config.free.enabled and config.free.pool:
         row = config.free.pool[0]
         free = {"provider": row.provider, "model": row.model, "thinking": row.thinking_level}
+    changed = current is None or current.provider != decision.target.provider or current.id != decision.target.model
     return {
         "session_id": session_id,
         "line": f"{glyph} {format_jev_line(decision, analysis)}".strip(),
         "glyph": glyph,
         "prompt": prompt[:80],
         "status": status,
+        "apply": bool(changed and mode == "auto" and not should_interrupt(decision, current, config.confirm_tiers, mode)),
         "interrupt": should_interrupt(decision, current, config.confirm_tiers, mode),
         "offered_tier": decision.tier,
         "provider": decision.target.provider,

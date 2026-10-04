@@ -36,15 +36,31 @@ def should_hold_send(decision, switched: str, current, gate) -> bool:
 
 
 def request_hold(agent, reason: str) -> bool:
-    """Set the interrupt the streaming call checks before it opens a socket."""
+    """Set the interrupt both API paths check before they open a socket."""
     interrupt = getattr(agent, "interrupt", None)
-    if not callable(interrupt):
-        return False
-    try:
-        interrupt(reason)
-        return True
-    except Exception:
-        return False
+    if callable(interrupt):
+        try:
+            interrupt(reason)
+        except Exception:
+            return False
+    else:
+        try:
+            agent._interrupt_requested = True
+            agent._interrupt_message = reason
+        except Exception:
+            return False
+    original = getattr(agent, "_interruptible_api_call", None)
+    if callable(original) and not getattr(original, "_jev_hold", False):
+        def wrapped(*args, **kwargs):
+            if getattr(agent, "_interrupt_requested", False):
+                raise InterruptedError(reason)
+            return original(*args, **kwargs)
+        wrapped._jev_hold = True
+        try:
+            agent._interruptible_api_call = wrapped
+        except Exception:
+            pass
+    return True
 
 
 def action_glyph(*, sticky: bool, switched: str, mode: str) -> str:
