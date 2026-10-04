@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from pathlib import Path
 
 try:
@@ -110,16 +111,23 @@ def on_pre_llm_call(**kwargs):
             history=_history(kwargs.get("conversation_history"), settings.history_turns),
             active_model=active,
         )
+        gate = codex_eligibility(config, read_codex_remaining(), now_ms=time.time() * 1000)
         decision = decide(
             analysis,
             config,
             models_from_config(config),
             current_index=tier_index_for(config, current.provider, current.id) if current else None,
             current_model=current,
-            eligibility=codex_eligibility(config, read_codex_remaining()),
+            eligibility=gate,
         )
         _LAST["decision"] = decision
-        if decision is not None and decision.tier in set(config.confirm_tiers):
+        _LAST["quota_notes"] = list(getattr(gate, "notes", ()))
+        hold_confirm = (
+            decision is not None
+            and decision.tier in set(config.confirm_tiers)
+            and config.confirm_on_timeout != "accept"
+        )
+        if hold_confirm:
             _LAST["blocked"] = "confirm"
             switched = "skip"
         else:

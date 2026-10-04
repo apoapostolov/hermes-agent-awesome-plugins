@@ -118,6 +118,7 @@ def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
         confirm_tiers=tuple(
             str(tier) for tier in ((data.get("confirm") or {}).get("tiers") or []) if tier
         ),
+        confirm_on_timeout=str((data.get("confirm") or {}).get("onTimeout") or (data.get("confirm") or {}).get("on_timeout") or "reject"),
         quota_floors={
             str(provider): _floors((block or {}).get("minQuota") or (block or {}).get("min_quota"))
             for provider, block in (data.get("quota") or {}).items()
@@ -125,6 +126,16 @@ def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
         },
         quota_on_unknown={
             str(provider): str((block or {}).get("onUnknown") or (block or {}).get("on_unknown") or "use")
+            for provider, block in (data.get("quota") or {}).items()
+            if isinstance(block, Mapping)
+        },
+        quota_enabled={
+            str(provider): bool((block or {}).get("enabled", True))
+            for provider, block in (data.get("quota") or {}).items()
+            if isinstance(block, Mapping)
+        },
+        quota_ttl_sec={
+            str(provider): int((block or {}).get("cacheTtlSec") or (block or {}).get("cache_ttl_sec") or 120)
             for provider, block in (data.get("quota") or {}).items()
             if isinstance(block, Mapping)
         },

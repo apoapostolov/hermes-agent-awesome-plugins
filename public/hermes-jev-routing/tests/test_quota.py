@@ -47,6 +47,30 @@ class QuotaTests(unittest.TestCase):
         self.assertEqual(decision.target.model, "grok-4.6")
         self.assertTrue(any("skipped" in note for note in decision.notes))
 
+    def test_stale_or_reset_reading_is_unknown(self):
+        from quota import QuotaReading, QuotaSnapshot, evaluate_codex, parse_codex_payload
+
+        target = RouteTarget("openai-codex", "gpt-6-luna", min_quota={"fiveHour": 0.05})
+        stale = QuotaSnapshot(fetched_at=0, windows={"fiveHour": QuotaReading(0.9)})
+        allowed, notes = evaluate_codex(
+            target, enabled=True, floors={"fiveHour": 0.05}, on_unknown="use",
+            ttl_sec=120, snapshot=stale, now_ms=200_000,
+        )
+        self.assertTrue(allowed)
+        self.assertIn("unknown", notes[0])
+        reset = QuotaSnapshot(fetched_at=1_000_000, windows={"fiveHour": QuotaReading(0.9, reset_at=500_000)})
+        allowed, notes = evaluate_codex(
+            target, enabled=True, floors={"fiveHour": 0.05}, on_unknown="skip",
+            ttl_sec=120, snapshot=reset, now_ms=1_010_000,
+        )
+        self.assertFalse(allowed)
+        parsed = parse_codex_payload(
+            {"rate_limit": {"primary_window": {"limit_window_seconds": 18000, "used_percent": 20, "reset_at": 50}}},
+            10_000,
+        )
+        self.assertAlmostEqual(parsed.windows["fiveHour"].remaining, 0.8)
+        self.assertEqual(parsed.windows["fiveHour"].reset_at, 50_000)
+
 
 if __name__ == "__main__":
     unittest.main()

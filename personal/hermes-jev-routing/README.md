@@ -12,7 +12,7 @@ Shadow is the default. It decides and does not switch. Off does nothing. An empt
 
 The current user message and up to four thousand characters of recent user and assistant text go to TypeSafe on your key. A missing key, a timeout, or a bad answer leaves the turn on the model you already had.
 
-Quota floors are checked when a Codex reading is available. A missing reading admits the model. A successful switch sets the session reasoning effort from the chosen row. A tier listed under confirm.tiers is still recorded and left alone, because this build has no approval dialog.
+Quota floors are checked when a Codex reading is fresh and has not reset. A missing, stale, or reset reading follows onUnknown, which admits the model unless it says skip. A successful switch sets the session reasoning effort from the chosen row. A tier listed under confirm.tiers is held when onTimeout is reject. There is still no approval prompt, so that tier cannot be accepted from the turn.
 
 ## Install
 

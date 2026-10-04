@@ -93,8 +93,11 @@ class RouterConfig:
     cache: Cache = field(default_factory=Cache)
     free: FreePool = field(default_factory=FreePool)
     confirm_tiers: tuple[str, ...] = ()
+    confirm_on_timeout: str = "reject"
     quota_floors: Mapping[str, Mapping[str, float]] = field(default_factory=dict)
     quota_on_unknown: Mapping[str, str] = field(default_factory=dict)
+    quota_enabled: Mapping[str, bool] = field(default_factory=dict)
+    quota_ttl_sec: Mapping[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
