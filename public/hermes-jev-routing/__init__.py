@@ -18,6 +18,7 @@ try:
     from .decide import Analysis, Decision, decide, same_provider_rewrite
     from .jev import JevError, classify
     from .choice import decision_for_target, parse_confirm_choice, target_for_choice
+    from .notice import publish_route, route_payload
     from .quota import codex_eligibility
     from .quota_live import read_codex_remaining
     from .switch import current_model, find_live_agent, maybe_switch, tier_index_for
@@ -26,6 +27,7 @@ except ImportError:
     from decide import Analysis, Decision, decide, same_provider_rewrite
     from jev import JevError, classify
     from choice import decision_for_target, parse_confirm_choice, target_for_choice
+    from notice import publish_route, route_payload
     from quota import codex_eligibility
     from quota_live import read_codex_remaining
     from switch import current_model, find_live_agent, maybe_switch, tier_index_for
@@ -141,6 +143,7 @@ def on_pre_llm_call(**kwargs):
         )
         _LAST["decision"] = decision
         _LAST["quota_notes"] = list(getattr(gate, "notes", ()))
+        publish_route(route_payload(decision, current, config, str(kwargs.get("session_id") or "")))
         hold_confirm = (
             decision is not None
             and decision.tier in set(config.confirm_tiers)

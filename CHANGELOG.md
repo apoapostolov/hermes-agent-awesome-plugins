@@ -11,7 +11,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ### Changed
 
-- hermes-jev-routing. A confirm click named `jev-confirm:free` switches to the first free-pool model before the client sends. `x` keeps the current model. The preview click itself does not switch.
+- hermes-jev-routing. The Jev line is broadcast when the user sends, and the desktop half mounts it under that prompt. The confirm strip sits under the line only when the weight wants a different model.
 
 - The chip refuses a click on a new chat instead of silently swallowing it, and its tooltip names the door that works there: the composer's Thinking menu, whose pick ships with `session.create`. A remembered pick could never be applied, because `session.create` reads the app's composer atom and not a plugin's variable.
 - Removed the pending-pick machinery, which was unreachable once the chip stopped pretending.
