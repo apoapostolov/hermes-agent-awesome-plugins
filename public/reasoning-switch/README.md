@@ -23,7 +23,7 @@
 - Follow an external pick: change the level from the composer menu or `/reasoning` and the chip tracks it.
 - Land on a session already running a level outside your rotation and keep clicking: it steps back into the rotation instead of freezing.
 - Chip labels stay short (`XHigh`, not `Extra High`) and never wrap, whatever the level or the prompt counter.
-- Set the level on a brand-new session before you send: the pick is remembered and applied as soon as the session starts.
+- On a brand-new chat, before the first send, set thinking from the composer's Thinking menu; that pick ships with the session. The chip cannot change a new chat and says so on hover.
 
 ## Install
 

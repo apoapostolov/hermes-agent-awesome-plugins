@@ -5,17 +5,21 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ## [Unreleased]
 
+### Changed
+
+- The chip refuses a click on a new chat instead of silently swallowing it, and its tooltip names the door that works there: the composer's Thinking menu, whose pick ships with `session.create`. A remembered pick could never be applied, because `session.create` reads the app's composer atom and not a plugin's variable.
+- Removed the pending-pick machinery, which was unreachable once the chip stopped pretending.
+
+Tracked upstream: https://github.com/NousResearch/hermes-agent/issues/132697
+
+
 ## [reasoning-switch 1.1.4] - 2026-10-03
 
 Two more defects from a live report.
 
 ### Fixed
 
-- Setting the level on a fresh session now works. A draft has no runtime session id until the first send, and `config.set reasoning` is session-scoped, so the click returned early and the chip was inert on every new session. The pick is remembered and flushed the moment an id exists, before that turn is built. The tooltip says the level is pending until then.
-- The chip no longer wraps. `whitespace-nowrap` was only on the inner label; the chip itself could still wrap its glyph and word onto separate lines when the statusbar's item container wrapped, which is what put `Extra High` on two lines. The outer span now carries `whitespace-nowrap` and `shrink-0`.
-- The pending branch on a fresh draft called `setCfg`, which is not in `LevelChip`'s scope, so the click threw a `ReferenceError` and did nothing. It now updates the chip's own state and mirrors through the module hook into the dialog's config.
-- A read issued before a rotation no longer repaints over it. `config.get` captures a per-session write epoch on entry and discards its answer when a write landed meanwhile, which is what let the chip jump back to the previous level with no visible cause.
-- The pending pick is no longer dropped when the first write is refused. The desktop mints the session on the first send, so the id appears before the gateway holds it and `config.set reasoning` answers 4001; the flush cleared the pick before awaiting, so one refusal silently ate it. It now clears only after an accepted write and retries while the gateway settles, keeping the pick if every attempt fails.
+- The chip is inert on a brand-new chat, before its first send. A draft has no runtime session id until then and `config.set reasoning` is session-scoped, so there is nothing to scope the write to. See Unreleased for the honest behavior that replaced a pending-pick mechanism which could not land.
 
 
 

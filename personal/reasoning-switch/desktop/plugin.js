@@ -192,6 +192,8 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
   const [wire, setWire] = useState('') // level the route actually sends
   const [remaining, setRemaining] = useState(null) // prompts left at this level
   const [flash, setFlash] = useState(false)
+  // A draft has no session to scope a write to. See the draft guard in rotate.
+  const onDraft = !sessionId
 
   // Follow tile focus.
   useEffect(() => host.state.focusedSessionId.subscribe(id => setSessionId(id)), [])
@@ -210,41 +212,6 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
       alive = false
     }
   }, [sessionId])
-
-  // The reliable trigger. session.info only arrives for a session the gateway
-  // actually holds and has finished building, so a pick made on a draft lands
-  // here even when the retry ladder above ran out. This is the channel the
-  // app's own composer uses; a bare config.set on a not-yet-minted session
-  // cannot work, because the desktop mints the session on the first send.
-  useEffect(
-    () =>
-      _onSessionInfo(event => {
-        if (!event?.session_id || event.session_id !== sessionId || !_pendingLevel) return
-        const wanted = _pendingLevel
-        const eff = normalizeEffort(event?.payload?.reasoning_effort)
-        console.error('[reasoning-switch] session.info arrived', sessionId, 'effort=', eff, 'pending=', wanted)
-        // The session already reports the wanted level: nothing to write.
-        if (eff === wanted) {
-          _pendingLevel = null
-          setLive(wanted)
-          setRemaining(cfg.levels[wanted]?.maxPrompts ?? null)
-          _syncCurrent(wanted)
-          return
-        }
-        // No reported level yet (the gateway may stamp it later in the frame
-        // set). Still write: a pending pick must not wait on a field that may
-        // never arrive for a session whose turn has not built.
-        setEffort(sessionId, wanted).then(accepted => {
-          console.error('[reasoning-switch] info-triggered flush', accepted)
-          if (!accepted || _pendingLevel !== wanted) return
-          _pendingLevel = null
-          setLive(accepted)
-          setRemaining(cfg.levels[accepted]?.maxPrompts ?? null)
-          _syncCurrent(accepted)
-        })
-      }),
-    [sessionId],
-  )
 
   // Live truth. The gateway emits session.info after every reasoning write and
   // on every turn; the payload carries the pick and the wire level. Polling
@@ -343,16 +310,14 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
     // session. Remember the pick and flush it the moment an id exists, the
     // shape the app's own model menu uses for a preset with no session.
     if (!sessionId) {
-      console.error('[reasoning-switch] draft click -> pending', next)
-      _pendingLevel = next
-      // Mirror through the module hook into Root's config; there is no setCfg
-      // in this component's scope (the pending branch threw a ReferenceError
-      // and the click did nothing).
-      _syncCurrent(next)
-      setLive(next)
-      setRemaining(cfg.levels[next]?.maxPrompts ?? null)
-      setFlash(true)
-      setTimeout(() => setFlash(false), 400)
+      // A draft pick cannot be written. `config.set reasoning` is session-scoped
+      // and the desktop mints the session on the first send, so there is no id to
+      // scope to; the atom the app's own composer writes ($currentReasoningEffort)
+      // is not exposed by the SDK. Saving the pick and flushing it later cannot
+      // work: session.create reads that atom, not a plugin's pending var.
+      // So say so instead of swallowing the click and showing a level that never
+      // applies. Tracked upstream: NousResearch/hermes-agent#132697
+      console.error('[reasoning-switch] draft click refused: no session to scope to', next)
       return
     }
     const accepted = await setEffort(sessionId, next)
@@ -372,7 +337,9 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
 
   const tip = [
     `Reasoning: ${LABEL[displayed] || displayed}`,
-    !sessionId && _pendingLevel ? `Applies when this session starts (${LABEL[_pendingLevel] || _pendingLevel})` : null,
+    onDraft
+      ? `New chat: clicking here cannot change it. Set thinking from the composer's Thinking menu, it ships with the session`
+      : null,
     clamped ? `This route sends ${LABEL[clamped] || clamped}` : null,
     limited && remaining != null ? `${remaining} prompt${remaining === 1 ? '' : 's'} left at this level` : null,
     'Click to rotate · gear to configure',
@@ -418,10 +385,6 @@ function LevelChip({ cfg, storage, onOpenDialog }) {
 
 // Prompt tick shared with the subscriber above (module-level to avoid rebinds).
 let _tickPrompt = () => {}
-
-// A level picked while no runtime session existed (fresh draft). The chip
-// flushes it as soon as the session id arrives, so the first turn runs it.
-let _pendingLevel = null
 
 // Module-level session.info fan-in. ONE gateway listener is registered at load
 // (tracked, so unload/reload/disable removes it) and each mount adds its own
