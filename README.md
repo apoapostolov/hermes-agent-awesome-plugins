@@ -73,7 +73,7 @@ Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reaso
 | [memory-review](personal/memory-review/README.md) · [public](public/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
 | [better-capabilities](personal/better-capabilities/README.md) (personal only) | Delete plugins/skills. Zip a skill. On/off presets. |
 | [cdp-manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar. The `cdp` tool does the same from chat, on your preferred port. |
-| [hermes-jev-routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing. Personal switches the live session. Public rewrites only inside the bound provider. **Not in the pack; enable separately.** |
+| [hermes-jev-routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. Both editions switch the live session; the personal one also reads the provider catalogue and Codex quota. **Not in the pack; enable separately.** |
 
 ### Sessions and Sidebar
 

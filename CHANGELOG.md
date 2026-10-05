@@ -3,21 +3,38 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
-## [Unreleased]
+## [hermes-jev-routing 1.0.0] - 2026-10-04
+
+Per-turn model routing from TypeSafe Jev. The full feature set ships here; there is no earlier release for this plugin, and it is not in the pack.
 
 ### Added
 
-- hermes-jev-routing 0.1.0. Personal edition switches the live session before the client sends. Public edition rewrites the model only inside the provider already bound to the request. Neither edition is in the pack.
+- Jev reads the current message, a short history excerpt, the cwd, the live context size, and the spend snapshot, then answers four typed questions: task kind, complexity, capability deserved, and deep reasoning.
+- The demand score picks a tier: `0.55·complexity + 0.45·capability` plus a reasoning nudge, floored per task kind, then clamped by a confidence guard, a budget guard, and a cache-penalty hold. `xpremium` only fires when the demand already rounds to premium and the kind confidence clears the threshold.
+- Five tiers with candidate chains, ten kind specialists with `minTier` and `priority`, and a zero-cost free pool that can be tried before the chains or only after them.
+- Codex quota gates the Sol family on remaining account quota. The stricter of the provider floor and the row floor wins, equality passes, and a missing, stale, or reset reading follows `onUnknown`.
+- The live session moves onto the pick before the provider client is built, and the row's thinking level lands with it.
+- A spend ledger records real cost beside the routing file and feeds budget pressure, so soft and hard caps downgrade a tier instead of overspending.
+- The judgment line appears under the prompt that was just sent, before the model works, one row at subline size, with the kind and each score against its range.
+- A thin confirm strip under that line, in the same subline, offering Yes, No, Free, and each tier name. Yes and X are the only bold words.
+- `/jev-routing` with `why`, `route`, `revert`, `budget`, `suggest`, and `on`, `off`, and `mode`. The `jev_route` tool classifies a request without switching.
+- Plugin settings override the JSON file only when they are actually set. An unset key leaves the tuned file value alone.
+- `suggest` ranks a scores file into proposed chains, and `--write` saves a generated layer that the hand table always overrides.
 
-### Changed
+### Fixed
 
-- hermes-jev-routing. A prompt that is empty, a slash command, an acknowledgement, or a short continuation does not re-route. Jev now receives the cwd, the live context size, and the spend snapshot. A model the provider no longer serves loses the chain, while an unreadable catalogue keeps every row. The composer chip is gone; the judgment line is the only surface.
+- The in-place switch reused the current provider's credential, so a cross-provider pick raised and the session stayed on the old model. The destination key, base URL, and API mode are resolved before the client is rebuilt.
+- The session chip update used the agent session id, which the gateway rejects. It now uses the focused runtime session.
+- The desktop half failed to load with `Unexpected token 'export'` because a helper function was missing its closing brace.
+- The judgment line rendered white because the colour mixed against an undefined token, and it wrapped onto a second row. It now uses the theme's muted token at 60 percent and stays on one row.
 
-- The chip refuses a click on a new chat instead of silently swallowing it, and its tooltip names the door that works there: the composer's Thinking menu, whose pick ships with `session.create`. A remembered pick could never be applied, because `session.create` reads the app's composer atom and not a plugin's variable.
-- Removed the pending-pick machinery, which was unreachable once the chip stopped pretending.
+### Notes
 
-Tracked upstream: https://github.com/NousResearch/hermes-agent/issues/132697
-
+- Not in `hermes-pack.yaml`. Install it separately.
+- A prompt that is empty, a slash command, an acknowledgement, or a short continuation in a live conversation does not re-route.
+- A model the provider no longer serves loses the chain, while an unreadable catalogue keeps every row so a degraded probe cannot strand routing.
+- An ineligible turn sets the interrupt both API paths check, so the prompt is not sent on a model under its quota floor.
+- The judgment line is a page memory, not a durable transcript entry, and there is no status-bar surface in the plugin SDK. Those two Pi surfaces have no Hermes equivalent.
 
 ## [reasoning-switch 1.1.4] - 2026-10-03
 

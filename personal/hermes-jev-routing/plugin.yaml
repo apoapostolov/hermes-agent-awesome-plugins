@@ -1,6 +1,6 @@
 name: hermes-jev-routing
-version: 0.1.0
-description: "Per-turn Jev model routing. Shadow by default. Sends the current user message and a short excerpt to TypeSafe. Rewrites the model only inside the provider already bound to the turn."
+version: 1.0.0
+description: "Per-turn Jev model routing. Shadow by default. Sends the current user message, a short excerpt, the cwd, the context size, and the spend snapshot to TypeSafe. Moves the live session onto the tier the request deserves."
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2
