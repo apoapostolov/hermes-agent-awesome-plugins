@@ -4,15 +4,19 @@
   <img src="docs/hero.png" width="100%" alt="Jev Routing" />
 </div>
 
-Per-turn model routing for Hermes. Apostol Apostolov.
+Per-turn model routing from TypeSafe Jev. Apostol Apostolov.
 
-Jev reads the current user message and a short recent excerpt, then names a task kind and a capability tier. Code walks your chains for that tier and picks the first configured model. Auto mode switches the live session onto that model before the client sends. A tier listed under confirm.tiers is recorded and left alone, because this build has no approval dialog.
+Type normally. Before the model starts, Jev reads the current message, a short history excerpt, the cwd, the live context size, and the spend snapshot, then answers four typed questions about it. Code composes those into a capability tier, applies your budget and availability policy, and the live session moves onto that model before the provider client is built. Jev judges the task; your policy owns the money.
 
-Shadow is the default. It decides and does not switch. Off does nothing. An empty config_path leaves routing inert.
+Shadow is the default and switches nothing. Auto switches the live session. Off does nothing. An empty config_path leaves routing inert.
 
-The current user message and up to four thousand characters of recent user and assistant text go to TypeSafe on your key. A missing key, a timeout, or a bad answer leaves the turn on the model you already had.
+A missing key, a timeout, a bad payload, or an unreadable provider catalogue leaves the current model alone and the turn sends. The quota hold is the exception: when every eligible route, including the current model, is under its floor, the turn is not sent. A prompt that is empty, a slash command, an acknowledgement, or a short continuation in a live conversation does not re-route.
 
-Quota floors are checked when a Codex reading is fresh and has not reset. A missing, stale, or reset reading follows onUnknown, which admits the model unless it says skip. A successful switch sets the session reasoning effort from the chosen row. `/jev-routing suggest` previews a scores file. `--write` saves a generated layer beside the hand table, and a chain the hand table already names still wins. A tier listed under confirm.tiers is held when onTimeout is reject. There is still no approval prompt, so that tier cannot be accepted from the turn.
+Codex quota is checked when a reading is fresh and has not reset. The stricter of the provider floor and the row floor wins, equality passes, and a missing, stale, or reset reading follows onUnknown. A real switch sets the session reasoning effort from the chosen row, and the destination credential is resolved before the client is rebuilt, so a cross-provider pick lands. A model the provider no longer serves loses the chain.
+
+Every routed turn shows one dim subline under the prompt you just sent. A tier under confirm.tiers is held when onTimeout is reject, and the thin strip under that line is where a guarded pick is accepted.
+
+Real cost lands in a ledger beside the routing file and feeds the budget caps. `/jev-routing suggest` previews a scores file, and `--write` saves a generated layer beside the hand table, where a chain the hand table already names still wins.
 
 ## Install
 
@@ -21,6 +25,8 @@ hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/hermes
 ```
 
 Requires Hermes Agent 0.21.4 or newer. Set config_path to your hermes-jev-routing.json, then enable the plugin. The running gateway keeps the copy it started with until you Save and Reconnect.
+
+Full configuration reference, settings, and command list: see [the public edition's README](../../public/hermes-jev-routing/README.md). Not in `hermes-pack.yaml`.
 
 ## License
 
