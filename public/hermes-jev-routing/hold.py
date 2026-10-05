@@ -26,6 +26,25 @@ def current_allowed(gate, current) -> bool:
         return True
 
 
+def hold_for_approval(agent, prompt: str, reason: str) -> bool:
+    """Stop the turn now and re-send the original prompt on the accepted model.
+
+    A confirm tier must not answer on the model the user did not approve. This
+    interrupts the in-flight send and queues the prompt, so an approval click
+    runs the same request on the picked model instead of the held one.
+    """
+    if agent is None:
+        return False
+    steer = getattr(agent, "steer", None)
+    if not callable(steer) or not prompt:
+        return False
+    try:
+        steer(prompt)
+    except Exception:
+        return False
+    return request_hold(agent, reason)
+
+
 def should_hold_send(decision, switched: str, current, gate) -> bool:
     """Hold when this turn would still send on a quota-ineligible model."""
     if current_allowed(gate, current):

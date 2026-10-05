@@ -20,7 +20,7 @@ try:
     from .choice import decision_for_target, parse_confirm_choice, target_for_choice
     from .availability import live_models
     from .commands import explain, revert_target, spend_lines
-    from .hold import action_glyph, request_hold, should_hold_send, sticky_keep
+    from .hold import action_glyph, hold_for_approval, request_hold, should_hold_send, sticky_keep
     from .ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_cost
     from .notice import publish_route, route_payload
     from .quota import codex_eligibility
@@ -35,7 +35,7 @@ except ImportError:
     from choice import decision_for_target, parse_confirm_choice, target_for_choice
     from availability import live_models
     from commands import explain, revert_target, spend_lines
-    from hold import action_glyph, request_hold, should_hold_send, sticky_keep
+    from hold import action_glyph, hold_for_approval, request_hold, should_hold_send, sticky_keep
     from ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_cost
     from notice import publish_route, route_payload
     from quota import codex_eligibility
@@ -92,22 +92,28 @@ def _cwd(agent) -> str:
     return str(getattr(_CTX, "cwd", "") or "") if _CTX is not None else ""
 
 
-def _context_tokens(agent) -> int | None:
-    if agent is None:
-        return None
-    for attr in ("_last_context_tokens", "context_tokens", "_context_tokens_used"):
-        value = getattr(agent, attr, None)
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-            return value
-    try:
-        compressor = getattr(agent, "context_compressor", None)
-        if compressor is not None:
-            for attr in ("current_tokens", "tokens", "last_prompt_tokens"):
-                value = getattr(compressor, attr, None)
-                if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-                    return value
-    except Exception:
-        return None
+def _context_tokens(agent, messages=None) -> int | None:
+    """Anchored prompt tokens, then the host's own estimate. Never a guess."""
+    if agent is not None and isinstance(messages, list) and messages:
+        anchor = getattr(agent, "_usage_anchor", None)
+        try:
+            from agent.usage_anchor import anchored_context_tokens
+
+            anchored = anchored_context_tokens(messages, anchor)
+            if isinstance(anchored, int) and anchored > 0:
+                return anchored
+        except Exception:
+            pass
+    if agent is not None:
+        try:
+            from agent.turn_context import _preflight_request_tokens
+
+            system_prompt = str(getattr(agent, "_cached_system_prompt", "") or "")
+            estimate = _preflight_request_tokens(agent, list(messages or []), system_prompt)
+            if isinstance(estimate, int) and not isinstance(estimate, bool) and estimate > 0:
+                return estimate
+        except Exception:
+            pass
     return None
 
 
@@ -236,7 +242,7 @@ def on_pre_llm_call(**kwargs):
             history=history,
             active_model=active,
             cwd=_cwd(agent),
-            context_tokens=_context_tokens(agent),
+            context_tokens=_context_tokens(agent, kwargs.get("conversation_history")),
             spend=spent[1].as_state() if spent is not None else None,
         )
         file = state_path(path)
@@ -295,8 +301,15 @@ def on_pre_llm_call(**kwargs):
             status = f"{status} {spent[1].pressure * 100:.0f}%"
         publish_route(route_payload(
             decision, current, config, str(kwargs.get("session_id") or ""), analysis, mode,
-            glyph=glyph, prompt=prompt, status=status,
+            glyph=glyph, prompt=prompt, status=status, held=hold_confirm,
         ))
+        if hold_confirm and agent is not None:
+            held = hold_for_approval(
+                agent, str(_LAST.get("prompt") or prompt), "confirm tier; awaiting approval"
+            )
+            if held:
+                _LAST["blocked"] = "confirm"
+                return None
         if should_hold_send(decision, switched, current, gate) and agent is not None:
             held = request_hold(agent, "prompt not sent; current model is quota-ineligible")
             if held:

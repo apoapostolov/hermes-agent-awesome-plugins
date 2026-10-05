@@ -35,7 +35,7 @@ def should_interrupt(decision, current, confirm_tiers, mode: str = "auto") -> bo
     return decision.tier in set(confirm_tiers)
 
 
-def route_payload(decision, current, config, session_id: str, analysis=None, mode: str = "auto", glyph: str = "", prompt: str = "", status: str = "") -> Optional[dict]:
+def route_payload(decision, current, config, session_id: str, analysis=None, mode: str = "auto", glyph: str = "", prompt: str = "", status: str = "", held: bool = False) -> Optional[dict]:
     if decision is None:
         return None
     heads = {}
@@ -59,6 +59,8 @@ def route_payload(decision, current, config, session_id: str, analysis=None, mod
         "glyph": glyph,
         "prompt": prompt[:80],
         "status": status,
+        "held": bool(held),
+        "owed_prompt": prompt if held else "",
         "apply": bool(changed and mode == "auto" and not should_interrupt(decision, current, config.confirm_tiers, mode)),
         "interrupt": should_interrupt(decision, current, config.confirm_tiers, mode),
         "offered_tier": decision.tier,

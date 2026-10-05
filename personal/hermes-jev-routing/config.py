@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 try:
+    from . import pricing
     from .decide import (
         AvailableModel,
         Budget,
@@ -29,6 +30,8 @@ except ImportError:
         RouteTarget,
         RouterConfig,
     )
+    from pricing import cost_for as _cost_for
+    from pricing import supports_reasoning as _reasoning_supported
 
 TASK_KINDS = {
     "plan": "Deciding what to build, sequencing work, or designing an approach before editing",
@@ -203,10 +206,11 @@ def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
 
 
 def models_from_config(config: RouterConfig) -> tuple[AvailableModel, ...]:
-    """Treat every configured target as available.
+    """Every configured target, priced when the host can price it.
 
-    Hermes does not hand the plugin a priced catalogue. Unknown cost makes the
-    cache-penalty estimate return 0, so the hold gate does not block on a guess.
+    Personal edition reads real rates so the cache guard can price a miss. An
+    unpriced row keeps ``cost=None``, which makes the penalty estimate 0 and
+    therefore never holds a turn.
     """
     seen: set[tuple[str, str]] = set()
     models: list[AvailableModel] = []
@@ -217,5 +221,12 @@ def models_from_config(config: RouterConfig) -> tuple[AvailableModel, ...]:
             if not target.model or key in seen:
                 continue
             seen.add(key)
-            models.append(AvailableModel(provider=target.provider, id=target.model))
+            models.append(
+                AvailableModel(
+                    provider=target.provider,
+                    id=target.model,
+                    cost=_cost_for(target.provider, target.model),
+                    reasoning=_reasoning_supported(target.provider, target.model),
+                )
+            )
     return tuple(models)

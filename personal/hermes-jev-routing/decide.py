@@ -44,6 +44,7 @@ class AvailableModel:
     provider: str
     id: str
     cost: Optional[Mapping[str, float]] = None
+    reasoning: bool = False
 
 
 @dataclass(frozen=True)
@@ -337,12 +338,18 @@ def decide(
         )
         big_upgrade = delta >= config.cache.bypass_tier_delta
         affordable = penalty <= config.cache.max_penalty_usd
+
+        # Three explicit branches, in the Pi order. `outside_band` means the work
+        # genuinely left the current tier's demand band; that alone justifies a
+        # re-read. Inside the band the switch is only worth its cache miss, and a
+        # big upgrade pays for its own miss.
         hold_reason = None
-        if delta == 0 and not affordable:
-            hold_reason = f"same-tier swap to {model.id} would miss the cache"
-        elif delta != 0 and not outside:
+        if delta == 0:
+            if not affordable:
+                hold_reason = f"same-tier swap to {model.id} would miss the cache"
+        elif not outside:
             hold_reason = f"demand {demand:.2f} sits inside the {TIERS[current_index]} band"
-        elif delta != 0 and not big_upgrade and not affordable:
+        elif not big_upgrade and not affordable:
             hold_reason = "cache penalty keeps the warm cache"
         if hold_reason and current_target is not None:
             notes.append(hold_reason)

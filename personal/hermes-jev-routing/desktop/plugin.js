@@ -68,6 +68,12 @@ async function applyChoice(payload, pick) {
       value: String(pick.thinking),
     })
   }
+  // A held turn was interrupted before it sent, so the approved prompt still owes
+  // an answer. Resubmit it once the session is on the accepted model.
+  const owed = payload.owed_prompt
+  if (owed && typeof host.composer?.submit === 'function') {
+    host.composer.submit(sessionId, owed)
+  }
 }
 
 function mountStatus() {
@@ -102,6 +108,57 @@ function reattach() {
   })
 }
 
+function mountStrip(payload, block) {
+  const strip = document.createElement('div')
+  strip.dataset.jevStrip = '1'
+  const offered = payload.offered_tier || 'premium'
+  const label = document.createElement('span')
+  label.dataset.strong = '1'
+  label.textContent = 'Approve:'
+  strip.appendChild(label)
+
+  const offeredTier = document.createElement('span')
+  offeredTier.dataset.head = '1'
+  const yes = document.createElement('button')
+  yes.type = 'button'
+  yes.textContent = 'Yes,'
+  const yesTier = document.createElement('span')
+  yesTier.textContent = ` ${offered}`
+  yes.appendChild(yesTier)
+  offeredTier.appendChild(yes)
+  yes.addEventListener('click', () => {
+    applyChoice(payload, { provider: payload.provider, model: payload.model, thinking: payload.thinking })
+    strip.remove()
+  })
+  strip.appendChild(document.createTextNode(' '), offeredTier)
+  strip.appendChild(
+    document.createTextNode(' · '),
+    button('No', false, () => strip.remove()),
+  )
+  if (payload.free) {
+    strip.appendChild(
+      document.createTextNode(' · '),
+      button('Free', false, () => {
+        applyChoice(payload, payload.free)
+        strip.remove()
+      }),
+    )
+  }
+  const heads = payload.heads || {}
+  for (const tier of Object.keys(heads)) {
+    if (tier === offered) continue
+    strip.appendChild(
+      document.createTextNode(' · '),
+      button(tier, false, () => {
+        applyChoice(payload, heads[tier])
+        strip.remove()
+      }),
+    )
+  }
+  strip.appendChild(document.createTextNode(' · '), button('X', false, () => strip.remove()))
+  block.appendChild(strip)
+}
+
 function mount(payload) {
   const user = latestUserRoot()
   if (!user || !user.parentNode) return
@@ -118,42 +175,7 @@ function mount(payload) {
   line.textContent = payload.line
   block.appendChild(line)
   if (!payload.interrupt) return
-  const strip = document.createElement('div')
-  strip.dataset.jevStrip = '1'
-  const offered = payload.offered_tier || 'premium'
-  const yes = button('Yes', true, () => {
-    applyChoice(payload, { provider: payload.provider, model: payload.model, thinking: payload.thinking })
-    strip.remove()
-  })
-  const yesTail = document.createElement('span')
-  yesTail.textContent = `, ${offered}`
-  yes.appendChild(yesTail)
-  strip.append(yes, dot(), button('No', false, () => strip.remove()))
-  if (payload.free) {
-    strip.append(
-      dot(),
-      button('Free', false, () => {
-        applyChoice(payload, payload.free)
-        strip.remove()
-      }),
-    )
-  }
-  const heads = payload.heads || {}
-  for (const tier of Object.keys(heads)) {
-    if (tier === offered) continue
-    strip.append(
-      dot(),
-      button(tier, false, () => {
-        applyChoice(payload, heads[tier])
-        strip.remove()
-      }),
-    )
-  }
-  strip.append(
-    dot(),
-    button('X', true, () => strip.remove()),
-  )
-  block.appendChild(strip)
+  mountStrip(payload, block)
 }
 
 export default {
