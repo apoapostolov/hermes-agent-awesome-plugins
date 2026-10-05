@@ -52,6 +52,16 @@ def route_payload(decision, current, config, session_id: str, analysis=None, mod
     if config.free.enabled and config.free.pool:
         row = config.free.pool[0]
         free = {"provider": row.provider, "model": row.model, "thinking": row.thinking_level}
+    kinds = {}
+    for kind, chain in config.kind_models.items():
+        if not chain:
+            continue
+        row = chain[0]
+        kinds[str(kind)] = {
+            "provider": row.provider,
+            "model": row.model,
+            "thinking": row.thinking_level,
+        }
     changed = current is None or current.provider != decision.target.provider or current.id != decision.target.model
     return {
         "session_id": session_id,
@@ -68,6 +78,7 @@ def route_payload(decision, current, config, session_id: str, analysis=None, mod
         "model": decision.target.model,
         "thinking": decision.target.thinking_level,
         "heads": heads,
+        "kinds": kinds,
         "free": free,
     }
 

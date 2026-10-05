@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from commands import dry_run, explain, revert_target  # noqa: E402
+from choice import target_for_choice  # noqa: E402
 from decide import Analysis, AvailableModel, Budget, RouteTarget, RouterConfig, Spend  # noqa: E402
 from ledger import load_ledger, record_cost, save_ledger, spend_snapshot  # noqa: E402
 
@@ -60,6 +61,14 @@ class CommandTests(unittest.TestCase):
             spend=Spend(pressure=0.95),
         )
         self.assertIn("quick", text)
+
+    def test_a_kind_name_selects_that_chain_head(self):
+        config = RouterConfig(
+            routes={"quick": (RouteTarget("p", "small"),)},
+            kind_models={"operate": (RouteTarget("p", "runner"),)},
+        )
+        target = target_for_choice(config, "operate")
+        self.assertEqual((target.provider, target.model), ("p", "runner"))
 
     def test_revert_needs_a_recorded_model(self):
         self.assertIsNone(revert_target(None))

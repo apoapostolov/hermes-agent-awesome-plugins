@@ -155,7 +155,26 @@ function mountStrip(payload, block) {
       }),
     )
   }
-  strip.appendChild(document.createTextNode(' · '), button('X', false, () => strip.remove()))
+  // The ten kinds are the second row. Same subline weight, one line below.
+  const kinds = payload.kinds || {}
+  const kindNames = Object.keys(kinds)
+  if (kindNames.length) {
+    strip.appendChild(document.createElement('br'))
+    const kindRow = document.createElement('span')
+    kindRow.dataset.kinds = '1'
+    for (const kind of kindNames) {
+      const btn = button(kind, false, () => {
+        applyChoice(payload, kinds[kind])
+        strip.remove()
+      })
+      kindRow.appendChild(btn)
+      kindRow.appendChild(document.createTextNode(' '))
+    }
+    kindRow.appendChild(button('X', false, () => strip.remove()))
+    strip.appendChild(kindRow)
+  } else {
+    strip.appendChild(document.createTextNode(' · '), button('X', false, () => strip.remove()))
+  }
   block.appendChild(strip)
 }
 
@@ -211,7 +230,8 @@ export default {
         white-space: nowrap;
         overflow: visible;
       }
-      [data-jev-strip] { display: flex; align-items: baseline; white-space: nowrap; }
+      [data-jev-strip] { display: flex; align-items: baseline; flex-wrap: wrap; white-space: nowrap; }
+      [data-jev-strip] [data-kinds] { flex-basis: 100%; }
       [data-jev-strip] button {
         font: inherit; line-height: inherit; color: inherit;
         background: transparent; border: 0; padding: 0; cursor: pointer;

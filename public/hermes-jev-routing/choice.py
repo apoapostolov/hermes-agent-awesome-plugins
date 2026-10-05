@@ -34,6 +34,9 @@ def target_for_choice(config, choice: str, previous: Optional[Decision] = None) 
     for tier, chain in config.routes.items():
         if choice == str(tier).lower() and chain:
             return chain[0]
+    for kind, chain in config.kind_models.items():
+        if choice == str(kind).lower() and chain:
+            return chain[0]
     return None
 
 
