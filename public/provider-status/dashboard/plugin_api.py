@@ -154,6 +154,8 @@ def resolve_key(env_names: list[str], pool: list[str] | None = None, pool_index:
 LIBRARY_PATH = PLUGIN_ROOT / "library.env"
 HERMES_ENV = HERMES_HOME / ".env"
 ROTATE_REMAINING = 2.0  # switch when displayed remaining is 2% or less
+_ROTATE_OAUTH_MAX_TRIALS = 8  # one exhausted account scans at most 8 others;
+# a 200+ account pool once stalled /status past the 30s gateway timeout
 _library_lock = threading.Lock()
 
 ROTATABLE = {
@@ -490,7 +492,8 @@ def _maybe_rotate_oauth(pid: str, pconf: dict, status: dict, fetcher) -> tuple[d
     if len(accounts) < 2 or not _exhausted(pid, status):
         return status, pconf, False
     start = int(pconf.get("account_index") or 0) % len(accounts)
-    for off in range(1, len(accounts)):
+    # Bounded scan: the remainder is retried on a later cold poll.
+    for off in range(1, min(len(accounts), _ROTATE_OAUTH_MAX_TRIALS + 1)):
         idx = (start + off) % len(accounts)
         trial = _materialize_oauth({**pconf, "account_index": idx})
         st = fetcher(trial)
@@ -1647,16 +1650,47 @@ _HERMES_TO_PID = {
 }
 
 
+def _read_active_model() -> tuple[str, str]:
+    """Best-effort (provider, model) from Hermes config.yaml without pyyaml.
+
+    The dashboard backend venv has no yaml module, so parse the small
+    `model:` block with regexes. Never raises: returns ("", "") when
+    unreadable.
+    """
+    try:
+        text = (HERMES_HOME / "config.yaml").read_text(encoding="utf-8")
+    except Exception:
+        return "", ""
+    try:
+        import yaml
+        y = yaml.safe_load(text) or {}
+        prov = str((y.get("model") or {}).get("provider") or "").strip().lower()
+        model = str((y.get("model") or {}).get("default") or "")
+        return prov, model
+    except Exception:
+        pass
+    prov = model = ""
+    m = re.search(r"(?m)^model:\s*$", text)
+    if m:
+        block = text[m.end():]
+        nxt = re.search(r"(?m)^[A-Za-z_][^:]*:", block)  # next top-level key
+        if nxt:
+            block = block[:nxt.start()]
+        pm = re.search(r"(?m)^\s+provider:\s*(\S+)", block)
+        dm = re.search(r"(?m)^\s+default:\s*(\S+)", block)
+        if pm:
+            prov = pm.group(1).strip().strip("\'\"").lower()
+        if dm:
+            model = dm.group(1).strip().strip("\'\"")
+    return prov, model
+
+
 @router.get("/active")
 def get_active():
     """Which provider backs Hermes' current default model. Best effort —
     unknown providers map to none."""
-    import yaml  # hermes env has pyyaml
     try:
-        with open(HERMES_HOME / "config.yaml", "r", encoding="utf-8") as f:
-            y = yaml.safe_load(f) or {}
-        prov = str((y.get("model") or {}).get("provider") or "").strip().lower()
-        model = str((y.get("model") or {}).get("default") or "")
+        prov, model = _read_active_model()
         return {"provider": prov or None, "model": model or None,
                 "pid": _HERMES_TO_PID.get(prov)}
     except Exception as e:
