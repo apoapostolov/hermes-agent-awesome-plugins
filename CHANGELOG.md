@@ -10,6 +10,8 @@ the component that changed; a plugin patch does not imply a new pack release.
 - hermes-jev-routing. The cache guard had no prices to work with, so its penalty was always zero and the "would miss the cache" holds could never fire. Every configured model is now priced from the host rate card, and the context size comes from the anchored usage anchor rather than a guess at attribute names.
 - The three cache-guard branches were a boolean arrangement whose fast path only worked by accident. They are written explicitly now: a same-tier swap needs an affordable miss, a move inside the current band always holds, and a move out of the band holds unless it is a big upgrade or cheap.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
+- **provider-status:** 1.5.13. The `/active` endpoint imported yaml outside its error handler, and the backend ships no yaml module, so every call failed and the active-model marker never resolved. It now parses the small `model:` block without yaml and the endpoint keeps answering.
+- **provider-status:** 1.5.13. An exhausted Grok account triggered a rotation scan over the whole account pool, one network call per account, pushing cold `/status` past the 30s gateway timeout so the full chip line vanished. Rotation now scans at most 8 accounts per poll.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
 
 ### Added
