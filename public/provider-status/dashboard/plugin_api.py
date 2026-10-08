@@ -1752,27 +1752,21 @@ def update_config(body: ConfigUpdate):
             if not merged.get("expires_at") and prev.get("expires_at"):
                 merged["expires_at"] = prev["expires_at"]
             # explicit logout: dialog sends empty tokens WITH expires_at=0.
-            # With an account pool: drop the ACTIVE account; activate the next
-            # one (if any) so logging out one account switches, not nukes.
+            # Clear EVERY account. The button reads "Log out" and the user
+            # expects the provider logged out; dropping only the ACTIVE account
+            # re-materialized the next one through the flat fields (pop + copy),
+            # so the row kept showing "Log out" and needed a second click.
+            # Forget email as well, else the button tooltip keeps rendering the
+            # signed-out address.
             explicit_clear = False
             if incoming.get("expires_at") == 0 and not incoming.get("access_token"):
-                accounts = [a for a in (prev.get("accounts") or []) if isinstance(a, dict)]
-                if len(accounts) > 1:
-                    drop = int(prev.get("account_index") or 0) % len(accounts)
-                    accounts.pop(drop)
-                    nxt = accounts[drop % len(accounts)]
-                    merged["accounts"] = accounts
-                    merged["account_index"] = drop % len(accounts)
-                    for f in _OAUTH_FIELDS:
-                        if f in nxt:
-                            merged[f] = nxt[f]
-                else:
-                    merged["access_token"] = ""
-                    merged["refresh_token"] = ""
-                    merged["expires_at"] = 0
-                    merged.pop("accounts", None)
-                    merged.pop("account_index", None)
-                    explicit_clear = True
+                merged["access_token"] = ""
+                merged["refresh_token"] = ""
+                merged["expires_at"] = 0
+                merged.pop("accounts", None)
+                merged.pop("account_index", None)
+                merged["email"] = ""
+                explicit_clear = True
             # account pool is backend-managed; a dialog save never touches it
             # (but an explicit logout clear must stick)
             if not explicit_clear and "accounts" in prev and "accounts" not in merged:
