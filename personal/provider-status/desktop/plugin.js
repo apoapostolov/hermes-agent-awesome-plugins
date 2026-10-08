@@ -453,6 +453,21 @@ let _rest = null // injected at register(ctx) — ctx.rest hits /api/plugins/pro
 let _openExternal = null // ctx.os.openExternal: the app DENIES target=_blank window.open
 // (window-open-policy.ts, CVE-2026-70608), so external links go through the OS bridge.
 
+// Every external open goes through ctx.os.openExternal. window.open is denied
+// by the app's window-open policy, so an OAuth login that used it never
+// reached the browser. The bridge answers a boolean, and `false` means the
+// bridge was missing or the OS refused, so report it instead of pretending
+// the browser opened.
+function openExternal(url) {
+  if (!url) return
+  Promise.resolve(_openExternal ? _openExternal(url) : false).then(
+    ok => {
+      if (!ok) console.warn('[provider-status] could not open', url)
+    },
+    err => console.warn('[provider-status] external open failed', url, err)
+  )
+}
+
 function useProviderStatus(pollMinutes) {
   return useQuery({
     queryKey: ['provider-status-v4', pollMinutes],
@@ -1127,7 +1142,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
         setBusy(false)
         if (res?.ok && res.authorize_url) {
           setFlow({ browser: true, authorize_url: res.authorize_url, port: 1455 })
-          window.open(res.authorize_url, '_blank', 'width=560,height=760')
+          openExternal(res.authorize_url)
         }
         return
       } catch { setBusy(false); return }
@@ -1186,7 +1201,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
           flow.user_code,
           copied ? jsx('span', { style: { color: copied ? 'var(--ui-accent)' : 'inherit' }, children: '✓' }) : null,
         ] }) }),
-        jsx(Button, { variant: 'default', size: 'sm', className: 'h-6 px-2 text-[0.7rem] shrink-0', onClick: () => window.open(flow.verification_uri, '_blank', 'width=560,height=760'), children: 'Connect ↗' }),
+        jsx(Button, { variant: 'default', size: 'sm', className: 'h-6 px-2 text-[0.7rem] shrink-0', onClick: () => openExternal(flow.verification_uri), children: 'Connect ↗' }),
       ]})
     } else {
       loginSlot = pc.access_token
