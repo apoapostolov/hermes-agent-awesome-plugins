@@ -2,7 +2,7 @@
   "name": "provider-status",
   "label": "Provider Quota Status",
   "description": "Unified multi-provider usage status bars with setup dialog",
-  "version": "1.5.13",
+  "version": "1.5.14",
   "api": "plugin_api.py",
   "tab": {
     "path": "/provider-status",

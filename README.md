@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Provider Status 1.5.13 brings back the statusbar chip line. The active-model endpoint reads Hermes config without yaml, which the backend does not ship, and an exhausted Grok account scans at most 8 others per poll instead of walking the whole pool past the gateway timeout. Intelligent Tool Break 1.3.4 moves the public edition's settings onto the plugin SDK storage hook.
+Provider Status 1.5.14 signs a provider off in one Log out click, opens Connect in the system browser, and keeps the chip line up when Grok has a large account pool. Intelligent Tool Break 1.3.4 moves the public edition's settings onto the plugin SDK storage hook.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 

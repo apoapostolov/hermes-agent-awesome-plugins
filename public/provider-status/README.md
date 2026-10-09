@@ -4,7 +4,7 @@
   <strong>See provider quota without leaving Hermes.</strong>
   <p>Status-bar used/remaining and user-managed provider pools. Polling is read-only for vendor credentials.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.5.11-2ea44f" alt="Version 1.5.11" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.5.14-2ea44f" alt="Version 1.5.14" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
