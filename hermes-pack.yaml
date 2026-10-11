@@ -26,7 +26,7 @@ plugins:
     ref: 1ce1758bf18979244b70e89352629ec3fd71c73e
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/memory-review
-    ref: 38c3e911f38544bf8188b564874addbb3f988322
+    ref: 13866a5bab0064c8596e4e6464cbc17b923674e4
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/rss-reader
     ref: 30d6dc6311bfce951c10ed120c878dc3f28a7ced
