@@ -16,6 +16,22 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [memory-review 1.2.3] - 2026-10-11
+
+The status bar has a native Memory chip. The chrome-menu row sits next to New chat.
+
+### Added
+
+- Both editions: a native status-bar chip with the app's Brain glyph. Right-click the bar to show or hide it.
+
+### Fixed
+
+- Personal edition: the chrome-menu row was appended after the menu was sized, so it sat below the box and React could wipe it. It now inserts next to New chat.
+
+### Changed
+
+- Both editions: the dialog's memory store meter uses the Brain glyph at 0.65rem, matching Settings → Memory.
+
 ## [memory-review 1.2.2] - 2026-10-11
 
 The review dialog and palette follow the app language. The chrome-menu row no longer depends on English labels.

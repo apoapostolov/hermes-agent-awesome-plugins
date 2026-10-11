@@ -18,6 +18,7 @@ import {
   Tip as Tooltip,
   STATUSBAR_AREAS,
   host,
+  icons,
   usePluginI18n,
 } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
@@ -26,7 +27,6 @@ import { useEffect, useState } from 'react'
 const ID = 'memory-review'
 const MENU = '[data-slot="dropdown-menu-content"][data-state="open"]'
 const ITEM_ATTR = 'data-mrc-item'
-const SEP_ATTR = 'data-mrc-sep'
 const DOT = ' \u00b7\u00a0'
 const OPEN_EVENT = 'hermes-mrc-open'
 const SOURCE = 'https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/memory-review'
@@ -300,7 +300,7 @@ function pickAll(items) {
   return sel
 }
 
-function StoreMeter({ glyph, label, info }) {
+function StoreMeter({ icon, label, info }) {
   if (!info) return null
   const used = Number(info.used)
   const limit = Number(info.limit)
@@ -312,7 +312,7 @@ function StoreMeter({ glyph, label, info }) {
   return jsxs('div', {
     className: 'flex items-center gap-1.5 text-[0.65rem] leading-none text-(--ui-text-quaternary)',
     children: [
-      jsx(Codicon, { name: glyph, size: '0.65rem' }),
+      icon,
       jsx('span', { children: label }),
       jsx('span', {
         className: 'tabular-nums',
@@ -383,13 +383,19 @@ function applyRow(row, state) {
   }
 }
 
-function makeSeparator() {
-  const sep = document.createElement('div')
-  sep.setAttribute(SEP_ATTR, '1')
-  sep.setAttribute('data-slot', 'dropdown-menu-separator')
-  sep.setAttribute('role', 'separator')
-  sep.className = '-mx-1 my-1 h-px bg-(--ui-stroke-tertiary)'
-  return sep
+function shellAnchor(menu) {
+  const glyph = menu.querySelector('.codicon-add')
+  if (!glyph) return null
+  return glyph.closest('[data-slot="dropdown-menu-item"]')
+}
+
+function placeRow(menu, row) {
+  const anchor = shellAnchor(menu)
+  const parent = (anchor && anchor.parentNode) || menu
+  const before = anchor ? anchor.nextSibling : null
+  if (row.parentNode !== parent || (anchor && row.previousSibling !== anchor) || (!anchor && row.parentNode !== menu)) {
+    parent.insertBefore(row, before)
+  }
 }
 
 function makeRow() {
@@ -424,11 +430,8 @@ function makeRow() {
 function enhanceMenu(menu) {
   if (!isShellMenu(menu)) return
   let row = menu.querySelector('[' + ITEM_ATTR + ']')
-  if (!row) {
-    if (!menu.querySelector('[' + SEP_ATTR + ']')) menu.appendChild(makeSeparator())
-    row = makeRow()
-    menu.appendChild(row)
-  }
+  if (!row) row = makeRow()
+  placeRow(menu, row)
   applyRow(row, lastState)
   if (menu.dataset.mrcFetch === '1') return
   menu.dataset.mrcFetch = '1'
@@ -440,9 +443,20 @@ function enhanceMenu(menu) {
 
 function startMenu() {
   let scheduled = false
+  let retries = 0
   const scan = () => {
     scheduled = false
     document.querySelectorAll(MENU).forEach(enhanceMenu)
+    const missing = Array.from(document.querySelectorAll(MENU)).some(
+      menu => isShellMenu(menu) && !menu.querySelector('[' + ITEM_ATTR + ']')
+    )
+    if (missing && retries < 8) {
+      retries += 1
+      scheduled = true
+      requestAnimationFrame(scan)
+      return
+    }
+    retries = 0
   }
   const observer = new MutationObserver(() => {
     if (scheduled) return
@@ -459,7 +473,7 @@ function startMenu() {
   return () => {
     fetchGen += 1
     observer.disconnect()
-    document.querySelectorAll('[' + ITEM_ATTR + '], [' + SEP_ATTR + ']').forEach(node => node.remove())
+    document.querySelectorAll('[' + ITEM_ATTR + ']').forEach(node => node.remove())
   }
 }
 
@@ -635,12 +649,15 @@ function ReviewDialog({ open, onOpenChange }) {
               className: 'flex items-center justify-between gap-4',
               children: [
                 jsx(StoreMeter, {
-                  glyph: 'note',
+                  icon: jsx(icons.Brain, {
+                    'aria-hidden': true,
+                    style: { width: '0.65rem', height: '0.65rem', flexShrink: 0 },
+                  }),
                   label: t('memory'),
                   info: state.stores.memory,
                 }),
                 jsx(StoreMeter, {
-                  glyph: 'person',
+                  icon: jsx(Codicon, { name: 'person', size: '0.65rem' }),
                   label: t('user'),
                   info: state.stores.user,
                 }),
@@ -812,9 +829,22 @@ export default {
     })
 
     ctx.register({
-      id: 'host',
+      id: 'chip',
       area: STATUSBAR_AREAS.right,
       order: 400,
+      data: {
+        id: 'memory-review',
+        icon: jsx(icons.Brain, { className: 'size-3 shrink-0', 'aria-hidden': true }),
+        label: tr('memory'),
+        title: tr('title'),
+        toggleLabel: tr('title'),
+        onSelect: openReview,
+      },
+    })
+    ctx.register({
+      id: 'host',
+      area: STATUSBAR_AREAS.right,
+      order: 401,
       render: () =>
         jsx('span', {
           'aria-hidden': true,

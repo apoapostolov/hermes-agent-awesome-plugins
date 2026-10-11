@@ -4,7 +4,7 @@
   <strong>Review staged memory writes before they land.</strong>
   <p>Checkbox the writes you want. Approve or reject from a dialog.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.2-2ea44f" alt="Version 1.2.2" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.3-2ea44f" alt="Version 1.2.3" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -21,7 +21,7 @@
 
 ## What You Can Do
 
-- Open pending memory from **Ctrl+K → Memory: pending**.
+- Open pending memory from the status bar chip or **Ctrl+K → Memory: pending**.
 - Select individual rows or use **All**.
 - Approve or reject the selected staged writes in one decision.
 - See store meters and a Consolidate action when a store is over budget. Approve skips dead replace/remove ops.
