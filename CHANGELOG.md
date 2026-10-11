@@ -16,6 +16,14 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [memory-review 1.2.4] - 2026-10-11
+
+The status-bar chip shows how many writes are waiting.
+
+### Added
+
+- Both editions: the chip label is `Memory · 3` when writes are pending, and plain `Memory` when the queue is empty. Re-registering the same declarative item keeps the bar's show/hide checkbox.
+
 ## [memory-review 1.2.3] - 2026-10-11
 
 The status bar has a native Memory chip. The chrome-menu row sits next to New chat.

@@ -122,6 +122,51 @@ let rest = null
 let lastState = null
 let fetchGen = 0
 let openExternal = null
+let registerChip = null
+let lastChipLabel = null
+let pollTimer = null
+function chipLabel(state) {
+  const n = state && Number(state.pending) || 0
+  return n > 0 ? tr('memory') + DOT + n : tr('memory')
+}
+
+function chipData(state) {
+  return {
+    id: 'memory-review',
+    icon: jsx(icons.Brain, { className: 'size-3 shrink-0', 'aria-hidden': true }),
+    label: chipLabel(state),
+    title: tr('title'),
+    toggleLabel: tr('title'),
+    onSelect: openReview,
+  }
+}
+
+function pushChip(state) {
+  if (!registerChip) return
+  const label = chipLabel(state)
+  if (label === lastChipLabel) return
+  lastChipLabel = label
+  registerChip({
+    id: 'chip',
+    area: STATUSBAR_AREAS.right,
+    order: 400,
+    data: chipData(state),
+  })
+}
+
+function startChipPoll() {
+  if (pollTimer) return
+  pollTimer = setInterval(() => {
+    void refreshState()
+  }, 15000)
+}
+
+function stopChipPoll() {
+  if (!pollTimer) return
+  clearInterval(pollTimer)
+  pollTimer = null
+}
+
 
 function openReview() {
   window.dispatchEvent(new CustomEvent(OPEN_EVENT))
@@ -352,6 +397,7 @@ function refreshState() {
         stores: (data && data.stores) || null,
         items,
       }
+      pushChip(lastState)
       return lastState
     }
     if (data && data.stores) return finish(restItems)
@@ -795,7 +841,11 @@ function ReviewRoot() {
     window.addEventListener(OPEN_EVENT, onOpen)
     return () => window.removeEventListener(OPEN_EVENT, onOpen)
   }, [])
-  return jsx(ReviewDialog, { open, onOpenChange: setOpen })
+  const onOpenChange = next => {
+    setOpen(next)
+    if (!next) void refreshState()
+  }
+  return jsx(ReviewDialog, { open, onOpenChange })
 }
 
 export default {
@@ -809,6 +859,8 @@ export default {
     i18nT = ctx.i18n.t
     ctx.i18n.register(LOCALES)
     ctx.i18n.onLocaleChange(() => {
+      lastChipLabel = null
+      pushChip(lastState)
       document.querySelectorAll('[' + ITEM_ATTR + ']').forEach(row => applyRow(row, lastState))
     })
     void refreshState()
@@ -828,18 +880,13 @@ export default {
       document.getElementById(STYLE_ID)?.remove()
     })
 
-    ctx.register({
-      id: 'chip',
-      area: STATUSBAR_AREAS.right,
-      order: 400,
-      data: {
-        id: 'memory-review',
-        icon: jsx(icons.Brain, { className: 'size-3 shrink-0', 'aria-hidden': true }),
-        label: tr('memory'),
-        title: tr('title'),
-        toggleLabel: tr('title'),
-        onSelect: openReview,
-      },
+    registerChip = ctx.register
+    pushChip(lastState)
+    startChipPoll()
+    ctx.onDispose(() => {
+      stopChipPoll()
+      registerChip = null
+      lastChipLabel = null
     })
     ctx.register({
       id: 'host',
