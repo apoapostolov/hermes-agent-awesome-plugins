@@ -16,6 +16,15 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [prompt-enhance 1.2.0] - 2026-10-11
+
+The edit dialog can rename a saved prompt and format its body with a markdown toolbar.
+
+### Added
+
+- Both editions: the prompt name is an editable field in the edit dialog. Save writes the name with the body.
+- Both editions: a markdown toolbar sits above the prompt body (headings, emphasis, lists, link, table, code, block, rule).
+
 ## [provider-status 1.5.14] - 2026-10-09
 
 Log out signs the provider off in one click, Connect opens the system browser, and the chip line stays up when Grok has a large account pool.

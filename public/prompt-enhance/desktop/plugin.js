@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Button,
+  Input,
   Textarea,
   host,
   useValue,
@@ -911,14 +912,100 @@ function LibraryDialog({ open, folderId, onFolder, onClose, onEdit }) {
   })
 }
 
+const MARKDOWN_TOOLS = [
+  ['h1', 'H1', 'Heading 1'],
+  ['h2', 'H2', 'Heading 2'],
+  ['h3', 'H3', 'Heading 3'],
+  ['bold', 'B', 'Bold'],
+  ['italic', 'I', 'Italic'],
+  ['strike', 'S', 'Strikethrough'],
+  ['quote', '❞', 'Quote'],
+  ['bullet', '• List', 'Bulleted list'],
+  ['number', '1. List', 'Numbered list'],
+  ['task', 'List', 'Task list', 'check'],
+  ['link', 'Link', 'Link'],
+  ['table', 'Table', 'Table'],
+  ['code', 'Code', 'Inline code'],
+  ['block', 'Block', 'Code block'],
+  ['rule', '―', 'Horizontal rule'],
+]
+
+function applyMarkdown(value, start, end, command) {
+  const selection = value.slice(start, end)
+  const wrap = (left, right = left, placeholder = 'text') => {
+    const content = selection || placeholder
+    const text = left + content + right
+    return { text, from: start, to: end, caret: start + left.length, caretEnd: start + left.length + content.length }
+  }
+  if (command === 'h1' || command === 'h2' || command === 'h3' || command === 'quote' || command === 'bullet' || command === 'number' || command === 'task') {
+    const prefix = command === 'h1' ? '# ' : command === 'h2' ? '## ' : command === 'h3' ? '### ' : command === 'quote' ? '> ' : command === 'bullet' ? '- ' : command === 'number' ? '1. ' : '- [ ] '
+    const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1
+    const lineEnd = value.indexOf('\n', end)
+    const to = lineEnd < 0 ? value.length : lineEnd
+    const lines = value.slice(lineStart, to).split('\n')
+    const text = lines.map((line, index) => command === 'number' ? `${index + 1}. ${line}` : prefix + line).join('\n')
+    return { text, from: lineStart, to, caret: lineStart, caretEnd: lineStart + text.length }
+  }
+  if (command === 'bold') return wrap('**')
+  if (command === 'italic') return wrap('*')
+  if (command === 'strike') return wrap('~~')
+  if (command === 'code') return wrap('`')
+  if (command === 'block') return wrap('```\n', '\n```', 'code')
+  if (command === 'link') return wrap('[', '](https://example.com)', 'link text')
+  if (command === 'table') {
+    const text = '| Column 1 | Column 2 |\n| --- | --- |\n| Value 1 | Value 2 |'
+    return { text, from: start, to: end, caret: start + 2, caretEnd: start + 10 }
+  }
+  if (command === 'rule') {
+    const text = '\n---\n'
+    return { text, from: start, to: end, caret: start + text.length, caretEnd: start + text.length }
+  }
+  return null
+}
+
+function spliceMarkdown(value, patch) {
+  return value.slice(0, patch.from) + patch.text + value.slice(patch.to)
+}
+
 function EditDialog({ prompt, onClose }) {
   const data = useLib()
+  const [name, setName] = useState(prompt ? prompt.name : '')
   const [body, setBody] = useState(prompt ? prompt.body : '')
-  useEffect(() => { setBody(prompt ? prompt.body : '') }, [prompt])
+  const [sel, setSel] = useState({ start: 0, end: 0 })
+  const areaRef = useRef(null)
+  const pendingSel = useRef(null)
+  useEffect(() => {
+    setName(prompt ? prompt.name : '')
+    setBody(prompt ? prompt.body : '')
+    setSel({ start: 0, end: 0 })
+    pendingSel.current = null
+  }, [prompt])
+  useEffect(() => {
+    const next = pendingSel.current
+    const node = areaRef.current
+    if (!next || !node) return undefined
+    pendingSel.current = null
+    node.focus()
+    node.setSelectionRange(next.start, next.end)
+    return undefined
+  }, [body])
   function commit() {
     if (!prompt) return
-    save({ ...data, prompts: data.prompts.map(row => row.id === prompt.id ? { ...row, body } : row) })
+    const nextName = name.trim() || prompt.name
+    save({ ...data, prompts: data.prompts.map(row => row.id === prompt.id ? { ...row, name: nextName, body } : row) })
     onClose()
+  }
+  function rememberSel(event) {
+    const node = event.currentTarget
+    areaRef.current = node
+    setSel({ start: node.selectionStart || 0, end: node.selectionEnd || 0 })
+  }
+  function formatMarkdown(command) {
+    const patch = applyMarkdown(body, sel.start, sel.end, command)
+    if (!patch) return
+    pendingSel.current = { start: patch.caret, end: patch.caretEnd }
+    setBody(spliceMarkdown(body, patch))
+    setSel({ start: patch.caret, end: patch.caretEnd })
   }
   return jsx(Dialog, {
     open: Boolean(prompt),
@@ -931,10 +1018,52 @@ function EditDialog({ prompt, onClose }) {
         'data-pe-edit': '',
         style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' },
         children: [
-          jsx(DialogHeader, { children: jsx(DialogTitle, { children: prompt ? prompt.name : 'Edit' }) }),
+          jsx(DialogHeader, { children: jsx(DialogTitle, { children: 'Edit prompt' }) }),
+          jsx('div', {
+            'data-pe-name': '',
+            children: jsx(Input, {
+              value: name,
+              maxLength: 100,
+              'aria-label': 'Prompt name',
+              placeholder: 'Prompt name',
+              onChange: event => setName(event.target.value),
+              onKeyDown: event => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  commit()
+                }
+              },
+            }),
+          }),
+          jsx('div', {
+            role: 'toolbar',
+            'aria-label': 'Markdown formatting',
+            'data-pe-md-bar': '',
+            onMouseDown: event => event.preventDefault(),
+            children: MARKDOWN_TOOLS.map(([command, label, title, glyph]) => jsx('button', {
+              type: 'button',
+              title,
+              'aria-label': title,
+              'data-pe-md': command,
+              onClick: () => formatMarkdown(command),
+              children: glyph
+                ? jsxs('span', {
+                    className: 'inline-flex items-center gap-0.5',
+                    children: [jsx(Codicon, { name: glyph, size: '0.7rem' }), label],
+                  })
+                : label,
+            }, command)),
+          }),
           jsx(Textarea, {
             value: body,
-            onChange: event => setBody(event.target.value),
+            'aria-label': 'Prompt',
+            onChange: event => {
+              setBody(event.target.value)
+              rememberSel(event)
+            },
+            onSelect: rememberSel,
+            onKeyUp: rememberSel,
+            onClick: rememberSel,
             onKeyDown: event => {
               if (event.key !== 'Escape') return
               event.preventDefault()
@@ -1022,7 +1151,11 @@ function ComposerTools() {
 const CSS = `
 [data-slot="dialog-content"]:has([data-pe-library]){width:min(46rem,92vw)!important;max-width:min(46rem,92vw)!important}
 [data-slot="dialog-content"]:has([data-pe-edit]){width:min(36.8rem,74vw)!important;max-width:min(36.8rem,74vw)!important}
-[data-pe-edit],[data-pe-edit] textarea{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+[data-pe-edit],[data-pe-edit] textarea,[data-pe-edit] input{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+[data-pe-edit] [data-pe-name]{margin:0 0 8px}
+[data-pe-edit] [data-pe-md-bar]{display:flex;flex-wrap:nowrap;align-items:center;gap:2px;min-width:0;margin:0 0 4px}
+[data-pe-edit] [data-pe-md]{flex:none;min-height:22px;padding:2px 5px;border:1px solid color-mix(in srgb, var(--ui-text-primary) 22%, transparent);border-radius:2px;background:transparent;color:var(--ui-text-secondary);font-size:10px;line-height:1.2;white-space:nowrap}
+[data-pe-edit] [data-pe-md]:hover{background:var(--chrome-action-hover);color:var(--foreground)}
 [data-pe-clamp]{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 [data-pe-gap]{height:2px;margin:3px 0;background:var(--ui-accent)}
 [data-pe-over]{outline:1px solid var(--ui-accent);outline-offset:-1px}

@@ -4,7 +4,7 @@
   <strong>Turn a rough composer draft into the prompt you meant.</strong>
   <p>Enhancers rewrite the draft outside the chat. The library keeps the prompts you reuse.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.1-2ea44f" alt="Version 1.1.1" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.0-2ea44f" alt="Version 1.2.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -18,6 +18,7 @@
 - Rewrite the current draft with a saved enhancer. The call runs outside the chat, the composer icon spins while it works, and the result replaces the draft.
 - Undo that rewrite back to the previous composer text.
 - Keep prompts in folders, reorder them, import the current draft, insert one into the composer, or send one with the draft as context.
+- Rename a saved prompt in the edit dialog. A markdown toolbar sits above the body.
 - Pick an enhance model for one call. That pick does not write the session model.
 
 ## Install
