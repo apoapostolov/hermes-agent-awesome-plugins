@@ -21,7 +21,7 @@
 
 ## What You Can Do
 
-- Open pending memory from **Ctrl+K → Memory: pending** or by right-clicking empty app chrome.
+- Open pending memory from **Ctrl+K → Memory: pending**.
 - Select individual rows or use **All**.
 - Approve or reject the selected staged writes in one decision.
 - See store meters and a Consolidate action when a store is over budget. Approve skips dead replace/remove ops.

@@ -19,6 +19,7 @@ import {
   Tip as Tooltip,
   STATUSBAR_AREAS,
   host,
+  usePluginI18n,
 } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useEffect, useState } from 'react'
@@ -28,6 +29,92 @@ const DOT = ' \u00b7\u00a0'
 const OPEN_EVENT = 'hermes-mrc-open'
 const SOURCE = 'https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/public/memory-review'
 const STYLE_ID = 'memory-review-style'
+
+const EN = {
+  title: 'Memory review',
+  source: 'Source on GitHub',
+  memory: 'Memory',
+  user: 'User',
+  all: 'All',
+  none: 'none',
+  entry: 'entry',
+  entries: 'entries',
+  approve: 'Approve',
+  reject: 'Reject',
+  consolidate: 'Consolidate',
+  working: 'Working',
+  add: 'Add',
+  remove: 'Remove',
+  replace: 'Replace',
+  userProfile: 'User profile',
+  memoryNotes: 'Memory notes',
+  noPending: 'No pending writes.',
+  readFail: 'Could not read pending writes.',
+  noComposer: 'No composer for a consolidation round',
+  promptReady: 'Prompt ready in the composer. Send it to start consolidation.',
+  requestFailed: 'request failed',
+  stateUnknown: 'Memory' + DOT + 'state unknown',
+  storeFull: 'store full',
+  userStoreFull: 'user store full',
+  memoryStoreFull: 'memory store full',
+  memoryStoreFullLabel: 'Memory: store full',
+  paletteLabel: 'Memory: pending',
+  paletteDetail: 'opens review',
+  paletteClean: 'clean',
+  pending: n => 'Memory: pending (' + n + ')',
+  pendingFull: (n, suffix) => 'Pending: ' + n + DOT + suffix,
+  approved: n => 'Approved ' + n,
+  approvedFailed: (n, failed, err) => 'Approved ' + n + ', ' + failed + ' failed' + (err ? ': ' + err : ''),
+  rejected: n => 'Rejected ' + n,
+  count: (sel, total) => sel + ' / ' + total,
+}
+const ES = {
+  title: 'Revisión de memoria',
+  source: 'Código en GitHub',
+  memory: 'Memoria',
+  user: 'Usuario',
+  all: 'Todas',
+  none: 'ninguna',
+  entry: 'entrada',
+  entries: 'entradas',
+  approve: 'Aprobar',
+  reject: 'Rechazar',
+  consolidate: 'Consolidar',
+  working: 'Trabajando',
+  add: 'Añadir',
+  remove: 'Quitar',
+  replace: 'Reemplazar',
+  userProfile: 'Perfil de usuario',
+  memoryNotes: 'Notas de memoria',
+  noPending: 'No hay escrituras pendientes.',
+  readFail: 'No se pudieron leer las escrituras pendientes.',
+  noComposer: 'No hay compositor para una ronda de consolidación',
+  promptReady: 'El prompt está en el compositor. Envíalo para iniciar la consolidación.',
+  requestFailed: 'la petición falló',
+  stateUnknown: 'Memoria' + DOT + 'estado desconocido',
+  storeFull: 'almacén lleno',
+  userStoreFull: 'almacén de usuario lleno',
+  memoryStoreFull: 'almacén de memoria lleno',
+  memoryStoreFullLabel: 'Memoria: almacén lleno',
+  paletteLabel: 'Memoria: pendientes',
+  paletteDetail: 'abre la revisión',
+  paletteClean: 'limpio',
+  pending: n => 'Memoria: pendientes (' + n + ')',
+  pendingFull: (n, suffix) => 'Pendientes: ' + n + DOT + suffix,
+  approved: n => 'Aprobadas ' + n,
+  approvedFailed: (n, failed, err) => 'Aprobadas ' + n + ', ' + failed + ' fallidas' + (err ? ': ' + err : ''),
+  rejected: n => 'Rechazadas ' + n,
+  count: (sel, total) => sel + ' / ' + total,
+}
+const LOCALES = { en: EN, es: ES }
+let i18nT = null
+function tr(key, ...args) {
+  if (i18nT) return i18nT(key, ...args)
+  const msg = EN[key]
+  if (typeof msg === 'function') return msg(...args)
+  return msg == null ? key : msg
+}
+
 
 let rest = null
 let lastState = null
@@ -45,26 +132,26 @@ function openSource(e) {
 
 function labelFor(state) {
   if (!state || !state.ok) {
-    return { text: 'Memory' + DOT + 'state unknown', enabled: false }
+    return { text: tr('stateUnknown'), enabled: false }
   }
   const pending = Number(state.pending) || 0
   const memFull = Boolean(state.memory_full)
   const userFull = Boolean(state.user_full)
   const full = memFull || userFull
   if (pending <= 0 && !full) {
-    return { text: 'Memory', enabled: false }
+    return { text: tr('memory'), enabled: false }
   }
   let fullSuffix = ''
-  if (memFull && userFull) fullSuffix = 'store full'
-  else if (userFull) fullSuffix = 'user store full'
-  else if (memFull) fullSuffix = 'memory store full'
+  if (memFull && userFull) fullSuffix = tr('storeFull')
+  else if (userFull) fullSuffix = tr('userStoreFull')
+  else if (memFull) fullSuffix = tr('memoryStoreFull')
   if (pending > 0 && fullSuffix) {
-    return { text: 'Pending: ' + pending + DOT + fullSuffix, enabled: true }
+    return { text: tr('pendingFull', pending, fullSuffix), enabled: true }
   }
   if (pending > 0) {
-    return { text: 'Memory: pending (' + pending + ')', enabled: true }
+    return { text: tr('pending', pending), enabled: true }
   }
-  return { text: 'Memory: store full', enabled: true }
+  return { text: tr('memoryStoreFullLabel'), enabled: true }
 }
 
 function sessionId() {
@@ -214,7 +301,7 @@ function StoreMeter({ glyph, label, info }) {
       jsx('span', { children: label }),
       jsx('span', {
         className: 'tabular-nums',
-        children: n + (n === 1 ? ' entry' : ' entries'),
+        children: n + ' ' + (n === 1 ? tr('entry') : tr('entries')),
       }),
       jsx('span', { className: 'tabular-nums', children: pct + '%' }),
       jsx('div', {
@@ -276,6 +363,7 @@ function useGlassOn() {
 }
 
 function ReviewDialog({ open, onOpenChange }) {
+  const t = usePluginI18n(ID)
   const glass = useGlassOn()
   const [state, setState] = useState(() => lastState || { ok: true, items: [] })
   const [picked, setPicked] = useState(() => pickAll((lastState && lastState.items) || []))
@@ -316,11 +404,11 @@ function ReviewDialog({ open, onOpenChange }) {
     if (busy) return
     const target = fitFail && displayParts(fitFail).target === 'user' ? 'user' : 'memory'
     if (!(await seatPrompt(compactPrompt(target)))) {
-      setNote('No composer for a consolidation round')
+      setNote(tr('noComposer'))
       return
     }
     setBusy(false)
-    setNote('Prompt ready in the composer. Send it to start consolidation.')
+    setNote(tr('promptReady'))
   }
 
   const run = action => {
@@ -357,12 +445,12 @@ function ReviewDialog({ open, onOpenChange }) {
         if (action === 'approve') {
           setNote(
             failed.length
-              ? 'Approved ' + applied + ', ' + failed.length + ' failed' + (err ? ': ' + err : '')
-              : 'Approved ' + applied
+              ? tr('approvedFailed', applied, failed.length, err)
+              : tr('approved', applied)
           )
         } else {
           setFails({})
-          setNote('Rejected ' + (out.rejected || selected.length))
+          setNote(tr('rejected', out.rejected || selected.length))
         }
         return refreshState()
       })
@@ -372,7 +460,7 @@ function ReviewDialog({ open, onOpenChange }) {
         setPicked(pickAll(next.items))
       })
       .catch(err => {
-        setNote(err && err.message ? String(err.message) : 'request failed')
+        setNote(err && err.message ? String(err.message) : tr('requestFailed'))
       })
       .finally(() => setBusy(false))
   }
@@ -394,10 +482,10 @@ function ReviewDialog({ open, onOpenChange }) {
         jsxs(DialogHeader, {
           className: 'flex flex-row items-center justify-between gap-2 pr-8 h-7 -mt-2',
           children: [
-            jsx(DialogTitle, { children: 'Memory review' }),
+            jsx(DialogTitle, { children: t('title') }),
             jsx('a', {
               href: SOURCE,
-              title: 'Source on GitHub',
+              title: t('source'),
               target: '_blank',
               rel: 'noreferrer',
               onClick: openSource,
@@ -413,12 +501,12 @@ function ReviewDialog({ open, onOpenChange }) {
               children: [
                 jsx(StoreMeter, {
                   glyph: 'note',
-                  label: 'Memory',
+                  label: t('memory'),
                   info: state.stores.memory,
                 }),
                 jsx(StoreMeter, {
                   glyph: 'person',
-                  label: 'User',
+                  label: t('user'),
                   info: state.stores.user,
                 }),
               ],
@@ -437,10 +525,10 @@ function ReviewDialog({ open, onOpenChange }) {
                   disabled: !ids.length || busy,
                   onCheckedChange: v => toggleAll(Boolean(v)),
                 }),
-                jsx('span', { className: 'font-medium', children: 'All' }),
+                jsx('span', { className: 'font-medium', children: t('all') }),
                 jsx('span', {
                   className: 'ml-auto text-[0.65rem] text-(--ui-text-quaternary)',
-                  children: ids.length ? selected.length + ' / ' + ids.length : 'none',
+                  children: ids.length ? t('count', selected.length, ids.length) : t('none'),
                 }),
               ],
             }),
@@ -463,7 +551,7 @@ function ReviewDialog({ open, onOpenChange }) {
                           className: 'flex w-8 shrink-0 items-center gap-0.5 text-(--ui-text-tertiary)',
                           children: [
                             jsx(Tooltip, {
-                              label: parts.target === 'user' ? 'User profile' : 'Memory notes',
+                              label: parts.target === 'user' ? t('userProfile') : t('memoryNotes'),
                               children: jsx(Codicon, {
                                 name: parts.target === 'user' ? 'person' : 'note',
                                 size: '0.75rem',
@@ -472,10 +560,10 @@ function ReviewDialog({ open, onOpenChange }) {
                             jsx(Tooltip, {
                               label:
                                 parts.action === 'add'
-                                  ? 'Add'
+                                  ? t('add')
                                   : parts.action === 'remove'
-                                    ? 'Remove'
-                                    : 'Replace',
+                                    ? t('remove')
+                                    : t('replace'),
                               children: jsx(Codicon, {
                                 name: actionGlyph(parts.action),
                                 size: '0.75rem',
@@ -495,7 +583,7 @@ function ReviewDialog({ open, onOpenChange }) {
                 })
               : jsx('div', {
                   className: 'px-2 py-3 text-xs text-(--ui-text-quaternary)',
-                  children: state.ok === false ? 'Could not read pending writes.' : 'No pending writes.',
+                  children: state.ok === false ? t('readFail') : t('noPending'),
                 }),
           ],
         }),
@@ -509,7 +597,7 @@ function ReviewDialog({ open, onOpenChange }) {
                     jsx('span', {
                       className: 'min-w-0 flex-1 truncate text-[0.65rem] text-(--ui-text-quaternary)',
                       title: note || (fitFail && String(fails[fitFail.id]).split('\n')[0]) || '',
-                      children: note || (busy ? 'Working' : String(fails[fitFail.id]).split('\n')[0]),
+                      children: note || (busy ? t('working') : String(fails[fitFail.id]).split('\n')[0]),
                     }),
                     fitFail
                       ? jsx(Button, {
@@ -517,7 +605,7 @@ function ReviewDialog({ open, onOpenChange }) {
                           className: 'h-6 shrink-0 px-2 text-[0.65rem]',
                           disabled: busy,
                           onClick: compact,
-                          children: 'Consolidate',
+                          children: t('consolidate'),
                         })
                       : null,
                   ],
@@ -531,13 +619,13 @@ function ReviewDialog({ open, onOpenChange }) {
                   className: 'h-8 min-w-0 flex-1 basis-1/2',
                   disabled: busy || !selected.length,
                   onClick: () => run('reject'),
-                  children: 'Reject',
+                  children: t('reject'),
                 }),
                 jsx(Button, {
                   className: 'h-8 min-w-0 flex-1 basis-1/2',
                   disabled: busy || !selected.length,
                   onClick: () => run('approve'),
-                  children: 'Approve',
+                  children: t('approve'),
                 }),
               ],
             }),
@@ -566,6 +654,8 @@ export default {
   register(ctx) {
     rest = ctx.rest
     openExternal = ctx.os && ctx.os.openExternal
+    i18nT = ctx.i18n.t
+    ctx.i18n.register(LOCALES)
     void refreshState()
 
     const style = document.createElement('style')
@@ -598,12 +688,12 @@ export default {
       area: 'palette',
       data: {
         id: 'memory.review',
-        label: 'Memory: pending',
-        keywords: ['memory', 'pending', 'review', 'store', 'full', 'approve'],
+        label: tr('paletteLabel'),
+        keywords: ['memory', 'pending', 'review', 'store', 'full', 'approve', 'memoria', 'pendientes', 'revisión', 'almacén', 'aprobar'],
         detail: () => {
           const { text, enabled } = labelFor(lastState)
-          if (!lastState) return 'opens review'
-          return enabled ? text : 'clean'
+          if (!lastState) return tr('paletteDetail')
+          return enabled ? text : tr('paletteClean')
         },
         detailVariant: 'state',
         run: openReview,

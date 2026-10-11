@@ -7,6 +7,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ### Fixed
 
+- memory-review. The shell-menu row used English labels (`New session`, `Settings`) to find the app chrome menu, so it never appeared in Spanish or any other UI language. Personal now matches that menu by the locale-stable Codicon classes on New chat, Settings, and Update Hermes.
 - hermes-jev-routing. The cache guard had no prices to work with, so its penalty was always zero and the "would miss the cache" holds could never fire. Every configured model is now priced from the host rate card, and the context size comes from the anchored usage anchor rather than a guess at attribute names.
 - The three cache-guard branches were a boolean arrangement whose fast path only worked by accident. They are written explicitly now: a same-tier swap needs an affordable miss, a move inside the current band always holds, and a move out of the band holds unless it is a big upgrade or cheap.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
@@ -14,6 +15,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ### Added
 
+- memory-review. Dialog, palette, and status copy ship an `es` bundle through `ctx.i18n.register`. English is unchanged.
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
 ## [prompt-enhance 1.2.0] - 2026-10-11
