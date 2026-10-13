@@ -16,6 +16,20 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [iteration-budget-meter 1.3.0] - 2026-10-13
+
+The chip shows the session's cumulative totals; the per-turn readout stays in the popover.
+
+### Added
+
+- Both editions: the chip shows `N turns · M steps` for the focused session — user rows and assistant rows in the durable display transcript, the same counters the CLI bar keeps. Totals load lazily via `session.resume`, survive app restarts and compaction rotations, and the step count animates live while a turn runs.
+- The popover carries the session totals above the existing per-turn readout and request stats.
+
+### Changed
+
+- Chip chrome (tone, weight, icon) now matches the native statusbar items; the accent color stays only on the ceiling-suggestion line.
+- Cold sessions and fresh drafts stay hidden until their totals land; failed loads retry on a timer, and session switches never show another session's totals.
+
 ## [memory-review 1.2.4] - 2026-10-11
 
 The status-bar chip shows how many writes are waiting.
