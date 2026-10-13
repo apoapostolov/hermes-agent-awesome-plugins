@@ -1,20 +1,32 @@
 /**
  * Iteration Budget Meter — statusbar chip showing the FOCUSED SESSION's
- * per-turn iteration usage (N/60) while a turn runs, with a one-line hover
- * tooltip and a click popover with per-request stats.
+ * cumulative totals ("12 turns · 181 steps", the same counters the CLI bar
+ * keeps), with a one-line hover tooltip and a click popover carrying the
+ * per-turn readout and per-request stats.
  *
- * Data source (pure renderer, no backend, no polling, no writes):
- *   - "is a turn running" -> host.state.busy
- *   - raw counter         -> host.state.focusedUsage.calls
+ * Data source:
+ *   - session totals  -> `session.resume` RPC (durable display transcript;
+ *     user rows -> turns, assistant rows -> steps — the same count the
+ *     sessions table keeps), re-anchored on session switches and turn
+ *     boundaries. Light payloads only (`inline_images: false`); falls back
+ *     to the live runtime usage counters.
+ *   - live step delta -> host.state.focusedUsage.calls while a turn runs
+ *     (display = fetched base + delta since the fetch anchor, so it stays
+ *     correct whether or not the runtime counter survives restarts).
  *
- * v1.2.0: popover redesigned — average tool calls per request, ratio of
- * requests hitting the max, and a ceiling suggestion derived from both
- * (see ceilingSuggestion).
+ * v1.3.0: the chip switched from the per-turn counter to the session's
+ * cumulative totals — the per-turn readout stays in the popover. Loads are
+ * race-proofed (settle delay, timeout, idle-safe retries; the chip stays
+ * hidden until totals land), session switches and fresh drafts never bleed
+ * across, and the chrome matches the native statusbar items.
+ * v1.2.2: every observed busy->idle edge is a per-round boundary, and focused
+ * session changes reset the baseline before the next usage sample.
  * v1.2.1: chained-continuation fix. The gateway emits message.complete and a
  * busy dip between chained segments of one logical request (goal follow-ups,
  * queued drains, auto-continue), which reset the counter mid-request.
- * v1.2.2: every observed busy->idle edge is a per-round boundary, and focused
- * session changes reset the baseline before the next usage sample.
+ * v1.2.0: popover redesigned — average tool calls per request, ratio of
+ * requests hitting the max, and a ceiling suggestion derived from both
+ * (see ceilingSuggestion).
  */
 import { cn, host, Tip as Tooltip, Popover, PopoverContent, PopoverTrigger, useValue } from '@hermes/plugin-sdk'
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
@@ -71,12 +83,100 @@ function IterBudgetChip() {
   const [, bump] = useState(0)
 
   const sessionId = useValue(host.state.focusedSessionId)
+  const storedId = useValue(host.state.focusedStoredSessionId)
   const previousSessionId = useRef(null)
   const hasSession = useRef(false)
   const wasBusy = useRef(false)
   const peak = useRef(0)
   // Cumulative session counter observed at the current round's start.
   const base = useRef(null)
+  // Session-level stats cache (turns / steps) + fetch bookkeeping.
+  const stats = useRef({ key: null, stored: null, runtime: null, turns: null, stepsBase: null, stepsAnchor: null, fetchedAt: 0, retryAt: 0, retryTimer: null, inflight: false })
+  // Drop cached totals (session switch / fresh draft / retry housekeeping).
+  const resetStats = () => {
+    const s = stats.current
+
+    if (s.retryTimer) { clearTimeout(s.retryTimer); s.retryTimer = null }
+    s.key = null
+    s.stored = null
+    s.runtime = null
+    s.turns = null
+    s.stepsBase = null
+    s.stepsAnchor = null
+    s.fetchedAt = 0
+    s.retryAt = 0
+  }
+  // Fetch session totals via the gateway: `session.resume` returns the
+  // durable display transcript (user rows -> turns) plus, when present,
+  // `info.usage.calls` (cumulative steps). Falls back to `session.usage`.
+  const refreshStats = (stored, runtime, liveCalls) => {
+    const st = stats.current
+
+    if (!stored || st.inflight) return
+
+    const now = Date.now()
+
+    if (st.retryAt && now < st.retryAt) return
+    if (st.key === stored && now - st.fetchedAt < 2000) return
+    st.inflight = true
+    st.key = stored
+    st.stored = stored
+    st.runtime = runtime
+
+    ;(async () => {
+      try {
+        // Let the desktop's own resume win the attach race (cold sessions).
+        await new Promise((resolve) => setTimeout(resolve, 900))
+        if (stats.current.key !== stored) return // switched during settle — abort
+        const res = await host.request('session.resume', { session_id: stored, inline_images: false }, 8000)
+        const messages = res && Array.isArray(res.messages) ? res.messages : []
+
+        // A payload with no rows for a non-empty session is not ready yet.
+        if (messages.length === 0 && res && res.message_count > 0) throw new Error('transcript pending')
+        const turns = messages.filter((m) => m && m.role === 'user').length
+        // Steps = assistant rows in the durable display transcript (one per
+        // model call); monotonic across runtime restarts and compactions.
+        let steps = messages.length ? messages.filter((m) => m && m.role === 'assistant').length : null
+
+        if (steps === null && res && res.info && res.info.usage && typeof res.info.usage.calls === 'number') {
+          steps = res.info.usage.calls
+        }
+
+        if (steps === null && runtime) {
+          try {
+            const u = await host.request('session.usage', { session_id: runtime }, 5000)
+
+            if (u && typeof u.calls === 'number') steps = u.calls
+          } catch (_e2) { /* keep null */ }
+        }
+        if (stats.current.key !== stored) return // switched mid-fetch — drop
+        st.turns = turns
+        st.stepsBase = steps
+        st.stepsAnchor = typeof liveCalls === 'number' ? liveCalls : null
+        st.retryAt = 0
+        if (st.retryTimer) { clearTimeout(st.retryTimer); st.retryTimer = null }
+      } catch (_e) {
+        // Keep last known values; retry soon — a timer covers the idle case
+        // where no turn edge would otherwise re-trigger the fetch.
+        st.retryAt = Date.now() + 3000
+        st.key = null
+        if (st.retryTimer) clearTimeout(st.retryTimer)
+        st.retryTimer = setTimeout(() => {
+          const s = stats.current
+
+          if (!s.inflight && s.stored) {
+            const live = host.state.focusedUsage.get()
+
+            refreshStats(s.stored, s.runtime, live && typeof live.calls === 'number' ? live.calls : null)
+          }
+        }, 3200)
+      } finally {
+        st.fetchedAt = Date.now()
+        st.inflight = false
+        bump(Date.now())
+      }
+    })()
+  }
 
   useEffect(() => {
     const isBusy = !!busy
@@ -92,11 +192,25 @@ function IterBudgetChip() {
       wasBusy.current = isBusy
       previousSessionId.current = sessionId
       hasSession.current = true
+      // A different session gets its own numbers — drop the old ones so the
+      // chip never shows another session's totals (hidden until fetched).
+      resetStats()
+      refreshStats(storedId, sessionId, calls)
       bump(Date.now())
       return
     }
     previousSessionId.current = sessionId
     hasSession.current = true
+    // Fresh draft (no session yet): nothing to count — clear, so a stale
+    // session's totals never linger under an empty chat.
+    if (!storedId && (stats.current.key !== null || stats.current.stored !== null)) {
+      resetStats()
+      bump(Date.now())
+    }
+    // Mount / switch catch-up: fetch once per new session (edges retry).
+    if (storedId && (stats.current.key !== storedId || stats.current.fetchedAt === 0)) {
+      refreshStats(storedId, sessionId, calls)
+    }
 
     if (!isBusy) {
       if (wasBusy.current) {
@@ -105,6 +219,7 @@ function IterBudgetChip() {
         if (peak.current > 0) pushPeak(peak.current)
         peak.current = 0
         if (calls !== null) base.current = calls
+        refreshStats(storedId, sessionId, calls)
         bump(Date.now())
       } else if (calls !== null) {
         // Idle usage may arrive after message.complete. Keep the next round's
@@ -112,6 +227,7 @@ function IterBudgetChip() {
         base.current = calls
       }
     } else if (calls !== null) {
+      if (!wasBusy.current) refreshStats(storedId, sessionId, calls)
       if (base.current === null || calls < base.current) {
         base.current = calls
         peak.current = 0
@@ -120,21 +236,38 @@ function IterBudgetChip() {
       if (delta > peak.current) peak.current = delta
     }
     wasBusy.current = isBusy
-  }, [busy, usage, sessionId])
-
-  // Hidden while idle — the chip only exists during a running turn.
-  if (!busy) return null
+  }, [busy, usage, sessionId, storedId])
 
   const calls = usage && typeof usage.calls === 'number' && usage.calls >= 0 ? usage.calls : null
   const n = base.current !== null && calls !== null ? Math.max(0, calls - base.current) : null
   const atCap = n !== null && n >= CAP
   const warn = n !== null && n >= AMBER_AT
-  const color = atCap ? RED : warn ? AMBER : ACCENT
-
+  const color = atCap ? RED : warn ? AMBER : null
   const countText = n === null ? '–' : String(n)
+
+  // Session totals (the CLI bar's counters): turns from the last transcript
+  // fetch; steps = fetched base + live delta since the fetch anchor.
+  const st = stats.current
+  let stepsTotal = null
+
+  if (st.stepsBase !== null) {
+    const delta = st.stepsAnchor !== null && calls !== null ? Math.max(0, calls - st.stepsAnchor) : 0
+
+    stepsTotal = st.stepsBase + delta
+  } else if (calls !== null) {
+    stepsTotal = calls
+  }
+
+  const turnsTotal = st.turns
+  const turnsText = turnsTotal === null ? '–' : String(turnsTotal)
+  const stepsText = stepsTotal === null ? '–' : String(stepsTotal)
+
+  // Loaded only: no placeholder while a session's totals are being fetched
+  // (fresh drafts and cold sessions stay hidden until their numbers land).
+  if (turnsTotal === null) return null
+
   const dot = ' \u00b7\u00a0' // breakable before the dot, NBSP after (label won't wrap here)
-  // One line, middle-dot separators: 'iteration budget · 52/60 · this turn · cap 60'
-  const label = 'iteration budget' + dot + countText + '/60' + dot + 'this turn' + dot + 'cap 60'
+  const label = 'session totals' + dot + turnsText + ' turns' + dot + stepsText + ' steps'
 
   // Per-request stats over the recorded window.
   const nDone = _turnPeaks.length
@@ -150,21 +283,21 @@ function IterBudgetChip() {
           label,
           children: jsx('button', {
             type: 'button',
-            title: 'iteration budget details',
+            title: 'session stats details',
             className: cn(
-              'inline-flex h-full items-center rounded-none px-1.5 text-[0.6875rem] font-medium',
+              'inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem] text-(--ui-text-tertiary) transition-colors',
               'hover:bg-(--chrome-action-hover) hover:text-foreground'
             ),
-            style: { color },
+            style: color ? { color } : undefined,
             onClick: () => bump(Date.now()), // refresh only this chip's details
             children: jsxs(Fragment, {
               children: [
                 jsx('i', {
-                  className: 'codicon codicon-tools',
+                  className: 'codicon codicon-pulse',
                   'aria-hidden': 'true',
-                  style: { fontSize: '12px', marginRight: '3px', opacity: 0.9 },
+                  style: { fontSize: '12px', opacity: 0.9 },
                 }),
-                jsx('span', { children: countText + '/60' }),
+                jsx('span', { children: turnsText + ' turns · ' + stepsText + ' steps' }),
               ],
             }),
           }),
@@ -178,6 +311,10 @@ function IterBudgetChip() {
           children: [
             jsxs('div', {
               className: 'text-[0.8125rem] font-medium',
+              children: ['Session totals: ', jsx('span', { children: turnsText + ' turns · ' + stepsText + ' steps' })],
+            }),
+            jsxs('div', {
+              className: 'mt-1 text-[0.8125rem] font-medium',
               children: [
                 'Iterations used this turn: ',
                 jsx('span', { style: { color }, children: countText + ' of 60' }),
@@ -246,7 +383,7 @@ function IterBudgetChip() {
 export default {
   id: 'iteration-budget-meter',
   name: 'Iteration Budget Meter',
-  description: 'Shows the live per-turn iteration budget (N/60) of the running turn in the status bar.',
+  description: 'Shows the focused session totals — cumulative turns and steps — plus per-turn iteration details.',
 
   register(ctx) {
     ctx.register({
