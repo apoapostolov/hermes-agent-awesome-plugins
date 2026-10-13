@@ -91,7 +91,7 @@ function IterBudgetChip() {
   // Cumulative session counter observed at the current round's start.
   const base = useRef(null)
   // Session-level stats cache (turns / steps) + fetch bookkeeping.
-  const stats = useRef({ key: null, stored: null, runtime: null, turns: null, stepsBase: null, stepsAnchor: null, fetchedAt: 0, retryAt: 0, retryTimer: null, inflight: false })
+  const stats = useRef({ key: null, stored: null, runtime: null, turns: null, stepsBase: null, stepsAnchor: null, fetchedAt: 0, retryAt: 0, retryTimer: null, inflight: false, gen: 0, pending: null })
   // Drop cached totals (session switch / fresh draft / retry housekeeping).
   const resetStats = () => {
     const s = stats.current
@@ -105,19 +105,28 @@ function IterBudgetChip() {
     s.stepsAnchor = null
     s.fetchedAt = 0
     s.retryAt = 0
+    // Orphan any in-flight fetch so it can neither block nor overwrite the
+    // new session's totals.
+    s.gen += 1
+    s.inflight = false
+    s.pending = null
   }
   // Fetch session totals via the gateway: `session.resume` returns the
   // durable display transcript (user rows -> turns) plus, when present,
   // `info.usage.calls` (cumulative steps). Falls back to `session.usage`.
-  const refreshStats = (stored, runtime, liveCalls) => {
+  const refreshStats = (stored, runtime, liveCalls, force) => {
     const st = stats.current
 
-    if (!stored || st.inflight) return
+    if (!stored) return
+    // Latest request wins: queue it and re-run once the current fetch ends.
+    if (st.inflight) { st.pending = { stored, runtime, liveCalls }; return }
 
     const now = Date.now()
 
-    if (st.retryAt && now < st.retryAt) return
-    if (st.key === stored && now - st.fetchedAt < 2000) return
+    if (!force && st.retryAt && now < st.retryAt) return
+    if (!force && st.key === stored && now - st.fetchedAt < 2000) return
+    const gen = st.gen
+
     st.inflight = true
     st.key = stored
     st.stored = stored
@@ -127,7 +136,7 @@ function IterBudgetChip() {
       try {
         // Let the desktop's own resume win the attach race (cold sessions).
         await new Promise((resolve) => setTimeout(resolve, 900))
-        if (stats.current.key !== stored) return // switched during settle — abort
+        if (st.gen !== gen || st.key !== stored) return // switched during settle — abort
         const res = await host.request('session.resume', { session_id: stored, inline_images: false }, 8000)
         const messages = res && Array.isArray(res.messages) ? res.messages : []
 
@@ -149,13 +158,14 @@ function IterBudgetChip() {
             if (u && typeof u.calls === 'number') steps = u.calls
           } catch (_e2) { /* keep null */ }
         }
-        if (stats.current.key !== stored) return // switched mid-fetch — drop
+        if (st.gen !== gen || st.key !== stored) return // switched mid-fetch — drop
         st.turns = turns
         st.stepsBase = steps
         st.stepsAnchor = typeof liveCalls === 'number' ? liveCalls : null
         st.retryAt = 0
         if (st.retryTimer) { clearTimeout(st.retryTimer); st.retryTimer = null }
       } catch (_e) {
+        if (st.gen !== gen) return // orphaned by a session switch
         // Keep last known values; retry soon — a timer covers the idle case
         // where no turn edge would otherwise re-trigger the fetch.
         st.retryAt = Date.now() + 3000
@@ -171,9 +181,15 @@ function IterBudgetChip() {
           }
         }, 3200)
       } finally {
-        st.fetchedAt = Date.now()
-        st.inflight = false
-        bump(Date.now())
+        if (st.gen === gen) {
+          st.fetchedAt = Date.now()
+          st.inflight = false
+          const next = st.pending
+
+          st.pending = null
+          if (next) refreshStats(next.stored, next.runtime, next.liveCalls, true)
+          bump(Date.now())
+        }
       }
     })()
   }
@@ -219,7 +235,7 @@ function IterBudgetChip() {
         if (peak.current > 0) pushPeak(peak.current)
         peak.current = 0
         if (calls !== null) base.current = calls
-        refreshStats(storedId, sessionId, calls)
+        refreshStats(storedId, sessionId, calls, true)
         bump(Date.now())
       } else if (calls !== null) {
         // Idle usage may arrive after message.complete. Keep the next round's
