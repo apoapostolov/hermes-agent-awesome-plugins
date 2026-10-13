@@ -31,6 +31,8 @@
 - Ask Hermes for summaries, discussions, evidence checks, digests, and optional grading only when you choose.
 - Optionally register Hermes tools so the agent can read, find, tag, filter, and manage subscriptions.
 - Optionally show an animated headline ticker with grade colors and tag pills.
+- Run a scheduled digest as an Automation Blueprint: `/blueprint rss-reader:daily-digest` picks the days, the time, and which articles, and delivers the digest where you set it up (also in the dashboard Blueprints tab and the Desktop Cron page).
+- Post a digest straight into a Telegram or Discord chat with inline Save / Open / Mute feed buttons: `/rss digest-post [unread|saved|all]`.
 - Drive the same local library from chat:
 
 ```text
@@ -43,6 +45,7 @@
 /rss add r/programming
 /rss mark-read all
 /rss digest unread 7d
+/rss digest-post unread
 /rss health
 /rss find …
 /rss tag … / /rss untag …
@@ -80,7 +83,7 @@ Desktop reader plus a local Python API for feed, article, grading, and preferenc
 
 This plugin is a fork of [Adolanium/hermes-rss](https://github.com/Adolanium/hermes-rss) (MIT). Copyright notices are in [LICENSE](../../LICENSE).
 
-The public edition does not use archive or proxy mirrors, does not submit a self-improvement prompt that edits the installed plugin, and does not import private Hermes gateway internals.
+The public edition does not use archive or proxy mirrors and does not submit a self-improvement prompt that edits the installed plugin. One disclosed exception to the SDK-only import rule: the interactive digest reads `gateway.session_context` to learn which chat a `/rss digest-post` command came from, the same read the core's own `/blueprint` command uses for its delivery origin. The import is guarded, and the command degrades to a plain text digest when the module is unavailable. Catalog rule 13 disclosure.
 
 ## License
 

@@ -16,6 +16,16 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [rss-reader 1.2.0] - 2026-10-14
+
+Digests leave the reader page and arrive where you already talk to Hermes.
+
+### Added
+
+- Both editions: the `rss-reader:daily-digest` Automation Blueprint. `/blueprint rss-reader:daily-digest` fills in the time, which days, and which articles, and the scheduled job builds the digest through the rss tool. It also shows up in the dashboard Blueprints tab and the Desktop Cron page, and the cron job it creates keeps running even if the plugin is later disabled.
+- Both editions: `/rss digest-post [unread|saved|all]` posts the digest straight into the Telegram or Discord chat you ran it from, with inline Save, Open, and Mute feed buttons per story. Buttons are pattern-scoped and never touch core button flows. In the desktop app and CLI, where there is no gateway chat to post to, the command prints the digest instead.
+- Public edition: one disclosed read of `gateway.session_context` to learn the chat a `/rss digest-post` command came from, the same read the core's own `/blueprint` command uses for its delivery origin. The import is guarded and the command degrades to a text digest without it.
+
 ## [iteration-budget-meter 1.3.0] - 2026-10-13
 
 The chip shows the session's cumulative totals; the per-turn readout stays in the popover.

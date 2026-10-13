@@ -38,7 +38,7 @@ def _usage() -> str:
         "/rss unmute <keyword or tag> | /rss tag <key> <article> | /rss untag <article> | "
         "/rss refine [starred|XXd] | /rss add <url or website>[, name] [to <folder>] | "
         "/rss remove <feed> | /rss find <text> | /rss mark-read {all|feed <name>|folder <name>} | "
-        "/rss digest {unread [XXd]|saved} | /rss health"
+        "/rss digest {unread [XXd]|saved} | /rss digest-post [unread|saved|all] | /rss health"
     )
 
 
@@ -126,6 +126,12 @@ def _parse(raw_args: str) -> tuple[str, dict[str, Any]] | None:
         if rest:
             raise ValueError("Usage: /rss health")
         return "health", {}
+
+    if action == "digest-post":
+        scope = rest.strip().lower() if rest.strip() else "unread"
+        if scope not in {"unread", "saved", "all"}:
+            raise ValueError("Usage: /rss digest-post [unread|saved|all]")
+        return "digest-post", {"scope": scope}
 
     if action == "add":
         match = re.fullmatch(r"(.+?)\s+to\s+(.+)", rest, re.IGNORECASE)
@@ -226,12 +232,48 @@ def _wait_result(command_id: str, timeout: float = 45.0) -> str:
     return "RSS Reader did not answer. Keep Hermes desktop running and try again."
 
 
+#: Lazily loaded platform module (automation blueprints + gateway handlers).
+_PLATFORM = None
+
+
+def _load_platform():
+    """Load the platform module once; None when the file is unreadable."""
+    global _PLATFORM
+    if _PLATFORM is not None:
+        return _PLATFORM
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "rss_reader_platform",
+            Path(__file__).with_name("platform.py"),
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except Exception:
+        return None
+    _PLATFORM = module
+    return module
+
+
+def _post_digest(scope: str) -> str:
+    """Post an interactive digest to the current chat (gateway) or render it."""
+    module = _load_platform()
+    if module is None:
+        return "RSS Reader platform module is unavailable; restart the plugin."
+    try:
+        return module.post_digest(scope=scope)
+    except Exception as exc:
+        return f"RSS digest could not be posted: {exc.__class__.__name__}."
+
+
 def _handle(raw_args: str) -> str:
     try:
         parsed = _parse(raw_args)
         if parsed is None:
             return _usage()
         action, payload = parsed
+        if action == "digest-post":
+            return _post_digest(payload.get("scope") or "unread")
         if action == "find":
             return _wait_result(_enqueue(action, payload, reply=True))
         _enqueue(action, payload)
@@ -278,8 +320,8 @@ def register(ctx=None):
         ctx.register_command(
             "rss",
             handler=_handle,
-            description="Control RSS Reader feeds, refresh, mutes, grading, triage, and health.",
-            args_hint="refresh [5m|10m|15m|30m|60m|120m|180m] | mute <keyword|tag <key>> | unmute <keyword or tag> | tag <key> <article> | untag <article> | refine [starred|XXd] | add <website> [to <folder>] | remove <feed> | find <text> | mark-read {all|feed <name>|folder <name>} | digest {unread [XXd]|saved} | health",
+            description="Control RSS Reader feeds, refresh, mutes, grading, triage, digests, and health.",
+            args_hint="refresh [5m|10m|15m|30m|60m|120m|180m] | mute <keyword|tag <key>> | unmute <keyword or tag> | tag <key> <article> | untag <article> | refine [starred|XXd] | add <website> [to <folder>] | remove <feed> | find <text> | mark-read {all|feed <name>|folder <name>} | digest {unread [XXd]|saved} | digest-post [unread|saved|all] | health",
             argument_mode="mixed",
         )
         import importlib.util
@@ -298,6 +340,9 @@ def register(ctx=None):
             description=tools.RSS_SCHEMA["description"],
             emoji="📰",
         )
+        platform = _load_platform()
+        if platform is not None:
+            platform.register_extras(ctx, tools._run, _enqueue)
     return None
 
 
