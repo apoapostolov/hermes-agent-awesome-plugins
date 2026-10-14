@@ -14,6 +14,9 @@
  *     (display = fetched base + delta since the fetch anchor, so it stays
  *     correct whether or not the runtime counter survives restarts).
  *
+ * v1.3.1: the live step count anchors at the running turn's start (a
+ * mid-turn fetch never reads 0 steps), and the chip stays plain — the
+ * per-turn warning color lives in the popover only.
  * v1.3.0: the chip switched from the per-turn counter to the session's
  * cumulative totals — the per-turn readout stays in the popover. Loads are
  * race-proofed (settle delay, timeout, idle-safe retries; the chip stays
@@ -161,7 +164,15 @@ function IterBudgetChip() {
         if (st.gen !== gen || st.key !== stored) return // switched mid-fetch — drop
         st.turns = turns
         st.stepsBase = steps
-        st.stepsAnchor = typeof liveCalls === 'number' ? liveCalls : null
+        // Anchor the live delta at the RUNNING turn's start. The display
+        // transcript carries completed turns only, so a fetch landing mid-turn
+        // (cold retry, catch-up, queued pending) must count this turn's
+        // iterations from its first busy tick — anchoring at the fetch moment
+        // reads 0 steps for a turn that is already underway.
+        const busyNow = !!host.state.busy.get()
+        const anchor = busyNow && base.current !== null ? base.current : liveCalls
+
+        st.stepsAnchor = typeof anchor === 'number' ? anchor : null
         st.retryAt = 0
         if (st.retryTimer) { clearTimeout(st.retryTimer); st.retryTimer = null }
       } catch (_e) {
@@ -304,7 +315,6 @@ function IterBudgetChip() {
               'inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem] text-(--ui-text-tertiary) transition-colors',
               'hover:bg-(--chrome-action-hover) hover:text-foreground'
             ),
-            style: color ? { color } : undefined,
             onClick: () => bump(Date.now()), // refresh only this chip's details
             children: jsxs(Fragment, {
               children: [
