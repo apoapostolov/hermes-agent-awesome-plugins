@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -40,6 +41,8 @@ def _default_hermes_home() -> Path:
 
 
 HERMES_HOME = _default_hermes_home()
+LIBRARY_PATH = PLUGIN_ROOT / "library.env"
+HERMES_ENV = HERMES_HOME / ".env"
 CACHE_TTL = 60  # 1 min — keep the bar fresh, APIs are cheap
 
 # ── Config ─────────────────────────────────────────────────────────
@@ -52,6 +55,16 @@ def load_config() -> dict:
                 cfg = loaded
         except Exception:
             pass
+    if not cfg.get("poll_minutes"):
+        lib = PLUGIN_ROOT / "library.env"
+        if lib.exists():
+            try:
+                for line in lib.read_text("utf-8").splitlines():
+                    if line.strip().startswith("POLL_MINUTES="):
+                        cfg["poll_minutes"] = max(1, int(line.split("=", 1)[1].strip()))
+                        break
+            except Exception:
+                pass
     return cfg
 
 def save_config(cfg: dict) -> None:
@@ -61,6 +74,12 @@ def save_config(cfg: dict) -> None:
     tmp = CONFIG_PATH.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(cfg, indent=2), "utf-8")
     os.replace(tmp, CONFIG_PATH)
+    try:
+        pm = int(cfg.get("poll_minutes") or 0)
+        if pm >= 1:
+            _upsert_env_key(PLUGIN_ROOT / "library.env", "POLL_MINUTES", str(pm))
+    except Exception:
+        pass
 
 
 # Serializes every read-modify-write of config.json. Without it, a token
@@ -97,27 +116,33 @@ def _merge_pool_fields(fresh_cfg: dict, src_providers: dict, pids: list[str]) ->
 _env_cache: dict[str, str] = {}
 _env_loaded = False
 
+def _merge_env_file(path: Path) -> None:
+    """Load KEY=value lines into _env_cache. Later files overwrite."""
+    try:
+        if not path.exists():
+            return
+        for line in path.read_text("utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            k = k.strip()
+            v = v.strip().strip("\"'")
+            if k:
+                _env_cache[k] = v
+    except Exception:
+        pass
+
+
 def _load_env_files() -> None:
     global _env_loaded
     if _env_loaded:
         return
     _env_loaded = True
-    for p in [HERMES_HOME / ".env"]:
-        try:
-            if not p.exists():
-                continue
-            for line in p.read_text("utf-8").splitlines():
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                k, _, v = line.partition("=")
-                k = k.strip()
-                v = v.strip().strip("\"'")
-                # Hermes .env is the only env file this edition reads.
-                if k:
-                    _env_cache[k] = v
-        except Exception:
-            pass
+    # Account store first (library.env). Hermes runtime .env wins on overlap.
+    # Never read C:/git/lifestyle/.env.
+    _merge_env_file(LIBRARY_PATH)
+    _merge_env_file(HERMES_ENV)
     # expand ${VAR} refs against the merged map (numbered-pool layouts use them)
     for _ in range(4):  # bounded passes for chained refs
         changed = False
@@ -149,10 +174,9 @@ def resolve_key(env_names: list[str], pool: list[str] | None = None, pool_index:
 
 
 # ── Key library + rotation ─────────────────────────────────────────
-# Provider-status keeps its own env file so rotating the active Hermes
-# key never drops a previous subscription. Hermes .env is copy-in only.
-LIBRARY_PATH = PLUGIN_ROOT / "library.env"
-HERMES_ENV = HERMES_HOME / ".env"
+# library.env is the plugin-owned account store. Hermes .env holds the
+# active runtime key (and, when Apply Changes is on, native numbered
+# siblings). Lifestyle .env is never read or written.
 ROTATE_REMAINING = 2.0  # switch when displayed remaining is 2% or less
 _ROTATE_OAUTH_MAX_TRIALS = 8  # one exhausted account scans at most 8 others;
 # a 200+ account pool once stalled /status past the 30s gateway timeout
@@ -170,6 +194,53 @@ _SKIP_ENV = (
     "_AUTH_COOKIE", "_LAST_REASON", "_LAST_ROTATED", "_LEFT_SLOT",
     "_LEFT_SLOT1", "_LEFT_SLOT_2",
 )
+
+# ── Deletion tombstones ────────────────────────────────────────────
+# A key the user deleted must never come back. library.env and the Hermes
+# .env are both append-only feeds into _ingest_library(), so without a
+# durable "this one is gone" record every poll resurrects the key (the pool
+# is rebuilt as `old + every library value`). Tombstones close that loop.
+#
+# Fingerprints, not keys: sha256 of the raw value, truncated. A leaked
+# tombstone file then reveals nothing about the credentials it covers.
+TOMBSTONE_PATH = PLUGIN_ROOT / "removed.json"
+_TOMBSTONES_MAX = 200
+
+
+def _fingerprint(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def _load_tombstones() -> set[str]:
+    try:
+        data = json.loads(TOMBSTONE_PATH.read_text("utf-8"))
+        items = data.get("removed") if isinstance(data, dict) else data
+        return {str(x) for x in items} if isinstance(items, list) else set()
+    except Exception:
+        return set()
+
+
+def _save_tombstones(tombs: set[str]) -> None:
+    """Bounded write; oldest entries are dropped past _TOMBSTONES_MAX."""
+    try:
+        kept = sorted(tombs)[:_TOMBSTONES_MAX]
+        tmp = TOMBSTONE_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"removed": kept}, indent=2), "utf-8")
+        os.replace(tmp, TOMBSTONE_PATH)
+    except Exception as e:
+        log.warning("provider-status tombstone write failed: %s", e)
+
+
+def _tombstone_keys(values: list[str]) -> None:
+    """Record these raw key values as user-deleted."""
+    if not values:
+        return
+    with _library_lock:
+        tombs = _load_tombstones()
+        before = len(tombs)
+        tombs.update(_fingerprint(v) for v in values if v)
+        if len(tombs) != before:
+            _save_tombstones(tombs)
 
 
 def _parse_env_map(path: Path) -> dict[str, str]:
@@ -222,6 +293,53 @@ def _library_values() -> list[str]:
     return list(_parse_env_map(LIBRARY_PATH).values())
 
 
+def _library_slots_for_value(value: str) -> list[str]:
+    """Library slot NAMES (e.g. OPENCODE_GO_API_KEY_2) holding this value."""
+    return [k for k, v in _parse_env_map(LIBRARY_PATH).items() if v == value]
+
+
+def _delete_from_library(value: str) -> list[str]:
+    """Remove every library slot holding `value`. Returns the slot names
+    removed. The library used to be copy-in only, which is why a key the user
+    deleted in the dialog came straight back on the next poll."""
+    if not value:
+        return []
+    with _library_lock:
+        removed = []
+        for slot in _library_slots_for_value(value):
+            _remove_env_key(LIBRARY_PATH, slot)
+            removed.append(slot)
+        if removed:
+            log.info("provider-status library removed slots %s", removed)
+        return removed
+
+
+def _prune_env_for_provider(pid: str, live_values: list[str]) -> list[str]:
+    """Drop numbered HERMES_ENV siblings for `pid` that no longer carry a live
+    key. Discovery needs contiguous numbering, so a gap is worse than the
+    removed entry. Returns the env var names removed."""
+    spec = ROTATABLE.get(pid)
+    if not spec:
+        return []
+    primary = spec["primary"]
+    live = {v for v in live_values if v}
+    with _library_lock:
+        existing = _parse_env_map(HERMES_ENV)
+        dropped: set[str] = set()
+        for name, val in existing.items():
+            if name == primary or not name.startswith(primary + "_"):
+                continue
+            if not name[len(primary) + 1:].isdigit():
+                continue
+            if not val or val in live:
+                continue
+            _remove_env_key(HERMES_ENV, name)
+            dropped.add(name)
+        if dropped:
+            log.info("provider-status %s: env dropped stale carriers %s", pid, sorted(dropped))
+        return sorted(dropped)
+
+
 def _library_has_value(value: str) -> bool:
     return value in set(_library_values())
 
@@ -248,13 +366,11 @@ def _is_key_name(name: str, stems: tuple[str, ...]) -> bool:
 
 
 def _ingest_library(cfg: dict) -> dict:
-    """Public edition does not copy secrets into a plugin-owned library file."""
-    return cfg
-
-    """Copy new keys from Hermes .env + current pools into library.env. Never delete."""
+    """Archive new keys from Hermes runtime .env + dialog pools into library.env."""
     hermes = _parse_env_map(HERMES_ENV)
     with _library_lock:
         lib = _parse_env_map(LIBRARY_PATH)
+        tombs = _load_tombstones()
         added = 0
         for pid, spec in ROTATABLE.items():
             stems = tuple(spec["match"])
@@ -267,6 +383,11 @@ def _ingest_library(cfg: dict) -> dict:
                 if val and val not in candidates:
                     candidates.append(val)
             for val in candidates:
+                # A tombstoned key is never re-ingested and never re-added to a
+                # pool, even if a stale library.env or Hermes .env still lists
+                # it. This is what makes a dialog delete stick.
+                if _fingerprint(val) in tombs:
+                    continue
                 if val in lib.values():
                     continue
                 slot = _next_library_name(spec["primary"], lib)
@@ -280,7 +401,8 @@ def _ingest_library(cfg: dict) -> dict:
         dirty = False
         for pid, spec in ROTATABLE.items():
             stems = tuple(spec["match"])
-            values = [v for k, v in lib.items() if _is_key_name(k, stems)]
+            values = [v for k, v in lib.items()
+                      if _is_key_name(k, stems) and _fingerprint(v) not in tombs]
             # keep first-seen order from current pool then library extras
             pconf = providers.get(pid)
             if pconf is None:
@@ -398,8 +520,28 @@ _HERMES_STRATEGY_SLUG = {
 
 
 def _apply_hermes_pool(pid: str, pool: list) -> None:
-    """Automatic Hermes .env pool writes are disabled in the public edition."""
-    return None
+    """Seed the native credential pool: PRIMARY=pool[0], PRIMARY_2=pool[1], ...
+    in Hermes .env (contiguous numbering is required by discovery)."""
+    spec = ROTATABLE.get(pid)
+    if not spec:
+        return
+    primary = spec["primary"]
+    with _library_lock:
+        # stale numbered siblings beyond the current pool get dropped so
+        # discovery never stops at a missing number.
+        existing = _parse_env_map(HERMES_ENV)
+        stale = [n for n in existing
+                 if n != primary and n.startswith(primary + "_")
+                 and n[len(primary) + 1:].isdigit()]
+        for n in stale:
+            _remove_env_key(HERMES_ENV, n)
+        for i, key in enumerate(pool[:6]):
+            name = primary if i == 0 else f"{primary}_{i + 1}"
+            _upsert_env_key(HERMES_ENV, name, key)
+    os.environ[primary] = pool[0] if pool else ""
+    if pool:
+        _env_cache[primary] = pool[0]
+    log.info("provider-status %s: pool applied to Hermes .env (%d keys)", pid, len(pool))
 
 
 def _remove_env_key(path: Path, key: str) -> None:
@@ -420,8 +562,15 @@ def _remove_env_key(path: Path, key: str) -> None:
 
 
 def _apply_hermes_key(pid: str, key: str) -> None:
-    """Automatic Hermes .env key writes are disabled in the public edition."""
-    return None
+    spec = ROTATABLE.get(pid)
+    if not spec or not key:
+        return
+    primary = spec["primary"]
+    with _library_lock:
+        _upsert_env_key(HERMES_ENV, primary, key)
+    os.environ[primary] = key
+    _env_cache[primary] = key
+    log.info("provider-status rotated %s -> Hermes .env %s", pid, primary)
 
 
 def _maybe_rotate(pid: str, pconf: dict, status: dict, fetcher) -> tuple[dict, dict, bool]:
@@ -438,8 +587,8 @@ def _maybe_rotate(pid: str, pconf: dict, status: dict, fetcher) -> tuple[dict, d
         if st.get("ok") and not _exhausted(pid, st):
             pconf = dict(pconf)
             pconf["pool_index"] = idx
-            # Public edition records the selected pool index but never writes
-            # Hermes .env automatically during exhaustion rotation.
+            _apply_hermes_key(pid, pool[idx])
+            st["rotated"] = True
             st["pool_index"] = idx
             st["pool_size"] = len(pool)
             return st, pconf, True
@@ -567,7 +716,8 @@ def _maybe_reset_day_rotate(pid: str, pconf: dict) -> tuple[dict, bool]:
             pconf = dict(pconf)
             pconf["pool_index"] = i
             pconf["reset_days_fired"] = consumed + [tag]
-            log.info("provider-status %s: renewal day %s passed, selected key #%d (env unchanged)",
+            _apply_hermes_key(pid, pool[i])
+            log.info("provider-status %s: renewal day %s passed, switched to key #%d",
                      pid, d, i + 1)
             return pconf, True
     # nothing fired; persist consumed marks only if they changed
@@ -618,6 +768,21 @@ def cached_status(pid: str) -> dict[str, Any] | None:
             return e["data"]
     return None
 
+def _write_quota_cache(pid: str, data: dict[str, Any]) -> None:
+    """Persist a secret-free snapshot the gateway presence can read."""
+    try:
+        import importlib.util
+        path = PLUGIN_ROOT / "quota_bridge.py"
+        spec = importlib.util.spec_from_file_location("provider_status_quota_bridge", path)
+        if spec is None or spec.loader is None:
+            return
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.upsert(PLUGIN_ROOT, pid, data)
+    except Exception:
+        pass
+
+
 def store_status(pid: str, data: dict[str, Any]) -> None:
     with _cache_lock:
         _cache[pid] = {"data": data, "ts": time.time()}
@@ -626,6 +791,7 @@ def store_status(pid: str, data: dict[str, Any]) -> None:
             _fail_counts[pid] = 0
     if data.get("ok", False):
         _sample_usage(pid, data)
+        _write_quota_cache(pid, data)
 
 
 # ── Burn-rate tracking (in-memory) ─────────────────────────────────
@@ -789,21 +955,15 @@ def fetch_glm(cfg: dict) -> dict:
             windows.append({"label": "wk", "pct": weekly_pct, "direction": "exhaust"})
         if has_monthly:
             windows.append({"label": "mo", "pct": monthly_pct, "direction": "exhaust"})
-        # Multi-window arrow detail, same convention as fetch_opencode: every
-        # arrow carries REMAINING. The chip turns the leading arrow back into a
-        # used % for the burst window and shows the down arrows as remaining.
-        segs = []
-        if has_session:
-            segs.append(f"↑{max(0.0, 100 - session_pct):.0f}%")
-        if has_weekly:
-            segs.append(f"↓{max(0.0, 100 - weekly_pct):.0f}%")
-        if has_monthly:
-            segs.append(f"↓{max(0.0, 100 - monthly_pct):.0f}%")
         status = {"ok": True,
                   "exhaust_percent": exhaust,
                   "resets_at": session_reset,
-                  "detail": " ".join(segs),
+                  "detail": "5h",
                   "windows": windows}
+        # The headline number is only meaningful once a burst window was
+        # actually reported. Omit the key rather than sending null: the
+        # desktop fallback reads Number(null) as 0 and would draw a full
+        # 5h window, while Number(undefined) is NaN and gets rejected.
         if has_session:
             status["percent"] = session_pct
         return status
@@ -933,8 +1093,31 @@ _refresh_results: dict[tuple[str, str], dict] = {}
 
 
 def _token_refresh(issuer: str, refresh_token: str, client_id: str) -> dict:
-    """Disabled in the public edition. OAuth expiry requires a new login."""
-    return {"ok": False, "error": "automatic token refresh disabled"}
+    with _refresh_locks_guard:
+        lock = _refresh_locks.setdefault(issuer, threading.Lock())
+    with lock:
+        cached = _refresh_results.get((issuer, refresh_token))
+        if cached is not None:
+            return dict(cached)
+        try:
+            disc = _oidc_discover(issuer)
+            ep = disc.get("token_endpoint", issuer.rstrip("/") + "/oauth/token")
+            body = {"grant_type": "refresh_token", "refresh_token": refresh_token,
+                    "client_id": client_id}
+            d = api_post(ep, {"Content-Type": "application/x-www-form-urlencoded"}, body)
+            if "access_token" in d:
+                out = {"ok": True, "access_token": d["access_token"],
+                       "refresh_token": d.get("refresh_token", refresh_token),
+                       "expires_in": d.get("expires_in", 3600)}
+            else:
+                out = {"ok": False, "error": d.get("error", "refresh failed")}
+        except Exception as e:
+            out = {"ok": False, "error": str(e)[:80]}
+        # remember successes per refresh_token (it is single-use; a repeat call
+        # with it can only ever fail). Do not cache failures — they may be transient.
+        if out.get("ok"):
+            _refresh_results[(issuer, refresh_token)] = dict(out)
+        return out
 
 
 GROK_BILLING_URL = "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
@@ -969,8 +1152,28 @@ def _jwt_alive(token: str, skew: int = 60) -> bool:
 
 
 def _cli_grok_entry() -> dict | None:
-    """Vendor CLI credential files are intentionally out of scope."""
-    return None
+    p = Path.home() / ".grok" / "auth.json"
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    best = None
+    best_exp = -1.0
+    for entry in (data or {}).values():
+        if not isinstance(entry, dict):
+            continue
+        tok = str(entry.get("key") or "").strip()
+        if not tok:
+            continue
+        exp = entry.get("expires_at")
+        try:
+            import datetime as _dt
+            exp_ts = _dt.datetime.fromisoformat(str(exp).replace("Z", "+00:00")).timestamp() if exp else float("inf")
+        except Exception:
+            exp_ts = float(_jwt_payload(tok).get("exp") or 0) or 0.0
+        if exp_ts >= best_exp:
+            best, best_exp = entry, exp_ts
+    return best
 
 
 def _upsert_oauth_account(pid: str, result: dict, client_id: str, issuer: str, email: str = "") -> None:
@@ -1015,8 +1218,12 @@ def _upsert_oauth_account(pid: str, result: dict, client_id: str, issuer: str, e
 
 
 def _persist_grok_tokens(access: str, refresh: str, expires_in: int, client_id: str, email: str = "") -> None:
-    """Automatic vendor-token persistence is disabled in the public edition."""
-    return None
+    try:
+        _upsert_oauth_account("grok", {
+            "access_token": access, "refresh_token": refresh, "expires_in": expires_in},
+            client_id or DEFAULT_CLIENT_ID, "https://auth.x.ai", email)
+    except Exception:
+        pass
 
 
 class BillingPermissionError(Exception):
@@ -1099,12 +1306,43 @@ def fetch_grok(cfg: dict) -> dict:
         if hit and hit.get("ok"):
             return hit
 
+    cli_entry = _cli_grok_entry() or {}
+    cli_tok = str(cli_entry.get("key") or "").strip()
+    if cli_tok and _jwt_alive(cli_tok) and _has_cli_scope(cli_tok):
+        hit = _try_grok_token(cli_tok, "cli")
+        if hit and hit.get("ok"):
+            return hit
+
+    cli_rt = str(cli_entry.get("refresh_token") or "").strip()
+    if cli_rt:
+        r = _token_refresh("https://auth.x.ai", cli_rt, cli_entry.get("oidc_client_id") or client_id)
+        if r.get("ok"):
+            tok = r["access_token"]
+            _persist_grok_tokens(tok, r.get("refresh_token", cli_rt), r.get("expires_in", 21600),
+                                 cli_entry.get("oidc_client_id") or client_id,
+                                 str(cli_entry.get("email") or ""))
+            hit = _try_grok_token(tok, "cli-refresh")
+            if hit:
+                return hit
+
     if dialog and _jwt_alive(dialog):
         hit = _try_grok_token(dialog, "dialog")
         if hit:
             return hit
 
-    return {"ok": False, "error": "re-login required (access token expired or missing)", "needs_auth": True}
+    rt = str(cfg.get("refresh_token") or "").strip()
+    if rt:
+        r = _token_refresh("https://auth.x.ai", rt, client_id)
+        if r.get("ok"):
+            tok = r["access_token"]
+            _persist_grok_tokens(tok, r.get("refresh_token", rt), r.get("expires_in", 3600), client_id)
+            hit = _try_grok_token(tok, "dialog-refresh")
+            if hit:
+                return hit
+
+    if dialog or cli_tok:
+        return {"ok": False, "error": "re-login required (need grok-cli:access)", "needs_auth": True}
+    return {"ok": False, "error": "not logged in", "needs_auth": True}
 
 # ── Codex (OAuth device flow) ────────────────────────────────────
 
@@ -1115,8 +1353,25 @@ def fetch_codex(cfg: dict) -> dict:
     expires = cfg.get("expires_at", 0)
     if not token:
         return {"ok": False, "error": "not logged in", "needs_auth": True}
+    # refresh if needed
     if expires and time.time() > expires - 60:
-        return {"ok": False, "error": "token expired; re-login required", "needs_auth": True}
+        rt = cfg.get("refresh_token", "")
+        if rt:
+            r = _token_refresh(CODEX_ISSUER, rt, CODEX_CLIENT_ID)
+            if r.get("ok"):
+                token = r["access_token"]
+                # persist refreshed token (locked; keeps the account pool in sync)
+                try:
+                    _upsert_oauth_account("codex", {
+                        "access_token": token,
+                        "refresh_token": r.get("refresh_token", rt),
+                        "expires_in": r.get("expires_in", 3600),
+                    }, CODEX_CLIENT_ID, CODEX_ISSUER)
+                except Exception: pass
+            else:
+                return {"ok": False, "error": "token expired", "needs_auth": True}
+        else:
+            return {"ok": False, "error": "token expired", "needs_auth": True}
     try:
         d = api_get(WHAM_URL, {
             "Authorization": f"Bearer {token}",
@@ -1511,6 +1766,10 @@ class ConfigUpdate(BaseModel):
     poll_minutes: int | None = None
     apply_hermes_env: bool | None = None
     remove: list[str] = []   # provider ids to delete entirely (rows + order)
+    # Key VALUES (not slot names) the user deleted in the dialog. The backend
+    # maps each to its library slot(s) and the Hermes .env carriers, then
+    # tombstones it so no later poll re-ingests it.
+    remove_keys: dict[str, list[str]] = {}
 
 @router.get("/status")
 def get_status(only: set | None = None):
@@ -1642,11 +1901,20 @@ def get_status(only: set | None = None):
 _HERMES_TO_PID = {
     "zai": "glm", "z_ai": "glm", "glm": "glm",
     "deepseek": "deepseek",
-    "xai": "grok", "grok": "grok",
-    "openai": "codex", "codex": "codex",
+    "xai": "grok", "grok": "grok", "xai-oauth": "grok",
+    "openai": "codex", "codex": "codex", "openai-codex": "codex",
     "opencode": "opencode", "opencode-go": "opencode",
     "openrouter": "openrouter",
     "tavily": "tavily",
+    "anthropic": "anthropic",
+    "groq": "groq",
+    "cerebras": "cerebras",
+    "moonshot": "moonshot", "kimi": "moonshot", "kimi-coding": "moonshot",
+    "minimax": "minimax",
+    "gemini": "gemini", "google": "gemini",
+    "huggingface": "huggingface", "hf": "huggingface",
+    "mistral": "mistral",
+    "qwen": "qwen", "dashscope": "qwen",
 }
 
 
@@ -1697,6 +1965,121 @@ def get_active():
         return {"provider": None, "model": None, "pid": None, "error": str(e)[:80]}
 
 
+# ── Pet bubble settings ───────────────────────────────────────────
+# The pet speech bubble is a desktop-only surface, and the renderer cannot read
+# the gateway settings store, so it asks /pet-settings and this module parses
+# plugins.entries.provider-status.settings.* out of config.yaml. The backend
+# install venv ships no yaml module, hence the regex parse (the same shape
+# _read_active_model already uses). Defaults here mirror plugin.yaml
+# config_schema; the desktop half carries its own copy for when this endpoint
+# is unreachable. Never raises, never returns a secret.
+_PET_DEFAULTS: dict[str, Any] = {
+    "pet_show_quota": True,
+    "pet_source": "active",
+    "pet_fallback_to_worst": True,
+    "pet_metric": "auto",
+    "pet_show_provider_name": True,
+    "pet_show_percent_sign": True,
+    "pet_show_unit_word": True,
+    "pet_show_errors": True,
+    "pet_providers": "",
+    "pet_warn_remaining": 20,
+    "pet_error_remaining": 10,
+    "pet_warn_balance": 5,
+    "pet_error_balance": 1,
+    "pet_ttl_seconds": 8,
+}
+_PET_SOURCES = ("active", "worst")
+_PET_METRICS = ("auto", "remaining", "used", "balance")
+_PET_BOOL_KEYS = (
+    "pet_show_quota", "pet_fallback_to_worst", "pet_show_provider_name",
+    "pet_show_percent_sign", "pet_show_unit_word", "pet_show_errors",
+)
+# key -> (default, low, high)
+_PET_INT_KEYS: dict[str, tuple[int, int, int]] = {
+    "pet_warn_remaining": (20, 1, 100),
+    "pet_error_remaining": (10, 1, 100),
+    "pet_warn_balance": (5, 1, 1000),
+    "pet_error_balance": (1, 1, 1000),
+    "pet_ttl_seconds": (8, 1, 60),
+}
+
+
+def _pet_bool(value: Any, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        low = value.strip().lower()
+        if low in {"1", "true", "yes", "on"}:
+            return True
+        if low in {"0", "false", "no", "off", ""}:
+            return False
+    return default
+
+
+def _pet_int(value: Any, default: int, low: int, high: int) -> int:
+    try:
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, number))
+
+
+def read_pet_settings() -> dict[str, Any]:
+    """Parse this plugin's ``settings`` block out of config.yaml.
+
+    Returns the defaults for anything missing or unparseable, so a malformed
+    value degrades to the shipped behaviour instead of blanking the bubble.
+    """
+    out = dict(_PET_DEFAULTS)
+    try:
+        # Read with splitlines() so mixed CRLF and LF endings both lose
+        # their terminator. A stray carriage return would otherwise glue
+        # itself to every parsed value on this host.
+        text = (HERMES_HOME / "config.yaml").read_text(encoding="utf-8")
+    except Exception:
+        return out
+    try:
+        entry = re.search(r"(?m)^    provider-status:\s*$", text)
+        if not entry:
+            return out
+        rest = text[entry.end():]
+        block = re.search(r"(?m)^      settings:\s*$", rest)
+        if not block:
+            return out
+        for line in rest[block.end():].splitlines():
+            if not line.strip():
+                continue
+            if not line.startswith("        "):
+                break  # left the settings block (next entry or top-level key)
+            m = re.match(r"^        ([A-Za-z0-9_]+):[ \t]*(.*?)[ \t]*$", line)
+            if not m:
+                continue
+            key, raw = m.group(1), m.group(2).strip().strip("'\"")
+            if key in _PET_BOOL_KEYS:
+                out[key] = _pet_bool(raw, out[key])
+            elif key in _PET_INT_KEYS:
+                default, low, high = _PET_INT_KEYS[key]
+                out[key] = _pet_int(raw, default, low, high)
+            elif key == "pet_source":
+                if raw in _PET_SOURCES:
+                    out[key] = raw
+            elif key == "pet_metric":
+                if raw in _PET_METRICS:
+                    out[key] = raw
+            elif key == "pet_providers":
+                out[key] = raw[:200]
+    except Exception:
+        return out
+    return out
+
+
+@router.get("/pet-settings")
+def get_pet_settings():
+    """Settings the desktop pet bubble needs, parsed from config.yaml."""
+    return read_pet_settings()
+
+
 @router.get("/meta")
 def get_meta():
     # Per-provider flag: does an API key resolve from env/.env chain right now?
@@ -1716,7 +2099,7 @@ def get_meta():
 
 @router.get("/config")
 def get_config():
-    return load_config()
+    return _ingest_library(load_config())
 
 @router.post("/config")
 def update_config(body: ConfigUpdate):
@@ -1791,10 +2174,38 @@ def update_config(body: ConfigUpdate):
                 valid = ("fill_first", "round_robin", "least_used", "random")
                 if incoming.get("pool_strategy") not in valid:
                     merged["pool_strategy"] = "fill_first"
+            # "Apply Changes to Hermes .env": native providers seed PRIMARY,
+            # PRIMARY_2, ... so the credential pool can see every key. Tavily
+            # is not in that registry, so only the active scalar is written.
+            # Extra Tavily accounts stay in library.env.
+            if pid in ROTATABLE and cfg.get("apply_hermes_env"):
+                pool = [k for k in (merged.get("pool") or []) if k]
+                if pid == "tavily":
+                    if pool:
+                        idx = int(merged.get("pool_index") or 0) % len(pool)
+                        _apply_hermes_key(pid, pool[idx])
+                else:
+                    _apply_hermes_pool(pid, pool)
             if "pool_apply_env" in incoming and pid == "tavily":
                 merged["pool_apply_env"] = False
+            # Manual active-key switch (dialog radio): push the chosen key into
+            # the Hermes env so the TUI/runtime picks it up immediately.
+            if pid in ROTATABLE and "pool_index" in incoming:
+                prev_idx = int(prev.get("pool_index") or 0)
+                new_idx = int(merged.get("pool_index") or 0)
+                pool = [k for k in (merged.get("pool") or []) if k]
+                if new_idx != prev_idx and 0 <= new_idx < len(pool):
+                    _apply_hermes_key(pid, pool[new_idx])
+                    log.info("provider-status %s: manual key switch -> #%d, env updated",
+                             pid, new_idx + 1)
             providers[pid] = merged
         cfg["providers"] = providers
+        # Tombstone FIRST, before anything else can re-read the stale value:
+        # a poll already in flight would otherwise re-ingest the key we are
+        # about to delete and re-commit it after this save.
+        for pid, values in (body.remove_keys or {}).items():
+            if pid in ROTATABLE:
+                _tombstone_keys([v for v in (values or []) if v])
         if body.remove:
             rm = [p for p in body.remove if p in providers]
             for p in rm:
@@ -1808,8 +2219,62 @@ def update_config(body: ConfigUpdate):
         if body.apply_hermes_env is not None:
             cfg["apply_hermes_env"] = bool(body.apply_hermes_env)
     mutate_config(_m)
-    # Public edition never writes Hermes .env as a side effect of config save.
-    # The explicit Apply Changes to Hermes .env control calls this path only.
+    try:
+        _ingest_library(load_config())
+    except Exception as e:
+        log.warning("provider-status library archive failed: %s", e)
+    # Purge the deleted key from the library and the Hermes .env, and only
+    # from providers the caller named. Hermes .env is touched regardless of
+    # apply_hermes_env: a stale carrier would keep feeding the library.
+    try:
+        for pid, values in (body.remove_keys or {}).items():
+            if pid not in ROTATABLE:
+                continue
+            for val in [v for v in (values or []) if v]:
+                _delete_from_library(val)
+            live = [k for k in ((load_config().get("providers") or {}).get(pid) or {}).get("pool") or [] if k]
+            _prune_env_for_provider(pid, live)
+    except Exception as e:
+        log.warning("provider-status key removal failed: %s", e)
+    # Applying the switch materializes native pools, and Tavily's active key.
+    try:
+        saved = load_config()
+        if saved.get("apply_hermes_env"):
+            for pid in ROTATABLE:
+                pconf = (saved.get("providers") or {}).get(pid) or {}
+                pool = [k for k in (pconf.get("pool") or []) if k]
+                if not pool:
+                    continue
+                if pid == "tavily":
+                    idx = int(pconf.get("pool_index") or 0) % len(pool)
+                    _apply_hermes_key(pid, pool[idx])
+                else:
+                    _apply_hermes_pool(pid, pool)
+    except Exception as e:
+        log.warning("provider-status env pool apply failed: %s", e)
+    # Mirror per-provider strategies into Hermes config.yaml
+    # (credential_pool_strategies) so the native credential pool picks them up.
+    try:
+        cfg = load_config()
+        provs = cfg.get("providers") or {}
+        strategies = {}
+        for pid, spec in ROTATABLE.items():
+            if pid == "tavily":
+                continue
+            st = (provs.get(pid) or {}).get("pool_strategy") or "fill_first"
+            slug = _HERMES_STRATEGY_SLUG.get(pid)
+            if slug and st:
+                strategies[slug] = st
+        with open(HERMES_HOME / "config.yaml", "r", encoding="utf-8") as f:
+            import yaml as _yaml
+            y = _yaml.safe_load(f) or {}
+        if strategies != (y.get("credential_pool_strategies") or {}):
+            y["credential_pool_strategies"] = strategies
+            tmp = HERMES_HOME / "config.yaml.tmp"
+            tmp.write_text(_yaml.safe_dump(y, sort_keys=False), "utf-8")
+            os.replace(tmp, HERMES_HOME / "config.yaml")
+    except Exception as e:
+        log.warning("provider-status strategies sync failed: %s", e)
     log.info("provider-status config saved: %s", sorted(load_config().get("providers", {})))
     with _cache_lock:
         _cache.clear()

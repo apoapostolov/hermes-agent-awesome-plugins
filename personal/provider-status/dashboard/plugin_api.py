@@ -768,6 +768,21 @@ def cached_status(pid: str) -> dict[str, Any] | None:
             return e["data"]
     return None
 
+def _write_quota_cache(pid: str, data: dict[str, Any]) -> None:
+    """Persist a secret-free snapshot the gateway presence can read."""
+    try:
+        import importlib.util
+        path = PLUGIN_ROOT / "quota_bridge.py"
+        spec = importlib.util.spec_from_file_location("provider_status_quota_bridge", path)
+        if spec is None or spec.loader is None:
+            return
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.upsert(PLUGIN_ROOT, pid, data)
+    except Exception:
+        pass
+
+
 def store_status(pid: str, data: dict[str, Any]) -> None:
     with _cache_lock:
         _cache[pid] = {"data": data, "ts": time.time()}
@@ -776,6 +791,7 @@ def store_status(pid: str, data: dict[str, Any]) -> None:
             _fail_counts[pid] = 0
     if data.get("ok", False):
         _sample_usage(pid, data)
+        _write_quota_cache(pid, data)
 
 
 # ── Burn-rate tracking (in-memory) ─────────────────────────────────
@@ -1885,11 +1901,20 @@ def get_status(only: set | None = None):
 _HERMES_TO_PID = {
     "zai": "glm", "z_ai": "glm", "glm": "glm",
     "deepseek": "deepseek",
-    "xai": "grok", "grok": "grok",
-    "openai": "codex", "codex": "codex",
+    "xai": "grok", "grok": "grok", "xai-oauth": "grok",
+    "openai": "codex", "codex": "codex", "openai-codex": "codex",
     "opencode": "opencode", "opencode-go": "opencode",
     "openrouter": "openrouter",
     "tavily": "tavily",
+    "anthropic": "anthropic",
+    "groq": "groq",
+    "cerebras": "cerebras",
+    "moonshot": "moonshot", "kimi": "moonshot", "kimi-coding": "moonshot",
+    "minimax": "minimax",
+    "gemini": "gemini", "google": "gemini",
+    "huggingface": "huggingface", "hf": "huggingface",
+    "mistral": "mistral",
+    "qwen": "qwen", "dashscope": "qwen",
 }
 
 
@@ -1938,6 +1963,121 @@ def get_active():
                 "pid": _HERMES_TO_PID.get(prov)}
     except Exception as e:
         return {"provider": None, "model": None, "pid": None, "error": str(e)[:80]}
+
+
+# ── Pet bubble settings ───────────────────────────────────────────
+# The pet speech bubble is a desktop-only surface, and the renderer cannot read
+# the gateway settings store, so it asks /pet-settings and this module parses
+# plugins.entries.provider-status.settings.* out of config.yaml. The backend
+# install venv ships no yaml module, hence the regex parse (the same shape
+# _read_active_model already uses). Defaults here mirror plugin.yaml
+# config_schema; the desktop half carries its own copy for when this endpoint
+# is unreachable. Never raises, never returns a secret.
+_PET_DEFAULTS: dict[str, Any] = {
+    "pet_show_quota": True,
+    "pet_source": "active",
+    "pet_fallback_to_worst": True,
+    "pet_metric": "auto",
+    "pet_show_provider_name": True,
+    "pet_show_percent_sign": True,
+    "pet_show_unit_word": True,
+    "pet_show_errors": True,
+    "pet_providers": "",
+    "pet_warn_remaining": 20,
+    "pet_error_remaining": 10,
+    "pet_warn_balance": 5,
+    "pet_error_balance": 1,
+    "pet_ttl_seconds": 8,
+}
+_PET_SOURCES = ("active", "worst")
+_PET_METRICS = ("auto", "remaining", "used", "balance")
+_PET_BOOL_KEYS = (
+    "pet_show_quota", "pet_fallback_to_worst", "pet_show_provider_name",
+    "pet_show_percent_sign", "pet_show_unit_word", "pet_show_errors",
+)
+# key -> (default, low, high)
+_PET_INT_KEYS: dict[str, tuple[int, int, int]] = {
+    "pet_warn_remaining": (20, 1, 100),
+    "pet_error_remaining": (10, 1, 100),
+    "pet_warn_balance": (5, 1, 1000),
+    "pet_error_balance": (1, 1, 1000),
+    "pet_ttl_seconds": (8, 1, 60),
+}
+
+
+def _pet_bool(value: Any, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        low = value.strip().lower()
+        if low in {"1", "true", "yes", "on"}:
+            return True
+        if low in {"0", "false", "no", "off", ""}:
+            return False
+    return default
+
+
+def _pet_int(value: Any, default: int, low: int, high: int) -> int:
+    try:
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, number))
+
+
+def read_pet_settings() -> dict[str, Any]:
+    """Parse this plugin's ``settings`` block out of config.yaml.
+
+    Returns the defaults for anything missing or unparseable, so a malformed
+    value degrades to the shipped behaviour instead of blanking the bubble.
+    """
+    out = dict(_PET_DEFAULTS)
+    try:
+        # Read with splitlines() so mixed CRLF and LF endings both lose
+        # their terminator. A stray carriage return would otherwise glue
+        # itself to every parsed value on this host.
+        text = (HERMES_HOME / "config.yaml").read_text(encoding="utf-8")
+    except Exception:
+        return out
+    try:
+        entry = re.search(r"(?m)^    provider-status:\s*$", text)
+        if not entry:
+            return out
+        rest = text[entry.end():]
+        block = re.search(r"(?m)^      settings:\s*$", rest)
+        if not block:
+            return out
+        for line in rest[block.end():].splitlines():
+            if not line.strip():
+                continue
+            if not line.startswith("        "):
+                break  # left the settings block (next entry or top-level key)
+            m = re.match(r"^        ([A-Za-z0-9_]+):[ \t]*(.*?)[ \t]*$", line)
+            if not m:
+                continue
+            key, raw = m.group(1), m.group(2).strip().strip("'\"")
+            if key in _PET_BOOL_KEYS:
+                out[key] = _pet_bool(raw, out[key])
+            elif key in _PET_INT_KEYS:
+                default, low, high = _PET_INT_KEYS[key]
+                out[key] = _pet_int(raw, default, low, high)
+            elif key == "pet_source":
+                if raw in _PET_SOURCES:
+                    out[key] = raw
+            elif key == "pet_metric":
+                if raw in _PET_METRICS:
+                    out[key] = raw
+            elif key == "pet_providers":
+                out[key] = raw[:200]
+    except Exception:
+        return out
+    return out
+
+
+@router.get("/pet-settings")
+def get_pet_settings():
+    """Settings the desktop pet bubble needs, parsed from config.yaml."""
+    return read_pet_settings()
 
 
 @router.get("/meta")

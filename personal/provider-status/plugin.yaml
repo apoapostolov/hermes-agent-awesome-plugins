@@ -1,6 +1,7 @@
 name: provider-status
-version: 1.6.0
-description: "Unified multi-provider quota usage tracking in the status bar, with support for OAuth, color-based warnings, and multiple accounts per provider with Hermes key rotation on exhaust."
+label: Provider Quota Status
+version: 1.7.0
+description: "Unified multi-provider quota usage tracking in the status bar, with support for OAuth, color-based warnings, and multiple accounts per provider with Hermes key rotation on exhaust. Publishes the current session's tokens/sec, context occupancy, and that provider's remaining quota as the Discord bot presence."
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2
@@ -11,3 +12,198 @@ tags:
   - quota
   - oauth
   - statusbar
+  - discord
+  - presence
+
+provides_tools:
+  - agent_pulse
+
+provides_hooks:
+  - pre_api_request
+  - post_api_request
+  - api_request_error
+  - pre_tool_call
+  - post_tool_call
+  - pre_llm_call
+  - post_llm_call
+
+config_schema:
+  pet_show_quota:
+    type: bool
+    default: true
+    label: Pet bubble
+    description: Show one quota line in the agent pet's speech bubble
+  pet_source:
+    type: str
+    choices: [active, worst]
+    default: active
+    label: Pet provider
+    description: active = the provider backing the current session; worst = the lowest-quota enabled provider
+  pet_fallback_to_worst:
+    type: bool
+    default: true
+    label: Fall back to worst
+    description: When Pet provider is Active and that provider has no quota to show, use the worst enabled provider instead
+  pet_metric:
+    type: str
+    choices: [auto, remaining, used, balance]
+    default: auto
+    label: Pet metric
+    description: Which number the bubble shows. auto follows the provider (balance for credits, used for 5h windows, remaining otherwise)
+  pet_show_provider_name:
+    type: bool
+    default: true
+    label: Provider name in bubble
+    description: Prefix the value with the provider name
+  pet_show_percent_sign:
+    type: bool
+    default: true
+    label: Percent sign
+    description: Append % to a percentage value
+  pet_show_unit_word:
+    type: bool
+    default: true
+    label: Unit word
+    description: Append left / used after the value
+  pet_show_errors:
+    type: bool
+    default: true
+    label: Show provider errors
+    description: Report auth? / no plan / error in the bubble instead of staying silent
+  pet_providers:
+    type: str
+    default: ""
+    label: Providers in bubble
+    description: Comma-separated provider ids to include. Empty means every enabled provider.
+  pet_warn_remaining:
+    type: int
+    default: 20
+    label: Warn below (% left)
+    description: Remaining quota that switches the bubble to a wait tone. A used-percent metric warns at 100 minus this.
+  pet_error_remaining:
+    type: int
+    default: 10
+    label: Error below (% left)
+    description: Remaining quota that switches the bubble to an error tone
+  pet_warn_balance:
+    type: int
+    default: 5
+    label: Warn below ($ left)
+    description: Credit balance that switches the bubble to a wait tone
+  pet_error_balance:
+    type: int
+    default: 1
+    label: Error below ($ left)
+    description: Credit balance that switches the bubble to an error tone
+  pet_ttl_seconds:
+    type: int
+    default: 8
+    label: Bubble TTL (s)
+    description: How long the bubble stays before it clears itself (1-60)
+  discord_presence_enabled:
+    type: bool
+    default: true
+    label: Discord presence
+    description: Publish this session's telemetry as the Discord bot presence
+  discord_presence_mode:
+    type: str
+    choices: [rotate, compact]
+    default: compact
+    label: Presence layout
+    description: compact = every metric on one line; rotate = one metric per update
+  discord_activity_type:
+    type: str
+    choices: [custom, playing, watching, listening, competing]
+    default: custom
+    label: Activity type
+    description: Discord activity kind
+  discord_update_interval_seconds:
+    type: int
+    default: 20
+    label: Update interval (s)
+    description: Seconds between presence updates (10-600). Discord allows ~5 per 20s.
+  discord_status_emoji:
+    type: str
+    default: "📊"
+    label: Status emoji
+    description: Leading emoji for the custom status
+  discord_idle_after_seconds:
+    type: int
+    default: 180
+    label: Idle after (s)
+    description: Switch the presence dot to idle after this long with no activity
+  discord_context_warn_percent:
+    type: int
+    default: 80
+    label: Context warn (%)
+    description: Context occupancy that switches the presence dot to dnd
+  discord_quota_warn_remaining:
+    type: int
+    default: 20
+    label: Quota warn (%)
+    description: Remaining quota that switches the presence dot to dnd
+  discord_show_tokens_per_second:
+    type: bool
+    default: true
+    label: Tokens/sec
+    description: Show throughput (windowed sum of output tokens / sum of durations)
+  discord_show_context:
+    type: bool
+    default: true
+    label: Context usage
+    description: Show context-window occupancy
+  discord_show_context_bar:
+    type: bool
+    default: true
+    label: Context bar
+    description: Draw the block-character context bar beside the percentage
+  discord_show_quota:
+    type: bool
+    default: true
+    label: Quota
+    description: Show remaining quota for the provider backing this session
+  discord_show_quota_bar:
+    type: bool
+    default: true
+    label: Quota bar
+    description: Draw the block-character quota bar
+  discord_show_balance:
+    type: bool
+    default: true
+    label: Credit balance
+    description: Show dollar credit balance when the provider reports one
+  discord_show_cache_hit:
+    type: bool
+    default: false
+    label: Cache hit rate
+    description: Show prompt-cache hit rate
+  discord_show_tool:
+    type: bool
+    default: false
+    label: Running tool
+    description: Show the tool the agent is executing right now
+  discord_show_model:
+    type: bool
+    default: false
+    label: Model
+    description: Show the active model
+  discord_show_latency:
+    type: bool
+    default: false
+    label: Latency
+    description: Show mean request latency
+  discord_show_totals:
+    type: bool
+    default: false
+    label: Lifetime tokens
+    description: Show the session's lifetime token total
+  discord_bar_width:
+    type: int
+    default: 5
+    label: Bar width
+    description: Bar cells (3-20). Discord's member list truncates long statuses, so keep it short there.
+  discord_separator:
+    type: str
+    default: " · "
+    label: Separator
+    description: String between segments in compact mode

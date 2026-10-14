@@ -349,7 +349,7 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
     : 'exhaust'                             // glm default (worst across windows)
 
   // codex: multi-window (↑5h · ↓weekly) rendered like opencode
-  const multi = (id === 'opencode' || id === 'codex' || id === 'glm') && status?.detail
+  const multi = (id === 'opencode' || id === 'codex') && status?.detail
 
   let valueCls = ''
   let valueStyle = { color: 'var(--ui-accent)' }
@@ -454,49 +454,154 @@ let _openExternal = null // ctx.os.openExternal: the app DENIES target=_blank wi
 // (window-open-policy.ts, CVE-2026-70608), so external links go through the OS bridge.
 
 // PET_HELPERS_START
-let _pet = null
-let _petLast = ''
-let _petAt = 0
+// Pure helpers for the agent pet bubble. Every input is a parameter (the pet
+// object, the settings, the clock) so the block can be lifted into a node test
+// against stub objects. Keep it free of module state, SDK imports, and DOM.
+const PET_DEFAULTS = {
+  show_quota: true,
+  source: 'active',
+  fallback_to_worst: true,
+  metric: 'auto',
+  show_provider_name: true,
+  show_percent_sign: true,
+  show_unit_word: true,
+  show_errors: true,
+  providers: '',
+  warn_remaining: 20,
+  error_remaining: 10,
+  warn_balance: 5,
+  error_balance: 1,
+  ttl_seconds: 8,
+}
+const PET_SOURCES = ['active', 'worst']
+const PET_METRICS = ['auto', 'remaining', 'used', 'balance']
+// The host allows 10 says per plugin per 10s. 1.2s locally keeps a live counter
+// inside that without dropping a value the user asked to see.
+const PET_SAME_TEXT_MS = 1200
 
-function quotaPetPayload(id, name, status) {
-  if (!status) return null
+function petNormalize(raw) {
+  const r = raw && typeof raw === 'object' ? raw : {}
+  const out = { ...PET_DEFAULTS }
+  if (typeof r.show_quota === 'boolean') out.show_quota = r.show_quota
+  if (typeof r.fallback_to_worst === 'boolean') out.fallback_to_worst = r.fallback_to_worst
+  if (typeof r.show_provider_name === 'boolean') out.show_provider_name = r.show_provider_name
+  if (typeof r.show_percent_sign === 'boolean') out.show_percent_sign = r.show_percent_sign
+  if (typeof r.show_unit_word === 'boolean') out.show_unit_word = r.show_unit_word
+  if (typeof r.show_errors === 'boolean') out.show_errors = r.show_errors
+  if (PET_SOURCES.includes(r.source)) out.source = r.source
+  if (PET_METRICS.includes(r.metric)) out.metric = r.metric
+  out.providers = typeof r.providers === 'string' ? r.providers.slice(0, 200) : ''
+  const warn = Number(r.warn_remaining)
+  const error = Number(r.error_remaining)
+  const warnBal = Number(r.warn_balance)
+  const errorBal = Number(r.error_balance)
+  const ttl = Number(r.ttl_seconds)
+  out.warn_remaining = Number.isFinite(warn) && warn > 0 ? Math.round(warn) : PET_DEFAULTS.warn_remaining
+  out.error_remaining = Number.isFinite(error) && error > 0 ? Math.round(error) : PET_DEFAULTS.error_remaining
+  out.warn_balance = Number.isFinite(warnBal) && warnBal > 0 ? Math.round(warnBal) : PET_DEFAULTS.warn_balance
+  out.error_balance = Number.isFinite(errorBal) && errorBal > 0 ? Math.round(errorBal) : PET_DEFAULTS.error_balance
+  out.ttl_seconds = Number.isFinite(ttl) && ttl > 0 ? Math.min(60, Math.max(1, Math.round(ttl))) : PET_DEFAULTS.ttl_seconds
+  return out
+}
+
+// The backend serves the keys exactly as config.yaml spells them; map them onto
+// the short names the helpers use. Unknown and missing values fall back.
+function petFromRest(data) {
+  if (!data || typeof data !== 'object') return petNormalize(null)
+  return petNormalize({
+    show_quota: data.pet_show_quota,
+    source: data.pet_source,
+    fallback_to_worst: data.pet_fallback_to_worst,
+    metric: data.pet_metric,
+    show_provider_name: data.pet_show_provider_name,
+    show_percent_sign: data.pet_show_percent_sign,
+    show_unit_word: data.pet_show_unit_word,
+    show_errors: data.pet_show_errors,
+    providers: data.pet_providers,
+    warn_remaining: data.pet_warn_remaining,
+    error_remaining: data.pet_error_remaining,
+    warn_balance: data.pet_warn_balance,
+    error_balance: data.pet_error_balance,
+    ttl_seconds: data.pet_ttl_seconds,
+  })
+}
+
+function petAllowed(id, cfg) {
+  const list = String(cfg.providers || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+  return !list.length || list.includes(String(id || '').toLowerCase())
+}
+
+// Thresholds are configured in "percent left", so one pair of knobs covers a
+// remaining metric and the mirrored used metric (100 - left).
+function petToneForRemaining(left, cfg) {
+  if (left <= cfg.error_remaining) return 'error'
+  if (left <= cfg.warn_remaining) return 'wait'
+  return 'info'
+}
+
+function petValue(value, cfg) {
+  return Math.round(value) + (cfg.show_percent_sign ? '%' : '')
+}
+
+function petMessage(label, body, word, cfg) {
+  const head = cfg.show_provider_name && label ? label + ' ' : ''
+  const tail = cfg.show_unit_word && word ? ' ' + word : ''
+  return head + body + tail
+}
+
+function petPayload(id, name, status, cfg) {
+  if (!cfg.show_quota || !status || !petAllowed(id, cfg)) return null
   const label = name || id
   if (status.ok === false) {
+    if (!cfg.show_errors) return null
     const err = status.no_plan ? 'no plan' : status.needs_auth ? 'auth?' : 'error'
-    return { text: label + ' ' + err, tone: 'error' }
+    return { text: petMessage(label, err, '', cfg), tone: 'error' }
   }
-  const pct = status.percent ?? status.pct
-  const bal = status.balance
+  const pct = Number(status.percent ?? status.pct)
+  const hasPct = Number.isFinite(pct)
+  const bal = Number(status.balance)
+  const hasBal = Number.isFinite(bal)
   const kind =
     id === 'deepseek' || id === 'openrouter' ? 'credit'
     : id === 'glm' ? 'increase'
     : 'exhaust'
-  const hasPct = pct !== null && pct !== undefined && Number.isFinite(Number(pct))
-  const hasBal = bal !== null && bal !== undefined && Number.isFinite(Number(bal))
-  if (kind === 'credit' && hasBal) {
-    const n = Number(bal)
-    return { text: label + ' $' + n.toFixed(2) + ' left', tone: n < 1 ? 'error' : n < 5 ? 'wait' : 'info' }
+  let metric = cfg.metric
+  if (metric === 'auto') metric = kind === 'credit' ? 'balance' : kind === 'increase' ? 'used' : 'remaining'
+  if (metric === 'balance' && hasBal) {
+    const n = bal
+    const body = '$' + n.toFixed(2)
+    const tone = n < cfg.error_balance ? 'error' : n < cfg.warn_balance ? 'wait' : 'info'
+    return { text: petMessage(label, body, 'left', cfg), tone }
   }
   if (hasPct) {
-    const used = Number(pct)
-    if (kind === 'increase') {
-      return { text: label + ' ' + Math.round(used) + '% used', tone: used >= 90 ? 'error' : used >= 80 ? 'wait' : 'info' }
+    if (metric === 'used') {
+      return { text: petMessage(label, petValue(pct, cfg), 'used', cfg), tone: petToneForRemaining(100 - pct, cfg) }
     }
-    const left = Math.max(0, 100 - used)
-    const shown = id === 'tavily' ? (Math.round(left * 10) / 10) : Math.round(left)
-    return { text: label + ' ' + shown + '% left', tone: left <= 10 ? 'error' : left <= 20 ? 'wait' : 'info' }
+    const left = Math.max(0, 100 - pct)
+    const shown = id === 'tavily' ? Math.round(left * 10) / 10 : Math.round(left)
+    return { text: petMessage(label, petValue(shown, cfg), 'left', cfg), tone: petToneForRemaining(left, cfg) }
+  }
+  if (hasBal) {
+    const n = bal
+    const body = '$' + n.toFixed(2)
+    const tone = n < cfg.error_balance ? 'error' : n < cfg.warn_balance ? 'wait' : 'info'
+    return { text: petMessage(label, body, 'left', cfg), tone }
   }
   return null
 }
 
-function pickPetProvider(entries, activePid) {
+function petPick(entries, activePid, cfg) {
+  if (!cfg.show_quota || !entries || !entries.length) return [null, null]
   const byId = Object.fromEntries(entries)
-  if (activePid && byId[activePid] && quotaPetPayload(activePid, byId[activePid].name || activePid, byId[activePid])) {
-    return [activePid, byId[activePid]]
+  if (cfg.source === 'active' && activePid && byId[activePid]) {
+    if (petPayload(activePid, byId[activePid]?.name || activePid, byId[activePid], cfg)) {
+      return [activePid, byId[activePid]]
+    }
+    if (!cfg.fallback_to_worst) return [null, null]
   }
   let worst = null
   for (const [id, s] of entries) {
-    const p = quotaPetPayload(id, s.name || id, s)
+    const p = petPayload(id, s?.name || id, s, cfg)
     if (!p) continue
     const rank = p.tone === 'error' ? 2 : p.tone === 'wait' ? 1 : 0
     if (!worst || rank > worst.rank) worst = { id, s, rank }
@@ -504,26 +609,35 @@ function pickPetProvider(entries, activePid) {
   return worst ? [worst.id, worst.s] : [null, null]
 }
 
-function pushQuotaPet(id, name, status) {
-  const pet = _pet
+function petPush(pet, state, id, name, status, cfg, now) {
   if (!pet || typeof pet.say !== 'function') return
   if (pet.visible && typeof pet.visible.get === 'function' && !pet.visible.get()) return
-  const payload = quotaPetPayload(id, name, status)
+  const payload = petPayload(id, name, status, cfg)
   const key = payload ? payload.tone + '\0' + payload.text : ''
-  const now = Date.now()
   if (!payload) {
-    if (_petLast) {
-      _petLast = ''
+    if (state.last) {
+      state.last = ''
       if (typeof pet.clear === 'function') pet.clear('quota')
     }
     return
   }
-  if (key === _petLast && _petAt && now - _petAt < 4000) return
-  _petLast = key
-  _petAt = now
-  pet.say(payload.text, { id: 'quota', tone: payload.tone, ttlMs: 8000 })
+  // The key carries the tone, so a tone escalation already breaks the skip and
+  // lands immediately. Identical text inside the window is dropped to stay
+  // inside the host's 10-says-per-10s cap.
+  if (key === state.last && state.at && now - state.at < PET_SAME_TEXT_MS) return
+  state.last = key
+  state.at = now
+  pet.say(payload.text, { id: 'quota', tone: payload.tone, ttlMs: cfg.ttl_seconds * 1000 })
 }
 // PET_HELPERS_END
+
+let _pet = null
+const _petState = { last: '', at: 0 }
+let _petCfg = petNormalize(null)
+
+function pushQuotaPet(id, name, status) {
+  petPush(_pet, _petState, id, name, status, _petCfg, Date.now())
+}
 
 // Every external open goes through ctx.os.openExternal. window.open is denied
 // by the app's window-open policy, so an OAuth login that used it never
@@ -593,16 +707,24 @@ function StatusBarGroup() {
     retry: 1,
   })
   const activePid = actQ.data?.pid
+  const petQ = useQuery({
+    queryKey: ['provider-pet-settings-v1'],
+    queryFn: () => (_rest ? _rest('/pet-settings') : Promise.resolve(null)),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: 1,
+  })
+  const petCfg = petFromRest(petQ.data)
   const onChipRefresh = useClickToRefresh(pollMin)
 
   useEffect(() => {
     if (!statuses) return
+    _petCfg = petCfg
     const enabled = Object.entries(statuses).filter(([, s]) => s.enabled)
-    if (!enabled.length) { pushQuotaPet(null, null, null); return }
-    const [id, s] = pickPetProvider(enabled, activePid)
+    const [id, s] = petPick(enabled, activePid, petCfg)
     if (!id) { pushQuotaPet(null, null, null); return }
     pushQuotaPet(id, chipName(id, s.name || id, false), s)
-  }, [statuses, activePid])
+  }, [statuses, activePid, petCfg])
 
   if (!statuses) return null
 
@@ -790,40 +912,24 @@ function ExpGearMenu() {
 
   // House dialog overlay is bg-black/22 — that kills glass. Thin it only while
   // this experimental dialog is open AND Glass is on.
-  //
-  // The house overlay is a SIBLING of the dialog content inside the Radix
-  // portal, not a descendant of anything this plugin renders, so a descendant
-  // selector cannot scope it. Our own content node below carries our own
-  // data-ps-dialog attribute, and the Radix portal wrapper around it holds
-  // exactly our overlay plus our content, so OUR overlay is the one sitting in
-  // that wrapper. Every other dialog portals elsewhere and is unreachable from
-  // here. Cleanup clears the exact element reference we stored and re-queries
-  // nothing.
   useEffect(() => {
     if (!open || !glass) return
-    let mine = null
-    const clear = el => {
-      el.style.background = ''
-      el.style.backdropFilter = ''
-      el.style.webkitBackdropFilter = ''
-    }
     const apply = () => {
-      const content = document.querySelector('[data-ps-dialog]')
-      const scope = content && content.parentElement
-      if (!scope) return
-      const found = scope.querySelector('[data-slot="dialog-overlay"]')
-      if (!found || found === mine) return
-      if (mine) clear(mine) // React re-created the node; drop the old one
-      mine = found
-      mine.style.background = 'rgb(0 0 0 / 0.06)'
-      mine.style.backdropFilter = 'blur(10px)'
-      mine.style.webkitBackdropFilter = 'blur(10px)'
+      document.querySelectorAll('[data-slot="dialog-overlay"]').forEach(el => {
+        el.style.background = 'rgb(0 0 0 / 0.06)'
+        el.style.backdropFilter = 'blur(10px)'
+        el.style.webkitBackdropFilter = 'blur(10px)'
+      })
     }
     apply()
     const id = requestAnimationFrame(apply)
     return () => {
       cancelAnimationFrame(id)
-      if (mine) { clear(mine); mine = null }
+      document.querySelectorAll('[data-slot="dialog-overlay"]').forEach(el => {
+        el.style.background = ''
+        el.style.backdropFilter = ''
+        el.style.webkitBackdropFilter = ''
+      })
     }
   }, [open, glass])
 
@@ -843,7 +949,6 @@ function ExpGearMenu() {
         open,
         onOpenChange: setOpen,
         children: jsx(DialogContent, {
-          'data-ps-dialog': '',
           onOpenAutoFocus: e => e.preventDefault(),
           className: cn(
             'max-w-lg rounded-xl shadow-nous border-(--ui-accent)',
@@ -1174,12 +1279,27 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
     setKeys(pc.pool?.length ? [...pc.pool] : [''])
   }, [pc.enabled, (pc.pool || []).join('\n')])
 
-  const persist = async (nextEnabled, nextKeys, updates) => {
+  const persist = async (nextEnabled, nextKeys, updates, removed) => {
     const pool = (nextKeys ?? keys).map(s => s.trim()).filter(Boolean)
-    await onSave(pid, { ...pc, enabled: nextEnabled ?? enabled, pool, ...updates })
+    await onSave(pid, { ...pc, enabled: nextEnabled ?? enabled, pool, ...updates }, removed)
   }
   const setKeyAt = (i, v) => { const n = [...keys]; n[i] = v; setKeys(n) }
   const addKey = () => { setKeys([...keys, '']) }
+  const delKey = (i) => {
+    const removed = [keys[i]].map(s => s.trim()).filter(Boolean)
+    const n = keys.filter((_, j) => j !== i)
+    setKeys(n.length ? n : [''])
+    // keep the radio honest: deleting the active key falls back to #1; deleting
+    // one before it shifts the active index up by one
+    let nextIdx = activeIdx
+    if (i === activeIdx) nextIdx = 0
+    else if (i < activeIdx) nextIdx = activeIdx - 1
+    setActiveIdx(nextIdx)
+    // The removed VALUE travels with the save: the backend needs it to purge
+    // the library slot and the Hermes .env carrier. Without it the pool shrinks
+    // here and the next poll re-adds the key from library.env.
+    persist(undefined, n.length ? n : [''], { pool_index: nextIdx }, removed)
+  }
 
   const [activeIdx, setActiveIdx] = useState(() => {
     const n = Math.max(1, (pc.pool || []).filter(Boolean).length)
@@ -1331,7 +1451,6 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
   const hermes = variant === 'hermes'
   return jsxs('div', {
     'data-pid': pid,
-    'data-ps-row': '',
     className: cn(
       hermes ? 'px-3 py-2.5 flex flex-col gap-2' : 'rounded-lg p-2.5 flex flex-col gap-2',
       dragging && 'opacity-40',
@@ -1395,6 +1514,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
         jsx(Input, { type: 'password', value: k, onChange: e => setKeyAt(i + 1, e.target.value), onBlur: () => persist(), placeholder: `Key #${i + 2}`, size: 'sm', className: 'flex-1 h-6 font-mono text-[0.7rem]' }),
         resetDaySelect(i + 1),
         jsx(SignalDot, { pid, tone: (probe?.keys || []).find(row => row.index === i + 1)?.tone, reason: (probe?.keys || []).find(row => row.index === i + 1)?.reason, quotas: (probe?.keys || []).find(row => row.index === i + 1)?.quotas, age: probeAge, onCheck: c => checkProbe(pid, false, i + 1) }),
+        jsx(Button, { variant: 'ghost', size: 'icon-xs', className: 'text-destructive', onClick: () => delKey(i + 1), title: 'remove', children: jsx(Codicon, { name: 'close', size: '0.7rem' }) }),
       ]}, i + 1)),
       poolStrategyFooter,
     ],
@@ -1635,6 +1755,11 @@ function SetupBody({ variant } = {}) {
     }
   }, [addMenuOpen])
 
+  const [applyHermesEnv, setApplyHermesEnv] = useState(Boolean(cfg.apply_hermes_env))
+  useEffect(() => {
+    setApplyHermesEnv(Boolean(cfg.apply_hermes_env))
+  }, [cfg.apply_hermes_env])
+
   if (metaWaiting) return jsx('div', { className: 'p-2 text-xs', children: 'Loading…' })
 
   const banner = (!metaLive) ? jsxs('div', {
@@ -1647,9 +1772,18 @@ function SetupBody({ variant } = {}) {
     ],
   }) : null
 
-  const saveProvider = async (pid, next) => {
-    await postJson('config', { providers: { ...provCfg, [pid]: next }, order: pids, poll_minutes: cfg.poll_minutes || undefined })
+  const saveProvider = async (pid, next, removedKeys) => {
+    // removedKeys: the key VALUES just deleted for this provider. The backend
+    // purges the library slot + Hermes .env carrier and tombstones them.
+    const remove_keys = removedKeys?.length ? { [pid]: removedKeys } : undefined
+    await postJson('config', { providers: { ...provCfg, [pid]: next }, order: pids, poll_minutes: cfg.poll_minutes || undefined, apply_hermes_env: applyHermesEnv, remove_keys })
     postJson('refresh')
+    refetchCfg()
+  }
+
+  const saveApplyHermesEnv = async value => {
+    setApplyHermesEnv(value)
+    await postJson('config', { apply_hermes_env: value, order: pids })
     refetchCfg()
   }
 
@@ -1711,6 +1845,14 @@ function SetupBody({ variant } = {}) {
       variant === 'hermes'
         ? jsx('div', { ref: flipRef, className: 'overflow-hidden rounded-lg border border-(--stroke-nous) divide-y divide-(--ui-stroke-secondary)', children: rows })
         : jsx('div', { ref: flipRef, className: 'flex flex-col gap-2', children: rows }),
+      jsxs('div', {
+        className: 'flex items-center justify-end gap-1 text-[0.65rem] leading-none',
+        style: { color: 'var(--ui-text-quaternary)' },
+        children: [
+          jsx(Checkbox, { checked: applyHermesEnv, onCheckedChange: value => saveApplyHermesEnv(Boolean(value)), size: 'sm' }),
+          jsx('span', { children: 'Apply Changes to Hermes .env' }),
+        ],
+      }),
     ] })
 }
 
@@ -1730,10 +1872,7 @@ export default {
 
   // Theme fixes: native <select> popups ignore inherited colors and render
   // light-on-light in dark mode; the SDK checkbox checked fill (bg-primary) is
-  // near-white in dark mode and reads harsh. Both stay inside this plugin: the
-  // select by its own data-ps-select, the checkbox by the data-ps-row attribute
-  // this plugin puts on its provider rows, so a checkbox anywhere else in the
-  // app is never restyled.
+  // near-white in dark mode and reads harsh. Both are scoped to this plugin.
   const STYLE_ID = 'provider-status-theme-fix'
   const style = document.createElement('style')
   style.id = STYLE_ID
@@ -1742,8 +1881,8 @@ export default {
       background: var(--ui-bg-elevated, var(--background, inherit));
       color: var(--ui-text-secondary, var(--foreground));
     }
-    [data-ps-row] [data-slot="checkbox"][data-state="checked"],
-    [data-ps-row] [data-slot="checkbox"][data-state="indeterminate"] {
+    [data-slot="checkbox"][data-state="checked"],
+    [data-slot="checkbox"][data-state="indeterminate"] {
       background: color-mix(in srgb, var(--ui-accent, var(--foreground)) 55%, transparent) !important;
       border-color: color-mix(in srgb, var(--ui-accent, var(--foreground)) 70%, transparent) !important;
       color: var(--ui-text-primary, var(--foreground)) !important;

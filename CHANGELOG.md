@@ -16,6 +16,15 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [provider-status 1.7.0] - 2026-10-15
+
+The current session's speed, context, and remaining quota now speak from Discord, and the pet bubble is configurable.
+
+### Added
+
+- Both editions: Discord bot presence for the provider backing the current session. Tokens/sec, context occupancy, and remaining quota (or credit balance) rotate or sit on one line. `/pulse`, `agent_pulse`, and `hermes session-pulse` report the same numbers. Bar width defaults to 5 cells so it fits Discord's member list, and is configurable.
+- Both editions: pet-bubble settings sit above the Discord ones. Master switch on by default. Pick current vs worst provider, remaining / used / balance / auto, rewrite the line (name, percent sign, unit word), allowlist providers, and set wait / error thresholds plus bubble TTL.
+
 ## [iteration-budget-meter 1.4.0] - 2026-10-14
 
 The live N/60 count can speak from the pet bubble while a turn runs.
