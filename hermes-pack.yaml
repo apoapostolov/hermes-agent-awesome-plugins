@@ -41,4 +41,4 @@ plugins:
     ref: b364f8d5f015b9a9c10fb6af1d2d1112edc2af48
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/sessionretitler
-    ref: c867ccb58c942181cdea17358006938f29df137b
+    ref: 9d61e4dcea9998a7422739703306371d1d754cbf
