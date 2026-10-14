@@ -4,8 +4,10 @@ Counts titleable user messages in the live history (not completed,
 non-interrupted turns). ``pre_llm_call`` fires at the start of a turn
 even if the user later breaks or steers, so interrupt-heavy chats still
 advance the counter. Every ``interval`` user messages, the plugin builds
-a digest and asks the host's ``title_generation`` auxiliary tier for a
-fresh 3-6 word title.
+a digest and asks its own ``sessionretitler_title`` auxiliary slot for a
+fresh 3-6 word title. The slot inherits the host ``title_generation``
+route until the operator pins a different model under Settings, Models,
+Auxiliary.
 
 Title authority is ``llm`` rank, never ``user``:
 
@@ -33,6 +35,7 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 PLUGIN_ID = "sessionretitler"
+AUX_TASK = "sessionretitler_title"
 
 DEFAULTS = {
     "interval": 20,       # user messages between retitles
@@ -341,7 +344,7 @@ def _retitle(ctx: Any, session_id: str, digest: str) -> None:
             temperature=0.3,
             max_tokens=64,
             timeout=_cfg(ctx, "timeout"),
-            task="title_generation",
+            task=AUX_TASK,
             purpose="session-retitle",
         )
         parsed = getattr(result, "parsed", None)
@@ -485,3 +488,9 @@ def register(ctx):  # noqa: ANN001 — host-defined PluginContext
     ctx.register_hook("pre_llm_call", on_pre_llm_call)
     ctx.register_hook("post_llm_call", on_post_llm_call)
     ctx.register_hook("on_session_reset", on_session_reset)
+    ctx.register_auxiliary_task(
+        AUX_TASK,
+        display_name="Session title",
+        description="Rename a session from the latest exchanges.",
+        inherit_from="title_generation",
+    )

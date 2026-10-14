@@ -16,6 +16,14 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [sessionretitler 1.1.1] - 2026-10-14
+
+Renames no longer need a trust flag in config.yaml.
+
+### Changed
+
+- Personal: the plugin registers its own `sessionretitler_title` auxiliary slot (inherits the host `title_generation` route) and routes the rename call through that key. Pin a cheap fast model for it under Settings, Models, Auxiliary. The old `allow_task_override` config line is no longer required.
+
 ## [rss-reader 1.2.0] - 2026-10-14
 
 Digests leave the reader page and arrive where you already talk to Hermes.

@@ -4,7 +4,7 @@
   <strong>Keep the session list readable as the topic drifts.</strong>
   <p>Every N titleable user messages, retitles the session from the latest exchanges. A title you set yourself is never touched.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.0-2ea44f" alt="Version 1.1.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.1-2ea44f" alt="Version 1.1.1" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -12,7 +12,7 @@
 ## What You Can Do
 
 - Counts titleable user messages (not completed turns), so break- and steer-heavy chats still advance the counter.
-- Every `interval` messages, builds a digest of the latest exchanges and asks the `title_generation` auxiliary tier for a fresh 3-6 word title.
+- Every `interval` messages, builds a digest of the latest exchanges and asks the plugin's own `sessionretitler_title` auxiliary slot for a fresh 3-6 word title. The slot inherits the host `title_generation` route until you pin a different model under Settings, Models, Auxiliary.
 - Rewrites at `llm` rank only. A user-set name (`title_source == user`) is a hard wall and is never overwritten.
 - `derived` / untitled sessions upgrade straight to the new `llm` title; `llm` to `llm` rewrites clear the row first so the core's rank-gated write does not no-op.
 
@@ -34,7 +34,7 @@ Enable **Session Retitler** under **Capabilities → Plugins**.
 
 ## Requirements / Limits
 
-Backend-only (Python hooks). Needs `plugins.entries.sessionretitler.llm.allow_task_override: true` in `config.yaml` so `ctx.llm.complete_structured(task="title_generation")` can route through the cheap aux tier; the key must sit nested under `llm.` (a flat key is silently ignored) and without it renames silently no-op.
+Backend-only (Python hooks). The plugin registers its own `sessionretitler_title` auxiliary slot, so renaming no longer needs `allow_task_override`. Pin a cheap fast model for it under Settings, Models, Auxiliary if you want it off the default title-generation route.
 
 ## License
 

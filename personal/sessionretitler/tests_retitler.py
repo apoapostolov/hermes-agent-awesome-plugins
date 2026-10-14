@@ -179,6 +179,7 @@ def test_retitle_persists_cleaned_title():
     class FakeLlm:
         def complete_structured(self, **kwargs):
             assert "USER:" in kwargs["input"][0].text
+            assert kwargs["task"] == mod.AUX_TASK
             return types.SimpleNamespace(parsed={"title": "Topic: Fresh Session Name"})
 
     class Ctx(_FakeCtx):
@@ -197,6 +198,24 @@ def test_retitle_persists_cleaned_title():
                 sys.modules[k] = v
 
 
+def test_register_owns_auxiliary_task():
+    captured = {}
+
+    class Ctx(_FakeCtx):
+        def register_hook(self, name, cb):
+            captured.setdefault("hooks", []).append(name)
+
+        def register_auxiliary_task(self, key, **kwargs):
+            captured["aux"] = (key, kwargs)
+
+    mod.register(Ctx())
+    assert captured["hooks"] == ["pre_llm_call", "post_llm_call", "on_session_reset"]
+    key, kwargs = captured["aux"]
+    assert key == "sessionretitler_title"
+    assert kwargs["inherit_from"] == "title_generation"
+    assert kwargs["display_name"] == "Session title"
+
+
 if __name__ == "__main__":
     test_count_user_messages()
     test_clean_title_truncates_instead_of_dropping()
@@ -205,4 +224,5 @@ if __name__ == "__main__":
     test_record_claim_ladder()
     test_write_llm_title_rank_ladder()
     test_retitle_persists_cleaned_title()
+    test_register_owns_auxiliary_task()
     print("ok")

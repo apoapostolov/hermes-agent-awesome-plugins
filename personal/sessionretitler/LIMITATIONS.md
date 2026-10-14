@@ -21,14 +21,13 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 
 ### 2. Structured LLM call routed through an aux task
 
-- **Personal behavior:** `ctx.llm.complete_structured(..., task="title_generation")` must run with `plugins.entries.sessionretitler.llm.allow_task_override: true` (nested under `llm.`; a flat key is silently ignored and every rename no-ops). The README carries this manual config requirement.
-- **Why it fails:** the trust contract is per-install wiring, not a catalogable capability.
-- **Confirmed route for public:** `ctx.register_auxiliary_task("sessionretitler_title", ...)` (SDK, probe-safe) makes the key plugin-owned, and an owned key passes the task gate with no trust config. Verified against the host source (`hermes_cli/plugins.py`, `agent/plugin_llm.py`). The public edition must use the owned key, never the built-in `title_generation` slot.
-- **Needed hook:** none for this blocker anymore. The write side (blocker 1) is the remaining wall.
+- **Personal behavior:** `ctx.llm.complete_structured(..., task="sessionretitler_title")` after `ctx.register_auxiliary_task("sessionretitler_title", inherit_from="title_generation")`. The owned key passes the task gate with no `allow_task_override` trust flag. The operator can pin a different model under Settings, Models, Auxiliary.
+- **Why it used to fail:** the old call used the built-in `title_generation` slot, which needed per-install `plugins.entries.sessionretitler.llm.allow_task_override: true`. That trust contract is not a catalogable capability.
+- **Status:** cleared. The write side (blocker 1) is the remaining wall.
 
 ## Checklist before listing personal
 
 - [ ] No direct `agent.*` / `hermes_state.SessionDB` imports; an SDK-level llm-rank title write exists and is used.
-- [ ] The public edition registers its own auxiliary task (e.g. `sessionretitler_title`) and routes through the owned key; no `allow_task_override` requirement in the README.
+- [x] The plugin registers its own auxiliary task (`sessionretitler_title`, inherits `title_generation`) and routes through the owned key; no `allow_task_override` requirement in the README.
 - [ ] `hermes plugins validate --install-deps public/sessionretitler` passes (probe runs, hooks match, scan `safe`).
 - [ ] Re-pin the catalog `sha:` to a clean public tree once one exists.

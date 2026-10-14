@@ -1,5 +1,5 @@
 name: sessionretitler
-version: 1.1.0
+version: 1.1.1
 description: "Rename sessions dynamically every N user messages (llm-rank rewrites, user titles untouchable)."
 author: Apostol Apostolov
 license: MIT
