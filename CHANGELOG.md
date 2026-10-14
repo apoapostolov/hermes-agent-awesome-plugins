@@ -15,7 +15,14 @@ the component that changed; a plugin patch does not imply a new pack release.
 ### Added
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
-- **iteration-budget-meter:** while a turn runs, the pet bubble shows the live N/60 iteration count, id-replaced in place. Idle stays silent. Status-bar chip is unchanged.
+
+## [iteration-budget-meter 1.4.0] - 2026-10-14
+
+The live N/60 count can speak from the pet bubble while a turn runs.
+
+### Added
+
+- Both editions: while a turn runs, the pet bubble shows the live N/60 iteration count, id-replaced in place. Idle stays silent. The status-bar chip is unchanged.
 
 ## [provider-status 1.6.0] - 2026-10-14
 
