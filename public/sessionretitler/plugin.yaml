@@ -1,0 +1,15 @@
+name: sessionretitler
+version: 1.1.1
+description: "Rename sessions dynamically every N user messages (llm-rank rewrites, user titles untouchable). Disclosure: writes the new title through agent.title_generator and hermes_state.SessionDB because no plugin SDK title-write seam exists yet; those imports are guarded and a failed write is logged, never raised."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/public/sessionretitler
+tags:
+  - sessions
+  - titles
+provides_hooks:
+  - pre_llm_call
+  - post_llm_call
+  - on_session_reset

@@ -17,7 +17,7 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 
 - **Personal behavior:** imports `agent.title_generator` and `hermes_state.SessionDB` directly, and calls the private-ish `_persist_session_title` helper.
 - **Why it fails:** touching core internals outside the plugin SDK contract. A core rename or refactor silently breaks title persistence, and a listing cannot carry that coupling.
-- **Needed hook:** a public, SDK-level way to write an `llm`-rank session title (the plugin genuinely needs an llm rank write plus llm-to-llm rewrite). Until that exists, there is no public edition: `public/sessionretitler/` does not exist and personal is held from the catalog.
+- **Needed hook:** a public, SDK-level way to write an `llm`-rank session title (the plugin genuinely needs an llm rank write plus llm-to-llm rewrite). The listed edition keeps the guarded imports and discloses them (catalog rule 13) because without the write there is no product.
 
 ### 2. Structured LLM call routed through an aux task
 
@@ -29,5 +29,5 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 
 - [ ] No direct `agent.*` / `hermes_state.SessionDB` imports; an SDK-level llm-rank title write exists and is used.
 - [x] The plugin registers its own auxiliary task (`sessionretitler_title`, inherits `title_generation`) and routes through the owned key; no `allow_task_override` requirement in the README.
-- [ ] `hermes plugins validate --install-deps public/sessionretitler` passes (probe runs, hooks match, scan `safe`).
-- [ ] Re-pin the catalog `sha:` to a clean public tree once one exists.
+- [ ] `hermes plugins validate --install-deps public/sessionretitler` passes (probe runs, hooks match, scan `safe`). Private-core-import warnings for the title write are expected until an SDK seam exists.
+- [ ] Re-pin the catalog `sha:` to the public tree.

@@ -10,7 +10,7 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, and memory. Sixteen plugins. Fourteen have a catalog-safe public edition. Two stay personal until a catalog hook exists.</p>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, and memory. Sixteen plugins. Fifteen have a public edition. One stays personal until a catalog hook exists.</p>
 
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
@@ -40,7 +40,7 @@ This repository keeps two trees.
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
-**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. Fourteen of the sixteen plugins have one; `better-capabilities` and `sessionretitler` stay personal until a catalog hook exists, and each table below marks those rows.
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. Fifteen of the sixteen plugins have one; `better-capabilities` stays personal until a catalog hook exists.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
@@ -82,7 +82,7 @@ Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reaso
 | [better-session-appearance](personal/better-session-appearance/README.md) · [public](public/better-session-appearance/README.md) | Idle color, bold, and icon. Auto Rules by title keywords. |
 | [sidebar-manager](personal/sidebar-manager/README.md) · [public](public/sidebar-manager/README.md) | Hide and reorder nav rows and session sections. |
 | [drag-to-pin-session](personal/drag-to-pin-session/README.md) · [public](public/drag-to-pin-session/README.md) | Drag pin/unpin with lasting order. |
-| [sessionretitler](personal/sessionretitler/README.md) (personal only) | Retitles the session every N titleable user messages, from the latest exchanges. A title you set yourself is never touched. |
+| [sessionretitler](personal/sessionretitler/README.md) · [public](public/sessionretitler/README.md) | Retitles the session every N titleable user messages, from the latest exchanges. A title you set yourself is never touched. |
 | [scroll-on-switch](personal/scroll-on-switch/README.md) · [public](public/scroll-on-switch/README.md) | Snap to bottom on session switch. Does not fight streaming. |
 
 ### Composer
@@ -153,6 +153,7 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [better-capabilities](personal/better-capabilities/README.md)
 - [cdp-manager](personal/cdp-manager/README.md)
 - [rss-reader](personal/rss-reader/README.md)
+- [sessionretitler](personal/sessionretitler/README.md)
 
 ## Support
 

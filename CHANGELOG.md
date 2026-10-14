@@ -22,7 +22,8 @@ Renames no longer need a trust flag in config.yaml.
 
 ### Changed
 
-- Personal: the plugin registers its own `sessionretitler_title` auxiliary slot (inherits the host `title_generation` route) and routes the rename call through that key. Pin a cheap fast model for it under Settings, Models, Auxiliary. The old `allow_task_override` config line is no longer required.
+- Both editions: the plugin registers its own `sessionretitler_title` auxiliary slot (inherits the host `title_generation` route) and routes the rename call through that key. Pin a cheap fast model for it under Settings, Models, Auxiliary. The old `allow_task_override` config line is no longer required.
+- Public edition: listed copy of the same rename path. The title write through `agent.title_generator` and `hermes_state.SessionDB` is disclosed because Hermes has no plugin SDK title-write seam yet.
 
 ## [rss-reader 1.2.0] - 2026-10-14
 
