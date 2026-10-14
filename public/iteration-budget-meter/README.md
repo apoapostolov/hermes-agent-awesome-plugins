@@ -20,6 +20,7 @@
 ## What You Can Do
 
 - Watch the focused session's cumulative totals: turns (your messages) and steps (model calls), the same counters the CLI bar keeps.
+- While a turn runs, the pet bubble shows the live N/60 iteration count when a pet is on screen. It stays silent at idle and on older hosts without the pet door.
 - Hover for the session overview. Click for the per-turn iterations used, averages, ceiling-hit ratio, and a data-based ceiling suggestion when the numbers support one.
 - Totals survive app restarts and compaction, and the step count animates while a turn runs.
 

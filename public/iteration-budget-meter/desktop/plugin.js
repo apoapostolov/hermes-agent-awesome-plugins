@@ -38,6 +38,41 @@ import { useEffect, useRef, useState } from 'react'
 
 const CAP = 60
 const AMBER_AT = 45
+
+// PET_HELPERS_START
+let _pet = null
+let _petLast = ''
+let _petAt = 0
+
+function turnPetPayload(n, busy) {
+  if (!busy || n === null || n < 1) return null
+  const tone = n >= CAP ? 'error' : n >= AMBER_AT ? 'wait' : 'info'
+  return { text: n + '/' + CAP, tone }
+}
+
+function pushTurnPet(n, busy) {
+  const pet = _pet
+  if (!pet || typeof pet.say !== 'function') return
+  const payload = turnPetPayload(n, busy)
+  if (!payload) {
+    if (_petLast) {
+      _petLast = ''
+      if (typeof pet.clear === 'function') pet.clear('turn')
+    }
+    return
+  }
+  if (pet.visible && typeof pet.visible.get === 'function' && !pet.visible.get()) return
+  const key = payload.tone + '\0' + payload.text
+  const now = Date.now()
+  const prevTone = _petLast.split('\0')[0]
+  const escalate = (prevTone === 'info' && payload.tone !== 'info') || (prevTone === 'wait' && payload.tone === 'error')
+  if (key === _petLast) return
+  if (!escalate && _petAt && now - _petAt < 1200) return
+  _petLast = key
+  _petAt = now
+  pet.say(payload.text, { id: 'turn', tone: payload.tone, ttlMs: 8000 })
+}
+// PET_HELPERS_END
 const ACCENT = 'var(--ui-accent)'
 const AMBER = '#f59e0b' // same warn tone the app's status dot uses
 const RED = '#ef4444'
@@ -286,6 +321,15 @@ function IterBudgetChip() {
   }
 
   const turnsTotal = st.turns
+
+  useEffect(() => {
+    pushTurnPet(n, !!busy)
+  }, [n, busy])
+  useEffect(() => () => {
+    if (_pet && typeof _pet.clear === 'function') _pet.clear('turn')
+    _petLast = ''
+  }, [])
+
   const turnsText = turnsTotal === null ? '–' : String(turnsTotal)
   const stepsText = stepsTotal === null ? '–' : String(stepsTotal)
 
@@ -412,6 +456,7 @@ export default {
   description: 'Shows the focused session totals — cumulative turns and steps — plus per-turn iteration details.',
 
   register(ctx) {
+    _pet = ctx.pet && typeof ctx.pet.say === 'function' ? ctx.pet : null
     ctx.register({
       id: 'chip',
       area: 'statusBar.right',
