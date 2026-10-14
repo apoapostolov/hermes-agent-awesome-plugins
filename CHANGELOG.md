@@ -15,6 +15,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 ### Added
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
+- **provider-status:** when a pet is on screen, one quota line goes in its speech bubble: the active model's remaining balance (or the worst enabled provider), with wait/error tones near a ceiling or at exhaustion. Status-bar chips stay the fallback on older hosts.
 
 ## [memory-review 1.2.5] - 2026-10-14
 

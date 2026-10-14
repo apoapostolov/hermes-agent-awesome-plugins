@@ -22,6 +22,7 @@
 ## What You Can Do
 
 - Read used and remaining quota in the status bar for each enabled provider.
+- When a pet is on screen, one quota line appears in its speech bubble: the active model's remaining balance, or the worst enabled provider if none is active. Near a ceiling it uses a wait tone; at exhaustion it uses an error tone. Older hosts without the pet door keep the status-bar chips only.
 - Keep multiple accounts per provider and inspect their status.
 - Use an access token that is already configured in the plugin. Expired OAuth tokens require a new login.
 - Provider polling does not read vendor CLI auth files, refresh vendor tokens, write Hermes `.env` or `config.yaml`, or copy secrets into a plugin-owned `library.env`.

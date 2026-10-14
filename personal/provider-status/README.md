@@ -22,6 +22,7 @@
 ## What You Can Do
 
 - Read used and remaining quota in the status bar for each enabled provider.
+- When a pet is on screen, one quota line appears in its speech bubble: the active model's remaining balance, or the worst enabled provider if none is active. Near a ceiling it uses a wait tone; at exhaustion it uses an error tone. Older hosts without the pet door keep the status-bar chips only.
 - Keep multiple accounts per provider, reorder them, and set a reset day per key.
 - Delete a key you no longer use. The removal clears the key library entry and the Hermes `.env` carriers, and a later poll will not bring it back.
 - Rotate to the next healthy key when remaining quota hits your threshold or a renewal day passes.

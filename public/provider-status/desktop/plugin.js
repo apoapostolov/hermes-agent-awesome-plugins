@@ -453,6 +453,78 @@ let _rest = null // injected at register(ctx) — ctx.rest hits /api/plugins/pro
 let _openExternal = null // ctx.os.openExternal: the app DENIES target=_blank window.open
 // (window-open-policy.ts, CVE-2026-70608), so external links go through the OS bridge.
 
+// PET_HELPERS_START
+let _pet = null
+let _petLast = ''
+let _petAt = 0
+
+function quotaPetPayload(id, name, status) {
+  if (!status) return null
+  const label = name || id
+  if (status.ok === false) {
+    const err = status.no_plan ? 'no plan' : status.needs_auth ? 'auth?' : 'error'
+    return { text: label + ' ' + err, tone: 'error' }
+  }
+  const pct = status.percent ?? status.pct
+  const bal = status.balance
+  const kind =
+    id === 'deepseek' || id === 'openrouter' ? 'credit'
+    : id === 'glm' ? 'increase'
+    : 'exhaust'
+  const hasPct = pct !== null && pct !== undefined && Number.isFinite(Number(pct))
+  const hasBal = bal !== null && bal !== undefined && Number.isFinite(Number(bal))
+  if (kind === 'credit' && hasBal) {
+    const n = Number(bal)
+    return { text: label + ' $' + n.toFixed(2) + ' left', tone: n < 1 ? 'error' : n < 5 ? 'wait' : 'info' }
+  }
+  if (hasPct) {
+    const used = Number(pct)
+    if (kind === 'increase') {
+      return { text: label + ' ' + Math.round(used) + '% used', tone: used >= 90 ? 'error' : used >= 80 ? 'wait' : 'info' }
+    }
+    const left = Math.max(0, 100 - used)
+    const shown = id === 'tavily' ? (Math.round(left * 10) / 10) : Math.round(left)
+    return { text: label + ' ' + shown + '% left', tone: left <= 10 ? 'error' : left <= 20 ? 'wait' : 'info' }
+  }
+  return null
+}
+
+function pickPetProvider(entries, activePid) {
+  const byId = Object.fromEntries(entries)
+  if (activePid && byId[activePid] && quotaPetPayload(activePid, byId[activePid].name || activePid, byId[activePid])) {
+    return [activePid, byId[activePid]]
+  }
+  let worst = null
+  for (const [id, s] of entries) {
+    const p = quotaPetPayload(id, s.name || id, s)
+    if (!p) continue
+    const rank = p.tone === 'error' ? 2 : p.tone === 'wait' ? 1 : 0
+    if (!worst || rank > worst.rank) worst = { id, s, rank }
+  }
+  return worst ? [worst.id, worst.s] : [null, null]
+}
+
+function pushQuotaPet(id, name, status) {
+  const pet = _pet
+  if (!pet || typeof pet.say !== 'function') return
+  if (pet.visible && typeof pet.visible.get === 'function' && !pet.visible.get()) return
+  const payload = quotaPetPayload(id, name, status)
+  const key = payload ? payload.tone + '\0' + payload.text : ''
+  const now = Date.now()
+  if (!payload) {
+    if (_petLast) {
+      _petLast = ''
+      if (typeof pet.clear === 'function') pet.clear('quota')
+    }
+    return
+  }
+  if (key === _petLast && _petAt && now - _petAt < 4000) return
+  _petLast = key
+  _petAt = now
+  pet.say(payload.text, { id: 'quota', tone: payload.tone, ttlMs: 8000 })
+}
+// PET_HELPERS_END
+
 // Every external open goes through ctx.os.openExternal. window.open is denied
 // by the app's window-open policy, so an OAuth login that used it never
 // reached the browser. The bridge answers a boolean, and `false` means the
@@ -522,6 +594,16 @@ function StatusBarGroup() {
   })
   const activePid = actQ.data?.pid
   const onChipRefresh = useClickToRefresh(pollMin)
+
+  useEffect(() => {
+    if (!statuses) return
+    const enabled = Object.entries(statuses).filter(([, s]) => s.enabled)
+    if (!enabled.length) { pushQuotaPet(null, null, null); return }
+    const [id, s] = pickPetProvider(enabled, activePid)
+    if (!id) { pushQuotaPet(null, null, null); return }
+    pushQuotaPet(id, chipName(id, s.name || id, false), s)
+  }, [statuses, activePid])
+
   if (!statuses) return null
 
   const entries = Object.entries(statuses).filter(([, s]) => s.enabled)
@@ -1644,6 +1726,7 @@ export default {
   register(ctx) {
     _rest = ctx.rest // plugin-scoped REST door to /api/plugins/provider-status (auth handled)
     _openExternal = ctx.os?.openExternal ?? null
+    _pet = ctx.pet && typeof ctx.pet.say === 'function' ? ctx.pet : null
 
   // Theme fixes: native <select> popups ignore inherited colors and render
   // light-on-light in dark mode; the SDK checkbox checked fill (bg-primary) is
