@@ -16,6 +16,14 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [memory-review 1.2.5] - 2026-10-14
+
+The chrome-menu row no longer lands in the model picker.
+
+### Fixed
+
+- Personal edition: glyph matching for the shell menu also matched the composer model picker (`add` plus `settings-gear`). Menus with a search field or `data-model-menu-row-badge` are refused now. The status-bar chip was already the working door.
+
 ## [sessionretitler 1.1.1] - 2026-10-14
 
 Renames no longer need a trust flag in config.yaml.

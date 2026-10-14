@@ -185,6 +185,9 @@ function isShellMenu(menu) {
   if (!(menu instanceof Element)) return false
   if (menu.getAttribute('data-slot') !== 'dropdown-menu-content') return false
   if (menu.getAttribute('data-state') !== 'open') return false
+  // The model catalog reuses add + settings-gear. It is the one with a
+  // search field and row badges; the shell menu has neither (#8).
+  if (menu.querySelector('input, [role="searchbox"], [data-model-menu-row-badge]')) return false
   const start = hasGlyph(menu, 'add')
   const chrome = hasGlyph(menu, 'settings-gear') || hasGlyph(menu, 'cloud-download')
   return start && chrome
