@@ -23,7 +23,7 @@ plugins:
     ref: 1ce1758bf18979244b70e89352629ec3fd71c73e
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/iteration-budget-meter
-    ref: 343968a5de6c90f219a4b4fab7002e54e1d697f7
+    ref: d5748450be8c6fedd951ee72094a154f5959e45b
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/memory-review
     ref: 2e1fcfd5b9b031c962b029880ee3f4885da42726
