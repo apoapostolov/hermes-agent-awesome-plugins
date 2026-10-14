@@ -4,7 +4,7 @@
   <strong>See the session's turns and steps while work runs.</strong>
   <p>Session totals in the status bar. Hover and click for per-turn stats.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.0-2ea44f" alt="Version 1.3.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.1-2ea44f" alt="Version 1.3.1" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>

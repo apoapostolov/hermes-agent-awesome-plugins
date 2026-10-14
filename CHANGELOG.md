@@ -35,6 +35,18 @@ Digests leave the reader page and arrive where you already talk to Hermes.
 - Both editions: `/rss digest-post [unread|saved|all]` posts the digest straight into the Telegram or Discord chat you ran it from, with inline Save, Open, and Mute feed buttons per story. Buttons are pattern-scoped and never touch core button flows. In the desktop app and CLI, where there is no gateway chat to post to, the command prints the digest instead.
 - Public edition: one disclosed read of `gateway.session_context` to learn the chat a `/rss digest-post` command came from, the same read the core's own `/blueprint` command uses for its delivery origin. The import is guarded and the command degrades to a text digest without it.
 
+## [iteration-budget-meter 1.3.1] - 2026-10-14
+
+The step count holds up mid-turn, and the chip stays plain.
+
+### Fixed
+
+- A totals fetch that lands while a turn is running anchors the live step count at the turn's start, so the chip never reads 0 steps for a turn that is already underway (cold retries, catch-up, and queued pending fetches all land mid-turn).
+
+### Changed
+
+- The chip no longer carries the per-turn warning color; the warnings and the accent ceiling-suggestion line live in the popover.
+
 ## [iteration-budget-meter 1.3.0] - 2026-10-13
 
 The chip shows the session's cumulative totals; the per-turn readout stays in the popover.
