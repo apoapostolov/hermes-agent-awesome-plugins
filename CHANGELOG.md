@@ -16,6 +16,10 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+### Changed
+
+- provider-status. The presence release was renumbered to 1.6.1 before it was announced, and 1.7.0 is retired with its tag removed. A copy still reporting 1.7.0 will not self-update, because the version compare sees nothing newer. Reinstall from `main` to realign it.
+
 ## [provider-status 1.6.1] - 2026-10-15
 
 The current session's speed, context, and remaining quota now speak from Discord, with a configurable pet bubble and an emoji per line.
