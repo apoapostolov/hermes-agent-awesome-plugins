@@ -63,6 +63,16 @@ class FakeCtx:
         self.skills.append(name)
 
 
+def strip_lead(text, cfg):
+    """Drop whichever per-line emoji a segment wears, so bar math is exact."""
+    for emoji in (cfg.emoji_context, cfg.emoji_quota, cfg.emoji_tokens_per_second,
+                  cfg.emoji_balance, cfg.emoji_cache, cfg.emoji_tool, cfg.emoji_model,
+                  cfg.emoji_latency, cfg.emoji_totals):
+        if emoji and text.startswith(emoji + " "):
+            return text[len(emoji) + 1:]
+    return text
+
+
 class TestQuotaBridge(unittest.TestCase):
     def test_provider_map_oauth_aliases(self):
         bridge = _load().quota_bridge if False else None
@@ -155,7 +165,7 @@ class TestRender(unittest.TestCase):
             quota={"ok": True, "id": "grok", "name": "Grok", "remaining": 50, "kind": "exhaust"},
         )
         segs = dict(self.render.segments(snap, cfg))
-        ctx_bar = segs["context"].split(cfg.separator)[0]
+        ctx_bar = strip_lead(segs["context"].split(cfg.separator)[0], cfg)
         quota_text = segs["quota"].replace(self.render.GLYPH_QUOTA, "").strip()
         quota_bar = quota_text.split(cfg.separator)[0]
         self.assertEqual(len(ctx_bar), 8)
@@ -297,7 +307,97 @@ class TestShowFlags(unittest.TestCase):
         self.assertNotIn("▱", segs["quota"].replace(self.render.GLYPH_QUOTA, ""))
         self.assertIn("61% Grok", segs["quota"])
         # the context bar is untouched and still draws its full width
-        self.assertEqual(len(segs["context"].split(cfg.separator)[0]), cfg.bar_width)
+        ctx = strip_lead(segs["context"].split(cfg.separator)[0], cfg)
+        self.assertEqual(len(ctx), cfg.bar_width)
+
+
+class TestLineEmoji(unittest.TestCase):
+    """Every presence line wears its own configured emoji."""
+
+    def setUp(self):
+        _load()
+        self.config = importlib.import_module(f"{PACKAGE}.presence_config")
+        self.render = importlib.import_module(f"{PACKAGE}.presence_render")
+        self.metrics = importlib.import_module(f"{PACKAGE}.presence_metrics")
+
+    def _cfg(self, **settings):
+        return self.config.PresenceConfig.from_ctx(FakeCtx(settings))
+
+    def _snap(self):
+        return self.metrics.Snapshot(
+            model="grok-4.6", provider="xai-oauth", tps=84.0,
+            context_used=12000, context_length=200000, context_pct=6.0,
+            quota={"ok": True, "id": "grok", "name": "Grok", "remaining": 61, "kind": "exhaust"},
+        )
+
+    def test_each_line_has_its_own_default_emoji(self):
+        cfg = self.config.PresenceConfig()
+        self.assertEqual(cfg.emoji_tokens_per_second, "⚡")
+        self.assertEqual(cfg.emoji_cache, "◎")
+        self.assertEqual(cfg.emoji_context, "▤")
+        self.assertEqual(cfg.emoji_quota, "◍")
+        self.assertEqual(cfg.emoji_balance, "◈")
+        self.assertEqual(cfg.emoji_tool, "⧉")
+        self.assertEqual(cfg.emoji_model, "☤")
+        self.assertEqual(cfg.emoji_latency, "◷")
+        self.assertEqual(cfg.emoji_totals, "Σ")
+        # the names the renderer re-exports are the shipped defaults
+        self.assertEqual(self.render.GLYPH_TPS, cfg.emoji_tokens_per_second)
+        self.assertEqual(self.render.GLYPH_QUOTA, cfg.emoji_quota)
+        self.assertEqual(self.render.GLYPH_CONTEXT, cfg.emoji_context)
+
+    def test_rotate_shows_a_different_emoji_per_line(self):
+        cfg = self._cfg(discord_presence_mode="rotate")
+        lines = [self.render.render_status(self._snap(), cfg, turn) for turn in range(3)]
+        self.assertEqual(lines[0], "⚡ 84 tok/s")
+        self.assertTrue(lines[1].startswith("▤ "), lines[1])
+        self.assertTrue(lines[2].startswith("◍ "), lines[2])
+        self.assertEqual(len({line.split()[0] for line in lines}), 3, lines)
+
+    def test_every_line_emoji_is_individually_configurable(self):
+        cfg = self._cfg(
+            discord_presence_mode="rotate",
+            discord_emoji_tokens_per_second="🚀",
+            discord_emoji_context="🧠",
+            discord_emoji_quota="📉",
+        )
+        lines = [self.render.render_status(self._snap(), cfg, turn) for turn in range(3)]
+        self.assertEqual(lines[0], "🚀 84 tok/s")
+        self.assertTrue(lines[1].startswith("🧠 "), lines[1])
+        self.assertTrue(lines[2].startswith("📉 "), lines[2])
+
+    def test_blank_emoji_drops_the_glyph_without_a_stray_space(self):
+        cfg = self._cfg(discord_presence_mode="rotate", discord_emoji_tokens_per_second="")
+        first = self.render.render_status(self._snap(), cfg, 0)
+        self.assertEqual(first, "84 tok/s")
+        cfg2 = self._cfg(discord_presence_mode="rotate", discord_emoji_context="")
+        second = self.render.render_status(self._snap(), cfg2, 1)
+        self.assertTrue(second.startswith("▱"), second)
+        self.assertNotIn("  ", second)
+
+    def test_state_emoji_covers_only_idle_and_thinking(self):
+        cfg = self._cfg(discord_status_emoji="🤖")
+        metric = self.render.render_status(self._snap(), cfg, 0)
+        self.assertNotIn("🤖", metric)
+        idle = self.render.render_status(self.metrics.Snapshot(), cfg, 0)
+        self.assertTrue(idle.startswith("🤖 "), idle)
+        thinking = self.render.render_status(self.metrics.Snapshot(inflight=True), cfg, 0)
+        self.assertEqual(thinking, "🤖 thinking…")
+
+    def test_emoji_stays_out_of_the_value(self):
+        cfg = self._cfg()
+        segs = dict(self.render.segments(self._snap(), cfg))
+        self.assertIn("61% Grok", segs["quota"])
+        self.assertIn("84", segs["tps"])
+        self.assertNotIn("⚡", segs["quota"])
+        self.assertNotIn("◍", segs["tps"])
+
+    def test_compact_joins_lines_each_with_its_own_emoji(self):
+        cfg = self._cfg()
+        text = self.render.render_status(self._snap(), cfg)
+        self.assertTrue(text.startswith("⚡ 84 tok/s"), text)
+        self.assertIn(" ▤ ", text)
+        self.assertIn(" ◍ ", text)
 
 
 class TestRegister(unittest.TestCase):

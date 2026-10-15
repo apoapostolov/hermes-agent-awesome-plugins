@@ -1,18 +1,46 @@
-"""Pure rendering: snapshot + config → the strings Discord shows."""
+"""Pure rendering: snapshot + config → the strings Discord shows.
+
+Kept free of any ``discord`` import so it is unit-testable and so ``register()``
+works on a host that has the Discord platform but no gateway running.
+
+Layout contract: every metric line carries its own lead emoji, configured per
+line, so the lines are distinguishable — most visibly in rotate mode, where one
+line shows at a time. ``config.status_emoji`` covers the states that are not a
+metric line (idle and thinking).
+
+The ``GLYPH_*`` names are the shipped defaults, re-exported from the config
+module so there is exactly one source for them.
+"""
 
 from __future__ import annotations
 
+from .presence_config import (
+    GLYPH_BALANCE,
+    GLYPH_CACHE,
+    GLYPH_CONTEXT,
+    GLYPH_LATENCY,
+    GLYPH_MODEL,
+    GLYPH_QUOTA,
+    GLYPH_TOOL,
+    GLYPH_TOTALS,
+    GLYPH_TPS,
+)
 from .presence_metrics import Snapshot
 
-GLYPH_TPS = "⚡"
-GLYPH_CACHE = "◎"
-GLYPH_TOOL = "⧉"
-GLYPH_MODEL = "☤"
-GLYPH_LATENCY = "◷"
-GLYPH_TOTALS = "Σ"
-GLYPH_QUOTA = "◍"
+__all__ = [
+    "GLYPH_TPS", "GLYPH_CACHE", "GLYPH_CONTEXT", "GLYPH_QUOTA", "GLYPH_BALANCE",
+    "GLYPH_TOOL", "GLYPH_MODEL", "GLYPH_LATENCY", "GLYPH_TOTALS",
+    "build_context_bar", "segments", "idle_status", "rotate_status",
+    "compact_status", "render_status", "presence_status", "render_report",
+]
 
+# Discord caps activity name/state at 128 chars; leave headroom for the emoji.
 _MAX_STATUS = 110
+
+
+def _lead(emoji: str) -> str:
+    """The prefix a line wears. An empty emoji contributes nothing, not a space."""
+    return f"{emoji} " if emoji else ""
 
 
 def _compact_tokens(count: int) -> str:
@@ -69,9 +97,12 @@ def segments(snapshot: Snapshot, config) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
 
     if config.show_tokens_per_second and snapshot.tps > 0:
-        out.append(("tps", f"{GLYPH_TPS} {snapshot.tps:.0f} tok/s"))
+        out.append(("tps", f"{_lead(config.emoji_tokens_per_second)}{snapshot.tps:.0f} tok/s"))
     if config.show_cache_hit and snapshot.cache_hit_pct is not None:
-        out.append(("cache", f"{GLYPH_CACHE} {_fmt_pct(snapshot.cache_hit_pct, 0)} cache"))
+        out.append((
+            "cache",
+            f"{_lead(config.emoji_cache)}{_fmt_pct(snapshot.cache_hit_pct, 0)} cache",
+        ))
     if config.show_context and snapshot.context_pct is not None:
         used = _compact_tokens(snapshot.context_used)
         total = _compact_tokens(snapshot.context_length)
@@ -83,7 +114,7 @@ def segments(snapshot: Snapshot, config) -> list[tuple[str, str]]:
         parts.append(f"{snapshot.context_pct:.0f}% ctx")
         if total != "0":
             parts.append(f"{used}/{total}")
-        out.append(("context", f"{sep.join(parts)}"))
+        out.append(("context", f"{_lead(config.emoji_context)}{sep.join(parts)}"))
 
     quota = snapshot.quota if isinstance(snapshot.quota, dict) else None
     remaining = _quota_remaining(quota)
@@ -96,26 +127,30 @@ def segments(snapshot: Snapshot, config) -> list[tuple[str, str]]:
             parts.append(build_context_bar(used, config.bar_width, config.fill, config.empty))
         name = label or "quota"
         parts.append(f"{remaining:.0f}% {name}")
-        out.append(("quota", f"{GLYPH_QUOTA} {sep.join(parts)}"))
+        out.append(("quota", f"{_lead(config.emoji_quota)}{sep.join(parts)}"))
     if config.show_balance and balance is not None:
         name = label or "credits"
-        out.append(("balance", f"{name} ${balance:.2f}"))
+        out.append(("balance", f"{_lead(config.emoji_balance)}{name} ${balance:.2f}"))
 
     if config.show_tool and snapshot.current_tool:
-        out.append(("tool", f"{GLYPH_TOOL} {snapshot.current_tool}"))
+        out.append(("tool", f"{_lead(config.emoji_tool)}{snapshot.current_tool}"))
     if config.show_latency and snapshot.latency > 0:
-        out.append(("latency", f"{GLYPH_LATENCY} {snapshot.latency:.1f}s"))
+        out.append(("latency", f"{_lead(config.emoji_latency)}{snapshot.latency:.1f}s"))
     if config.show_model and snapshot.model:
         model = snapshot.model.split("/")[-1]
         if len(model) > 22:
             model = f"{model[:19]}..."
-        out.append(("model", f"{GLYPH_MODEL} {model}"))
+        out.append(("model", f"{_lead(config.emoji_model)}{model}"))
     if config.show_totals and snapshot.total_tokens > 0:
-        out.append(("totals", f"{GLYPH_TOTALS} {_compact_tokens(snapshot.total_tokens)} tok"))
+        out.append((
+            "totals",
+            f"{_lead(config.emoji_totals)}{_compact_tokens(snapshot.total_tokens)} tok",
+        ))
     return out
 
 
 def idle_status(config, now: float, snapshot: Snapshot | None = None) -> str:
+    """The states that are not a metric line, so they use the state emoji."""
     if snapshot is not None and snapshot.inflight:
         return f"{config.status_emoji} thinking…"
     return f"{config.status_emoji} idle · waiting for you"
@@ -127,7 +162,8 @@ def rotate_status(snapshot: Snapshot, config, turn: int) -> str:
         return idle_status(config, 0.0, snapshot)
     if snapshot.inflight and not snapshot.current_tool:
         return f"{config.status_emoji} thinking…"
-    return f"{config.status_emoji} {parts[turn % len(parts)][1]}"
+    # The line already wears its own emoji; no shared prefix on top of it.
+    return parts[turn % len(parts)][1]
 
 
 def compact_status(snapshot: Snapshot, config) -> str:
@@ -139,7 +175,7 @@ def compact_status(snapshot: Snapshot, config) -> str:
         while parts and len(config.separator.join(parts)) > _MAX_STATUS:
             parts.pop()
         text = config.separator.join(parts) or text[:_MAX_STATUS]
-    return f"{config.status_emoji} {text}"
+    return text
 
 
 def render_status(snapshot: Snapshot, config, turn: int = 0) -> str:
@@ -178,17 +214,19 @@ def render_report(snapshot: Snapshot, config) -> str:
 
     if snapshot.tps > 0:
         lines.append(
-            f"{GLYPH_TPS} **{snapshot.tps:.1f} tok/s** windowed "
+            f"{config.emoji_tokens_per_second} **{snapshot.tps:.1f} tok/s** windowed "
             f"({snapshot.instant_tps:.1f} tok/s last request, {snapshot.requests} samples)"
         )
     if snapshot.cache_hit_pct is not None:
-        lines.append(f"{GLYPH_CACHE} Cache hit: **{_fmt_pct(snapshot.cache_hit_pct)}**")
+        lines.append(
+            f"{config.emoji_cache} Cache hit: **{_fmt_pct(snapshot.cache_hit_pct)}**"
+        )
     if snapshot.context_pct is not None:
         bar = build_context_bar(
             snapshot.context_pct, config.bar_width * 2, config.fill, config.empty
         )
         lines.append(
-            f"Context: `{bar}` **{snapshot.context_pct:.1f}%** "
+            f"{config.emoji_context} Context: `{bar}` **{snapshot.context_pct:.1f}%** "
             f"({snapshot.context_used:,} / {snapshot.context_length:,} tokens)"
         )
     quota = snapshot.quota if isinstance(snapshot.quota, dict) else None
@@ -199,17 +237,17 @@ def render_report(snapshot: Snapshot, config) -> str:
         used = max(0.0, min(100.0, 100.0 - remaining))
         bar = build_context_bar(used, config.bar_width * 2, config.fill, config.empty)
         lines.append(
-            f"{GLYPH_QUOTA} {label or 'Quota'}: `{bar}` **{remaining:.0f}% left**"
+            f"{config.emoji_quota} {label or 'Quota'}: `{bar}` **{remaining:.0f}% left**"
         )
     if balance is not None:
-        lines.append(f"Credits: **${balance:.2f}**")
+        lines.append(f"{config.emoji_balance} Credits: **${balance:.2f}**")
     if snapshot.latency > 0:
-        lines.append(f"{GLYPH_LATENCY} Mean latency: {snapshot.latency:.2f}s")
+        lines.append(f"{config.emoji_latency} Mean latency: {snapshot.latency:.2f}s")
     lines.append("")
     lines.append(
         f"Session: {snapshot.api_calls} API calls · {snapshot.errors} errors · "
         f"{snapshot.compressions} compressions · "
-        f"{GLYPH_TOTALS} {snapshot.total_tokens:,} tokens"
+        f"{config.emoji_totals} {snapshot.total_tokens:,} tokens"
     )
     if snapshot.platform:
         lines.append(f"Surface: `{snapshot.platform}`")

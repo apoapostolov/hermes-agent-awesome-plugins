@@ -1,6 +1,6 @@
 name: provider-status
 label: Provider Quota Status
-version: 1.7.0
+version: 1.6.1
 description: "Unified multi-provider quota usage tracking in the status bar, with support for OAuth, color-based warnings, and multiple accounts per provider with Hermes key rotation on exhaust. Publishes the current session's tokens/sec, context occupancy, and that provider's remaining quota as the Discord bot presence."
 author: Apostol Apostolov
 license: MIT
@@ -125,8 +125,8 @@ config_schema:
   discord_status_emoji:
     type: str
     default: "📊"
-    label: Status emoji
-    description: Leading emoji for the custom status
+    label: State emoji
+    description: Emoji for the idle and thinking states. Each metric line below has its own.
   discord_idle_after_seconds:
     type: int
     default: 180
@@ -142,11 +142,31 @@ config_schema:
     default: 20
     label: Quota warn (%)
     description: Remaining quota that switches the presence dot to dnd
+  discord_emoji_tokens_per_second:
+    type: str
+    default: "⚡"
+    label: Tokens/sec emoji
+    description: Lead emoji for the tokens/sec line
   discord_show_tokens_per_second:
     type: bool
     default: true
     label: Tokens/sec
     description: Show throughput (windowed sum of output tokens / sum of durations)
+  discord_emoji_cache:
+    type: str
+    default: "◎"
+    label: Cache emoji
+    description: Lead emoji for the cache-hit line
+  discord_show_cache_hit:
+    type: bool
+    default: false
+    label: Cache hit rate
+    description: Show prompt-cache hit rate
+  discord_emoji_context:
+    type: str
+    default: "▤"
+    label: Context emoji
+    description: Lead emoji for the context line
   discord_show_context:
     type: bool
     default: true
@@ -157,6 +177,11 @@ config_schema:
     default: true
     label: Context bar
     description: Draw the block-character context bar beside the percentage
+  discord_emoji_quota:
+    type: str
+    default: "◍"
+    label: Quota emoji
+    description: Lead emoji for the quota line
   discord_show_quota:
     type: bool
     default: true
@@ -167,31 +192,51 @@ config_schema:
     default: true
     label: Quota bar
     description: Draw the block-character quota bar
+  discord_emoji_balance:
+    type: str
+    default: "◈"
+    label: Credit emoji
+    description: Lead emoji for the credit-balance line
   discord_show_balance:
     type: bool
     default: true
     label: Credit balance
     description: Show dollar credit balance when the provider reports one
-  discord_show_cache_hit:
-    type: bool
-    default: false
-    label: Cache hit rate
-    description: Show prompt-cache hit rate
+  discord_emoji_tool:
+    type: str
+    default: "⧉"
+    label: Tool emoji
+    description: Lead emoji for the running-tool line
   discord_show_tool:
     type: bool
     default: false
     label: Running tool
     description: Show the tool the agent is executing right now
+  discord_emoji_model:
+    type: str
+    default: "☤"
+    label: Model emoji
+    description: Lead emoji for the model line
   discord_show_model:
     type: bool
     default: false
     label: Model
     description: Show the active model
+  discord_emoji_latency:
+    type: str
+    default: "◷"
+    label: Latency emoji
+    description: Lead emoji for the latency line
   discord_show_latency:
     type: bool
     default: false
     label: Latency
     description: Show mean request latency
+  discord_emoji_totals:
+    type: str
+    default: "Σ"
+    label: Totals emoji
+    description: Lead emoji for the lifetime-tokens line
   discord_show_totals:
     type: bool
     default: false

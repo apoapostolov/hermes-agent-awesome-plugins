@@ -1,7 +1,7 @@
 ---
 name: provider-status
 description: "Read live Hermes session telemetry — tokens/sec, context-window occupancy, and the current provider's remaining quota or credit balance — as a Discord bot presence or on demand via /pulse and the agent_pulse tool."
-version: 1.7.0
+version: 1.6.1
 license: MIT
 metadata:
   hermes:
@@ -17,18 +17,21 @@ two on-demand read surfaces.
 
 ## What is published
 
-| Glyph | Metric | How it is computed |
+| Lead emoji (default) | Metric | How it is computed |
 |---|---|---|
 | ⚡ | Tokens/sec | `sum(output tokens) / sum(request durations)` over a 12-request rolling window |
-| ▰▰▱▱ | Context usage | last request's `prompt_tokens` / the model's context length |
+| ◎ | Cache hit rate | `cache_read / prompt`, **off by default** |
+| ▤ | Context usage | last request's `prompt_tokens` / the model's context length (the bar follows the emoji) |
 | ◍ | Quota remaining | the current session provider's remaining window, from the desktop quota poll |
-| $ | Credit balance | dollar leftover when that provider reports credits (DeepSeek, OpenRouter) |
-| ◎ | Cache hit rate | `cache_read / prompt` — **off by default** |
-| ⧉ | Running tool | the tool currently executing — **off by default** |
-| ☤ | Model | the active route, last path segment only — **off by default** |
+| ◈ | Credit balance | dollar leftover when that provider reports credits (DeepSeek, OpenRouter) |
+| ⧉ | Running tool | the tool currently executing, **off by default** |
+| ☤ | Model | the active route, last path segment only, **off by default** |
+| ◷ | Latency | mean request duration, **off by default** |
+| Σ | Lifetime tokens | session token total, **off by default** |
 
-The headline three (tokens/sec, context, quota) ship enabled. Discord caps a
-custom status at 128 characters, so extra segments compete with those.
+Every emoji here is a default; each line has its own setting. The headline three
+(tokens/sec, context, quota) ship enabled. Discord caps a custom status at 128
+characters, so extra segments compete with those.
 
 The quota line is **this session's provider**, not every chip in the bar.
 `xai-oauth` maps to Grok, `openai-codex` to Codex, `zai` to GLM. If the
@@ -57,9 +60,9 @@ below is a checkbox or field in that form.
 
 | Setting | Default | What it turns off |
 | --- | --- | --- |
-| `discord_show_tokens_per_second` | on | `⚡ 84 tok/s` |
+| `discord_show_tokens_per_second` | on | `84 tok/s` |
 | `discord_show_context` | on | `▰▰▱▱▱ · 6% ctx · 12.0K/200.0K` |
-| `discord_show_quota` | on | `◍ ▰▰▱▱▱ · 61% Grok` |
+| `discord_show_quota` | on | `▰▰▱▱▱ · 61% Grok` |
 | `discord_show_balance` | on | `DeepSeek $12.40` (credit providers only) |
 
 Each bar also has its own switch so you can keep the number and drop the art:
@@ -72,6 +75,35 @@ Each bar also has its own switch so you can keep the number and drop the art:
 Opt-in extras, off because they eat the status length: `discord_show_cache_hit`,
 `discord_show_tool`, `discord_show_model`, `discord_show_latency`,
 `discord_show_totals`.
+
+### One emoji per line
+
+Each metric line wears its own emoji, and its settings entry sits immediately
+before that line's switches. The default layout reads:
+
+```
+⚡ 84 tok/s · ▤ ▰▰▱▱▱ · 6% ctx · 12.0K/200.0K · ◍ ▰▰▱▱▱ · 61% Grok
+```
+
+| Line | Emoji setting | Default |
+| --- | --- | --- |
+| tokens/sec | `discord_emoji_tokens_per_second` | `⚡` |
+| cache hit | `discord_emoji_cache` | `◎` |
+| context | `discord_emoji_context` | `▤` |
+| quota | `discord_emoji_quota` | `◍` |
+| credits | `discord_emoji_balance` | `◈` |
+| running tool | `discord_emoji_tool` | `⧉` |
+| model | `discord_emoji_model` | `☤` |
+| latency | `discord_emoji_latency` | `◷` |
+| lifetime tokens | `discord_emoji_totals` | `Σ` |
+
+An explicitly empty value removes that line's emoji (no leftover space); only an
+unset key falls back to the default. A per-line emoji matters most in `rotate`
+mode, where one line shows at a time and the emoji is what identifies it.
+
+`discord_status_emoji` (default `📊`) covers the states that are not a metric
+line: idle and thinking. Metric lines no longer wear it in front of their own
+emoji.
 
 ```yaml
 plugins:

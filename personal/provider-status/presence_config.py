@@ -15,6 +15,20 @@ _DEFAULT_ACTIVITY = "custom"
 _DEFAULT_INTERVAL = 20
 _DEFAULT_EMOJI = "📊"
 
+# One lead glyph per presence line, in the order segments render. These are the
+# defaults; each line has its own ``discord_emoji_*`` setting so a reader can
+# tell the lines apart at a glance, which matters most in rotate mode where only
+# one line shows at a time.
+GLYPH_TPS = "⚡"
+GLYPH_CACHE = "◎"
+GLYPH_CONTEXT = "▤"
+GLYPH_QUOTA = "◍"
+GLYPH_BALANCE = "◈"
+GLYPH_TOOL = "⧉"
+GLYPH_MODEL = "☤"
+GLYPH_LATENCY = "◷"
+GLYPH_TOTALS = "Σ"
+
 
 def _bool(value: Any, default: bool) -> bool:
     if isinstance(value, bool):
@@ -44,6 +58,17 @@ def _choice(value: Any, allowed: tuple, default: str) -> str:
     return default
 
 
+def _emoji(value: Any, default: str) -> str:
+    """A line's lead glyph.
+
+    An explicitly empty string is meaningful: it removes the glyph from that
+    line. Only an unset (``None``) value falls back to the default.
+    """
+    if value is None:
+        return default
+    return str(value)[:8]
+
+
 @dataclass(frozen=True)
 class PresenceConfig:
     enabled: bool = True
@@ -54,6 +79,17 @@ class PresenceConfig:
     idle_after_seconds: int = 180
     context_warn_percent: int = 80
     quota_warn_remaining: int = 20
+
+    # One glyph per line, in render order.
+    emoji_tokens_per_second: str = GLYPH_TPS
+    emoji_cache: str = GLYPH_CACHE
+    emoji_context: str = GLYPH_CONTEXT
+    emoji_quota: str = GLYPH_QUOTA
+    emoji_balance: str = GLYPH_BALANCE
+    emoji_tool: str = GLYPH_TOOL
+    emoji_model: str = GLYPH_MODEL
+    emoji_latency: str = GLYPH_LATENCY
+    emoji_totals: str = GLYPH_TOTALS
 
     show_tokens_per_second: bool = True
     show_context: bool = True
@@ -105,6 +141,17 @@ class PresenceConfig:
             idle_after_seconds=_int(cfg("discord_idle_after_seconds", 180), 180, 10, 86_400),
             context_warn_percent=_int(cfg("discord_context_warn_percent", 80), 80, 10, 100),
             quota_warn_remaining=_int(cfg("discord_quota_warn_remaining", 20), 20, 1, 50),
+            emoji_tokens_per_second=_emoji(
+                cfg("discord_emoji_tokens_per_second", GLYPH_TPS), GLYPH_TPS
+            ),
+            emoji_cache=_emoji(cfg("discord_emoji_cache", GLYPH_CACHE), GLYPH_CACHE),
+            emoji_context=_emoji(cfg("discord_emoji_context", GLYPH_CONTEXT), GLYPH_CONTEXT),
+            emoji_quota=_emoji(cfg("discord_emoji_quota", GLYPH_QUOTA), GLYPH_QUOTA),
+            emoji_balance=_emoji(cfg("discord_emoji_balance", GLYPH_BALANCE), GLYPH_BALANCE),
+            emoji_tool=_emoji(cfg("discord_emoji_tool", GLYPH_TOOL), GLYPH_TOOL),
+            emoji_model=_emoji(cfg("discord_emoji_model", GLYPH_MODEL), GLYPH_MODEL),
+            emoji_latency=_emoji(cfg("discord_emoji_latency", GLYPH_LATENCY), GLYPH_LATENCY),
+            emoji_totals=_emoji(cfg("discord_emoji_totals", GLYPH_TOTALS), GLYPH_TOTALS),
             show_tokens_per_second=_bool(cfg("discord_show_tokens_per_second", True), True),
             show_context=_bool(cfg("discord_show_context", True), True),
             show_context_bar=_bool(cfg("discord_show_context_bar", True), True),
@@ -122,6 +169,11 @@ class PresenceConfig:
             separator=str(cfg("discord_separator", " · ") or " · ")[:8],
         )
 
+
+# ── manifest mirror ──────────────────────────────────────────────────────────
+# The plugin.yaml config_schema is what the Desktop renders; this mapping is the
+# single place that documents the same keys for readers of the source. Keep the
+# two in sync — plugin.yaml is authoritative for the UI.
 
 CONFIG_SCHEMA: dict = {
     "discord_presence_enabled": {
@@ -149,12 +201,12 @@ CONFIG_SCHEMA: dict = {
     "discord_status_emoji": {
         "type": "str",
         "default": _DEFAULT_EMOJI,
-        "description": "Leading emoji for the custom status",
+        "description": "Emoji for the idle and thinking states (each metric line has its own)",
     },
     "discord_idle_after_seconds": {
         "type": "int",
         "default": 180,
-        "description": "Idle dot after this many quiet seconds",
+        "description": "Show the idle dot after this long without activity",
     },
     "discord_context_warn_percent": {
         "type": "int",
@@ -166,17 +218,106 @@ CONFIG_SCHEMA: dict = {
         "default": 20,
         "description": "Remaining quota percent that switches the presence to dnd",
     },
-    "discord_show_tokens_per_second": {"type": "bool", "default": True, "description": "Show tokens/sec"},
-    "discord_show_context": {"type": "bool", "default": True, "description": "Show context usage"},
-    "discord_show_context_bar": {"type": "bool", "default": True, "description": "Draw the context bar"},
-    "discord_show_quota": {"type": "bool", "default": True, "description": "Show current-provider quota"},
-    "discord_show_quota_bar": {"type": "bool", "default": True, "description": "Draw the quota bar"},
-    "discord_show_balance": {"type": "bool", "default": True, "description": "Show credit balance when the provider reports dollars"},
-    "discord_show_cache_hit": {"type": "bool", "default": False, "description": "Show prompt-cache hit rate"},
-    "discord_show_tool": {"type": "bool", "default": False, "description": "Show the running tool"},
-    "discord_show_model": {"type": "bool", "default": False, "description": "Show the active model"},
-    "discord_show_latency": {"type": "bool", "default": False, "description": "Show mean request latency"},
-    "discord_show_totals": {"type": "bool", "default": False, "description": "Show lifetime token totals"},
+    "discord_emoji_tokens_per_second": {
+        "type": "str",
+        "default": GLYPH_TPS,
+        "description": "Lead emoji for the tokens/sec line",
+    },
+    "discord_show_tokens_per_second": {
+        "type": "bool",
+        "default": True,
+        "description": "Show tokens/sec",
+    },
+    "discord_emoji_cache": {
+        "type": "str",
+        "default": GLYPH_CACHE,
+        "description": "Lead emoji for the cache-hit line",
+    },
+    "discord_show_cache_hit": {
+        "type": "bool",
+        "default": False,
+        "description": "Show prompt-cache hit rate",
+    },
+    "discord_emoji_context": {
+        "type": "str",
+        "default": GLYPH_CONTEXT,
+        "description": "Lead emoji for the context line",
+    },
+    "discord_show_context": {
+        "type": "bool",
+        "default": True,
+        "description": "Show context usage",
+    },
+    "discord_show_context_bar": {
+        "type": "bool",
+        "default": True,
+        "description": "Draw the context bar",
+    },
+    "discord_emoji_quota": {
+        "type": "str",
+        "default": GLYPH_QUOTA,
+        "description": "Lead emoji for the quota line",
+    },
+    "discord_show_quota": {
+        "type": "bool",
+        "default": True,
+        "description": "Show current-provider quota",
+    },
+    "discord_show_quota_bar": {
+        "type": "bool",
+        "default": True,
+        "description": "Draw the quota bar",
+    },
+    "discord_emoji_balance": {
+        "type": "str",
+        "default": GLYPH_BALANCE,
+        "description": "Lead emoji for the credit-balance line",
+    },
+    "discord_show_balance": {
+        "type": "bool",
+        "default": True,
+        "description": "Show credit balance when the provider reports dollars",
+    },
+    "discord_emoji_tool": {
+        "type": "str",
+        "default": GLYPH_TOOL,
+        "description": "Lead emoji for the running-tool line",
+    },
+    "discord_show_tool": {
+        "type": "bool",
+        "default": False,
+        "description": "Show the running tool",
+    },
+    "discord_emoji_model": {
+        "type": "str",
+        "default": GLYPH_MODEL,
+        "description": "Lead emoji for the model line",
+    },
+    "discord_show_model": {
+        "type": "bool",
+        "default": False,
+        "description": "Show the active model",
+    },
+    "discord_emoji_latency": {
+        "type": "str",
+        "default": GLYPH_LATENCY,
+        "description": "Lead emoji for the latency line",
+    },
+    "discord_show_latency": {
+        "type": "bool",
+        "default": False,
+        "description": "Show mean request latency",
+    },
+    "discord_emoji_totals": {
+        "type": "str",
+        "default": GLYPH_TOTALS,
+        "description": "Lead emoji for the lifetime-tokens line",
+    },
+    "discord_show_totals": {
+        "type": "bool",
+        "default": False,
+        "description": "Show lifetime token totals",
+    },
     "discord_bar_width": {"type": "int", "default": 5, "description": "Bar cells (3-20)"},
     "discord_separator": {"type": "str", "default": " · ", "description": "Segment separator"},
 }
