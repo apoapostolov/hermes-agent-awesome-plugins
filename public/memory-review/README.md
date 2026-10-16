@@ -4,7 +4,7 @@
   <strong>Review staged memory writes before they land.</strong>
   <p>Checkbox the writes you want. Approve or reject from a dialog.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.5-2ea44f" alt="Version 1.2.5" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.6-2ea44f" alt="Version 1.2.6" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>

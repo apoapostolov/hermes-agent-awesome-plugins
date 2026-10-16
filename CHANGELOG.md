@@ -20,6 +20,14 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - provider-status. The presence release was renumbered to 1.6.1 before it was announced, and 1.7.0 is retired with its tag removed. A copy still reporting 1.7.0 will not self-update, because the version compare sees nothing newer. Reinstall from `main` to realign it.
 
+## [memory-review 1.2.6] - 2026-10-16
+
+The chrome-menu row is placed by proof now, not by elimination.
+
+### Fixed
+
+- Personal edition: the row landed in the profile switcher as well, because that menu carries the same `add` + `cloud-download` + `settings-gear` glyphs as the shell menu. A menu counts as the shell menu only when it also carries a chrome verb no other menu renders (`layout-statusbar`, `layout-menubar`, `multiple-windows`), which is one rule instead of one exception per menu. The composer model catalog from 1.2.5 and the profile switcher are both refused by it, and the status-bar chip stays the primary door.
+
 ## [provider-status 1.6.1] - 2026-10-15
 
 The current session's speed, context, and remaining quota now speak from Discord, with a configurable pet bubble and an emoji per line.

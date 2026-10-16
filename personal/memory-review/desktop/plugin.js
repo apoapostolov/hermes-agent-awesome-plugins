@@ -181,13 +181,17 @@ function hasGlyph(menu, name) {
   return Boolean(menu.querySelector('.codicon-' + name))
 }
 
+// The chrome verbs of the app context menu (layout-statusbar, layout-menubar,
+// multiple-windows). Nothing else in the app renders them, so they name the
+// shell menu positively. The add + gear pair alone names three menus at least:
+// the composer model catalog (#8) and the profile switcher (#11) both carry it.
+const SHELL_ONLY_GLYPHS = ['layout-statusbar', 'layout-menubar', 'multiple-windows']
+
 function isShellMenu(menu) {
   if (!(menu instanceof Element)) return false
   if (menu.getAttribute('data-slot') !== 'dropdown-menu-content') return false
   if (menu.getAttribute('data-state') !== 'open') return false
-  // The model catalog reuses add + settings-gear. It is the one with a
-  // search field and row badges; the shell menu has neither (#8).
-  if (menu.querySelector('input, [role="searchbox"], [data-model-menu-row-badge]')) return false
+  if (!SHELL_ONLY_GLYPHS.some(name => hasGlyph(menu, name))) return false
   const start = hasGlyph(menu, 'add')
   const chrome = hasGlyph(menu, 'settings-gear') || hasGlyph(menu, 'cloud-download')
   return start && chrome
