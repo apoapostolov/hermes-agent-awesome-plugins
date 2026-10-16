@@ -13,13 +13,13 @@ ACTIVITY_TYPES = ("custom", "playing", "watching", "listening", "competing")
 _DEFAULT_MODE = "compact"
 _DEFAULT_ACTIVITY = "custom"
 _DEFAULT_INTERVAL = 20
-_DEFAULT_EMOJI = "📊"
+_DEFAULT_EMOJI = "▥"
 
 # One lead glyph per presence line, in the order segments render. These are the
 # defaults; each line has its own ``discord_emoji_*`` setting so a reader can
 # tell the lines apart at a glance, which matters most in rotate mode where only
 # one line shows at a time.
-GLYPH_TPS = "⚡"
+GLYPH_TPS = "↯"
 GLYPH_CACHE = "◎"
 GLYPH_CONTEXT = "▤"
 GLYPH_QUOTA = "◍"

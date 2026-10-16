@@ -124,7 +124,7 @@ config_schema:
     description: Seconds between presence updates (10-600). Discord allows ~5 per 20s.
   discord_status_emoji:
     type: str
-    default: "📊"
+    default: "▥"
     label: State emoji
     description: Emoji for the idle and thinking states. Each metric line below has its own.
   discord_idle_after_seconds:
@@ -144,7 +144,7 @@ config_schema:
     description: Remaining quota that switches the presence dot to dnd
   discord_emoji_tokens_per_second:
     type: str
-    default: "⚡"
+    default: "↯"
     label: Tokens/sec emoji
     description: Lead emoji for the tokens/sec line
   discord_show_tokens_per_second:

@@ -19,7 +19,7 @@ two on-demand read surfaces.
 
 | Lead emoji (default) | Metric | How it is computed |
 |---|---|---|
-| ⚡ | Tokens/sec | `sum(output tokens) / sum(request durations)` over a 12-request rolling window |
+| ↯ | Tokens/sec | `sum(output tokens) / sum(request durations)` over a 12-request rolling window |
 | ◎ | Cache hit rate | `cache_read / prompt`, **off by default** |
 | ▤ | Context usage | last request's `prompt_tokens` / the model's context length (the bar follows the emoji) |
 | ◍ | Quota remaining | the current session provider's remaining window, from the desktop quota poll |
@@ -82,12 +82,12 @@ Each metric line wears its own emoji, and its settings entry sits immediately
 before that line's switches. The default layout reads:
 
 ```
-⚡ 84 tok/s · ▤ ▰▰▱▱▱ · 6% ctx · 12.0K/200.0K · ◍ ▰▰▱▱▱ · 61% Grok
+↯ 84 tok/s · ▤ ▰▰▱▱▱ · 6% ctx · 12.0K/200.0K · ◍ ▰▰▱▱▱ · 61% Grok
 ```
 
 | Line | Emoji setting | Default |
 | --- | --- | --- |
-| tokens/sec | `discord_emoji_tokens_per_second` | `⚡` |
+| tokens/sec | `discord_emoji_tokens_per_second` | `↯` |
 | cache hit | `discord_emoji_cache` | `◎` |
 | context | `discord_emoji_context` | `▤` |
 | quota | `discord_emoji_quota` | `◍` |
@@ -101,7 +101,13 @@ An explicitly empty value removes that line's emoji (no leftover space); only an
 unset key falls back to the default. A per-line emoji matters most in `rotate`
 mode, where one line shows at a time and the emoji is what identifies it.
 
-`discord_status_emoji` (default `📊`) covers the states that are not a metric
+Every line's shipped default lives in two places: the `plugin.yaml` schema, which
+is what the settings form shows, and the `GLYPH_*` / `_DEFAULT_EMOJI` constants in
+`presence_config.py`, which is what the presence renders. Move both, and the
+assertions in `tests_presence.py` that pin them. Pick a glyph with text
+presentation (no color emoji) so the family stays monochrome.
+
+`discord_status_emoji` (default `▥`) covers the states that are not a metric
 line: idle and thinking. Metric lines no longer wear it in front of their own
 emoji.
 

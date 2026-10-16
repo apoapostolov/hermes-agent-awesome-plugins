@@ -332,7 +332,7 @@ class TestLineEmoji(unittest.TestCase):
 
     def test_each_line_has_its_own_default_emoji(self):
         cfg = self.config.PresenceConfig()
-        self.assertEqual(cfg.emoji_tokens_per_second, "⚡")
+        self.assertEqual(cfg.emoji_tokens_per_second, "↯")
         self.assertEqual(cfg.emoji_cache, "◎")
         self.assertEqual(cfg.emoji_context, "▤")
         self.assertEqual(cfg.emoji_quota, "◍")
@@ -349,7 +349,7 @@ class TestLineEmoji(unittest.TestCase):
     def test_rotate_shows_a_different_emoji_per_line(self):
         cfg = self._cfg(discord_presence_mode="rotate")
         lines = [self.render.render_status(self._snap(), cfg, turn) for turn in range(3)]
-        self.assertEqual(lines[0], "⚡ 84 tok/s")
+        self.assertEqual(lines[0], "↯ 84 tok/s")
         self.assertTrue(lines[1].startswith("▤ "), lines[1])
         self.assertTrue(lines[2].startswith("◍ "), lines[2])
         self.assertEqual(len({line.split()[0] for line in lines}), 3, lines)
@@ -389,13 +389,13 @@ class TestLineEmoji(unittest.TestCase):
         segs = dict(self.render.segments(self._snap(), cfg))
         self.assertIn("61% Grok", segs["quota"])
         self.assertIn("84", segs["tps"])
-        self.assertNotIn("⚡", segs["quota"])
+        self.assertNotIn("↯", segs["quota"])
         self.assertNotIn("◍", segs["tps"])
 
     def test_compact_joins_lines_each_with_its_own_emoji(self):
         cfg = self._cfg()
         text = self.render.render_status(self._snap(), cfg)
-        self.assertTrue(text.startswith("⚡ 84 tok/s"), text)
+        self.assertTrue(text.startswith("↯ 84 tok/s"), text)
         self.assertIn(" ▤ ", text)
         self.assertIn(" ◍ ", text)
 

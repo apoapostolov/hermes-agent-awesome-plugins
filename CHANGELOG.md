@@ -18,6 +18,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ### Changed
 
+- provider-status. The tokens/sec and state presence lines shipped color emoji (U+26A1, U+1F4CA) beside a monochrome glyph family. Both now use glyphs (U+21AF, U+25A5), so the settings form and the presence read consistently.
 - provider-status. The presence release was renumbered to 1.6.1 before it was announced, and 1.7.0 is retired with its tag removed. A copy still reporting 1.7.0 will not self-update, because the version compare sees nothing newer. Reinstall from `main` to realign it.
 
 ## [memory-review 1.2.6] - 2026-10-16
