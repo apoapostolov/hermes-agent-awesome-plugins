@@ -18,8 +18,15 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ### Changed
 
-- provider-status. The tokens/sec and state presence lines shipped color emoji (U+26A1, U+1F4CA) beside a monochrome glyph family. Both now use glyphs (U+21AF, U+25A5), so the settings form and the presence read consistently.
 - provider-status. The presence release was renumbered to 1.6.1 before it was announced, and 1.7.0 is retired with its tag removed. A copy still reporting 1.7.0 will not self-update, because the version compare sees nothing newer. Reinstall from `main` to realign it.
+
+## [provider-status 1.6.2] - 2026-10-16
+
+The two presence lines that wore color emoji wear monochrome glyphs now, so the settings form and the Discord presence read as one family.
+
+### Changed
+
+- Tokens/sec and the idle/thinking state were the only two lead characters that rendered as color emoji (U+26A1, U+1F4CA) beside a monochrome glyph family. Tokens/sec uses U+21AF and the state line uses U+25A5. The settings form takes the new defaults on load; the presence needs a plugin reload (Save and Reconnect, then toggle Provider Quota Status off and on under Capabilities, Plugins).
 
 ## [memory-review 1.2.6] - 2026-10-16
 

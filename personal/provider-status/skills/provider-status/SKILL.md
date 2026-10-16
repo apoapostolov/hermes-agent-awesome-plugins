@@ -1,7 +1,7 @@
 ---
 name: provider-status
 description: "Read live Hermes session telemetry — tokens/sec, context-window occupancy, and the current provider's remaining quota or credit balance — as a Discord bot presence or on demand via /pulse and the agent_pulse tool."
-version: 1.6.1
+version: 1.6.2
 license: MIT
 metadata:
   hermes:
