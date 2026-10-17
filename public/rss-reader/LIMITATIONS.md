@@ -41,7 +41,7 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 ### 5. Unsandboxed embeds and app layout store — RESOLVED by SDK (item 9, PR #120927)
 
 - **Was:** raw Electron `<webview>` on `persist:hermes-preview` (browser + YouTube) and a `hermes.desktop.layoutTree.v2` read in the ticker dock-watch.
-- **Now (both editions):** `<SandboxedFrame>` renders the RSS browser pane and YouTube embeds. The dock-watch is gone: the ticker pane registers with `dock: { enforce: true }`, the SDK-sanctioned placement, so nothing reads the app layout store.
+- **Now (both editions):** `<SandboxedFrame>` renders the RSS browser pane. YouTube posts open from a poster that hands the watch URL to the desktop's own Browser pane (`host.openInAppBrowser`), or to your system browser on a build without that API, so no video is embedded in the reader. The dock-watch is gone: the ticker pane registers with `dock: { enforce: true }`, the SDK-sanctioned placement, so nothing reads the app layout store.
 - **Editions:** identical. No divergence.
 
 ### 6. Script-strip regex (lint false positive)
@@ -59,5 +59,5 @@ Before you pin personal to the catalog, or copy a personal feature into `public/
 - [ ] README matches whether paywall mirrors exist in that edition.
 - [ ] No `prompt.submit` that edits the installed plugin tree.
 - [ ] Transport stays on `broadcast_plugin_event` (no `tui_gateway` imports).
-- [ ] Embeds stay on `SandboxedFrame`; no webview, no layout-store reads.
+- [ ] The browser pane stays on `SandboxedFrame`; no webview, no layout-store reads.
 - [ ] Re-pin catalog `sha:` to `public/rss-reader` and comment on #115972.

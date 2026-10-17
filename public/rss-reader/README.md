@@ -5,7 +5,7 @@
   <p>Folders, mute and search, reader-mode capture, YouTube and Substack feeds, optional Hermes tools, and an optional headline ticker.</p>
   <p>
     <a href="https://github.com/NousResearch/hermes-agent"><img src="https://img.shields.io/badge/Hermes%20Desktop-plugin-6f42c1" alt="Hermes Desktop plugin" /></a>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.0-2ea44f" alt="Version 1.2.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.1-2ea44f" alt="Version 1.2.1" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -26,7 +26,7 @@
 - Organize with folders and nested folders. Move feeds between them.
 - Work from unread, saved, feed, folder, mute, and search views without losing the article you have open.
 - Capture full articles into reader mode (images and tables kept when useful).
-- Play YouTube posts in the reader with a 16:9 embed and chapter timestamps. Playlist feeds list oldest first.
+- Play YouTube posts from a 16:9 poster. The reader hands the watch URL to the desktop's own Browser pane, or to your system browser on a build without that API, and a chapter timestamp opens the video at that mark. Playlist feeds list oldest first.
 - Set a User-Agent and optional YouTube cookies under Settings → Advanced.
 - Ask Hermes for summaries, discussions, evidence checks, digests, and optional grading only when you choose.
 - Optionally register Hermes tools so the agent can read, find, tag, filter, and manage subscriptions.
