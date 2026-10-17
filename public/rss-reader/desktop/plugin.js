@@ -14,7 +14,8 @@ import {
   useQueryClient,
   ROUTES_AREA,
   SIDEBAR_NAV_AREA,
-  PALETTE_AREA
+  PALETTE_AREA,
+  SandboxedFrame
 } from "@hermes/plugin-sdk";
 
 var RSS_DEBUG = false;
@@ -960,18 +961,41 @@ function youtubeVideoId(value) {
 function isYoutubeArticle(article) {
   return !!(youtubeVideoId(article?.url) || youtubeVideoId(article?.identity));
 }
-function youtubePageOriginOk() {
-  try {
-    return typeof location !== "undefined" && (location.protocol === "http:" || location.protocol === "https:");
-  } catch {
-    return false;
-  }
-}
 function youtubeWatchUrl(id, start) {
   if (!id) return "";
   const base = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
   const seconds = Math.max(0, Math.floor(Number(start) || 0));
   return seconds ? `${base}&t=${seconds}s` : base;
+}
+function youtubePosterSrc(id) {
+  return id ? `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg` : "";
+}
+// The desktop's Browser pane is the only in-app surface with a real origin, and
+// the sandbox a plugin embeds into has none, so a player that needs one paints a
+// dead rectangle there. The player hands the watch URL to that pane when the
+// desktop exposes the door, and says which fallback it will use when it cannot.
+function appBrowserAvailable() {
+  try {
+    return typeof host !== "undefined" && !!host && typeof host.openInAppBrowser === "function";
+  } catch {
+    return false;
+  }
+}
+function youtubePlayerHint(available) {
+  return available ? "Plays in the app's Browser" : "Plays in your browser";
+}
+function openYoutubeVideo(id, start, label) {
+  const watch = youtubeWatchUrl(id, start);
+  if (!watch) return false;
+  if (appBrowserAvailable()) {
+    void host.openInAppBrowser(watch, { label: label || "YouTube video" });
+    return true;
+  }
+  if (rssCtx?.os?.openExternal) {
+    void rssCtx.os.openExternal(watch);
+    return true;
+  }
+  return false;
 }
 function youtubeEmbedSrc(id, start) {
   if (!id) return "";
@@ -3592,7 +3616,12 @@ var styles = `
 .hermes-rss .rss-youtube iframe,.hermes-rss .rss-youtube-frame{position:absolute;inset:0;width:100%;height:100%;max-width:none;margin:0;border:0;border-radius:0;display:block}
 .hermes-rss .rss-youtube-fallback a.rss-yt-open{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:inherit;text-decoration:none;border:0}
 .hermes-rss .rss-youtube-fallback img{width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:0}
-.hermes-rss .rss-youtube-fallback .rss-yt-play{position:absolute;width:68px;height:48px;border-radius:12px;background:#f00;box-shadow:0 2px 10px color-mix(in srgb,#000 40%,transparent)}
+.hermes-rss .rss-youtube-poster{position:absolute;inset:0;display:block;width:100%;height:100%;padding:0;border:0;background:#000;cursor:pointer;overflow:hidden}
+.hermes-rss .rss-youtube-poster img{width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:0}
+.hermes-rss .rss-youtube-poster .rss-youtube-hint{position:absolute;left:0;right:0;bottom:0;padding:6px 10px;background:linear-gradient(transparent,color-mix(in srgb,#000 78%,transparent));color:#fff;font-size:.78em;text-align:left}
+.hermes-rss .rss-youtube-poster .rss-yt-play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.hermes-rss .rss-youtube-poster .rss-yt-play::after{content:"";position:absolute;left:26px;top:14px;border-style:solid;border-width:10px 0 10px 18px;border-color:transparent transparent transparent #fff}
+.hermes-rss .rss-youtube-fallback .rss-yt-play,.hermes-rss .rss-youtube-poster .rss-yt-play{width:68px;height:48px;border-radius:12px;background:#f00;box-shadow:0 2px 10px color-mix(in srgb,#000 40%,transparent)}
 .hermes-rss .rss-youtube-fallback .rss-yt-play::after{content:"";position:absolute;left:26px;top:14px;border-style:solid;border-width:10px 0 10px 18px;border-color:transparent transparent transparent #fff}
 .hermes-rss .rss-yt-chapters{margin:0 0 1.2em}
 .hermes-rss .rss-yt-chapters .rss-eyebrow{margin:10px 0 6px}
@@ -4106,16 +4135,32 @@ function RssBrowserFrame({ url }) {
     style: { display: "flex", flex: "1 1 auto", minHeight: 0, height: "100%", width: "100%", border: 0, background: "#fff" }
   });
 }
-function YoutubeFrame({ id, start }) {
-  const src = youtubeEmbedSrc(id, start);
-  // SandboxedFrame (SDK, #116305 item 9): replaces the raw webview on the
-  // app's persist: partition. The embed referrer rides the youtube-nocookie
-  // URL; the sandbox's opaque origin is the containment.
-  return jsx(SandboxedFrame, {
-    src,
-    title: "YouTube player",
-    className: "rss-youtube-frame",
-    style: { position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, display: "flex", background: "#000" }
+function YoutubeFrame({ id, start, title }) {
+  // No embed: `SandboxedFrame` gives guest content an opaque origin, and
+  // YouTube's player needs a real one (it throws reading `caches` and never
+  // defines `writeEmbed`), so it paints a black rectangle that no URL tuning
+  // fixes. The app's own Browser pane is a real Chromium guest, so the poster
+  // hands the watch URL over, and names its fallback when this build predates
+  // that door. Verified against the live embed: only `allow-same-origin` boots
+  // it, which the SDK's token allowlist drops by design.
+  const label = title || "YouTube video";
+  const available = appBrowserAvailable();
+  const hint = youtubePlayerHint(available);
+  return jsx("div", {
+    className: "rss-youtube",
+    children: jsxs("button", {
+      type: "button",
+      className: "rss-youtube-poster",
+      "aria-label": `${hint}: ${label}`,
+      onClick: () => {
+        openYoutubeVideo(id, start, label);
+      },
+      children: [
+        jsx("img", { src: youtubePosterSrc(id), alt: "", loading: "lazy" }),
+        jsx("span", { className: "rss-yt-play", "aria-hidden": "true" }),
+        jsx("span", { className: "rss-youtube-hint", children: hint })
+      ]
+    })
   });
 }
 function openHermesPreview(url, label, { emitPreview = true } = {}) {
@@ -4666,7 +4711,6 @@ function ReaderProfile({ ctx, owner }) {
     updateSelected(value);
     storageSet(ctx, "selected", owner, value);
   };
-  const [youtubeStart, setYoutubeStart] = useState(0);
   const [query, setQuery] = useState("");
   const [exclude, setExclude] = useState("");
   const [showHidden, setShowHidden] = useState(false);
@@ -4719,8 +4763,16 @@ function ReaderProfile({ ctx, owner }) {
   const openHttpLink = (raw) => {
     const href = safeHttpHref(raw);
     if (!href) return;
+    // An explicit "always external" choice wins, YouTube included.
     if (settings.openInExternalBrowser === true) {
       void ctx.os.openExternal(href);
+      return;
+    }
+    // The reader's own browser panel is a sandboxed frame with an opaque origin,
+    // which is why a YouTube page renders empty in it. Hand YouTube to the
+    // desktop's Browser pane when this build has that door.
+    if (appBrowserAvailable() && isYoutubeRequestUrl(href)) {
+      void host.openInAppBrowser(href, { label: article?.title || "YouTube video" });
       return;
     }
     setBrowserUrl(href);
@@ -4741,8 +4793,7 @@ function ReaderProfile({ ctx, owner }) {
       if (id && start >= 0) {
         event.preventDefault();
         event.stopPropagation();
-        setYoutubeStart(start);
-        return;
+        if (openYoutubeVideo(id, start, article?.title || "YouTube video")) return;
       }
     }
     event.preventDefault();
@@ -4838,7 +4889,6 @@ function ReaderProfile({ ctx, owner }) {
   useEffect(() => {
     setDiscussOpen(false);
     setDiscussNote("");
-    setYoutubeStart(0);
     const pane = detailRef.current;
     if (pane) pane.scrollTop = 0;
   }, [selected]);
@@ -6534,7 +6584,7 @@ function ReaderProfile({ ctx, owner }) {
           }
         ) }),
         tab === "article" && /* @__PURE__ */ jsxs("div", { id: "rss-article-panel-article", role: "tabpanel", "aria-labelledby": "rss-article-tab-article", children: [
-          articleRender.youtube && articleRender.youtubeId ? /* @__PURE__ */ jsx(YoutubeFrame, { id: articleRender.youtubeId, start: youtubeStart }) : null,
+          articleRender.youtube && articleRender.youtubeId ? /* @__PURE__ */ jsx(YoutubeFrame, { id: articleRender.youtubeId, title: article.title }) : null,
           articleRender.bodyHtml ? /* @__PURE__ */ jsx("div", { ref: richRef, className: "rss-body rss-rich", onClick: onRichLinkClick, onAuxClick: onRichLinkClick, dangerouslySetInnerHTML: { __html: articleRender.bodyHtml } }) : articleRender.youtube ? null : /* @__PURE__ */ jsx("p", { className: "rss-body", children: "This feed contains only a headline. Open the original article to read more." }),
           !articleRender.youtube && /* @__PURE__ */ jsx("div", { className: "rss-note", children: article.captured ? "Scripts are stripped and only https links, images and embeds are shown." : articleRender.rich.isHtml ? "Rendered from the feed's own HTML. Scripts are stripped and only https links, images and embeds are shown." : "This is the text supplied by the feed. It may be an excerpt. Scripts are stripped; https images, tables and embeds are kept." })
         ] }),

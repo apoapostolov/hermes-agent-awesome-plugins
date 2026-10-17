@@ -18,7 +18,7 @@ function grab(name) {
   throw new Error(`unclosed ${name}`);
 }
 
-const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFolderOrder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("pruneArticleCache"), grab("normalizeCacheKeepDays"), grab("pruneExpiredArticles"), grab("youtubeVideoId"), grab("isYoutubeArticle"), grab("youtubeEmbedSrc"), grab("youtubeTimeParam"), grab("parseYoutubeChapters"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta"), grab("folderContains"), grab("articleMatchesReaderScope"), grab("rememberUnreadTrail"), grab("unreadListWithTrail"), grab("youtubeSiteHost"), grab("youtubeFeedFromUrl"), grab("isYoutubePlaylistFeed"), grab("pageSlice"), grab("sortArticlesByTime"), grab("substackFeedFromUrl"), grab("youtubeChannelIdFromHtml"), grab("expandSubscribeUrl"), grab("feedWantsCapture"), grab("feedShowsTicker"), grab("feedTriState"), grab("parseTriState"), grab("normalizeUserAgent"), grab("userAgentPresetId"), grab("normalizeYoutubeCookies"), grab("youtubeCookieHeader"), grab("isYoutubeRequestUrl")].join(String.fromCharCode(10));
+const bundle = [grab("profileFromOwner"), grab("cheapExcerpt"), grab("firstBodyImage"), grab("httpsSrc"), grab("imageKey"), grab("folderOf"), grab("folderTitle"), grab("groupFeedsByFolder"), grab("previewFolderOrder"), grab("previewFeedOrder"), grab("previewNavFeeds"), grab("applyFeedMove"), grab("muteScope"), grab("compactMuteScope"), grab("muteAppliesToArticle"), grab("isTagMute"), grab("muteTagKey"), grab("muteHidesArticle"), grab("muteHitCount"), grab("isDesignPreviewGrade"), grab("articleHasGrade"), grab("rememberGrade"), grab("applyCachedGrade"), grab("gradingTagFor"), grab("tagRank"), grab("sortArticlesByImportance"), grab("parseGradingTags"), grab("refreshButtonLabel"), grab("normalizeFolderName"), grab("folderNameTaken"), grab("remapMuteFolders"), grab("applyFolderAction"), grab("buildPreferenceSnapshot"), grab("interestPayloadJson"), grab("normalizeDefaultView"), grab("normalizeRefreshMinutes"), grab("pruneArticleCache"), grab("normalizeCacheKeepDays"), grab("pruneExpiredArticles"), grab("youtubeVideoId"), grab("isYoutubeArticle"), grab("youtubeEmbedSrc"), grab("youtubeWatchUrl"), grab("youtubePosterSrc"), grab("youtubePlayerHint"), grab("appBrowserAvailable"), grab("openYoutubeVideo"), grab("youtubeTimeParam"), grab("parseYoutubeChapters"), grab("articleNeedsCapture"), grab("healthAgeLabel"), grab("healthNotice"), grab("isShareHref"), grab("htmlPageTitle"), grab("headingMatchesTitle"), grab("readableChromeKind"), grab("rssFindTokens"), grab("rssArticleFindHaystack"), grab("rssArticleFindScore"), grab("feedsearchCanonicalUrl"), grab("feedsearchIsFresh"), grab("feedsearchRank"), grab("feedsearchVisible"), grab("feedsearchMeta"), grab("folderContains"), grab("articleMatchesReaderScope"), grab("rememberUnreadTrail"), grab("unreadListWithTrail"), grab("youtubeSiteHost"), grab("youtubeFeedFromUrl"), grab("isYoutubePlaylistFeed"), grab("pageSlice"), grab("sortArticlesByTime"), grab("substackFeedFromUrl"), grab("youtubeChannelIdFromHtml"), grab("expandSubscribeUrl"), grab("feedWantsCapture"), grab("feedShowsTicker"), grab("feedTriState"), grab("parseTriState"), grab("normalizeUserAgent"), grab("userAgentPresetId"), grab("normalizeYoutubeCookies"), grab("youtubeCookieHeader"), grab("isYoutubeRequestUrl")].join(String.fromCharCode(10));
 const fns = {};
 new Function("exports", `const DEFAULT_GRADING_TAGS = [
   { key: "important", label: "IMPORTANT", color: "#d9534f", tint: 12, rank: 100 },
@@ -34,6 +34,10 @@ const USER_AGENT_PRESETS = [
 ];
 const DEFAULT_USER_AGENT = USER_AGENT_PRESETS[0].value;
 function currentYoutubeCookies() { return ""; }
+const APP_CALLS = [];
+const EXT_CALLS = [];
+const rssCtx = { os: { openExternal: url => { EXT_CALLS.push(url); } } };
+const host = { openInAppBrowser: (url, options) => { APP_CALLS.push({ url, options }); return Promise.resolve(true); } };
 ${bundle}
 exports.profileFromOwner = profileFromOwner;
 exports.cheapExcerpt = cheapExcerpt;
@@ -71,6 +75,14 @@ exports.youtubeVideoId = youtubeVideoId;
 exports.isYoutubeArticle = isYoutubeArticle;
 exports.youtubeEmbedSrc = youtubeEmbedSrc;
 exports.youtubeTimeParam = youtubeTimeParam;
+exports.youtubeWatchUrl = youtubeWatchUrl;
+exports.youtubePosterSrc = youtubePosterSrc;
+exports.youtubePlayerHint = youtubePlayerHint;
+exports.appBrowserAvailable = appBrowserAvailable;
+exports.openYoutubeVideo = openYoutubeVideo;
+exports.host = host;
+exports.appCalls = APP_CALLS;
+exports.extCalls = EXT_CALLS;
 exports.parseYoutubeChapters = parseYoutubeChapters;
 exports.healthAgeLabel = healthAgeLabel;
 exports.healthNotice = healthNotice;
@@ -350,4 +362,26 @@ assert.equal(fns.youtubeCookieHeader("LOGIN_INFO=abc"), "LOGIN_INFO=abc");
 assert.equal(fns.youtubeCookieHeader("# Netscape\n.youtube.com\tTRUE\t/\tTRUE\t0\tLOGIN_INFO\tabc"), "LOGIN_INFO=abc");
 assert.equal(fns.isYoutubeRequestUrl("https://www.youtube.com/watch?v=abcdefghijk"), true);
 
-console.log("ok", 104);
+// The player cannot embed (a sandboxed frame has no real origin, so YouTube's
+// player never boots), so it hands the watch URL to a door and says where it
+// goes. Assert both branches, since the label the reader prints depends on it.
+assert.equal(fns.youtubePosterSrc("abcdefghijk"), "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg");
+assert.equal(fns.youtubePosterSrc(""), "");
+assert.equal(fns.youtubeWatchUrl("abcdefghijk", 0), "https://www.youtube.com/watch?v=abcdefghijk");
+assert.equal(fns.youtubeWatchUrl("abcdefghijk", 90), "https://www.youtube.com/watch?v=abcdefghijk&t=90s");
+assert.equal(fns.youtubePlayerHint(true), "Plays in the app's Browser");
+assert.equal(fns.youtubePlayerHint(false), "Plays in your browser");
+assert.equal(fns.appBrowserAvailable(), true);
+fns.openYoutubeVideo("abcdefghijk", 90, "A video");
+assert.equal(fns.appCalls.length, 1);
+assert.equal(fns.appCalls[0].url, "https://www.youtube.com/watch?v=abcdefghijk&t=90s");
+assert.equal(fns.appCalls[0].options.label, "A video");
+assert.equal(fns.extCalls.length, 0);
+fns.host.openInAppBrowser = undefined;
+assert.equal(fns.appBrowserAvailable(), false);
+assert.equal(fns.youtubePlayerHint(fns.appBrowserAvailable()), "Plays in your browser");
+fns.openYoutubeVideo("abcdefghijk", 0, "");
+assert.equal(fns.extCalls.length, 1);
+assert.equal(fns.extCalls[0], "https://www.youtube.com/watch?v=abcdefghijk");
+
+console.log("ok", 162);
