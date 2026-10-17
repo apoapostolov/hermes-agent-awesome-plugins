@@ -8,16 +8,16 @@ plugins:
     ref: 35af68dea6cc0fa0688689f886ba0ac9400170c0
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/intelligent-tool-break
-    ref: b270520f14d5141c2ad686d7053907a341c8a46f
+    ref: 7a2ee6256dc4ba7276c2f2947b9e4fcb67991cec
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/better-session-appearance
     ref: be83818df2edc27743e6ca2a2484081272976400
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/drag-to-pin-session
-    ref: b270520f14d5141c2ad686d7053907a341c8a46f
+    ref: 4116276225a4df1da1c899998b5f69f6ca937130
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/opaque-composer
-    ref: 1ce1758bf18979244b70e89352629ec3fd71c73e
+    ref: 47d12c8c4e1f4b1e2200a3efbf7678f279636568
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/scroll-on-switch
     ref: 1ce1758bf18979244b70e89352629ec3fd71c73e
@@ -32,7 +32,7 @@ plugins:
     ref: 246b89cb955db1302f8156df4c4a09b0b6c013df
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/better-capabilities
-    ref: b270520f14d5141c2ad686d7053907a341c8a46f
+    ref: 47d12c8c4e1f4b1e2200a3efbf7678f279636568
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/sidebar-manager
     ref: 6e65021e0fa4e5de678f2dba67dda6fe097703d9
