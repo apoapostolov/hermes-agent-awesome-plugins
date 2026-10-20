@@ -5,10 +5,10 @@ author: Apostol Apostolov
 plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/provider-status
-    ref: 35af68dea6cc0fa0688689f886ba0ac9400170c0
+    ref: e2cacecd339677407347f7564565816959cf8747
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/intelligent-tool-break
-    ref: 7a2ee6256dc4ba7276c2f2947b9e4fcb67991cec
+    ref: c0445f956ee581a49972c5333467b96b264f9172
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/better-session-appearance
     ref: be83818df2edc27743e6ca2a2484081272976400
@@ -32,7 +32,7 @@ plugins:
     ref: 246b89cb955db1302f8156df4c4a09b0b6c013df
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/better-capabilities
-    ref: 47d12c8c4e1f4b1e2200a3efbf7678f279636568
+    ref: 114e7fb33b8092c3513da3c60e61215788d1fd27
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/sidebar-manager
     ref: 6e65021e0fa4e5de678f2dba67dda6fe097703d9
