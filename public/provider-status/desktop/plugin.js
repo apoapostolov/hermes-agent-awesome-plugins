@@ -910,28 +910,9 @@ function ExpGearMenu() {
   })
   const refreshing = !!refreshQ.data
 
-  // House dialog overlay is bg-black/22 — that kills glass. Thin it only while
-  // this experimental dialog is open AND Glass is on.
-  useEffect(() => {
-    if (!open || !glass) return
-    const apply = () => {
-      document.querySelectorAll('[data-slot="dialog-overlay"]').forEach(el => {
-        el.style.background = 'rgb(0 0 0 / 0.06)'
-        el.style.backdropFilter = 'blur(10px)'
-        el.style.webkitBackdropFilter = 'blur(10px)'
-      })
-    }
-    apply()
-    const id = requestAnimationFrame(apply)
-    return () => {
-      cancelAnimationFrame(id)
-      document.querySelectorAll('[data-slot="dialog-overlay"]').forEach(el => {
-        el.style.background = ''
-        el.style.backdropFilter = ''
-        el.style.webkitBackdropFilter = ''
-      })
-    }
-  }, [open, glass])
+  // The personal edition thins the house dialog overlay while this experimental
+  // dialog is open. That reaches into an app-owned element, so the listed
+  // edition keeps the stock overlay instead.
 
   return jsxs(Fragment, {
     children: [
