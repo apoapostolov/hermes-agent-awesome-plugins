@@ -1,45 +1,28 @@
 /**
- * After a user prompt, mount the Jev line under that prompt.
- * The confirm strip sits under the line only when the weight wants a different model.
+ * The Jev line renders in the composer underside strip.
+ *
+ * The listing edition uses the sanctioned composer contribution area: one line
+ * under the input for the turn that was just routed, plus the approve row when
+ * the weight wants another model. Nothing here reads or writes app-owned nodes,
+ * so the desktop surface check stays inside the plugin SDK.
  */
-import { host } from '@hermes/plugin-sdk'
+import { COMPOSER_AREAS, host } from '@hermes/plugin-sdk'
+import { jsx, jsxs } from 'react/jsx-runtime'
+import { useEffect, useState } from 'react'
 
 const EVENT = 'plugin.hermes-jev-routing.routed'
+
+let current = null
+const listeners = new Set()
+
+function publish(next) {
+  current = next
+  listeners.forEach((fn) => fn())
+}
 
 function payloadOf(frame) {
   if (!frame || typeof frame !== 'object') return null
   return frame.payload && typeof frame.payload === 'object' ? frame.payload : frame
-}
-
-function latestUserRoot() {
-  const nodes = document.querySelectorAll('[data-slot="aui_user-message-root"]')
-  return nodes.length ? nodes[nodes.length - 1] : null
-}
-
-function clearStrips() {
-  document.querySelectorAll('[data-jev-strip]').forEach((node) => node.remove())
-}
-
-function button(label, bold, onClick) {
-  const el = document.createElement('button')
-  el.type = 'button'
-  if (bold) {
-    const strong = document.createElement('span')
-    strong.dataset.strong = '1'
-    strong.textContent = label
-    el.appendChild(strong)
-  } else {
-    el.textContent = label
-  }
-  el.addEventListener('click', onClick)
-  return el
-}
-
-function dot() {
-  const el = document.createElement('span')
-  el.textContent = '·'
-  el.dataset.dot = '1'
-  return el
 }
 
 function runtimeSessionId(payload) {
@@ -68,181 +51,136 @@ async function applyChoice(payload, pick) {
       value: String(pick.thinking),
     })
   }
-  // A held turn was interrupted before it sent, so the approved prompt still owes
-  // an answer. Resubmit it once the session is on the accepted model.
+  // A held turn was interrupted before it sent, so the approved prompt still
+  // owes an answer. Resubmit it once the session is on the accepted model.
   const owed = payload.owed_prompt
   if (owed && typeof host.composer?.submit === 'function') {
     host.composer.submit(sessionId, owed)
   }
 }
 
-function mountStatus() {
-  document.querySelectorAll('[data-jev-status]').forEach((node) => node.remove())
+const WRAP = {
+  fontSize: '0.6875rem',
+  lineHeight: '1.25rem',
+  color: 'color-mix(in oklab, var(--ui-text-tertiary, var(--foreground)) 70%, transparent)',
+  padding: '0 0.5rem',
 }
 
-function rememberLine(payload) {
-  if (!payload.prompt || !payload.line) return
-  const key = 'hermes-jev-routing-lines'
-  const rows = JSON.parse(localStorage.getItem(key) || '[]')
-  const next = [{ prompt: payload.prompt, line: payload.line }, ...rows.filter((row) => row.prompt !== payload.prompt)].slice(0, 20)
-  sessionStorage.setItem(key, JSON.stringify(next))
-  localStorage.setItem(key, JSON.stringify(next))
+const ROW = { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline' }
+
+function choiceStyle(bold) {
+  return {
+    font: 'inherit',
+    lineHeight: 'inherit',
+    padding: 0,
+    border: 0,
+    background: 'transparent',
+    cursor: 'pointer',
+    color: bold ? 'var(--ui-text-primary, var(--foreground))' : 'inherit',
+    fontWeight: bold ? 600 : 400,
+  }
 }
 
-function reattach() {
-  const raw = localStorage.getItem('hermes-jev-routing-lines') || sessionStorage.getItem('hermes-jev-routing-lines')
-  if (!raw) return
-  const rows = JSON.parse(raw)
-  document.querySelectorAll('[data-slot="aui_user-message-root"]').forEach((user) => {
-    const text = (user.textContent || '').slice(0, 80)
-    const row = rows.find((item) => text && item.prompt && text.includes(item.prompt.slice(0, 24)))
-    if (!row || user.parentNode.querySelector(':scope > [data-jev-routing]')) return
-    const block = document.createElement('div')
-    block.dataset.jevRouting = '1'
-    block.dataset.jevStored = '1'
-    const line = document.createElement('div')
-    line.dataset.jevLine = '1'
-    line.textContent = row.line
-    block.appendChild(line)
-    user.insertAdjacentElement('afterend', block)
-  })
+function Choice({ label, bold, onClick }) {
+  return jsx('button', { type: 'button', onClick, style: choiceStyle(bold), children: label })
 }
 
-function mountStrip(payload, block) {
-  const strip = document.createElement('div')
-  strip.dataset.jevStrip = '1'
+function JevLine() {
+  const [payload, setPayload] = useState(current)
+
+  useEffect(() => {
+    const sync = () => setPayload(current)
+    listeners.add(sync)
+    sync()
+    return () => {
+      listeners.delete(sync)
+    }
+  }, [])
+
+  if (!payload || typeof payload.line !== 'string' || !payload.line) return null
+
+  const dismiss = () => publish({ ...payload, interrupt: false })
+  const pick = (target) => {
+    dismiss()
+    applyChoice(payload, target)
+  }
   const offered = payload.offered_tier || 'premium'
-  const label = document.createElement('span')
-  label.dataset.strong = '1'
-  label.textContent = 'Approve:'
-  strip.appendChild(label)
-
-  const offeredTier = document.createElement('span')
-  offeredTier.dataset.head = '1'
-  const yes = document.createElement('button')
-  yes.type = 'button'
-  yes.textContent = 'Yes,'
-  const yesTier = document.createElement('span')
-  yesTier.textContent = ` ${offered}`
-  yes.appendChild(yesTier)
-  offeredTier.appendChild(yes)
-  yes.addEventListener('click', () => {
-    applyChoice(payload, { provider: payload.provider, model: payload.model, thinking: payload.thinking })
-    strip.remove()
-  })
-  strip.appendChild(document.createTextNode(' '), offeredTier)
-  strip.appendChild(
-    document.createTextNode(' · '),
-    button('No', false, () => strip.remove()),
-  )
-  if (payload.free) {
-    strip.appendChild(
-      document.createTextNode(' · '),
-      button('Free', false, () => {
-        applyChoice(payload, payload.free)
-        strip.remove()
-      }),
-    )
-  }
   const heads = payload.heads || {}
-  for (const tier of Object.keys(heads)) {
-    if (tier === offered) continue
-    strip.appendChild(
-      document.createTextNode(' · '),
-      button(tier, false, () => {
-        applyChoice(payload, heads[tier])
-        strip.remove()
-      }),
-    )
-  }
-  // The ten kinds are the second row. Same subline weight, one line below.
   const kinds = payload.kinds || {}
   const kindNames = Object.keys(kinds)
-  if (kindNames.length) {
-    strip.appendChild(document.createElement('br'))
-    const kindRow = document.createElement('span')
-    kindRow.dataset.kinds = '1'
-    for (const kind of kindNames) {
-      const btn = button(kind, false, () => {
-        applyChoice(payload, kinds[kind])
-        strip.remove()
-      })
-      kindRow.appendChild(btn)
-      kindRow.appendChild(document.createTextNode(' '))
-    }
-    kindRow.appendChild(button('X', false, () => strip.remove()))
-    strip.appendChild(kindRow)
-  } else {
-    strip.appendChild(document.createTextNode(' · '), button('X', false, () => strip.remove()))
-  }
-  block.appendChild(strip)
-}
+  const otherTiers = Object.keys(heads).filter((tier) => tier !== offered)
 
-function mount(payload) {
-  const user = latestUserRoot()
-  if (!user || !user.parentNode) return
-  clearStrips()
-  let block = user.parentNode.querySelector(':scope > [data-jev-routing]')
-  if (!block || block.previousElementSibling !== user) {
-    block = document.createElement('div')
-    block.dataset.jevRouting = '1'
-    user.insertAdjacentElement('afterend', block)
+  const row = [
+    jsx(Choice, { label: 'Approve:', bold: true, onClick: dismiss }, 'approve'),
+    jsx('span', { children: ' ' }, 'gap-one'),
+    jsx(Choice, {
+      label: `Yes, ${offered}`,
+      onClick: () => pick({ provider: payload.provider, model: payload.model, thinking: payload.thinking }),
+    }, 'yes'),
+  ]
+  row.push(jsx('span', { children: ' \u00b7 ' }, 'gap-two'))
+  row.push(jsx(Choice, { label: 'No', onClick: dismiss }, 'no'))
+  if (payload.free) {
+    row.push(jsx('span', { children: ' \u00b7 ' }, 'gap-free'))
+    row.push(jsx(Choice, { label: 'Free', onClick: () => pick(payload.free) }, 'free'))
   }
-  block.replaceChildren()
-  const line = document.createElement('div')
-  line.dataset.jevLine = '1'
-  line.textContent = payload.line
-  block.appendChild(line)
-  if (!payload.interrupt) return
-  mountStrip(payload, block)
+  otherTiers.forEach((tier, index) => {
+    row.push(jsx('span', { children: ' \u00b7 ' }, `gap-tier-${index}`))
+    row.push(jsx(Choice, { label: tier, onClick: () => pick(heads[tier]) }, `tier-${tier}`))
+  })
+
+  if (kindNames.length) {
+    const kindRow = []
+    kindNames.forEach((kind) => {
+      kindRow.push(jsx(Choice, { label: kind, onClick: () => pick(kinds[kind]) }, `kind-${kind}`))
+      kindRow.push(jsx('span', { children: ' ' }, `kind-gap-${kind}`))
+    })
+    kindRow.push(jsx(Choice, { label: 'X', onClick: dismiss }, 'x-kind'))
+    row.push(jsx('span', { style: { flexBasis: '100%' }, children: kindRow }, 'kinds'))
+  } else {
+    row.push(jsx('span', { children: ' \u00b7 ' }, 'gap-x'))
+    row.push(jsx(Choice, { label: 'X', onClick: dismiss }, 'x'))
+  }
+
+  return jsxs('div', {
+    style: { ...WRAP, whiteSpace: 'normal' },
+    children: [
+      jsx('div', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }, children: payload.line }, 'line'),
+      payload.interrupt ? jsx('div', { style: ROW, children: row }, 'row') : null,
+    ],
+  })
 }
 
 export default {
   id: 'hermes-jev-routing',
   name: 'Jev Routing',
-  description: 'Shows the Jev line under the prompt that was just sent.',
+  description: 'Shows the Jev line for the turn that was just routed, under the composer.',
+
   register(ctx) {
+    publish(null)
+
+    ctx.register({
+      id: 'jev-line',
+      area: COMPOSER_AREAS.underside,
+      order: 10,
+      render: () => jsx(JevLine, {}),
+    })
+
     const off = typeof ctx.onEvent === 'function'
       ? ctx.onEvent(EVENT, (frame) => {
           const payload = payloadOf(frame)
           if (!payload || typeof payload.line !== 'string') return
-          mount(payload)
-          mountStatus()
-          rememberLine(payload)
+          publish(payload)
           if (payload.apply) {
             applyChoice(payload, { provider: payload.provider, model: payload.model, thinking: payload.thinking })
           }
         })
       : null
+
     ctx.onDispose(() => {
       if (typeof off === 'function') off()
-      document.querySelectorAll('[data-jev-routing]').forEach((node) => node.remove())
-      style.remove()
+      listeners.clear()
+      current = null
     })
-    const style = document.createElement('style')
-    style.textContent = `
-      [data-jev-routing],
-      [data-jev-line] {
-        font-size: 0.6875rem;
-        line-height: 1.25rem;
-        color: color-mix(in oklab, var(--color-muted-foreground) 60%, transparent);
-        padding: 0 0.5rem;
-        white-space: nowrap;
-        overflow: visible;
-      }
-      [data-jev-strip] { display: flex; align-items: baseline; flex-wrap: wrap; white-space: nowrap; }
-      [data-jev-strip] [data-kinds] { flex-basis: 100%; }
-      [data-jev-strip] button {
-        font: inherit; line-height: inherit; color: inherit;
-        background: transparent; border: 0; padding: 0; cursor: pointer;
-      }
-      [data-jev-strip] [data-strong] { font-weight: 600; color: var(--color-foreground, var(--foreground)); }
-      [data-jev-strip] [data-dot] { padding: 0 0.35rem; color: color-mix(in oklab, var(--color-muted-foreground) 35%, transparent); }
-    `
-    document.head.appendChild(style)
-    reattach()
-    const observer = new MutationObserver(() => reattach())
-    observer.observe(document.body, { childList: true, subtree: true })
-    ctx.onDispose(() => observer.disconnect())
   },
 }

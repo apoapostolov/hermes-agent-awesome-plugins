@@ -87,13 +87,15 @@ The chains, the model rows, and the scores stay in the JSON file. A route table 
 
 ## What you see
 
-One dim subline under the prompt you just sent, before the model works:
+One dim subline under the composer, for the turn that was just routed, before the model works:
 
 ```
 tier quick · opencode-go/space-bunny-free · thinking medium · kind chat · complexity 0.20/3 · capability 0.20/3 · reasoning 0.00/1
 ```
 
-The glyph leads it: `>` switched, `=` kept the active model through stickiness, `.` notify only, `x` skipped or held. When a guarded tier wants a different model, a thin strip appears under that line offering **Yes**, No, Free, and each tier name.
+The glyph leads it: `>` switched, `=` kept the active model through stickiness, `.` notify only, `x` skipped or held. When a guarded tier wants a different model, a thin row appears under that line offering **Yes**, No, Free, and each tier name.
+
+The line sits in the composer's underside strip, the contribution area the app provides for this. It is not attached to the message you already sent, so scrolling back to an older turn does not show the line that turn carried.
 
 ## Commands
 
