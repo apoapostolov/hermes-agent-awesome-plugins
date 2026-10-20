@@ -65,24 +65,44 @@ def _is_under(path: Path, root: Path) -> bool:
         return False
 
 
-def _find_skill_dir(name: str) -> Path | None:
-    try:
-        from tools.skill_manager_tool import _find_skill
+def _user_skill_roots() -> list[tuple[int, Path]]:
+    """Search roots inside the user skills tree, in the host's own precedence order."""
+    from tools.skills_tool import skill_search_dirs
 
-        found = _find_skill(name)
-        if found and found.get("path"):
-            path = Path(found["path"])
-            if path.is_dir() and (path / "SKILL.md").is_file():
-                return path
+    roots, active_dir = skill_search_dirs()
+    user_root = HOME / "skills"
+    picked = [(tier, Path(where)) for tier, where in roots if _is_under(Path(where), user_root)]
+    known = {where for _tier, where in picked}
+    if active_dir and _is_under(Path(active_dir), user_root) and Path(active_dir) not in known:
+        picked.append((99, Path(active_dir)))
+    return picked
+
+
+def _find_skill_dir(name: str) -> Path | None:
+    """Resolve one skill the way skill_view does, inside the user skills tree.
+
+    The public helpers give tier precedence and refuse an ambiguous name instead
+    of guessing, and the roots are filtered to the only tree this panel may zip
+    or delete. A quarantined project skill never resolves here because the
+    project tier is not in the root list.
+    """
+    try:
+        from tools.skills_tool import locate_skill, skill_lookup_path_error
+
+        if skill_lookup_path_error(name):
+            return None
+        roots = _user_skill_roots()
+        if not roots:
+            return None
+        error_json, skill_dir, _skill_md = locate_skill(name, None, roots)
+        if error_json or skill_dir is None:
+            return None
     except Exception:
-        pass
-    root = HOME / "skills"
-    if not root.is_dir():
         return None
-    for md in root.rglob("SKILL.md"):
-        if md.parent.name == name:
-            return md.parent
-    return None
+    path = Path(skill_dir)
+    if not path.is_dir() or not (path / "SKILL.md").is_file():
+        return None
+    return path
 
 
 def _find_plugin_dir(name: str) -> Path | None:
