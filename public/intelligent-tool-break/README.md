@@ -4,7 +4,7 @@
   <strong>Stop a stalled tool call without killing the turn.</strong>
   <p>`/break`, `/break {msg}`, and `/again` — plus a desktop strip for active tool calls.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.3-2ea44f" alt="Version 1.3.3" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.5-2ea44f" alt="Version 1.3.5" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
