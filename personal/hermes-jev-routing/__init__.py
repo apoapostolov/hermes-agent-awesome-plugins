@@ -49,6 +49,37 @@ logger = logging.getLogger(__name__)
 _LAST: dict[str, object] = {"mode": "shadow"}
 _LOADED: dict[str, object] = {}
 _CTX = None
+_SESSIONS: dict[str, dict[str, object]] = {}
+SESSION_LIMIT = 64
+# Turn facts copied into the owning session. Overrides (mode, enabled, budget
+# caps) are never copied: they belong to the command that set them.
+_TURN_KEYS = ("decision", "blocked", "applied", "prompt", "previous", "analysis", "notes")
+
+
+def _trim_sessions() -> None:
+    while len(_SESSIONS) > SESSION_LIMIT:
+        oldest = min(_SESSIONS, key=lambda key: float(_SESSIONS[key].get("touched") or 0))
+        _SESSIONS.pop(oldest, None)
+
+
+def _slot(session_id: object) -> dict[str, object]:
+    """Overrides and last routed turn for one session, capped in size."""
+    sid = str(session_id or "")
+    slot = _SESSIONS.get(sid)
+    if slot is None:
+        slot = {}
+        _SESSIONS[sid] = slot
+    slot["touched"] = time.time()
+    _trim_sessions()
+    return slot
+
+
+def _mirror_turn(session_id: str) -> None:
+    """Copy this turn's facts into the session that owns it, on every exit."""
+    slot = _slot(session_id)
+    for key in _TURN_KEYS:
+        if key in _LAST:
+            slot[key] = _LAST[key]
 
 
 def last_decision() -> dict[str, object]:
@@ -179,11 +210,34 @@ def on_post_api_request(**kwargs):
 
 
 def on_pre_llm_call(**kwargs):
+    session_id = str(kwargs.get("session_id") or "")
+    try:
+        return _pre_llm_call(**kwargs)
+    finally:
+        _mirror_turn(session_id)
+
+
+def _pre_llm_call(**kwargs):
+    session_id = str(kwargs.get("session_id") or "")
     if _CTX is not None:
         _LAST["mode"] = _mode(_CTX)
         _LAST["config_path"] = _config_path(_CTX)
+    slot = _slot(session_id)
+    # A /jev-routing override belongs to the session that asked for it, and it
+    # has to survive the config read above, which reset it on every turn.
+    if slot.get("mode"):
+        _LAST["mode"] = str(slot["mode"])
+    if "enabled" in slot:
+        _LAST["enabled"] = slot["enabled"]
+    else:
+        _LAST.pop("enabled", None)
+    if isinstance(slot.get("budget_caps"), dict):
+        _LAST["budget_caps"] = slot["budget_caps"]
     mode = str(_LAST.get("mode") or "shadow")
-    _LAST["session_id"] = str(kwargs.get("session_id") or "")
+    _LAST["session_id"] = session_id
+    # Record the prompt up front so /jev-routing why can explain a turn that
+    # was skipped or held before any decision was stored.
+    _LAST["prompt"] = str(kwargs.get("user_message") or "").strip()
     pending = _LAST.pop("pending_revert", None)
     if isinstance(pending, dict):
         target = revert_target(pending)
@@ -321,9 +375,11 @@ def on_pre_llm_call(**kwargs):
 
 
 def on_llm_request(**kwargs):
-    mode = str(_LAST.get("mode") or "shadow")
-    decision = _LAST.get("decision")
-    if mode == "off" or not isinstance(decision, Decision) or _LAST.get("blocked") == "confirm":
+    slot = _SESSIONS.get(str(kwargs.get("session_id") or "")) or {}
+    mode = str(slot.get("mode") or _LAST.get("mode") or "shadow")
+    decision = slot.get("decision") if "decision" in slot else _LAST.get("decision")
+    blocked = slot.get("blocked") if "blocked" in slot else _LAST.get("blocked")
+    if mode == "off" or not isinstance(decision, Decision) or blocked == "confirm":
         return None
     request = kwargs.get("request") or {}
     bound = str(kwargs.get("provider") or "")
@@ -332,11 +388,17 @@ def on_llm_request(**kwargs):
     except Exception:
         logger.warning("hermes-jev-routing left the request unchanged", exc_info=True)
         return None
+    applied = slot.get("applied") if "applied" in slot else _LAST.get("applied")
     if rewritten is None:
-        if mode == "auto" and not decision.held and decision.target.provider != bound and not _LAST.get("applied"):
-            _LAST["blocked"] = _LAST.get("blocked") or "cross-provider"
+        if mode == "auto" and not decision.held and decision.target.provider != bound and not applied:
+            withheld = str(blocked or "cross-provider")
+            _LAST["blocked"] = withheld
+            if slot:
+                slot["blocked"] = withheld
         return None
     _LAST["applied"] = rewritten.get("model")
+    if slot:
+        slot["applied"] = rewritten.get("model")
     return {
         "request": rewritten,
         "source": "hermes-jev-routing",
@@ -344,7 +406,8 @@ def on_llm_request(**kwargs):
     }
 
 
-def _command(raw: str = "") -> str:
+def _command(raw: str = "", *, session_id: str = "") -> str:
+    slot = _slot(session_id)
     parts = str(raw or "").split()
     head = parts[:1]
     if head == ["suggest"]:
@@ -357,26 +420,26 @@ def _command(raw: str = "") -> str:
             from ranking import suggestion_text
         return suggestion_text(path, write="--write" in parts)
     if head == ["on"]:
-        _LAST["enabled"] = True
+        slot["enabled"] = True
         return "jev-routing enabled for this session"
     if head == ["off"]:
-        _LAST["enabled"] = False
+        slot["enabled"] = False
         return "jev-routing disabled for this session"
     if head == ["mode"]:
         name = (parts[1] if len(parts) > 1 else "").lower()
         if name not in {"auto", "confirm", "notify", "shadow", "off"}:
             return "usage: /jev-routing mode auto|confirm|notify"
-        _LAST["mode"] = name
+        slot["mode"] = name
         return f"jev-routing mode: {name} for this session"
     if head == ["why"]:
-        return _dry_route(str(_LAST.get("prompt") or ""))
+        return _dry_route(str(slot.get("prompt") or _LAST.get("prompt") or ""))
     if head == ["route"]:
         return _dry_route(" ".join(parts[1:]))
     if head == ["revert"]:
-        return _revert()
+        return _revert(session_id, slot)
     if head == ["budget"]:
-        return _budget_command(parts[1:])
-    return _status()
+        return _budget_command(parts[1:], slot)
+    return _status(slot)
 
 
 def _dry_route(text: str) -> str:
@@ -406,20 +469,23 @@ def _dry_route(text: str) -> str:
     return explain(analysis, decision, tuple(getattr(decision, "notes", ()) or ()))
 
 
-def _revert() -> str:
-    target = revert_target(_LAST.get("previous"))
+def _revert(session_id: str = "", slot: dict[str, object] | None = None) -> str:
+    slot = slot if slot is not None else _slot(session_id)
+    previous = slot.get("previous") if "previous" in slot else _LAST.get("previous")
+    target = revert_target(previous)
     if target is None:
         return "no previous model recorded"
     picked = decision_for_target(target)
-    switched = maybe_switch(picked, str(_LAST.get("session_id") or ""), "auto")
+    switched = maybe_switch(picked, session_id or str(_LAST.get("session_id") or ""), "auto")
     if switched == "switched":
         _LAST["applied"] = target.model
+        slot["applied"] = target.model
         return f"reverted to {target.provider}/{target.model}"
     _LAST["pending_revert"] = {"provider": target.provider, "model": target.model}
     return f"revert to {target.provider}/{target.model} applies on the next send ({switched})"
 
 
-def _budget_command(parts) -> str:
+def _budget_command(parts, slot: dict[str, object] | None = None) -> str:
     if len(parts) < 2 or parts[0] not in {"daily", "monthly"}:
         return "usage: /jev-routing budget daily|monthly <usd>"
     try:
@@ -428,18 +494,24 @@ def _budget_command(parts) -> str:
         return "usage: /jev-routing budget daily|monthly <usd>"
     if amount <= 0:
         return "usage: /jev-routing budget daily|monthly <usd>"
-    caps = dict(_LAST.get("budget_caps") or {})
+    caps = dict((slot or {}).get("budget_caps") or _LAST.get("budget_caps") or {})
     caps["daily" if parts[0] == "daily" else "monthly"] = amount
     _LAST["budget_caps"] = caps
+    if slot is not None:
+        slot["budget_caps"] = caps
     return f"budget {parts[0]} cap: ${amount:.2f} for this session"
 
 
-def _status() -> str:
-    decision = _LAST.get("decision")
+def _status(slot: dict[str, object] | None = None) -> str:
+    slot = slot or {}
+    decision = slot.get("decision") if "decision" in slot else _LAST.get("decision")
     path = str(_LAST.get("config_path") or "")
     loaded = _load(path) if path else (None, None)
     config = loaded[0]
-    lines = [f"mode: {_LAST.get('mode', 'shadow')}"]
+    mode = str(slot.get("mode") or _LAST.get("mode") or "shadow")
+    lines = [f"mode: {mode}"]
+    if "enabled" in slot:
+        lines.append(f"enabled: {'yes' if slot['enabled'] else 'no'} (this session)")
     if config is not None:
         spent = _spend(config)
         if spent is not None:
@@ -456,7 +528,7 @@ def _status() -> str:
         lines.append(f"last: {decision.reason} -> {decision.target.provider}/{decision.target.model}")
     else:
         lines.append("last: none")
-    blocked = _LAST.get("blocked")
+    blocked = slot.get("blocked") if "blocked" in slot else _LAST.get("blocked")
     if blocked:
         lines.append(f"blocked: {blocked}")
     lines.append("commands: why, route <text>, revert, budget daily|monthly <usd>, suggest [--write]")
@@ -476,6 +548,16 @@ def classify_for_tests(analysis: Analysis, config, models, mode: str, **kwargs) 
     return decision
 
 
+
+def on_session_delete(**kwargs) -> None:
+    """A deleted session takes its overrides and its last turn with it."""
+    ids = {str(kwargs.get("session_id") or "")}
+    ids.update(str(item) for item in (kwargs.get("deleted_ids") or []))
+    ids.discard("")
+    for sid in ids:
+        _SESSIONS.pop(sid, None)
+
+
 def register(ctx):
     global _CTX
     _CTX = ctx
@@ -483,6 +565,7 @@ def register(ctx):
     _LAST["config_path"] = _config_path(ctx)
     ctx.register_hook("pre_llm_call", on_pre_llm_call)
     ctx.register_hook("post_api_request", on_post_api_request)
+    ctx.register_hook("on_session_delete", on_session_delete)
     ctx.register_middleware("llm_request", on_llm_request)
     ctx.register_command("jev-routing", _command, description="Status, why, route, revert, budget, or suggest")
     ctx.register_tool(
