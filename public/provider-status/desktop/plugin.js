@@ -1870,6 +1870,15 @@ export default {
     _openExternal = ctx.os?.openExternal ?? null
     _pet = ctx.pet && typeof ctx.pet.say === 'function' ? ctx.pet : null
 
+    // A save in Settings > Plugins lands through the same writer as this
+    // plugin's own dialog, and the backend now broadcasts it. Drive the same
+    // refresh the dialog does, so the pet bubble and the chips do not wait for
+    // their 60s poll.
+    ctx.onEvent('plugin.provider-status.settings.changed', () => {
+      queryClient.invalidateQueries({ queryKey: ['provider-pet-settings-v1'], exact: false, refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['provider-status-v4'], exact: false, refetchType: 'all' })
+    })
+
   // Theme fixes: native <select> popups ignore inherited colors and render
   // light-on-light in dark mode; the SDK checkbox checked fill (bg-primary) is
   // near-white in dark mode and reads harsh. Both are scoped to this plugin.
