@@ -3,6 +3,7 @@
   <h1>Better Capabilities</h1>
   <strong>Delete plugins and skills, zip a skill, save on/off presets.</strong>
   <p>Recycle Bin delete, Package (zip) for learned skills, and `/preset` apply from chat.</p>
+  <p><strong>On hold.</strong> The Capabilities page uninstalls plugins itself now, and the rest waits on a skill-file and preset seam. See <a href="../../RETIRED.md">RETIRED.md</a>.</p>
   <p>
     <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>

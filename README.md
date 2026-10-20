@@ -40,7 +40,7 @@ This repository keeps two trees.
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
-**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. Fifteen of the sixteen plugins have one; `better-capabilities` stays personal until a catalog hook exists.
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. Fifteen of the sixteen active plugins have one; [`better-capabilities`](RETIRED.md) is on hold.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
@@ -71,9 +71,10 @@ Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reaso
 | --- | --- |
 | [intelligent-tool-break](personal/intelligent-tool-break/README.md) · [public](public/intelligent-tool-break/README.md) | `/break`, `/break {msg}`, and `/again`. Desktop strip. Turn stays alive. |
 | [memory-review](personal/memory-review/README.md) · [public](public/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
-| [better-capabilities](personal/better-capabilities/README.md) (personal only) | Delete plugins/skills. Zip a skill. On/off presets. |
 | [cdp-manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar. The `cdp` tool does the same from chat, on your preferred port. |
 | [hermes-jev-routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. Both editions switch the live session; the personal one also reads the provider catalogue and Codex quota. **Not in the pack; enable separately.** |
+
+Retired and on-hold plugins live in [RETIRED.md](RETIRED.md).
 
 ### Sessions and Sidebar
 
@@ -150,7 +151,6 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [opaque-composer](personal/opaque-composer/README.md)
 - [prompt-enhance](personal/prompt-enhance/README.md) (not in the pack)
 - [memory-review](personal/memory-review/README.md)
-- [better-capabilities](personal/better-capabilities/README.md)
 - [cdp-manager](personal/cdp-manager/README.md)
 - [rss-reader](personal/rss-reader/README.md)
 - [sessionretitler](personal/sessionretitler/README.md)
