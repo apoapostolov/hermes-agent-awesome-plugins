@@ -6,7 +6,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 ## [Unreleased]
 
 ### Fixed
-
+- intelligent-tool-break. `/break`, `/again` and `/break-status` acted on the whole gateway process, so a break in one chat could kill a tool running in another. Each command now scopes to the session that invoked it, an explicit `--session-id` still wins, and a row with no recorded owner stays visible everywhere. A deleted session's rows are dropped by `on_session_delete`, which fires on Desktop deletes that never reach `on_session_end`.
 - hermes-jev-routing. The cache guard had no prices to work with, so its penalty was always zero and the "would miss the cache" holds could never fire. Every configured model is now priced from the host rate card, and the context size comes from the anchored usage anchor rather than a guess at attribute names.
 - The three cache-guard branches were a boolean arrangement whose fast path only worked by accident. They are written explicitly now: a same-tier swap needs an affordable miss, a move inside the current band always holds, and a move out of the band holds unless it is a big upgrade or cheap.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.

@@ -2,7 +2,7 @@
 
 Port of pi-break for this agent process:
 
-- ``/break`` kills the newest in-flight spawned child tree and keeps the turn
+- ``/break`` kills the newest in-flight spawned child tree in this session and keeps the turn
 - ``/break --id {id}`` kills that specific spawn
 - ``/break {message}`` same, then that text rides in the broken tool result
   (ahead of any later /steer drain)
@@ -413,9 +413,33 @@ def _killable(target: dict[str, Any]) -> bool:
     return bool(_registry_sessions(float(target.get("started_wall") or 0)))
 
 
-def _newest_killable() -> Optional[dict[str, Any]]:
+def _scoped_session(session_id: Optional[str]) -> Optional[str]:
+    """A usable session id, or None meaning every session.
+
+    A surface with no session of its own (a hook, an older dispatch path) passes
+    an empty string, and an empty id keeps the process-wide behavior.
+    """
+    text = str(session_id or "").strip()
+    return text or None
+
+
+def _in_session(item: dict[str, Any], session_id: Optional[str]) -> bool:
+    """True when this row belongs to the asking session.
+
+    None means no scoping at all. A row with no recorded owner cannot be
+    attributed, so it stays visible everywhere instead of disappearing.
+    """
+    if session_id is None:
+        return True
+    owner = str(item.get("session_id") or "")
+    return not owner or owner == session_id
+
+
+def _newest_killable(session_id: Optional[str] = None) -> Optional[dict[str, Any]]:
     pick = None
     for item in _inflight.values():
+        if not _in_session(item, session_id):
+            continue
         if not _killable(item):
             continue
         if pick is None or item["started_at"] > pick["started_at"]:
@@ -423,9 +447,11 @@ def _newest_killable() -> Optional[dict[str, Any]]:
     return pick
 
 
-def _newest_spawn() -> Optional[dict[str, Any]]:
+def _newest_spawn(session_id: Optional[str] = None) -> Optional[dict[str, Any]]:
     pick = None
     for item in _inflight.values():
+        if not _in_session(item, session_id):
+            continue
         if item.get("name") not in SPAWN_TOOLS:
             continue
         if pick is None or item["started_at"] > pick["started_at"]:
@@ -433,15 +459,16 @@ def _newest_spawn() -> Optional[dict[str, Any]]:
     return pick
 
 
-def _newest_visible() -> Optional[dict[str, Any]]:
-    return _newest_killable() or _newest_spawn()
+def _newest_visible(session_id: Optional[str] = None) -> Optional[dict[str, Any]]:
+    return _newest_killable(session_id) or _newest_spawn(session_id)
 
 
 def _visible_items(session_id: Optional[str] = None) -> list[dict[str, Any]]:
+    session_id = _scoped_session(session_id)
     items = [
         item
         for item in _inflight.values()
-        if (session_id is None or item.get("session_id") == session_id)
+        if _in_session(item, session_id)
         and (_killable(item) or item.get("name") in SPAWN_TOOLS)
     ]
     items.sort(key=lambda item: float(item.get("started_at") or 0), reverse=True)
@@ -476,9 +503,13 @@ def _kill_registry_since(started_wall: float) -> int:
     return n
 
 
-def _break_oldest(*, hint: Optional[str], again: bool, tool_call_id: Optional[str] = None) -> str:
+def _break_oldest(*, hint: Optional[str], again: bool, tool_call_id: Optional[str] = None,
+                  session_id: Optional[str] = None) -> str:
+    session_id = _scoped_session(session_id)
     with _lock:
-        target = _inflight.get(tool_call_id) if tool_call_id else _newest_visible()
+        target = _inflight.get(tool_call_id) if tool_call_id else _newest_visible(session_id)
+        if target is not None and tool_call_id and not _in_session(target, session_id):
+            return "That tool call belongs to another session"
         if not target:
             return "Nothing in flight"
         if not _killable(target) and target.get("name") not in SPAWN_TOOLS:
@@ -580,10 +611,26 @@ def _on_session_end(**kwargs: Any) -> None:
     _on_session_start(**kwargs)
 
 
-def _handle_break(raw_args: str) -> str:
+def _on_session_delete(**kwargs: Any) -> None:
+    """Drop rows for sessions the user deleted, which fire no end event."""
+    ids = {str(kwargs.get("session_id") or "")}
+    ids.update(str(item) for item in (kwargs.get("deleted_ids") or []))
+    ids.discard("")
+    if not ids:
+        return
+    with _lock:
+        doomed = [tid for tid, item in _inflight.items()
+                  if str(item.get("session_id") or "") in ids]
+        for tid in doomed:
+            _drop(tid)
+            _broken.pop(tid, None)
+
+
+def _handle_break(raw_args: str, *, session_id: str = "") -> str:
+    sid = _scoped_session(session_id)
     tool_id, hint = _parse_args(raw_args)
     with _lock:
-        empty = not _inflight
+        empty = not _visible_items(sid)
     if empty:
         if hint:
             return (
@@ -591,16 +638,17 @@ def _handle_break(raw_args: str) -> str:
                 f"Send this as a normal message:\n{hint}"
             )
         return "Nothing in flight"
-    return _break_oldest(hint=hint, again=False, tool_call_id=tool_id)
+    return _break_oldest(hint=hint, again=False, tool_call_id=tool_id, session_id=sid)
 
 
-def _handle_again(raw_args: str) -> str:
+def _handle_again(raw_args: str, *, session_id: str = "") -> str:
+    sid = _scoped_session(session_id)
     tool_id, hint = _parse_args(raw_args)
     with _lock:
-        empty = not _inflight
+        empty = not _visible_items(sid)
     if empty:
         return "Nothing in flight to reissue"
-    return _break_oldest(hint=hint, again=True, tool_call_id=tool_id)
+    return _break_oldest(hint=hint, again=True, tool_call_id=tool_id, session_id=sid)
 
 
 def _tool_label(item: dict[str, Any]) -> str:
@@ -656,14 +704,15 @@ def _status_payload(session_id: Optional[str] = None) -> dict[str, Any]:
         }
 
 
-def _handle_status(raw_args: str) -> str:
-    # Desktop passes the focused session because plugin state is shared by the
-    # gateway process across all sessions.
-    session_id = None
+def _handle_status(raw_args: str, *, session_id: str = "") -> str:
+    # Every surface now passes the calling session, so the focused session no
+    # longer needs to arrive as a flag. An explicit flag still wins, for a
+    # caller that has no session of its own.
+    explicit = None
     text = (raw_args or "").strip()
     if text.startswith("--session-id "):
-        session_id = text[len("--session-id "):].strip() or None
-    return json.dumps(_status_payload(session_id), separators=(",", ":"))
+        explicit = text[len("--session-id "):].strip() or None
+    return json.dumps(_status_payload(explicit or _scoped_session(session_id)), separators=(",", ":"))
 
 
 def _install_cli_busy_dispatch() -> None:
@@ -708,16 +757,17 @@ def register(ctx: Any) -> None:
     ctx.register_hook("transform_tool_result", _on_transform_tool_result)
     ctx.register_hook("on_session_start", _on_session_start)
     ctx.register_hook("on_session_end", _on_session_end)
+    ctx.register_hook("on_session_delete", _on_session_delete)
     ctx.register_command(
         "break",
         handler=_handle_break,
-        description="Skip the stalled tool call. /break {message} steers first after the break.",
+        description="Skip the stalled tool call in this session. /break {message} steers first after the break.",
         args_hint="[message]",
     )
     ctx.register_command(
         "again",
         handler=_handle_again,
-        description="Skip the stalled tool call and reissue it once. /again {hint} tweaks the retry.",
+        description="Skip the stalled tool call in this session and reissue it once. /again {hint} tweaks the retry.",
         args_hint="[hint]",
     )
     ctx.register_command(
