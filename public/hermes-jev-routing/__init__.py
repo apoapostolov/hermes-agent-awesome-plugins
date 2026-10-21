@@ -1,50 +1,69 @@
-"""Hermes plugin. Shadow by default.
+"""Per-turn Jev routing inside the plugin SDK.
 
-In auto mode the personal edition reaches the cached agent and calls
-switch_model before the client sends. A tier listed in confirm.tiers is not
-switched. llm_request can still rewrite the model id when the pick stays on
-the provider already bound to the turn.
+Shadow by default. In auto mode the pick is applied to the provider request
+through ``llm_request`` middleware, and the desktop half moves the live session
+onto the same model through the app's own model-switch request. The catalog
+edition never rebinds agent internals: it cannot open another provider and it
+cannot stop a send, so a cross-provider pick is reported and left alone.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import time
 from pathlib import Path
 
 try:
     from .config import load_router_config, models_from_config
-    from .decide import Analysis, Decision, decide, same_provider_rewrite
+    from .decide import Analysis, AvailableModel, Decision, decide
     from .jev import JevError, classify
     from .choice import decision_for_target, parse_confirm_choice, target_for_choice
     from .availability import live_models
     from .commands import explain, revert_target, spend_lines
-    from .hold import action_glyph, hold_for_approval, request_hold, should_hold_send, sticky_keep
-    from .ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_cost
+    from .ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_usd
     from .notice import publish_route, route_payload
     from .quota import codex_eligibility
     from .quota_live import read_codex_remaining
+    from .route import (
+        TIERS,
+        action_glyph,
+        crosses_provider,
+        current_from,
+        rewrite,
+        sticky_keep,
+        tier_index_for,
+    )
     from .settings_override import apply_setting_overrides, present_settings
     from .skip import should_skip
-    from .switch import current_model, find_live_agent, maybe_switch, tier_index_for
 except ImportError:
     from config import load_router_config, models_from_config
-    from decide import Analysis, Decision, decide, same_provider_rewrite
+    from decide import Analysis, AvailableModel, Decision, decide
     from jev import JevError, classify
     from choice import decision_for_target, parse_confirm_choice, target_for_choice
     from availability import live_models
     from commands import explain, revert_target, spend_lines
-    from hold import action_glyph, hold_for_approval, request_hold, should_hold_send, sticky_keep
-    from ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_cost
+    from ledger import load_ledger, record_cost, record_jev, save_ledger, spend_snapshot, state_path, usage_usd
     from notice import publish_route, route_payload
     from quota import codex_eligibility
     from quota_live import read_codex_remaining
+    from route import (
+        TIERS,
+        action_glyph,
+        crosses_provider,
+        current_from,
+        rewrite,
+        sticky_keep,
+        tier_index_for,
+    )
     from settings_override import apply_setting_overrides, present_settings
     from skip import should_skip
-    from switch import current_model, find_live_agent, maybe_switch, tier_index_for
 
 logger = logging.getLogger(__name__)
+
+API_KEY_ENV = "TYPESAFE_API_KEY"
+# Rough characters per token, used only to fill Jev's context estimate in the
+# hook payload. It is an estimate, not a billed count, and it never prices a row.
+CHARS_PER_TOKEN = 4
 
 _LAST: dict[str, object] = {"mode": "shadow"}
 _LOADED: dict[str, object] = {}
@@ -53,7 +72,7 @@ _SESSIONS: dict[str, dict[str, object]] = {}
 SESSION_LIMIT = 64
 # Turn facts copied into the owning session. Overrides (mode, enabled, budget
 # caps) are never copied: they belong to the command that set them.
-_TURN_KEYS = ("decision", "blocked", "applied", "prompt", "previous", "analysis", "notes")
+_TURN_KEYS = ("decision", "blocked", "applied", "prompt", "previous", "analysis", "notes", "pin")
 
 
 def _trim_sessions() -> None:
@@ -103,6 +122,23 @@ def _config_path(ctx) -> str:
         return ""
 
 
+def _env(name: str) -> str:
+    """Read a declared name through the host secret scope, never the raw process env."""
+    if not name:
+        return ""
+    try:
+        from agent.secret_scope import get_secret
+
+        return str(get_secret(name) or "")
+    except Exception:
+        return ""
+
+
+def _api_key() -> str:
+    """The Jev key, from the host secret scope under its declared name."""
+    return _env(API_KEY_ENV)
+
+
 def _load(path: str):
     file = Path(path)
     if not file.is_file():
@@ -115,37 +151,24 @@ def _load(path: str):
     return config, settings
 
 
-def _cwd(agent) -> str:
-    for attr in ("cwd", "working_dir", "workspace"):
-        value = str(getattr(agent, attr, "") or "") if agent is not None else ""
-        if value:
-            return value
-    return str(getattr(_CTX, "cwd", "") or "") if _CTX is not None else ""
-
-
-def _context_tokens(agent, messages=None) -> int | None:
-    """Anchored prompt tokens, then the host's own estimate. Never a guess."""
-    if agent is not None and isinstance(messages, list) and messages:
-        anchor = getattr(agent, "_usage_anchor", None)
-        try:
-            from agent.usage_anchor import anchored_context_tokens
-
-            anchored = anchored_context_tokens(messages, anchor)
-            if isinstance(anchored, int) and anchored > 0:
-                return anchored
-        except Exception:
-            pass
-    if agent is not None:
-        try:
-            from agent.turn_context import _preflight_request_tokens
-
-            system_prompt = str(getattr(agent, "_cached_system_prompt", "") or "")
-            estimate = _preflight_request_tokens(agent, list(messages or []), system_prompt)
-            if isinstance(estimate, int) and not isinstance(estimate, bool) and estimate > 0:
-                return estimate
-        except Exception:
-            pass
-    return None
+def _context_estimate(messages) -> int | None:
+    """Characters over four. An estimate the hook payload can carry, nothing more."""
+    if not isinstance(messages, list) or not messages:
+        return None
+    total = 0
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            total += len(content)
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and isinstance(part.get("text"), str):
+                    total += len(part["text"])
+    if total <= 0:
+        return None
+    return max(total // CHARS_PER_TOKEN, 1)
 
 
 def _history(messages, turns: int) -> str:
@@ -186,6 +209,13 @@ def _spend(config):
     return Spend(pressure=snapshot.pressure, today=snapshot.today), snapshot
 
 
+def _model_view(current):
+    """A hook-payload model as the decide() model row. Unpriced, so no cache penalty."""
+    if current is None:
+        return None
+    return AvailableModel(provider=current.provider, id=current.id)
+
+
 def _remember_route(prompt: str, analysis, decision, notes) -> None:
     _LAST["prompt"] = prompt
     _LAST["analysis"] = analysis
@@ -199,8 +229,10 @@ def on_post_api_request(**kwargs):
         return None
     provider = str(kwargs.get("provider") or "")
     model = str(kwargs.get("response_model") or kwargs.get("model") or "")
-    usd = usage_cost(kwargs.get("usage"))
-    if usd <= 0 or not model:
+    if not model:
+        return None
+    usd = usage_usd(kwargs.get("usage"), provider, model)
+    if usd <= 0:
         return None
     file = state_path(path)
     ledger = load_ledger(file)
@@ -236,13 +268,8 @@ def _pre_llm_call(**kwargs):
     mode = str(_LAST.get("mode") or "shadow")
     _LAST["session_id"] = session_id
     # Record the prompt up front so /jev-routing why can explain a turn that
-    # was skipped or held before any decision was stored.
+    # was skipped before any decision was stored.
     _LAST["prompt"] = str(kwargs.get("user_message") or "").strip()
-    pending = _LAST.pop("pending_revert", None)
-    if isinstance(pending, dict):
-        target = revert_target(pending)
-        if target is not None:
-            maybe_switch(decision_for_target(target), _LAST["session_id"], "auto")
     previous = _LAST.get("decision")
     _LAST["blocked"] = ""
     _LAST["applied"] = ""
@@ -269,34 +296,32 @@ def _pre_llm_call(**kwargs):
                 return None
             picked = decision_for_target(target)
             _LAST["decision"] = picked
-            switched = maybe_switch(picked, str(kwargs.get("session_id") or ""), mode)
-            if switched == "switched":
-                _LAST["applied"] = target.model
-            elif switched in {"missing-agent", "switch-failed"}:
-                _LAST["blocked"] = switched
+            _LAST["pin"] = {
+                "provider": target.provider,
+                "model": target.model,
+                "thinking": target.thinking_level,
+            }
+            _LAST["applied"] = target.model
             return None
         history = _history(kwargs.get("conversation_history"), settings.history_turns)
         skip = should_skip(prompt, config.min_prompt_chars, bool(history))
         if skip:
             _LAST["blocked"] = f"skip:{skip}"
             return None
-        key = os.environ.get(settings.api_key_env, "")
-        endpoint = os.environ.get(settings.endpoint_env, "") or settings.endpoint
+        endpoint = str(_env(settings.endpoint_env) or settings.endpoint)
         active = str(kwargs.get("model") or "")
-        agent = find_live_agent(str(kwargs.get("session_id") or ""))
-        current = current_model(agent) if agent is not None else None
+        current = current_from(kwargs)
         spent = _spend(config)
         analysis = classify(
             prompt,
-            api_key=key,
+            api_key=_api_key(),
             endpoint=endpoint,
             jev_model=settings.jev_model,
             task_kinds=settings.task_kinds,
             timeout_ms=settings.timeout_ms,
             history=history,
             active_model=active,
-            cwd=_cwd(agent),
-            context_tokens=_context_tokens(agent, kwargs.get("conversation_history")),
+            context_tokens=_context_estimate(kwargs.get("conversation_history")),
             spend=spent[1].as_state() if spent is not None else None,
         )
         file = state_path(path)
@@ -309,92 +334,101 @@ def _pre_llm_call(**kwargs):
             config,
             live_models(models_from_config(config)),
             current_index=tier_index_for(config, current.provider, current.id) if current else None,
-            current_model=current,
+            current_model=_model_view(current),
             eligibility=gate,
             spend=spent[0] if spent else None,
         )
         _remember_route(prompt, analysis, decision, getattr(decision, "notes", ()) if decision else ())
         _LAST["quota_notes"] = list(getattr(gate, "notes", ()))
         sticky = sticky_keep(config, current, decision)
-        changed = current is None or (
-            decision is not None
-            and (current.provider != decision.target.provider or current.id != decision.target.model)
-        )
-        hold_confirm = (
-            decision is not None
-            and changed
-            and not sticky
-            and (
-                mode == "confirm"
-                or (decision.tier in set(config.confirm_tiers) and config.confirm_on_timeout != "accept")
-            )
-            and mode not in {"shadow", "notify", "off"}
-        )
+        status = "offered"
         if sticky:
-            switched = "same"
+            status = "same"
             _LAST["blocked"] = "kept"
-        elif hold_confirm:
+        elif decision is None:
+            status = "none"
+        elif (
+            mode not in {"shadow", "notify", "off"}
+            and (mode == "confirm" or decision.tier in set(config.confirm_tiers))
+        ):
+            # No send can be stopped from here, so the pick waits for the approve
+            # row instead of changing the turn that already went out.
+            status = "offered"
             _LAST["blocked"] = "confirm"
-            switched = "skip"
-        else:
-            switched = maybe_switch(decision, str(kwargs.get("session_id") or ""), mode)
         logger.info(
             "hermes-jev-routing pick %s status=%s",
             getattr(getattr(decision, "target", None), "model", ""),
-            switched,
+            status,
         )
-        if switched == "switched":
-            if current is not None:
-                _LAST["previous"] = {"provider": current.provider, "model": current.id}
-            _LAST["applied"] = decision.target.model if decision else ""
-        elif switched in {"missing-agent", "switch-failed"}:
-            _LAST["blocked"] = switched
-        glyph = action_glyph(sticky=sticky, switched=switched, mode=mode)
-        status = f"jev {decision.tier}" if decision is not None else "jev"
+        if current is not None:
+            _LAST["previous"] = {"provider": current.provider, "model": current.id}
+        glyph = action_glyph(sticky=sticky, status=status, mode=mode)
+        label = f"jev {decision.tier}" if decision is not None else "jev"
         if spent is not None and spent[1].pressure > 0:
-            status = f"{status} {spent[1].pressure * 100:.0f}%"
+            label = f"{label} {spent[1].pressure * 100:.0f}%"
         publish_route(route_payload(
-            decision, current, config, str(kwargs.get("session_id") or ""), analysis, mode,
-            glyph=glyph, prompt=prompt, status=status, held=hold_confirm,
+            decision, current, config, session_id, analysis, mode,
+            glyph=glyph, prompt=prompt, status=label, held=False,
         ))
-        if hold_confirm and agent is not None:
-            held = hold_for_approval(
-                agent, str(_LAST.get("prompt") or prompt), "confirm tier; awaiting approval"
-            )
-            if held:
-                _LAST["blocked"] = "confirm"
-                return None
-        if should_hold_send(decision, switched, current, gate) and agent is not None:
-            held = request_hold(agent, "prompt not sent; current model is quota-ineligible")
-            if held:
-                _LAST["blocked"] = "quota"
-                return None
     except (JevError, OSError, TimeoutError, ValueError):
         logger.warning("hermes-jev-routing left the turn unrouted", exc_info=True)
     return None
 
 
+def _mark(slot: dict[str, object], state: str) -> None:
+    _LAST["blocked"] = state
+    if slot:
+        slot["blocked"] = state
+
+
 def on_llm_request(**kwargs):
-    slot = _SESSIONS.get(str(kwargs.get("session_id") or "")) or {}
+    """Apply the pick to the request that is about to be sent."""
+    session_id = str(kwargs.get("session_id") or "")
+    slot = _SESSIONS.get(session_id) or {}
     mode = str(slot.get("mode") or _LAST.get("mode") or "shadow")
+    if mode == "off" or _LAST.get("enabled") is False:
+        return None
+    request = kwargs.get("request")
+    if not isinstance(request, dict):
+        return None
+    bound = str(kwargs.get("provider") or "")
+    if not bound:
+        return None
+    pin = slot.get("pin") if "pin" in slot else _LAST.get("pin")
+    if isinstance(pin, dict) and pin.get("model"):
+        if pin.get("provider") and pin["provider"] != bound:
+            _mark(slot, "cross-provider")
+            return None
+        updated = dict(request)
+        updated["model"] = str(pin["model"])
+        level = str(pin.get("thinking") or "").strip().lower()
+        if level and level not in {"off", "none", "false", "disabled"}:
+            for field in ("reasoning_effort", "reasoning"):
+                if field in updated:
+                    updated[field] = level
+                    break
+        _LAST.pop("pin", None)
+        slot.pop("pin", None)
+        _LAST["applied"] = str(pin["model"])
+        if slot:
+            slot["applied"] = str(pin["model"])
+        return {
+            "request": updated,
+            "source": "hermes-jev-routing",
+            "reason": "pinned by /jev-routing revert",
+        }
     decision = slot.get("decision") if "decision" in slot else _LAST.get("decision")
     blocked = slot.get("blocked") if "blocked" in slot else _LAST.get("blocked")
-    if mode == "off" or not isinstance(decision, Decision) or blocked == "confirm":
+    if mode != "auto" or not isinstance(decision, Decision) or blocked == "confirm":
         return None
-    request = kwargs.get("request") or {}
-    bound = str(kwargs.get("provider") or "")
     try:
-        rewritten = same_provider_rewrite(request, decision, bound, mode)
+        rewritten = rewrite(request, decision, bound, mode)
     except Exception:
         logger.warning("hermes-jev-routing left the request unchanged", exc_info=True)
         return None
-    applied = slot.get("applied") if "applied" in slot else _LAST.get("applied")
     if rewritten is None:
-        if mode == "auto" and not decision.held and decision.target.provider != bound and not applied:
-            withheld = str(blocked or "cross-provider")
-            _LAST["blocked"] = withheld
-            if slot:
-                slot["blocked"] = withheld
+        if crosses_provider(decision, bound):
+            _mark(slot, "cross-provider")
         return None
     _LAST["applied"] = rewritten.get("model")
     if slot:
@@ -428,7 +462,7 @@ def _command(raw: str = "", *, session_id: str = "") -> str:
     if head == ["mode"]:
         name = (parts[1] if len(parts) > 1 else "").lower()
         if name not in {"auto", "confirm", "notify", "shadow", "off"}:
-            return "usage: /jev-routing mode auto|confirm|notify"
+            return "usage: /jev-routing mode auto|confirm|notify|shadow|off"
         slot["mode"] = name
         return f"jev-routing mode: {name} for this session"
     if head == ["why"]:
@@ -452,11 +486,10 @@ def _dry_route(text: str) -> str:
     if config is None or settings is None:
         return "hermes-jev-routing route: no config"
     try:
-        key = os.environ.get(settings.api_key_env, "")
-        endpoint = os.environ.get(settings.endpoint_env, "") or settings.endpoint
+        endpoint = str(_env(settings.endpoint_env) or settings.endpoint)
         analysis = classify(
             prompt,
-            api_key=key,
+            api_key=_api_key(),
             endpoint=endpoint,
             jev_model=settings.jev_model,
             task_kinds=settings.task_kinds,
@@ -470,19 +503,16 @@ def _dry_route(text: str) -> str:
 
 
 def _revert(session_id: str = "", slot: dict[str, object] | None = None) -> str:
+    """Pin the previous model onto the next request that can carry it."""
     slot = slot if slot is not None else _slot(session_id)
     previous = slot.get("previous") if "previous" in slot else _LAST.get("previous")
     target = revert_target(previous)
     if target is None:
         return "no previous model recorded"
-    picked = decision_for_target(target)
-    switched = maybe_switch(picked, session_id or str(_LAST.get("session_id") or ""), "auto")
-    if switched == "switched":
-        _LAST["applied"] = target.model
-        slot["applied"] = target.model
-        return f"reverted to {target.provider}/{target.model}"
-    _LAST["pending_revert"] = {"provider": target.provider, "model": target.model}
-    return f"revert to {target.provider}/{target.model} applies on the next send ({switched})"
+    values = {"provider": target.provider, "model": target.model, "thinking": target.thinking_level}
+    _LAST["pin"] = values
+    slot["pin"] = values
+    return f"revert to {target.provider}/{target.model} applies on the next send from that provider"
 
 
 def _budget_command(parts, slot: dict[str, object] | None = None) -> str:
@@ -517,7 +547,8 @@ def _status(slot: dict[str, object] | None = None) -> str:
         if spent is not None:
             lines.append(spend_lines(spent[1]))
         lines.append("routes:")
-        for tier, chain in config.routes.items():
+        for tier in TIERS:
+            chain = config.routes.get(tier) or ()
             if not chain:
                 lines.append(f"  {tier}: (none)")
                 continue
@@ -531,6 +562,10 @@ def _status(slot: dict[str, object] | None = None) -> str:
     blocked = slot.get("blocked") if "blocked" in slot else _LAST.get("blocked")
     if blocked:
         lines.append(f"blocked: {blocked}")
+    applied = slot.get("applied") if "applied" in slot else _LAST.get("applied")
+    if applied:
+        lines.append(f"applied: {applied}")
+    lines.append("edition: request-level. A pick on another provider is reported, not sent.")
     lines.append("commands: why, route <text>, revert, budget daily|monthly <usd>, suggest [--write]")
     return "\n".join(lines)
 
@@ -546,7 +581,6 @@ def classify_for_tests(analysis: Analysis, config, models, mode: str, **kwargs) 
     decision = decide(analysis, config, models, **kwargs)
     remember(decision, mode)
     return decision
-
 
 
 def on_session_delete(**kwargs) -> None:

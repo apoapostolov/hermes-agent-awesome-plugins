@@ -22,6 +22,7 @@ try:
         RouterConfig,
     )
 except ImportError:
+    import pricing  # type: ignore[no-redef]
     from decide import (
         AvailableModel,
         Budget,
@@ -30,8 +31,6 @@ except ImportError:
         RouteTarget,
         RouterConfig,
     )
-    from pricing import cost_for as _cost_for
-    from pricing import supports_reasoning as _reasoning_supported
 
 TASK_KINDS = {
     "plan": "Deciding what to build, sequencing work, or designing an approach before editing",
@@ -51,6 +50,8 @@ TASK_KINDS = {
 class JevSettings:
     endpoint: str = "https://api.typesafe.ai/v1/systemone"
     endpoint_env: str = "TYPESAFE_API_URL"
+    # The key name is fixed, not chosen by the config: the plugin declares
+    # TYPESAFE_API_KEY in plugin.yaml and reads it through the host secret scope.
     api_key_env: str = "TYPESAFE_API_KEY"
     jev_model: str = "jev-latest"
     timeout_ms: int = 3500
@@ -128,6 +129,7 @@ def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
     if not isinstance(hand, dict):
         raise ValueError("router config must be a JSON object")
     data = fill_from_generated(hand, path)
+    pricing.set_rates(data.get("pricing") or data.get("rateCard") or data.get("rate_card"))
     routes = data.get("routes") or {}
     kinds = data.get("kindModels") or data.get("kind_models") or {}
     floors = data.get("kindMinimumTier") or data.get("kind_minimum_tier") or {}
@@ -196,7 +198,6 @@ def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
     settings = JevSettings(
         endpoint=str(data.get("endpoint") or JevSettings.endpoint),
         endpoint_env=str(data.get("endpointEnv") or data.get("endpoint_env") or "TYPESAFE_API_URL"),
-        api_key_env=str(data.get("apiKeyEnv") or data.get("api_key_env") or "TYPESAFE_API_KEY"),
         jev_model=str(data.get("jevModel") or data.get("jev_model") or "jev-latest"),
         timeout_ms=int(data.get("timeoutMs", data.get("timeout_ms", 3500))),
         history_turns=int(data.get("historyTurns", data.get("history_turns", 4))),
@@ -206,11 +207,11 @@ def load_router_config(path: str | Path) -> tuple[RouterConfig, JevSettings]:
 
 
 def models_from_config(config: RouterConfig) -> tuple[AvailableModel, ...]:
-    """Every configured target, priced when the host can price it.
+    """Every configured target, priced only when the operator's rate card covers it.
 
-    Personal edition reads real rates so the cache guard can price a miss. An
-    unpriced row keeps ``cost=None``, which makes the penalty estimate 0 and
-    therefore never holds a turn.
+    A price comes from the ``pricing`` block in the same JSON. An unpriced row
+    keeps ``cost=None``, which makes the penalty estimate 0 and therefore never
+    holds a turn.
     """
     seen: set[tuple[str, str]] = set()
     models: list[AvailableModel] = []
@@ -225,8 +226,8 @@ def models_from_config(config: RouterConfig) -> tuple[AvailableModel, ...]:
                 AvailableModel(
                     provider=target.provider,
                     id=target.model,
-                    cost=_cost_for(target.provider, target.model),
-                    reasoning=_reasoning_supported(target.provider, target.model),
+                    cost=pricing.cost_for(target.provider, target.model),
+                    reasoning=pricing.supports_reasoning(target.provider, target.model),
                 )
             )
     return tuple(models)

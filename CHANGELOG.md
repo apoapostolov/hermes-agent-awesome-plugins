@@ -5,6 +5,10 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ## [Unreleased]
 
+### Changed
+
+- hermes-jev-routing 1.1.0. The listed edition routed by reaching into the running agent: it walked the caller stack and the `gc` objects to find the cached agent, called `switch_model` mid-turn, rebound `_interruptible_api_call` to hold a send, and priced rows from private usage modules. Catalog review at `ef98501c` rejected that, so the listed edition now routes only through the middleware it already registers. It rewrites the model and the reasoning effort on the provider the turn is already bound to, reports a cross-provider pick as `blocked: cross-provider` instead of sending it, prices rows from a `pricing` block written into the routing JSON, estimates context as characters over four, and reads the Jev key through the host secret scope with `TYPESAFE_API_KEY` declared in `requires_env`. The confirm row no longer holds a send, because a plugin cannot stop one: it offers the pick, the turn answers on its current model, and approving moves the session for the following sends. Personal keeps every reach-in. `LIMITATIONS.md`, identical in both editions, records each blocker and the core hook it needs.
+
 ### Fixed
 - hermes-jev-routing. The listed edition's desktop half mounted a strip under the user message with app DOM, so `hermes plugins validate` failed the desktop surface check and the plugin could not be catalogued. The line and its approve row now render as a React contribution at `COMPOSER_AREAS.underside`, with no app-owned nodes, no injected style tag and no line cache in `localStorage`. 1.0.2.
 - intelligent-tool-break. `/break`, `/again` and `/break-status` acted on the whole gateway process, so a break in one chat could kill a tool running in another. Each command now scopes to the session that invoked it, an explicit `--session-id` still wins, and a row with no recorded owner stays visible everywhere. A deleted session's rows are dropped by `on_session_delete`, which fires on Desktop deletes that never reach `on_session_end`.

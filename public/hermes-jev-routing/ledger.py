@@ -126,8 +126,28 @@ def spend_snapshot(ledger: dict, budget, now: Optional[datetime] = None) -> Spen
     )
 
 
-def usage_cost(usage) -> float:
-    """Prefer a reported total. Otherwise ask Hermes to price the tokens. Never raise."""
+def usage_tokens(usage) -> tuple[int, int]:
+    """Input and output tokens from a provider usage block, in either naming."""
+    if not isinstance(usage, dict):
+        return 0, 0
+    def _int(*names) -> int:
+        for name in names:
+            value = usage.get(name)
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
+                return int(value)
+        return 0
+    return (
+        _int("input_tokens", "prompt_tokens", "inputTokens", "promptTokens"),
+        _int("output_tokens", "completion_tokens", "outputTokens", "completionTokens"),
+    )
+
+
+def usage_usd(usage, provider: str = "", model: str = "") -> float:
+    """A reported total wins. Otherwise price the tokens with the operator's card.
+
+    Never raises and never guesses: an unpriced model returns 0, which leaves the
+    ledger row empty and the budget caps inert.
+    """
     if isinstance(usage, dict):
         cost = usage.get("cost")
         if isinstance(cost, dict):
@@ -137,17 +157,24 @@ def usage_cost(usage) -> float:
         reported = usage.get("cost_usd")
         if isinstance(reported, (int, float)) and reported > 0:
             return float(reported)
-    try:
-        from agent.usage_pricing import estimate_usage_cost, normalize_usage
-    except Exception:
+    if not provider or not model:
         return 0.0
     try:
-        canonical = normalize_usage(usage)
-        result = estimate_usage_cost("", canonical, api_key="")
-        amount = getattr(result, "amount_usd", None)
-        return float(amount) if amount is not None and float(amount) > 0 else 0.0
+        from . import pricing
+    except ImportError:
+        import pricing  # type: ignore[no-redef]
+    try:
+        rates = pricing.cost_for(provider, model)
     except Exception:
         return 0.0
+    if not rates:
+        return 0.0
+    tokens_in, tokens_out = usage_tokens(usage)
+    if not tokens_in and not tokens_out:
+        return 0.0
+    amount = (tokens_in / 1_000_000.0) * float(rates.get("input") or 0)
+    amount += (tokens_out / 1_000_000.0) * float(rates.get("output") or 0)
+    return round4(amount) if amount > 0 else 0.0
 
 
 def state_path(config_path: str) -> Path:

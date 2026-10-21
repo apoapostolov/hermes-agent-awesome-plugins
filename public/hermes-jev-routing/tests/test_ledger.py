@@ -31,9 +31,9 @@ class LedgerTests(unittest.TestCase):
         self.assertEqual(load_ledger(Path("missing-ledger.json"))["version"], 1)
 
     def test_a_reported_total_is_kept(self):
-        from ledger import usage_cost
-        self.assertEqual(usage_cost({"cost": {"total": 0.42}}), 0.42)
-        self.assertEqual(usage_cost({}), 0.0)
+        from ledger import usage_usd
+        self.assertEqual(usage_usd({"cost": {"total": 0.42}}), 0.42)
+        self.assertEqual(usage_usd({}), 0.0)
         path = Path(__file__).with_name("_ledger.json")
         ledger = {"version": 1, "days": {}, "months": {}, "jev": {"requests": 0, "inputTokens": 0, "outputTokens": 0}}
         record_cost(ledger, "a/b", 0.125, datetime(2026, 10, 4, tzinfo=timezone.utc))
