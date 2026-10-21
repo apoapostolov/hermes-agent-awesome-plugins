@@ -81,14 +81,18 @@ def rewrite(
     if decision.target.provider != bound_provider:
         return None
     updated = dict(request)
+    changed = updated.get("model") != decision.target.model
     updated["model"] = decision.target.model
     level = str(decision.target.thinking_level or "").strip().lower()
     if level and level not in {"off", "none", "false", "disabled"}:
         for field in REASONING_FIELDS:
-            if field in updated:
+            if field in updated and str(updated[field]).lower() != level:
                 updated[field] = level
+                changed = True
                 break
-    return updated
+    # Already on the pick: report nothing rather than claiming a change that
+    # carries the same model. Hermes records a trace entry for every replacement.
+    return updated if changed else None
 
 
 def action_glyph(*, sticky: bool, status: str, mode: str) -> str:

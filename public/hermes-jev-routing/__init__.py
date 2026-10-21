@@ -370,7 +370,11 @@ def _pre_llm_call(**kwargs):
             decision, current, config, session_id, analysis, mode,
             glyph=glyph, prompt=prompt, status=label, held=False,
         ))
-    except (JevError, OSError, TimeoutError, ValueError):
+    except JevError as exc:
+        # A missing or rejected key leaves every turn unrouted. One line, no
+        # traceback, so a bad credential does not fill the log.
+        logger.warning("hermes-jev-routing left the turn unrouted: %s", exc)
+    except (OSError, TimeoutError, ValueError):
         logger.warning("hermes-jev-routing left the turn unrouted", exc_info=True)
     return None
 
@@ -419,7 +423,7 @@ def on_llm_request(**kwargs):
         }
     decision = slot.get("decision") if "decision" in slot else _LAST.get("decision")
     blocked = slot.get("blocked") if "blocked" in slot else _LAST.get("blocked")
-    if mode != "auto" or not isinstance(decision, Decision) or blocked == "confirm":
+    if mode != "auto" or not isinstance(decision, Decision) or blocked in {"confirm", "kept"}:
         return None
     try:
         rewritten = rewrite(request, decision, bound, mode)

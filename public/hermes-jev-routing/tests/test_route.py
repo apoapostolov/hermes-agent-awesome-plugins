@@ -74,6 +74,18 @@ class RewriteTests(unittest.TestCase):
         )
         self.assertEqual(wire["reasoning_effort"], "high")
 
+    def test_already_on_the_pick_reports_nothing(self):
+        self.assertIsNone(rewrite({"model": "glm-5.3"}, _decision(), "opencode-go", "auto"))
+        self.assertIsNone(
+            rewrite({"model": "glm-5.3", "reasoning_effort": "high"}, _decision(), "opencode-go", "auto")
+        )
+
+    def test_a_reasoning_change_alone_still_rewrites(self):
+        updated = rewrite(
+            {"model": "glm-5.3", "reasoning_effort": "low"}, _decision(), "opencode-go", "auto"
+        )
+        self.assertEqual(updated["reasoning_effort"], "high")
+
     def test_the_original_request_is_not_mutated(self):
         request = {"model": "glm-5.3-flash"}
         rewrite(request, _decision(), "opencode-go", "auto")
