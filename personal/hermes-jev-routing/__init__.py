@@ -369,7 +369,11 @@ def _pre_llm_call(**kwargs):
             if held:
                 _LAST["blocked"] = "quota"
                 return None
-    except (JevError, OSError, TimeoutError, ValueError):
+    except JevError as exc:
+        # A missing or rejected key leaves every turn unrouted. One line, no
+        # traceback, so a bad credential does not fill the log.
+        logger.warning("hermes-jev-routing left the turn unrouted: %s", exc)
+    except (OSError, TimeoutError, ValueError):
         logger.warning("hermes-jev-routing left the turn unrouted", exc_info=True)
     return None
 

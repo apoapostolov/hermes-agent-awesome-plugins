@@ -22,6 +22,7 @@ try:
         RouterConfig,
     )
 except ImportError:
+    import pricing  # type: ignore[no-redef]
     from decide import (
         AvailableModel,
         Budget,
@@ -30,8 +31,6 @@ except ImportError:
         RouteTarget,
         RouterConfig,
     )
-    from pricing import cost_for as _cost_for
-    from pricing import supports_reasoning as _reasoning_supported
 
 TASK_KINDS = {
     "plan": "Deciding what to build, sequencing work, or designing an approach before editing",
@@ -225,8 +224,8 @@ def models_from_config(config: RouterConfig) -> tuple[AvailableModel, ...]:
                 AvailableModel(
                     provider=target.provider,
                     id=target.model,
-                    cost=_cost_for(target.provider, target.model),
-                    reasoning=_reasoning_supported(target.provider, target.model),
+                    cost=pricing.cost_for(target.provider, target.model),
+                    reasoning=pricing.supports_reasoning(target.provider, target.model),
                 )
             )
     return tuple(models)

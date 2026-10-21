@@ -187,6 +187,17 @@ class DecideTests(unittest.TestCase):
         self.assertEqual(rewritten["model"], decision.target.model)
         self.assertEqual(decision.target.provider, "opencode-go")
 
+    def test_rewrite_is_silent_when_the_pick_is_already_active(self):
+        decision = decide(
+            Analysis("chat", 0.2, 0.2, 0.1, 0.9),
+            _config(free=FreePool(enabled=False, policy="fallback-only", pool=()), kind_models={}),
+            _models(),
+        )
+        bound = decision.target.provider
+        self.assertIsNone(
+            same_provider_rewrite({"model": decision.target.model}, decision, bound, "auto")
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
