@@ -428,6 +428,10 @@ def same_provider_rewrite(
         return None
     if decision.target.provider != bound_provider:
         return None
+    if request.get("model") == decision.target.model:
+        # Already on the pick: report nothing rather than a replacement that
+        # carries the same model, which Hermes records as a middleware change.
+        return None
     updated = dict(request)
     updated["model"] = decision.target.model
     return updated
