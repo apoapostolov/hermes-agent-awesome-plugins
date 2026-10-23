@@ -45,7 +45,6 @@ def _load_api(tmp_path: Path):
     import plugin_api as pa  # type: ignore
 
     pa.CONFIG_PATH = tmp_path / "config.json"
-    pa.LIBRARY_PATH = tmp_path / "library.env"
     pa.HERMES_ENV = tmp_path / ".env"
     pa.PLUGIN_ROOT = tmp_path
     return pa

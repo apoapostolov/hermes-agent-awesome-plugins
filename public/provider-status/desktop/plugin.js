@@ -1260,14 +1260,13 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
     setKeys(pc.pool?.length ? [...pc.pool] : [''])
   }, [pc.enabled, (pc.pool || []).join('\n')])
 
-  const persist = async (nextEnabled, nextKeys, updates, removed) => {
+  const persist = async (nextEnabled, nextKeys, updates) => {
     const pool = (nextKeys ?? keys).map(s => s.trim()).filter(Boolean)
-    await onSave(pid, { ...pc, enabled: nextEnabled ?? enabled, pool, ...updates }, removed)
+    await onSave(pid, { ...pc, enabled: nextEnabled ?? enabled, pool, ...updates })
   }
   const setKeyAt = (i, v) => { const n = [...keys]; n[i] = v; setKeys(n) }
   const addKey = () => { setKeys([...keys, '']) }
   const delKey = (i) => {
-    const removed = [keys[i]].map(s => s.trim()).filter(Boolean)
     const n = keys.filter((_, j) => j !== i)
     setKeys(n.length ? n : [''])
     // keep the radio honest: deleting the active key falls back to #1; deleting
@@ -1276,10 +1275,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
     if (i === activeIdx) nextIdx = 0
     else if (i < activeIdx) nextIdx = activeIdx - 1
     setActiveIdx(nextIdx)
-    // The removed VALUE travels with the save: the backend needs it to purge
-    // the library slot and the Hermes .env carrier. Without it the pool shrinks
-    // here and the next poll re-adds the key from library.env.
-    persist(undefined, n.length ? n : [''], { pool_index: nextIdx }, removed)
+    persist(undefined, n.length ? n : [''], { pool_index: nextIdx })
   }
 
   const [activeIdx, setActiveIdx] = useState(() => {
@@ -1736,11 +1732,6 @@ function SetupBody({ variant } = {}) {
     }
   }, [addMenuOpen])
 
-  const [applyHermesEnv, setApplyHermesEnv] = useState(Boolean(cfg.apply_hermes_env))
-  useEffect(() => {
-    setApplyHermesEnv(Boolean(cfg.apply_hermes_env))
-  }, [cfg.apply_hermes_env])
-
   if (metaWaiting) return jsx('div', { className: 'p-2 text-xs', children: 'Loading…' })
 
   const banner = (!metaLive) ? jsxs('div', {
@@ -1753,18 +1744,9 @@ function SetupBody({ variant } = {}) {
     ],
   }) : null
 
-  const saveProvider = async (pid, next, removedKeys) => {
-    // removedKeys: the key VALUES just deleted for this provider. The backend
-    // purges the library slot + Hermes .env carrier and tombstones them.
-    const remove_keys = removedKeys?.length ? { [pid]: removedKeys } : undefined
-    await postJson('config', { providers: { ...provCfg, [pid]: next }, order: pids, poll_minutes: cfg.poll_minutes || undefined, apply_hermes_env: applyHermesEnv, remove_keys })
+  const saveProvider = async (pid, next) => {
+    await postJson('config', { providers: { ...provCfg, [pid]: next }, order: pids, poll_minutes: cfg.poll_minutes || undefined })
     postJson('refresh')
-    refetchCfg()
-  }
-
-  const saveApplyHermesEnv = async value => {
-    setApplyHermesEnv(value)
-    await postJson('config', { apply_hermes_env: value, order: pids })
     refetchCfg()
   }
 
@@ -1826,14 +1808,6 @@ function SetupBody({ variant } = {}) {
       variant === 'hermes'
         ? jsx('div', { ref: flipRef, className: 'overflow-hidden rounded-lg border border-(--stroke-nous) divide-y divide-(--ui-stroke-secondary)', children: rows })
         : jsx('div', { ref: flipRef, className: 'flex flex-col gap-2', children: rows }),
-      jsxs('div', {
-        className: 'flex items-center justify-end gap-1 text-[0.65rem] leading-none',
-        style: { color: 'var(--ui-text-quaternary)' },
-        children: [
-          jsx(Checkbox, { checked: applyHermesEnv, onCheckedChange: value => saveApplyHermesEnv(Boolean(value)), size: 'sm' }),
-          jsx('span', { children: 'Apply Changes to Hermes .env' }),
-        ],
-      }),
     ] })
 }
 
