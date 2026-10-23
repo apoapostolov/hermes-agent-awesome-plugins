@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from decide import AvailableModel, Decision, FreePool, RouteTarget, RouterConfig  # noqa: E402
-from notice import format_jev_line, should_interrupt  # noqa: E402
+from notice import format_jev_line, route_payload, should_interrupt  # noqa: E402
 
 
 def _decision(provider="openai-codex", model="gpt-6-sol", tier="premium"):
@@ -47,6 +47,24 @@ class NoticeTests(unittest.TestCase):
         current = AvailableModel("xai-oauth", "grok-4.7")
         self.assertTrue(should_interrupt(decision, current, ("premium", "xpremium")))
         self.assertFalse(should_interrupt(decision, current, ()))
+
+    def test_an_unknown_provider_compares_the_model_only(self):
+        # route.current_from() cannot see the provider, so a same-model turn must
+        # not read as a change: that re-issued config.set on every routed turn.
+        decision = _decision()
+        current = AvailableModel("", "gpt-6-sol")
+        self.assertFalse(should_interrupt(decision, current, ("premium",)))
+        config = RouterConfig(routes={"premium": (RouteTarget("openai-codex", "gpt-6-sol"),)})
+        payload = route_payload(decision, current, config, "s1")
+        self.assertFalse(payload["apply"])
+        self.assertFalse(payload["interrupt"])
+
+    def test_a_known_provider_that_differs_is_still_a_change(self):
+        decision = _decision()
+        current = AvailableModel("xai-oauth", "gpt-6-sol")
+        self.assertTrue(should_interrupt(decision, current, ("premium",)))
+        config = RouterConfig(routes={"premium": (RouteTarget("openai-codex", "gpt-6-sol"),)})
+        self.assertTrue(route_payload(decision, current, config, "s1")["apply"])
 
 
 if __name__ == "__main__":

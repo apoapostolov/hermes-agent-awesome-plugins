@@ -32,18 +32,20 @@ function runtimeSessionId(payload) {
   return focused || payload.session_id || ''
 }
 
-async function applyChoice(payload, pick) {
+function modelSet(payload, pick) {
+  const sessionId = runtimeSessionId(payload)
+  if (!sessionId || !pick) return null
+  return {
+    session_id: sessionId,
+    key: 'model',
+    value: `${pick.model} --provider ${pick.provider}`,
+  }
+}
+
+// The rest of a pick, once the session is on the accepted model.
+async function settle(payload, pick) {
   const sessionId = runtimeSessionId(payload)
   if (!sessionId || !pick) return
-  const request = (confirmExpensive) =>
-    host.request('config.set', {
-      session_id: sessionId,
-      key: 'model',
-      value: `${pick.model} --provider ${pick.provider}`,
-      ...(confirmExpensive ? { confirm_expensive_model: true } : {}),
-    })
-  let result = await request(false)
-  if (result && result.confirm_required) result = await request(true)
   if (pick.thinking) {
     await host.request('config.set', {
       session_id: sessionId,
@@ -57,6 +59,46 @@ async function applyChoice(payload, pick) {
   if (owed && typeof host.composer?.submit === 'function') {
     host.composer.submit(sessionId, owed)
   }
+}
+
+function guardMessage(result, pick) {
+  const text = result && typeof result.confirm_message === 'string' ? result.confirm_message : ''
+  return text || `Confirm ${pick.model}?`
+}
+
+// Core guards an expensive, data-policy, or large-context model. Answering that
+// guard here would approve it for the user, so leave the session on its current
+// model and let the strip ask. `auto` is the payload.apply path, which has no
+// click behind it: surface the message and never send the confirmation.
+async function applyChoice(payload, pick, auto) {
+  const body = modelSet(payload, pick)
+  if (!body) return
+  const result = await host.request('config.set', body)
+  if (result && result.confirm_required) {
+    const message = guardMessage(result, pick)
+    publish({ ...payload, interrupt: false, confirm: auto ? { message } : { message, pick } })
+    return
+  }
+  await settle(payload, pick)
+}
+
+async function confirmPick(payload) {
+  const pending = payload.confirm
+  if (!pending || !pending.pick) return
+  const body = modelSet(payload, pending.pick)
+  if (!body) return
+  const result = await host.request('config.set', { ...body, confirm_expensive_model: true })
+  if (result && result.confirm_required) {
+    // A second guard question stays with the user rather than being answered.
+    publish({ ...payload, interrupt: false, confirm: { message: guardMessage(result, pending.pick), pick: pending.pick } })
+    return
+  }
+  publish({ ...payload, interrupt: false, confirm: null })
+  await settle(payload, pending.pick)
+}
+
+function cancelPick(payload) {
+  publish({ ...payload, interrupt: false, confirm: null })
 }
 
 const WRAP = {
@@ -142,11 +184,27 @@ function JevLine() {
     row.push(jsx(Choice, { label: 'X', onClick: dismiss }, 'x'))
   }
 
+  const confirm = payload.confirm && typeof payload.confirm.message === 'string' ? payload.confirm : null
+  const confirmRow = []
+  if (confirm) {
+    confirmRow.push(jsx('span', { children: `${confirm.message} ` }, 'confirm-message'))
+    if (confirm.pick) {
+      confirmRow.push(jsx(Choice, {
+        label: `Confirm ${confirm.pick.model}`,
+        bold: true,
+        onClick: () => confirmPick(payload),
+      }, 'confirm-yes'))
+      confirmRow.push(jsx('span', { children: ' \u00b7 ' }, 'confirm-gap'))
+      confirmRow.push(jsx(Choice, { label: 'Cancel', onClick: () => cancelPick(payload) }, 'confirm-no'))
+    }
+  }
+
   return jsxs('div', {
     style: { ...WRAP, whiteSpace: 'normal' },
     children: [
       jsx('div', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }, children: payload.line }, 'line'),
       payload.interrupt ? jsx('div', { style: ROW, children: row }, 'row') : null,
+      confirm ? jsx('div', { style: ROW, children: confirmRow }, 'confirm') : null,
     ],
   })
 }
@@ -172,7 +230,9 @@ export default {
           if (!payload || typeof payload.line !== 'string') return
           publish(payload)
           if (payload.apply) {
-            applyChoice(payload, { provider: payload.provider, model: payload.model, thinking: payload.thinking })
+            // The automatic path has no click behind it, so it may apply a pick
+            // but it never answers core's model guard (third argument).
+            applyChoice(payload, { provider: payload.provider, model: payload.model, thinking: payload.thinking }, true)
           }
         })
       : null

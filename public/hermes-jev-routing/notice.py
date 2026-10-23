@@ -23,12 +23,21 @@ def format_jev_line(decision, analysis=None) -> str:
     return " · ".join(parts)
 
 
+def model_changed(current, decision) -> bool:
+    """Whether the pick differs. An unknown provider (`""` from the request hook)
+    compares model ids only, so a same-model turn is not re-applied."""
+    if current is None:
+        return True
+    if current.id != decision.target.model:
+        return True
+    return bool(current.provider) and current.provider != decision.target.provider
+
+
 def should_interrupt(decision, current, confirm_tiers, mode: str = "auto") -> bool:
     """The strip interrupts when the weight wants a different model."""
     if decision is None or mode in {"off", "shadow", "notify"}:
         return False
-    changed = current is None or current.provider != decision.target.provider or current.id != decision.target.model
-    if not changed:
+    if not model_changed(current, decision):
         return False
     if mode == "confirm":
         return True
@@ -62,7 +71,7 @@ def route_payload(decision, current, config, session_id: str, analysis=None, mod
             "model": row.model,
             "thinking": row.thinking_level,
         }
-    changed = current is None or current.provider != decision.target.provider or current.id != decision.target.model
+    changed = model_changed(current, decision)
     return {
         "session_id": session_id,
         "line": f"{glyph} {format_jev_line(decision, analysis)}".strip(),
