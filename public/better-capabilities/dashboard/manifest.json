@@ -2,7 +2,7 @@
   "name": "better-capabilities",
   "label": "Better Capabilities",
   "description": "Skill delete, packaging and file browsing, plus capability presets",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "api": "plugin_api.py",
   "tab": {
     "path": "/better-capabilities",

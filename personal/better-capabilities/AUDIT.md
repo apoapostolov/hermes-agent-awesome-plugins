@@ -1,8 +1,8 @@
 # Audit: Better Capabilities against the current Hermes Desktop build
 
 Written against the **running** Desktop build (`c714c42431`, `main`, 2026-10-26) and the
-older checkout at `C:/git-ext/hermes-agent` for history. Version stays `1.0.0` until the
-owner calls the audit finished.
+older checkout at `C:/git-ext/hermes-agent` for history. The audit closed on 2026-10-27; both
+editions are `1.1.0`.
 
 ## Why the plugin died
 
