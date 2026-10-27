@@ -1032,6 +1032,7 @@ const NAV_STYLE_ID = 'bc-nav-style'
 const NAV_CSS = `
   .bc-nav-actions {
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 1px;
     margin-left: auto;
@@ -1103,9 +1104,18 @@ const NAV_CSS = `
 `
 
 function navRow() {
-  for (const row of document.querySelectorAll('[data-sidebar="menu-button"]')) {
-    if (row.querySelector('[data-tour="sidebar-nav-capabilities"]')) {
-      return row
+  const handles = ['[data-tour="sidebar-nav-capabilities"]', '[data-tour="sidebar-nav-capabilities"] *']
+  const selectors = [
+    '[data-sidebar="menu-button"]',
+    '[data-slot="sidebar-menu-button"]',
+    'button',
+    'a'
+  ]
+  for (const selector of selectors) {
+    for (const candidate of document.querySelectorAll(selector)) {
+      if (handles.some(handle => candidate.querySelector(handle)) || candidate.matches(handles[0])) {
+        return candidate
+      }
     }
   }
   return null
@@ -1116,21 +1126,33 @@ function closeNavMenu() {
 }
 
 function navGlyphButton(glyph, label, onClick) {
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.className = 'bc-nav-btn'
-  button.title = label
-  button.setAttribute('aria-label', label)
-  button.addEventListener('click', event => {
+  // A span, not a button: this sits inside the row's own <button>, and nesting
+  // one button in another is invalid markup that browsers may reparent or stop
+  // delivering clicks to.
+  const control = document.createElement('span')
+  control.className = 'bc-nav-btn'
+  control.setAttribute('role', 'button')
+  control.setAttribute('tabindex', '-1')
+  control.title = label
+  control.setAttribute('aria-label', label)
+  const activate = event => {
     event.preventDefault()
     event.stopPropagation()
     onClick(event)
+  }
+  control.addEventListener('click', activate)
+  control.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      activate(event)
+    }
   })
   const icon = document.createElement('i')
-  icon.className = 'codicon ' + glyph
+  // Codicons need the prefixed class for their :before content; `codicon` alone
+  // sets the font and leaves an empty, zero-width glyph.
+  icon.className = 'codicon codicon-' + glyph
   icon.setAttribute('aria-hidden', 'true')
-  button.appendChild(icon)
-  return button
+  control.appendChild(icon)
+  return control
 }
 
 function placeNavMenu(anchor, menu) {
@@ -1260,6 +1282,93 @@ function paintNavRow() {
   return true
 }
 
+
+// TEMP PROBE (1.1.0): report what the row actually looks like back through our
+// own backend, so a missing glyph is diagnosable from a file instead of a guess.
+// Removed once the row renders reliably on both builds.
+let navProbed = false
+
+function navDiagnostics(inserted) {
+  const row = navRow()
+  const count = selector => {
+    try {
+      return document.querySelectorAll(selector).length
+    } catch {
+      return -1
+    }
+  }
+  const tours = []
+  document.querySelectorAll('[data-tour^="sidebar-nav-"]').forEach(node => {
+    const value = node.getAttribute('data-tour')
+    if (value && !tours.includes(value)) {
+      tours.push(value)
+    }
+  })
+  const cluster = document.querySelector('[data-bc-nav-actions]')
+  const box = cluster ? cluster.getBoundingClientRect() : null
+  const style = cluster ? getComputedStyle(cluster) : null
+  const icon = cluster ? cluster.querySelector('.codicon') : null
+  const iconStyle = icon ? getComputedStyle(icon) : null
+  const iconBox = icon ? icon.getBoundingClientRect() : null
+  const rowBox = row ? row.getBoundingClientRect() : null
+  return {
+    at: new Date().toISOString(),
+    found: Boolean(row),
+    rowTag: row ? row.tagName : '',
+    rowDataSidebar: row ? row.getAttribute('data-sidebar') : '',
+    rowDataSlot: row ? row.getAttribute('data-slot') : '',
+    rowWidth: rowBox ? Math.round(rowBox.width) : 0,
+    menuButtons: count('[data-sidebar="menu-button"]'),
+    menuSlots: count('[data-slot="sidebar-menu-button"]'),
+    tours,
+    inserted,
+    styleTag: Boolean(document.getElementById(NAV_STYLE_ID)),
+    cluster: box
+      ? {
+          display: style.display,
+          flex: style.flex,
+          opacity: style.opacity,
+          width: Math.round(box.width),
+          height: Math.round(box.height),
+          left: Math.round(box.left),
+          top: Math.round(box.top)
+        }
+      : null,
+    icon: iconBox
+      ? {
+          className: icon.className,
+          fontFamily: iconStyle.fontFamily,
+          width: Math.round(iconBox.width),
+          height: Math.round(iconBox.height),
+          content: iconStyle.getPropertyValue('--unused')
+        }
+      : null
+  }
+}
+
+function logNavProbe(inserted) {
+  // Renderer console capture in the app keeps console.error only, so this is the
+  // one channel that reaches desktop.log without a backend restart.
+  try {
+    console.error('[better-capabilities nav probe] ' + JSON.stringify(navDiagnostics(inserted)))
+  } catch (err) {
+    console.error('[better-capabilities nav probe] failed: ' + String(err))
+  }
+}
+
+function sendNavProbe(inserted) {
+  if (navProbed || typeof rest !== 'function') {
+    return
+  }
+  navProbed = true
+  try {
+    const payload = navDiagnostics(inserted)
+    void rest('/nav-probe', { method: 'POST', body: payload }).catch(() => {})
+  } catch {
+    // diagnostics must never affect the row
+  }
+}
+
 /** Inject the row actions and keep them painted across sidebar re-renders. */
 function mountNavActions(ctx) {
   if (!document.getElementById(NAV_STYLE_ID)) {
@@ -1270,8 +1379,29 @@ function mountNavActions(ctx) {
   }
 
   paintNavRow()
+  let attempts = 0
+  const retry = setInterval(() => {
+    attempts += 1
+    paintNavRow()
+    if (attempts >= 20) {
+      clearInterval(retry)
+    }
+  }, 1000)
+  setTimeout(() => {
+    logNavProbe(true)
+    sendNavProbe(true)
+  }, 2500)
   let scheduled = false
+  let missed = 0
   const observer = new MutationObserver(() => {
+    if (!navRow() && missed < 1) {
+      missed += 1
+      setTimeout(() => {
+        if (!navRow()) {
+          logNavProbe(false)
+        }
+      }, 4000)
+    }
     if (scheduled) {
       return
     }
@@ -1302,6 +1432,7 @@ function mountNavActions(ctx) {
   window.addEventListener('hashchange', closeNavMenu)
 
   ctx.onDispose(() => {
+    clearInterval(retry)
     observer.disconnect()
     document.removeEventListener('mousedown', onDown, true)
     document.removeEventListener('keydown', onKey, true)

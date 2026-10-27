@@ -14,11 +14,13 @@ from __future__ import annotations
 import base64
 import importlib.util
 import io
+import json
 import os
 import re
 import shutil
 import subprocess
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -323,6 +325,27 @@ def delete_skill(body: SkillBody):
     path, _root = _skill_dir(body.name)
     result = _delete_dir(path)
     return {"ok": True, "name": body.name, "result": result}
+
+
+@router.post("/nav-probe")
+def nav_probe(body: dict):
+    """TEMP PROBE (1.1.0): the Desktop half reports what the nav row looks like.
+
+    Appends one JSON line to ``better-capabilities-nav-probe.jsonl`` in this
+    Hermes home. Read it to tell a stale renderer module apart from a broken
+    selector. Remove with the matching block in desktop/plugin.js.
+    """
+    path = hermes_home() / "better-capabilities-nav-probe.jsonl"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"received": time.time(), "body": body}, ensure_ascii=False) + "\n")
+        if path.stat().st_size > 256_000:
+            lines = path.read_text(encoding="utf-8").splitlines()[-50:]
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Probe write failed: {exc}") from exc
+    return {"ok": True}
 
 
 @router.get("/presets")
