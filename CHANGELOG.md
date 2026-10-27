@@ -16,7 +16,6 @@ the component that changed; a plugin patch does not imply a new pack release.
 ### Fixed
 - hermes-jev-routing. The listed edition's desktop half mounted a strip under the user message with app DOM, so `hermes plugins validate` failed the desktop surface check and the plugin could not be catalogued. The line and its approve row now render as a React contribution at `COMPOSER_AREAS.underside`, with no app-owned nodes, no injected style tag and no line cache in `localStorage`. 1.0.2.
 - hermes-jev-routing. `/jev-routing on|off|mode` wrote one process-wide `_LAST`, so an override in one chat changed routing for every session and its "for this session" wording was false. Overrides now live per session and survive the config read that reset the mode on every turn; `why` and `status` read that session's own prompt and decision, and `on_session_delete` drops a deleted session's state.
-- provider-status. The pet bubble's settings query polls every 60s, so a save in Settings > Plugins took up to a minute to show. The Desktop half now refreshes the pet settings and the quota chips as soon as the backend broadcasts `plugin.provider-status.settings.changed`.
 - better-capabilities. Zipping or deleting a skill resolved the name through a private `tools.skill_manager_tool._find_skill` plus a directory walk of its own. It uses the public `tools.skills_tool` helpers now, so a name resolves with the host's tier precedence and an ambiguous name is refused instead of guessed, while the result stays inside the user skills tree this panel may change.
 - hermes-jev-routing. The cache guard had no prices to work with, so its penalty was always zero and the "would miss the cache" holds could never fire. Every configured model is now priced from the host rate card, and the context size comes from the anchored usage anchor rather than a guess at attribute names.
 - The three cache-guard branches were a boolean arrangement whose fast path only worked by accident. They are written explicitly now: a same-tier swap needs an affordable miss, a move inside the current band always holds, and a move out of the band holds unless it is a big upgrade or cheap.
@@ -27,9 +26,37 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [provider-status 1.6.5] - 2026-10-27
+
+The Discord presence draws a ten-cell bar, and the listed edition stays inside
+the catalog's credential rules.
+
 ### Changed
 
-- provider-status. The presence release was renumbered to 1.6.1 before it was announced, and 1.7.0 is retired with its tag removed. A copy still reporting 1.7.0 will not self-update, because the version compare sees nothing newer. Reinstall from `main` to realign it.
+- Both bars in the Discord presence draw ten cells instead of five, so a quota or
+  context reading is a gauge rather than a stub. `discord_bar_width` sets the
+  width anywhere from 3 to 20 cells, and its default is now ten; a status that
+  shares the row with Discord's member list keeps the shorter look by dropping
+  it back to five. The presence picks the new default up on the next gateway
+  restart, because it reads its settings once at registration.
+- The listed edition reads no vendor CLI auth file, refreshes and writes back no
+  Grok or Codex token, writes no Hermes `.env` on exhaustion, and keeps no copy
+  of a key in a plugin-owned `library.env`. Exhaustion and renewal-day rotation
+  record the pool index, and an expired OAuth token asks for a new login. Key
+  pools stay in the plugin's own `config.json`. This is the 1.6.4 credential
+  work, which had no release of its own.
+
+## [provider-status 1.6.3] - 2026-10-20
+
+The pet bubble follows a settings save at once.
+
+### Fixed
+
+- The pet bubble's settings query polls every 60s, so a save in Settings > Plugins
+  took up to a minute to show, and the quota chips kept their old values until
+  the next poll. The Desktop half now refreshes the pet settings and the quota
+  chips as soon as the backend broadcasts
+  `plugin.provider-status.settings.changed`.
 
 ## [intelligent-tool-break 1.3.6] - 2026-10-27
 
@@ -74,6 +101,10 @@ The current session's speed, context, and remaining quota now speak from Discord
 - Both editions: Discord bot presence for the provider backing the current session. Tokens/sec, context occupancy, and remaining quota (or credit balance) rotate or sit on one line. `/pulse`, `agent_pulse`, and `hermes session-pulse` report the same numbers. Bar width defaults to 5 cells so it fits Discord's member list, and is configurable.
 - Both editions: every presence line carries its own configurable emoji, with the emoji entry sitting directly above that line's switches. `discord_status_emoji` now covers only idle and thinking, since a metric line wearing both was redundant.
 - Both editions: pet-bubble settings sit above the Discord ones. Master switch on by default. Pick current vs worst provider, remaining / used / balance / auto, rewrite the line (name, percent sign, unit word), allowlist providers, and set wait / error thresholds plus bubble TTL.
+
+### Changed
+
+- The presence release was renumbered to 1.6.1 before it was announced, and 1.7.0 is retired with its tag removed. A copy still reporting 1.7.0 will not self-update, because the version compare sees nothing newer. Reinstall from `main` to realign it.
 
 ## [iteration-budget-meter 1.4.0] - 2026-10-14
 
