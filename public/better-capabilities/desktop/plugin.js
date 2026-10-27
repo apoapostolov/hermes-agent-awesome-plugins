@@ -248,6 +248,59 @@ async function profileNames() {
   }
 }
 
+/** Profile id → the name a person sees.
+
+ *  The app's own rule (profile rail, Profiles page): `display_name` when one is
+ *  configured, else the id. Ids are what every API call takes, so the two are
+ *  kept apart on purpose. */
+async function profileLabelMap() {
+  const map = {}
+  try {
+    const res = await host.profiles.list()
+    const rows = Array.isArray(res) ? res : res && Array.isArray(res.profiles) ? res.profiles : []
+    for (const row of rows) {
+      if (!row) {
+        continue
+      }
+      if (typeof row === 'string') {
+        map[row] = row
+        continue
+      }
+      const id = String(row.name || row.profile || '')
+      if (id) {
+        map[id] = String(row.display_name || '').trim() || id
+      }
+    }
+  } catch {
+    // a failed read just leaves labels as ids
+  }
+  return map
+}
+
+/** Label for a profile id, re-rendering once the list arrives. */
+function useProfileLabel() {
+  const [map, setMap] = useState({})
+
+  useEffect(() => {
+    let live = true
+    profileLabelMap()
+      .then(next => {
+        if (live) {
+          setMap(next)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [])
+
+  return id => {
+    const key = String(id || '')
+    return (key && map[key]) || key || 'default'
+  }
+}
+
 async function snapshotKind(kind, profile) {
   if (kind === 'skills') {
     const rows = await listSkills(profile)
@@ -484,6 +537,10 @@ function SkillsPage() {
   const pinnedProfile = useHashParam('bcprofile')
   const crossProfile = Boolean(pinnedProfile) && pinnedProfile !== (activeProfile || '')
   const scope = crossProfile ? pinnedProfile : ''
+  const labelFor = useProfileLabel()
+  const pinnedLabel = crossProfile
+    ? labelFor(pinnedProfile) + (labelFor(pinnedProfile) === pinnedProfile ? '' : ' (' + pinnedProfile + ')')
+    : ''
 
   const load = useCallback(async () => {
     setError('')
@@ -601,7 +658,7 @@ function SkillsPage() {
           'p',
           { className: MUTED },
           'Showing ' +
-            pinnedProfile +
+            pinnedLabel +
             ' (not this window’s profile). Switches apply to that profile; delete, package, folder and file actions need the app switched to it, so they stay hidden here.'
         )
       : el(
@@ -669,7 +726,8 @@ function PresetsPage() {
   const kindParam = useHashParam('bckind')
   const crossProfile = Boolean(pinnedProfile) && pinnedProfile !== (activeProfile || '')
   const scope = crossProfile ? pinnedProfile : ''
-  const profileLabel = (scope || activeProfile || 'default') + (scope ? ' (pinned)' : '')
+  const labelFor = useProfileLabel()
+  const profileLabel = labelFor(scope || activeProfile) + (scope ? ' (pinned)' : '')
   const [kind, setKind] = useState(() => (KINDS.some(item => item.id === kindParam) ? kindParam : 'skills'))
   const [store, setStore] = useState(null)
   const [name, setName] = useState('')
@@ -927,6 +985,7 @@ function PresetsPage() {
 
 function OverviewPage() {
   const profile = useAtom(host.state.profile)
+  const labelFor = useProfileLabel()
   const [counts, setCounts] = useState(null)
   const [error, setError] = useState('')
 
@@ -972,7 +1031,7 @@ function OverviewPage() {
     ),
     el(
       Section,
-      { hint: 'profile: ' + (profile || 'default') },
+      { hint: 'profile: ' + labelFor(profile) },
       error ? el('p', { className: cn(MUTED, 'text-(--ui-danger)') }, error) : null,
       line('Skills', counts && counts.skills),
       line('Toolsets', counts && counts.toolsets),
