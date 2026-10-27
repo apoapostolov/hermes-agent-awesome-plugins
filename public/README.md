@@ -20,7 +20,7 @@ Each public plugin that diverged from personal (or is held because of it) has `L
 | --- | --- |
 | memory-review | Path-id gate. No shell-menu inject. No hidden composer submit. Palette + dialog stay. |
 | intelligent-tool-break | Hooks + slash commands stay. No Popen patch, no private CLI rebind, no process SIGKILL, no composer insert. |
-| better-capabilities | Not in public. The product is Capabilities-page reach-in (row buttons, app-store writes, raw bridge). Kept in personal until a catalog hook exists. |
+| better-capabilities | Page stays: skill delete/package/browse plus per-profile presets, all through the SDK. No `/preset` chat command (needs core capability-state modules) and no sidebar row glyphs (app-markup reach-in). |
 | sessionretitler | Hooks plus owned `sessionretitler_title` aux slot. Title write goes through `agent.title_generator` and `hermes_state.SessionDB` (disclosed; no SDK title-write seam yet). |
 | provider-status | Quota chips, probes, plugin-owned config. No vendor CLI auth files, no token refresh on poll, no automatic Hermes `.env` / `config.yaml` writes, no `library.env` copy. |
 | sidebar-manager | Snapshot. Held until `host.sidebar` exists. |
