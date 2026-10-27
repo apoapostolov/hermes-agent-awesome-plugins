@@ -103,6 +103,43 @@ function useAtom(atom) {
   return value
 }
 
+/** Our own query params on the settings route (`bcprofile`, `bckind`).
+ *  Reading them is reading our own URL, never app markup. */
+function hashParam(name) {
+  const raw = typeof window === 'undefined' ? '' : String(window.location.hash || '')
+  const query = raw.split('?')[1] || ''
+  try {
+    return new URLSearchParams(query).get(name) || ''
+  } catch {
+    return ''
+  }
+}
+
+function useHashParam(name) {
+  const [value, setValue] = useState(() => hashParam(name))
+
+  useEffect(() => {
+    const onHash = () => setValue(hashParam(name))
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [name])
+
+  return value
+}
+
+/** Settings ▸ Plugins route for one of our sub-pages, optionally pinned to a
+ *  profile and a preset kind. */
+function settingsHref(page, profile, kind) {
+  const params = new URLSearchParams({ ppage: page, plugin: ID, tab: 'plugins' })
+  if (profile) {
+    params.set('bcprofile', profile)
+  }
+  if (kind) {
+    params.set('bckind', kind)
+  }
+  return '#/settings?' + params.toString()
+}
+
 function downloadZip(filename, b64) {
   const binary = atob(b64)
   const bytes = new Uint8Array(binary.length)
@@ -173,13 +210,13 @@ function ConfirmDialog({ body, confirmLabel, onCancel, onConfirm, title }) {
 
 // ── capability snapshots through the SDK doors ────────────────────────────
 
-async function listSkills() {
-  const rows = await host.skills.list()
+async function listSkills(scope) {
+  const rows = await host.skills.list(scope || undefined)
   return Array.isArray(rows) ? rows : []
 }
 
-async function listToolsets() {
-  const rows = await host.toolsets.list()
+async function listToolsets(scope) {
+  const rows = await host.toolsets.list(scope || undefined)
   return Array.isArray(rows) ? rows : []
 }
 
@@ -213,7 +250,7 @@ async function profileNames() {
 
 async function snapshotKind(kind, profile) {
   if (kind === 'skills') {
-    const rows = await listSkills()
+    const rows = await listSkills(profile)
     const enabled = {}
     for (const row of rows) {
       if (row && row.name) {
@@ -223,7 +260,7 @@ async function snapshotKind(kind, profile) {
     return { enabled }
   }
   if (kind === 'tools') {
-    const rows = await listToolsets()
+    const rows = await listToolsets(profile)
     const enabled = {}
     for (const row of rows) {
       if (row && row.name) {
@@ -232,8 +269,12 @@ async function snapshotKind(kind, profile) {
     }
     return { enabled }
   }
-  const current = await listAgentPlugins()
-  const maps = { [profile || 'default']: current }
+  const current = await listAgentPlugins(profile)
+  const key =
+    profile ||
+    (host.state.profile && typeof host.state.profile.get === 'function' ? host.state.profile.get() : '') ||
+    'default'
+  const maps = { [key]: current }
   for (const name of await profileNames()) {
     if (name === (profile || 'default') || Object.keys(maps).length > 12) {
       continue
@@ -248,10 +289,10 @@ async function snapshotKind(kind, profile) {
 }
 
 /** Flip one kind to the preset's state. Returns how many switches changed. */
-async function applyKind(kind, payload) {
+async function applyKind(kind, payload, scope) {
   if (kind === 'skills' || kind === 'tools') {
     const wanted = (payload && payload.enabled) || {}
-    const rows = kind === 'skills' ? await listSkills() : await listToolsets()
+    const rows = kind === 'skills' ? await listSkills(scope) : await listToolsets(scope)
     let changed = 0
     for (const row of rows) {
       const name = row && row.name
@@ -264,9 +305,9 @@ async function applyKind(kind, payload) {
       }
       try {
         if (kind === 'skills') {
-          await host.skills.setEnabled(name, want)
+          await host.skills.setEnabled(name, want, scope || undefined)
         } else {
-          await host.toolsets.setEnabled(name, want)
+          await host.toolsets.setEnabled(name, want, scope || undefined)
         }
         changed += 1
       } catch {
@@ -314,7 +355,7 @@ async function applyKind(kind, payload) {
 
 // ── Skills ────────────────────────────────────────────────────────────────
 
-function SkillRow({ busy, onDelete, onPackage, onReveal, onToggle, profile, row }) {
+function SkillRow({ busy, onDelete, onPackage, onReveal, onToggle, readOnly, row }) {
   const [open, setOpen] = useState(false)
   const [files, setFiles] = useState(null)
   const [activeRel, setActiveRel] = useState('SKILL.md')
@@ -380,15 +421,19 @@ function SkillRow({ busy, onDelete, onPackage, onReveal, onToggle, profile, row 
         row.description ? el('span', { className: cn(MUTED, 'truncate') }, row.description) : null
       ),
       provenance ? el('span', { className: PILL }, provenance) : null,
-      el(IconButton, { icon: open ? 'chevron-down' : 'chevron-right', label: 'Files', onClick: toggleOpen }),
-      el(IconButton, {
-        disabled: Boolean(busy),
-        icon: 'file-zip',
-        label: 'Package (zip)',
-        onClick: () => onPackage(row)
-      }),
-      el(IconButton, { icon: 'folder-opened', label: 'Open folder', onClick: () => onReveal(row) }),
-      el(IconButton, { icon: 'trash', label: 'Delete skill', onClick: () => onDelete(row), tone: 'danger' })
+      readOnly ? null : el(IconButton, { icon: open ? 'chevron-down' : 'chevron-right', label: 'Files', onClick: toggleOpen }),
+      readOnly
+        ? null
+        : el(IconButton, {
+            disabled: Boolean(busy),
+            icon: 'file-zip',
+            label: 'Package (zip)',
+            onClick: () => onPackage(row)
+          }),
+      readOnly ? null : el(IconButton, { icon: 'folder-opened', label: 'Open folder', onClick: () => onReveal(row) }),
+      readOnly
+        ? null
+        : el(IconButton, { icon: 'trash', label: 'Delete skill', onClick: () => onDelete(row), tone: 'danger' })
     ),
     open
       ? el(
@@ -435,16 +480,20 @@ function SkillsPage() {
   const [busy, setBusy] = useState('')
   const [query, setQuery] = useState('')
   const [pendingDelete, setPendingDelete] = useState(null)
+  const activeProfile = useAtom(host.state.profile)
+  const pinnedProfile = useHashParam('bcprofile')
+  const crossProfile = Boolean(pinnedProfile) && pinnedProfile !== (activeProfile || '')
+  const scope = crossProfile ? pinnedProfile : ''
 
   const load = useCallback(async () => {
     setError('')
     try {
-      setRows(await listSkills())
+      setRows(await listSkills(scope))
     } catch (err) {
       setRows([])
       setError(message(err))
     }
-  }, [])
+  }, [scope])
 
   useEffect(() => {
     void load()
@@ -467,7 +516,7 @@ function SkillsPage() {
     setBusy(row.name)
     setRows(current => (current || []).map(item => (item.name === row.name ? { ...item, enabled: next } : item)))
     try {
-      await host.skills.setEnabled(row.name, next)
+      await host.skills.setEnabled(row.name, next, scope || undefined)
     } catch (err) {
       setRows(current =>
         (current || []).map(item => (item.name === row.name ? { ...item, enabled: !next } : item))
@@ -547,11 +596,19 @@ function SkillsPage() {
       el(Button, { onClick: () => void load(), size: 'sm', variant: 'ghost' }, 'Refresh'),
       el('span', { className: MUTED }, (rows ? filtered.length : 0) + ' shown')
     ),
-    el(
-      'p',
-      { className: MUTED },
-      'Delete, package and folder actions only reach skills under this Hermes home’s skills folder. Bundled and hub skills resolve outside it and are left alone.'
-    ),
+    crossProfile
+      ? el(
+          'p',
+          { className: MUTED },
+          'Showing ' +
+            pinnedProfile +
+            ' (not this window’s profile). Switches apply to that profile; delete, package, folder and file actions need the app switched to it, so they stay hidden here.'
+        )
+      : el(
+          'p',
+          { className: MUTED },
+          'Delete, package and folder actions only reach skills under this Hermes home’s skills folder. Bundled and hub skills resolve outside it and are left alone.'
+        ),
     error ? el('p', { className: cn(MUTED, 'text-(--ui-danger)') }, error) : null,
     el(
       Section,
@@ -564,6 +621,7 @@ function SkillsPage() {
               el(SkillRow, {
                 busy,
                 key: row.name,
+                readOnly: crossProfile,
                 onDelete: setPendingDelete,
                 onPackage: row2 => void onPackage(row2),
                 onReveal: row2 => void onReveal(row2),
@@ -606,8 +664,13 @@ function PresetRow({ busy, entry, kind, onApply, onDelete, onMove, onOverwrite, 
 }
 
 function PresetsPage() {
-  const profile = useAtom(host.state.profile)
-  const [kind, setKind] = useState('skills')
+  const activeProfile = useAtom(host.state.profile)
+  const pinnedProfile = useHashParam('bcprofile')
+  const kindParam = useHashParam('bckind')
+  const crossProfile = Boolean(pinnedProfile) && pinnedProfile !== (activeProfile || '')
+  const scope = crossProfile ? pinnedProfile : ''
+  const profileLabel = (scope || activeProfile || 'default') + (scope ? ' (pinned)' : '')
+  const [kind, setKind] = useState(() => (KINDS.some(item => item.id === kindParam) ? kindParam : 'skills'))
   const [store, setStore] = useState(null)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState('')
@@ -628,6 +691,12 @@ function PresetsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (kindParam && KINDS.some(item => item.id === kindParam)) {
+      setKind(kindParam)
+    }
+  }, [kindParam])
 
   const persist = useCallback(async next => {
     setStore(next)
@@ -686,7 +755,7 @@ function PresetsPage() {
     setBusy(trimmed)
     setError('')
     try {
-      const payload = await snapshotKind(kind, profile)
+      const payload = await snapshotKind(kind, scope)
       payload.savedAt = Date.now()
       const nextBucket = { ...bucket, [trimmed]: payload }
       const nextOrder = order.filter(item => item !== trimmed)
@@ -711,7 +780,7 @@ function PresetsPage() {
     }
     setBusy(presetName)
     try {
-      const changed = await applyKind(targetKind, payload)
+      const changed = await applyKind(targetKind, payload, scope)
       toast('success', 'Applied ' + presetName, changed + ' switch' + (changed === 1 ? '' : 'es') + ' changed.')
       if (targetKind === 'plugins') {
         try {
@@ -799,7 +868,7 @@ function PresetsPage() {
           item.label
         )
       ),
-      el('span', { className: cn(MUTED, 'ml-2') }, 'profile: ' + (profile || 'default'))
+      el('span', { className: cn(MUTED, 'ml-2') }, 'profile: ' + profileLabel)
     ),
     el(
       'div',
@@ -945,6 +1014,304 @@ function OverviewPage() {
   )
 }
 
+// ── Sidebar row actions (personal edition) ────────────────────────────────
+// Two dim glyphs at the right edge of the Capabilities nav row: one opens this
+// profile's Skills editor, the other picks a profile to edit Skills or Plugins
+// for.
+//
+// This is app-markup reach-in, deliberately: the sidebar has no SDK hook for a
+// per-row action (SIDEBAR_NAV_AREA only ADDS rows, SIDEBAR_NAV_PREFS_AREA only
+// hides/reorders them), so the personal edition injects instead of waiting for
+// one. It is why this tree reports a `desktop surface` failure from
+// `hermes plugins validate`, and why the public edition omits this block. Every
+// node we add carries a `data-bc-*` marker and goes away on dispose.
+const NAV_ACTIONS_ATTR = 'data-bc-nav-actions'
+const NAV_MENU_ATTR = 'data-bc-nav-menu'
+const NAV_STYLE_ID = 'bc-nav-style'
+
+const NAV_CSS = `
+  .bc-nav-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    margin-left: auto;
+    opacity: 0.55;
+    transition: opacity 0.1s ease-out;
+  }
+  .bc-nav-actions:hover,
+  .bc-nav-actions:focus-within { opacity: 1; }
+  .bc-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: var(--ui-text-tertiary, inherit);
+    cursor: pointer;
+  }
+  .bc-nav-btn:hover {
+    background: var(--ui-control-hover-background, var(--chrome-action-hover, transparent));
+    color: var(--foreground, inherit);
+  }
+  .bc-nav-btn .codicon { font-size: 0.75rem; line-height: 1; }
+  .bc-nav-menu {
+    position: fixed;
+    z-index: 9999;
+    min-width: 11rem;
+    max-height: 60vh;
+    overflow: auto;
+    padding: 0.25rem 0;
+    border: 1px solid var(--ui-stroke-tertiary, var(--border, currentColor));
+    border-radius: 0.5rem;
+    background: var(--ui-bg-elevated, var(--card, #1b1b1b));
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.28);
+    font-size: 0.75rem;
+  }
+  .bc-nav-menu-head {
+    padding: 0.3rem 0.6rem 0.15rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ui-text-tertiary, inherit);
+  }
+  .bc-nav-menu-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.6rem;
+    border: 0;
+    background: transparent;
+    color: var(--foreground, inherit);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .bc-nav-menu-item:hover { background: var(--chrome-action-hover, rgba(127, 127, 127, 0.14)); }
+  .bc-nav-menu-check { margin-left: auto; font-size: 0.7rem; color: var(--ui-text-tertiary, inherit); }
+  .bc-nav-menu-sep {
+    height: 1px;
+    margin: 0.25rem 0.4rem;
+    background: var(--ui-stroke-tertiary, currentColor);
+    opacity: 0.5;
+  }
+`
+
+function navRow() {
+  for (const row of document.querySelectorAll('[data-sidebar="menu-button"]')) {
+    if (row.querySelector('[data-tour="sidebar-nav-capabilities"]')) {
+      return row
+    }
+  }
+  return null
+}
+
+function closeNavMenu() {
+  document.querySelectorAll('[' + NAV_MENU_ATTR + ']').forEach(node => node.remove())
+}
+
+function navGlyphButton(glyph, label, onClick) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'bc-nav-btn'
+  button.title = label
+  button.setAttribute('aria-label', label)
+  button.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    onClick(event)
+  })
+  const icon = document.createElement('i')
+  icon.className = 'codicon ' + glyph
+  icon.setAttribute('aria-hidden', 'true')
+  button.appendChild(icon)
+  return button
+}
+
+function placeNavMenu(anchor, menu) {
+  const rect = anchor.getBoundingClientRect()
+  menu.style.top = Math.round(rect.bottom + 4) + 'px'
+  menu.style.left = Math.round(rect.right - menu.offsetWidth) + 'px'
+  requestAnimationFrame(() => {
+    const box = menu.getBoundingClientRect()
+    if (box.right > window.innerWidth - 8) {
+      menu.style.left = Math.max(8, window.innerWidth - 8 - box.width) + 'px'
+    }
+    if (box.left < 8) {
+      menu.style.left = '8px'
+    }
+    if (box.bottom > window.innerHeight - 8) {
+      menu.style.top = Math.max(8, rect.top - box.height - 4) + 'px'
+    }
+  })
+}
+
+async function menuProfiles() {
+  const names = []
+  try {
+    const res = await host.profiles.list()
+    const rows = Array.isArray(res) ? res : res && Array.isArray(res.profiles) ? res.profiles : []
+    for (const row of rows) {
+      const name = typeof row === 'string' ? row : row && (row.name || row.profile)
+      if (name && !names.includes(String(name))) {
+        names.push(String(name))
+      }
+    }
+  } catch {
+    // fall through to the live profile below
+  }
+  const live =
+    host.state.profile && typeof host.state.profile.get === 'function' ? String(host.state.profile.get() || '') : ''
+  if (live && !names.includes(live)) {
+    names.unshift(live)
+  }
+  return names.length ? names : ['default']
+}
+
+async function openNavMenu(anchor) {
+  if (document.querySelector('[' + NAV_MENU_ATTR + ']')) {
+    closeNavMenu()
+    return
+  }
+  closeNavMenu()
+
+  const live =
+    host.state.profile && typeof host.state.profile.get === 'function' ? String(host.state.profile.get() || '') : ''
+  const names = await menuProfiles()
+
+  const menu = document.createElement('div')
+  menu.className = 'bc-nav-menu'
+  menu.setAttribute(NAV_MENU_ATTR, '1')
+  menu.setAttribute('role', 'menu')
+
+  const head = text => {
+    const node = document.createElement('div')
+    node.className = 'bc-nav-menu-head'
+    node.textContent = text
+    menu.appendChild(node)
+  }
+
+  const pick = (page, kind, name) => {
+    const row = document.createElement('button')
+    row.type = 'button'
+    row.className = 'bc-nav-menu-item'
+    row.setAttribute('role', 'menuitem')
+    row.textContent = name
+    if (name === live) {
+      const check = document.createElement('i')
+      check.className = 'codicon codicon-check bc-nav-menu-check'
+      check.setAttribute('aria-hidden', 'true')
+      row.appendChild(check)
+    }
+    row.addEventListener('click', event => {
+      event.preventDefault()
+      event.stopPropagation()
+      closeNavMenu()
+      window.location.hash = settingsHref(page, name, kind)
+    })
+    menu.appendChild(row)
+  }
+
+  head('Skills')
+  for (const name of names) {
+    pick('skills', '', name)
+  }
+
+  const sep = document.createElement('div')
+  sep.className = 'bc-nav-menu-sep'
+  menu.appendChild(sep)
+
+  head('Plugins')
+  for (const name of names) {
+    pick('presets', 'plugins', name)
+  }
+
+  document.body.appendChild(menu)
+  placeNavMenu(anchor, menu)
+}
+
+function paintNavRow() {
+  const row = navRow()
+  if (!row) {
+    return false
+  }
+  if (row.querySelector('[' + NAV_ACTIONS_ATTR + ']')) {
+    return true
+  }
+  const wrap = document.createElement('span')
+  wrap.className = 'bc-nav-actions'
+  wrap.setAttribute(NAV_ACTIONS_ATTR, '1')
+  wrap.appendChild(
+    navGlyphButton('edit', 'Edit skills for this profile', () => {
+      window.location.hash = settingsHref('skills')
+    })
+  )
+  wrap.appendChild(
+    navGlyphButton('account', 'Edit another profile', event => {
+      void openNavMenu(event.currentTarget)
+    })
+  )
+  row.appendChild(wrap)
+  return true
+}
+
+/** Inject the row actions and keep them painted across sidebar re-renders. */
+function mountNavActions(ctx) {
+  if (!document.getElementById(NAV_STYLE_ID)) {
+    const style = document.createElement('style')
+    style.id = NAV_STYLE_ID
+    style.textContent = NAV_CSS
+    document.head.appendChild(style)
+  }
+
+  paintNavRow()
+  let scheduled = false
+  const observer = new MutationObserver(() => {
+    if (scheduled) {
+      return
+    }
+    scheduled = true
+    requestAnimationFrame(() => {
+      scheduled = false
+      paintNavRow()
+    })
+  })
+  observer.observe(document.body, { childList: true, subtree: true })
+
+  const onDown = event => {
+    if (event.target && event.target.closest && event.target.closest('[' + NAV_MENU_ATTR + ']')) {
+      return
+    }
+    if (event.target && event.target.closest && event.target.closest('[' + NAV_ACTIONS_ATTR + ']')) {
+      return
+    }
+    closeNavMenu()
+  }
+  const onKey = event => {
+    if (event.key === 'Escape') {
+      closeNavMenu()
+    }
+  }
+  document.addEventListener('mousedown', onDown, true)
+  document.addEventListener('keydown', onKey, true)
+  window.addEventListener('hashchange', closeNavMenu)
+
+  ctx.onDispose(() => {
+    observer.disconnect()
+    document.removeEventListener('mousedown', onDown, true)
+    document.removeEventListener('keydown', onKey, true)
+    window.removeEventListener('hashchange', closeNavMenu)
+    closeNavMenu()
+    document.querySelectorAll('[' + NAV_ACTIONS_ATTR + ']').forEach(node => node.remove())
+    document.getElementById(NAV_STYLE_ID)?.remove()
+  })
+}
+
 // ── plugin ────────────────────────────────────────────────────────────────
 
 export default {
@@ -955,6 +1322,13 @@ export default {
   register(ctx) {
     rest = typeof ctx.rest === 'function' ? ctx.rest : null
     osDoor = ctx.os || null
+    // Personal edition only: see the note on NAV_CSS. Harmless if the row is
+    // not there — it retries on the next sidebar render and never throws.
+    try {
+      mountNavActions(ctx)
+    } catch {
+      // the Capacities row needs no actions to stay usable
+    }
     ctx.registerSettingsPage({
       id: 'better-capabilities',
       title: 'Better Capabilities',

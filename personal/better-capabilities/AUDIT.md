@@ -89,7 +89,12 @@ Carried from `LIMITATIONS.md`, all four are cheap and all four are real:
 
 ## What still keeps it off the catalog
 
-Rule 8 is satisfied by this rebuild. Remaining, for a later pass: the security scan reads the
+Rule 8 was satisfied by this rebuild until the sidebar row actions landed: the page is still
+SDK-only, but the two glyphs on the Capabilities nav row are injected app markup, so the tree now
+reports two `app DOM reach` findings from `desktop surface`. Those glyphs are personal-only by
+decision and the public edition will not carry them.
+
+Everything below applies once that block is stripped. Remaining, for a later pass: the security scan reads the
 PowerShell Recycle-Bin helper as `caution`, and `plugin_validate_private_imports` warns on
 `hermes_cli.*`/`tools.skills_tool` imports even though the skills helpers are public now. Both are
 warnings, not failures.

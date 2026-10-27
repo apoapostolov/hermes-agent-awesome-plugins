@@ -15,13 +15,22 @@
 
 ## Where it lives
 
-**Settings → Plugins → Better Capabilities**, with three entries: an overview, **Skills**, and
-**Presets**. The page renders inside Settings, so it is reachable from the Settings rail and from
-the gear on the plugin's own row in Capabilities → Plugins.
+Two ways in:
 
-It does not add buttons to the Capabilities page. That page gives plugins no slot to contribute
-to, and reaching into its markup would break on any Desktop release. Everything here is drawn by
-this plugin.
+- **The Capabilities row in the sidebar** carries two dim glyphs. The pencil opens this profile's
+  Skills editor. The second opens a profile menu with a thin **Skills** header and then a
+  **Plugins** header; picking a profile opens that page pinned to it.
+- **Settings → Plugins → Better Capabilities**, with an overview, **Skills**, and **Presets**.
+  Reachable from the Settings rail and from the gear on the plugin's own row in
+  Capabilities → Plugins.
+
+The page adds nothing to the Capabilities page — that page gives plugins no slot to contribute to.
+The two sidebar glyphs are injected into the nav row on purpose, because the sidebar has no per-row
+SDK hook; that is why this personal edition fails the catalog's `desktop surface` check. See
+[LIMITATIONS.md](LIMITATIONS.md).
+
+Picking another profile pins the page to it: skill switches apply to that profile, while delete,
+package, folder and file actions stay hidden because those routes act on the window's own profile.
 
 ## What you can do
 
