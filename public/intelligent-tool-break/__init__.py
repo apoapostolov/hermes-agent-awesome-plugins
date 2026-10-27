@@ -40,7 +40,7 @@ MAX_AGAIN = 2
 _lock = threading.Lock()
 _inflight: dict[str, dict[str, Any]] = {}
 _broken: dict[str, dict[str, Any]] = {}
-_again_by_fp: dict[str, int] = {}
+_again_by_fp: dict[tuple[str, str], int] = {}
 
 
 def _fmt_duration(ms: float) -> str:
@@ -67,6 +67,19 @@ def _fingerprint(name: str, args: Any) -> str:
     except Exception:
         blob = str(args)
     return f"{name}:{blob}"
+
+
+def _again_key(item: dict[str, Any]) -> tuple[str, str]:
+    """The /again budget belongs to the session that spent it.
+
+    Two sessions running the same command get two uses each. A row with no
+    recorded owner keys under "", which keeps the old process-wide behavior
+    for a surface that has no session of its own.
+    """
+    return (
+        str(item.get("session_id") or ""),
+        _fingerprint(str(item.get("name") or ""), item.get("args")),
+    )
 
 
 def _salvage(prior: str) -> str:
@@ -429,12 +442,12 @@ def _break_oldest(*, hint: Optional[str], again: bool, tool_call_id: Optional[st
             return "Nothing in flight"
         if not _killable(target) and target.get("name") not in SPAWN_TOOLS:
             return "Nothing in flight"
-        fp = _fingerprint(str(target.get("name") or ""), target.get("args"))
-        used = int(_again_by_fp.get(fp, 0))
+        key = _again_key(target)
+        used = int(_again_by_fp.get(key, 0))
         if again and used >= MAX_AGAIN:
             return "Again used twice on this call. Break instead."
         if again:
-            _again_by_fp[fp] = used + 1
+            _again_by_fp[key] = used + 1
         mark = {
             "name": target["name"],
             "args": target.get("args"),
@@ -502,22 +515,46 @@ def _on_transform_tool_result(**kwargs: Any) -> Optional[str]:
     return _rewrite(mark, prior)
 
 
-def _on_session_start(**_kwargs: Any) -> None:
-    with _lock:
-        for item in list(_inflight.values()):
-            poll = item.get("poll")
-            if poll is not None:
-                try:
-                    poll.cancel()
-                except Exception:
-                    pass
-        _inflight.clear()
-        _broken.clear()
+def _drop_session_rows(session_id: Optional[str]) -> None:
+    """Forget one session's tracked calls and its /again budget (caller holds lock).
+
+    None means every session, which is what a surface with no session of its
+    own gets. A row with no recorded owner cannot be attributed to a session,
+    so a scoped call leaves it alone instead of deleting it for everyone.
+    """
+    if session_id is None:
+        doomed = list(_inflight)
         _again_by_fp.clear()
+    else:
+        doomed = [
+            tid
+            for tid, item in _inflight.items()
+            if str(item.get("session_id") or "") == session_id
+        ]
+        for key in [key for key in _again_by_fp if key[0] == session_id]:
+            _again_by_fp.pop(key, None)
+    for tid in doomed:
+        _drop(tid)
+        _broken.pop(tid, None)
 
 
-def _on_session_end(**kwargs: Any) -> None:
-    _on_session_start(**kwargs)
+def _on_session_start(**kwargs: Any) -> None:
+    """Reset the state of the session that is starting, and no other."""
+    session_id = _scoped_session(kwargs.get("session_id"))
+    with _lock:
+        _drop_session_rows(session_id)
+
+
+def _on_session_end(**_kwargs: Any) -> None:
+    """A turn finished, not the session, so nothing is dropped here.
+
+    Hermes fires on_session_end after every turn (agent/turn_finalizer.py), and
+    a tool call can still be running for that same session across a turn
+    boundary. Dropping it here is what made /break report "Nothing in flight"
+    for a call that was live. Rows age out on post_tool_call, and the next
+    on_session_start or on_session_delete of that session clears the rest. The
+    /again budget is per session, so it survives turn boundaries too.
+    """
 
 
 def _on_session_delete(**kwargs: Any) -> None:
@@ -528,11 +565,8 @@ def _on_session_delete(**kwargs: Any) -> None:
     if not ids:
         return
     with _lock:
-        doomed = [tid for tid, item in _inflight.items()
-                  if str(item.get("session_id") or "") in ids]
-        for tid in doomed:
-            _drop(tid)
-            _broken.pop(tid, None)
+        for session_id in ids:
+            _drop_session_rows(session_id)
 
 
 def _handle_break(raw_args: str, *, session_id: str = "") -> str:
@@ -576,8 +610,7 @@ def _tool_label(item: dict[str, Any]) -> str:
 
 
 def _tool_status(item: dict[str, Any]) -> dict[str, Any]:
-    fp = _fingerprint(str(item.get("name") or ""), item.get("args"))
-    again_count = int(_again_by_fp.get(fp, 0))
+    again_count = int(_again_by_fp.get(_again_key(item), 0))
     killable = _killable(item) or item.get("name") in SPAWN_TOOLS
     return {
         "id": item["id"],

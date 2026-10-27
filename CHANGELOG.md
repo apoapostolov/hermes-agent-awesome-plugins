@@ -11,7 +11,6 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ### Fixed
 - hermes-jev-routing. The listed edition's desktop half mounted a strip under the user message with app DOM, so `hermes plugins validate` failed the desktop surface check and the plugin could not be catalogued. The line and its approve row now render as a React contribution at `COMPOSER_AREAS.underside`, with no app-owned nodes, no injected style tag and no line cache in `localStorage`. 1.0.2.
-- intelligent-tool-break. `/break`, `/again` and `/break-status` acted on the whole gateway process, so a break in one chat could kill a tool running in another. Each command now scopes to the session that invoked it, an explicit `--session-id` still wins, and a row with no recorded owner stays visible everywhere. A deleted session's rows are dropped by `on_session_delete`, which fires on Desktop deletes that never reach `on_session_end`.
 - hermes-jev-routing. `/jev-routing on|off|mode` wrote one process-wide `_LAST`, so an override in one chat changed routing for every session and its "for this session" wording was false. Overrides now live per session and survive the config read that reset the mode on every turn; `why` and `status` read that session's own prompt and decision, and `on_session_delete` drops a deleted session's state.
 - provider-status. The pet bubble's settings query polls every 60s, so a save in Settings > Plugins took up to a minute to show. The Desktop half now refreshes the pet settings and the quota chips as soon as the backend broadcasts `plugin.provider-status.settings.changed`.
 - better-capabilities. Zipping or deleting a skill resolved the name through a private `tools.skill_manager_tool._find_skill` plus a directory walk of its own. It uses the public `tools.skills_tool` helpers now, so a name resolves with the host's tier precedence and an ambiguous name is refused instead of guessed, while the result stays inside the user skills tree this panel may change.
@@ -27,6 +26,24 @@ the component that changed; a plugin patch does not imply a new pack release.
 ### Changed
 
 - provider-status. The presence release was renumbered to 1.6.1 before it was announced, and 1.7.0 is retired with its tag removed. A copy still reporting 1.7.0 will not self-update, because the version compare sees nothing newer. Reinstall from `main` to realign it.
+
+## [intelligent-tool-break 1.3.6] - 2026-10-27
+
+Hermes fires `on_session_end` after every turn, not at the end of a session, so
+the session lifecycle hooks were acting on the whole process.
+
+### Fixed
+
+- intelligent-tool-break. A turn ending in one chat dropped another chat's in-flight calls. `on_session_start` and `on_session_end` cleared every session's tracked calls and `/again` budget for the whole process, so `/break` reported "Nothing in flight" for a tool still running in another session. Both hooks act on the session they are given now, and `on_session_end` no longer drops calls at all, because a call can still be running for the same session across a turn boundary. A surface with no session id keeps the process-wide reset, and a deleted session takes its rows and budget with it.
+- intelligent-tool-break. Two sessions running an identical command shared one `/again` budget, because the key was the tool name and args alone. The budget is keyed by session as well now, so each session gets its own two uses.
+
+## [intelligent-tool-break 1.3.5] - 2026-10-20
+
+The break commands belong to the chat you type them in.
+
+### Fixed
+
+- intelligent-tool-break. `/break`, `/again` and `/break-status` acted on the whole gateway process, so a break in one chat could kill a tool running in another. Each command now scopes to the session that invoked it, an explicit `--session-id` still wins, and a row with no recorded owner stays visible everywhere. A deleted session's rows are dropped by `on_session_delete`, which fires on Desktop deletes that never reach `on_session_end`.
 
 ## [provider-status 1.6.2] - 2026-10-16
 

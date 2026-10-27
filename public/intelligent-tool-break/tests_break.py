@@ -181,3 +181,130 @@ if __name__ == "__main__":
     test_newest_is_default()
     test_again_cap()
     print("ok")
+
+def _two_sessions():
+    with mod._lock:
+        mod._inflight.clear()
+        mod._broken.clear()
+        mod._again_by_fp.clear()
+    mod._on_pre_tool_call(tool_name="terminal", tool_call_id="row-a", session_id="sa",
+                          args={"command": "sleep 11"})
+    time.sleep(0.02)
+    mod._on_pre_tool_call(tool_name="process", tool_call_id="row-b", session_id="sb",
+                          args={"command": "sleep 22"})
+
+
+
+
+def _two_sessions_same_command():
+    """Two sessions running an identical tool call in one process."""
+    with mod._lock:
+        mod._inflight.clear()
+        mod._broken.clear()
+        mod._again_by_fp.clear()
+    mod._on_pre_tool_call(tool_name="terminal", tool_call_id="dup-a", session_id="sa",
+                          args={"command": "same-command"})
+    mod._on_pre_tool_call(tool_name="terminal", tool_call_id="dup-b", session_id="sb",
+                          args={"command": "same-command"})
+
+
+def test_session_start_of_one_session_keeps_another_sessions_calls():
+    _two_sessions()
+    mod._on_session_start(session_id="sa")
+    # sa's own leftovers are stale; sb's call is still running in this process
+    assert "row-a" not in mod._inflight
+    assert "row-b" in mod._inflight
+    mod._on_post_tool_call(tool_call_id="row-b")
+
+
+def test_session_end_keeps_the_calling_sessions_in_flight_calls():
+    # Hermes fires on_session_end after EVERY turn (agent/turn_finalizer.py),
+    # so a call still running across a turn boundary has to survive it.
+    _two_sessions()
+    mod._on_session_end(session_id="sa", turn_id="t1", completed=True)
+    assert set(mod._inflight) == {"row-a", "row-b"}
+    mod._on_post_tool_call(tool_call_id="row-a")
+    mod._on_post_tool_call(tool_call_id="row-b")
+
+
+def test_session_start_without_a_session_id_still_clears_everything():
+    # A surface with no session of its own keeps the old process-wide reset.
+    _two_sessions()
+    mod._on_session_start()
+    assert not mod._inflight
+
+
+def test_again_budget_is_per_session():
+    _two_sessions_same_command()
+    assert "Broke" in mod._handle_again("", session_id="sa")
+    assert "Broke" in mod._handle_again("", session_id="sa")
+    assert "twice" in mod._handle_again("", session_id="sa").lower()
+    # sb never used /again on that command, so the shared fingerprint is not shared
+    assert "Broke" in mod._handle_again("", session_id="sb")
+    assert json.loads(mod._handle_status("", session_id="sa"))["again_count"] == 2
+    assert json.loads(mod._handle_status("", session_id="sb"))["again_count"] == 1
+    mod._on_post_tool_call(tool_call_id="dup-a")
+    mod._on_post_tool_call(tool_call_id="dup-b")
+
+
+def test_session_delete_forgets_its_again_budget():
+    _two_sessions_same_command()
+    assert "Broke" in mod._handle_again("", session_id="sa")
+    assert any(key[0] == "sa" for key in mod._again_by_fp)
+    mod._on_session_delete(session_id="sa")
+    assert not any(key[0] == "sa" for key in mod._again_by_fp)
+    mod._on_post_tool_call(tool_call_id="dup-b")
+
+
+def test_status_uses_the_calling_session():
+    _two_sessions()
+    shown = json.loads(mod._handle_status("", session_id="sa"))
+    assert [row["id"] for row in shown["tools"]] == ["row-a"]
+    # an explicit flag still wins for a caller with no session of its own
+    forced = json.loads(mod._handle_status("--session-id sb", session_id="sa"))
+    assert [row["id"] for row in forced["tools"]] == ["row-b"]
+    # no session at all keeps the old process-wide view
+    assert len(json.loads(mod._handle_status(""))["tools"]) == 2
+    mod._on_post_tool_call(tool_call_id="row-a")
+    mod._on_post_tool_call(tool_call_id="row-b")
+
+
+def test_break_touches_only_the_calling_session():
+    _two_sessions()
+    msg = mod._handle_break("", session_id="sa")
+    assert "Broke" in msg
+    assert "row-a" in mod._broken
+    assert "row-b" not in mod._broken
+    mod._on_post_tool_call(tool_call_id="row-a")
+    mod._on_post_tool_call(tool_call_id="row-b")
+
+
+def test_break_refuses_another_sessions_tool_id():
+    _two_sessions()
+    msg = mod._break_oldest(hint=None, again=False, tool_call_id="row-b", session_id="sa")
+    assert "another session" in msg
+    assert not mod._broken
+    mod._on_post_tool_call(tool_call_id="row-a")
+    mod._on_post_tool_call(tool_call_id="row-b")
+
+
+def test_session_delete_drops_that_sessions_rows():
+    _two_sessions()
+    mod._on_session_delete(session_id="sa")
+    assert "row-a" not in mod._inflight
+    assert "row-b" in mod._inflight
+    mod._on_session_delete(deleted_ids=["sb"])
+    assert not mod._inflight
+
+
+def test_unowned_row_stays_visible_to_every_session():
+    with mod._lock:
+        mod._inflight.clear()
+        mod._broken.clear()
+        mod._again_by_fp.clear()
+    mod._on_pre_tool_call(tool_name="process", tool_call_id="anon", args={"command": "sleep 3"})
+    shown = json.loads(mod._handle_status("", session_id="sa"))
+    assert [row["id"] for row in shown["tools"]] == ["anon"]
+    assert "Broke" in mod._handle_break("", session_id="sa")
+    assert "anon" in mod._broken
+    mod._on_post_tool_call(tool_call_id="anon")

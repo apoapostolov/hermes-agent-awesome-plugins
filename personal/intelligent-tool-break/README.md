@@ -4,7 +4,7 @@
   <strong>Stop a stalled tool call without killing the turn.</strong>
   <p>`/break`, `/break {msg}`, and `/again` — plus a desktop strip beside active work.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.5-2ea44f" alt="Version 1.3.5" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.6-2ea44f" alt="Version 1.3.6" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -18,6 +18,7 @@
 - `/break` stops the newest in-flight spawn tree and keeps the turn alive.
 - `/break {message}` stops the call and gives the model your correction.
 - `/again` retries the last call; `/again {hint}` retries with a tweak.
+- `/again` allows two uses of the same call in a session, so retries in another chat never use them up.
 - `/break-status` lists what is currently killable.
 - Use the desktop strip (Break, Message, Again, elapsed time, per-tool controls) or `mod+shift+b`.
 
