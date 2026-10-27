@@ -248,6 +248,59 @@ async function profileNames() {
   }
 }
 
+/** Profile id → the name a person sees.
+
+ *  The app's own rule (profile rail, Profiles page): `display_name` when one is
+ *  configured, else the id. Ids are what every API call takes, so the two are
+ *  kept apart on purpose — a menu shows the label and navigates with the id. */
+async function profileLabelMap() {
+  const map = {}
+  try {
+    const res = await host.profiles.list()
+    const rows = Array.isArray(res) ? res : res && Array.isArray(res.profiles) ? res.profiles : []
+    for (const row of rows) {
+      if (!row) {
+        continue
+      }
+      if (typeof row === 'string') {
+        map[row] = row
+        continue
+      }
+      const id = String(row.name || row.profile || '')
+      if (id) {
+        map[id] = String(row.display_name || '').trim() || id
+      }
+    }
+  } catch {
+    // a failed read just leaves labels as ids
+  }
+  return map
+}
+
+/** Label for a profile id, re-rendering once the list arrives. */
+function useProfileLabel() {
+  const [map, setMap] = useState({})
+
+  useEffect(() => {
+    let live = true
+    profileLabelMap()
+      .then(next => {
+        if (live) {
+          setMap(next)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [])
+
+  return id => {
+    const key = String(id || '')
+    return (key && map[key]) || key || 'default'
+  }
+}
+
 async function snapshotKind(kind, profile) {
   if (kind === 'skills') {
     const rows = await listSkills(profile)
@@ -484,6 +537,10 @@ function SkillsPage() {
   const pinnedProfile = useHashParam('bcprofile')
   const crossProfile = Boolean(pinnedProfile) && pinnedProfile !== (activeProfile || '')
   const scope = crossProfile ? pinnedProfile : ''
+  const labelFor = useProfileLabel()
+  const pinnedLabel = crossProfile
+    ? labelFor(pinnedProfile) + (labelFor(pinnedProfile) === pinnedProfile ? '' : ' (' + pinnedProfile + ')')
+    : ''
 
   const load = useCallback(async () => {
     setError('')
@@ -601,7 +658,7 @@ function SkillsPage() {
           'p',
           { className: MUTED },
           'Showing ' +
-            pinnedProfile +
+            pinnedLabel +
             ' (not this window’s profile). Switches apply to that profile; delete, package, folder and file actions need the app switched to it, so they stay hidden here.'
         )
       : el(
@@ -669,7 +726,8 @@ function PresetsPage() {
   const kindParam = useHashParam('bckind')
   const crossProfile = Boolean(pinnedProfile) && pinnedProfile !== (activeProfile || '')
   const scope = crossProfile ? pinnedProfile : ''
-  const profileLabel = (scope || activeProfile || 'default') + (scope ? ' (pinned)' : '')
+  const labelFor = useProfileLabel()
+  const profileLabel = labelFor(scope || activeProfile) + (scope ? ' (pinned)' : '')
   const [kind, setKind] = useState(() => (KINDS.some(item => item.id === kindParam) ? kindParam : 'skills'))
   const [store, setStore] = useState(null)
   const [name, setName] = useState('')
@@ -934,6 +992,7 @@ function PresetsPage() {
 
 function OverviewPage() {
   const profile = useAtom(host.state.profile)
+  const labelFor = useProfileLabel()
   const [counts, setCounts] = useState(null)
   const [error, setError] = useState('')
 
@@ -979,7 +1038,7 @@ function OverviewPage() {
     ),
     el(
       Section,
-      { hint: 'profile: ' + (profile || 'default') },
+      { hint: 'profile: ' + labelFor(profile) },
       error ? el('p', { className: cn(MUTED, 'text-(--ui-danger)') }, error) : null,
       line('Skills', counts && counts.skills),
       line('Toolsets', counts && counts.toolsets),
@@ -1174,25 +1233,18 @@ function placeNavMenu(anchor, menu) {
 }
 
 async function menuProfiles() {
-  const names = []
-  try {
-    const res = await host.profiles.list()
-    const rows = Array.isArray(res) ? res : res && Array.isArray(res.profiles) ? res.profiles : []
-    for (const row of rows) {
-      const name = typeof row === 'string' ? row : row && (row.name || row.profile)
-      if (name && !names.includes(String(name))) {
-        names.push(String(name))
-      }
-    }
-  } catch {
-    // fall through to the live profile below
+  const rows = []
+  const labels = await profileLabelMap()
+  for (const [id, label] of Object.entries(labels)) {
+    rows.push({ id, label })
   }
   const live =
     host.state.profile && typeof host.state.profile.get === 'function' ? String(host.state.profile.get() || '') : ''
-  if (live && !names.includes(live)) {
-    names.unshift(live)
+  if (live && !rows.some(row => row.id === live)) {
+    // the list failed or has not caught up: still offer the window's own profile
+    rows.unshift({ id: live, label: live })
   }
-  return names.length ? names : ['default']
+  return rows.length ? rows : [{ id: 'default', label: 'default' }]
 }
 
 async function openNavMenu(anchor) {
@@ -1204,7 +1256,7 @@ async function openNavMenu(anchor) {
 
   const live =
     host.state.profile && typeof host.state.profile.get === 'function' ? String(host.state.profile.get() || '') : ''
-  const names = await menuProfiles()
+  const rows = await menuProfiles()
 
   const menu = document.createElement('div')
   menu.className = 'bc-nav-menu'
@@ -1218,13 +1270,17 @@ async function openNavMenu(anchor) {
     menu.appendChild(node)
   }
 
-  const pick = (page, kind, name) => {
+  const pick = (page, kind, profile) => {
     const row = document.createElement('button')
     row.type = 'button'
     row.className = 'bc-nav-menu-item'
     row.setAttribute('role', 'menuitem')
-    row.textContent = name
-    if (name === live) {
+    row.textContent = profile.label
+    if (profile.label !== profile.id) {
+      // the id is what lands in the URL, so keep it discoverable
+      row.title = profile.label + ' (' + profile.id + ')'
+    }
+    if (profile.id === live) {
       const check = document.createElement('i')
       check.className = 'codicon codicon-check bc-nav-menu-check'
       check.setAttribute('aria-hidden', 'true')
@@ -1234,14 +1290,14 @@ async function openNavMenu(anchor) {
       event.preventDefault()
       event.stopPropagation()
       closeNavMenu()
-      window.location.hash = settingsHref(page, name, kind)
+      window.location.hash = settingsHref(page, profile.id, kind)
     })
     menu.appendChild(row)
   }
 
   head('Skills')
-  for (const name of names) {
-    pick('skills', '', name)
+  for (const profile of rows) {
+    pick('skills', '', profile)
   }
 
   const sep = document.createElement('div')
@@ -1249,8 +1305,8 @@ async function openNavMenu(anchor) {
   menu.appendChild(sep)
 
   head('Plugins')
-  for (const name of names) {
-    pick('presets', 'plugins', name)
+  for (const profile of rows) {
+    pick('presets', 'plugins', profile)
   }
 
   document.body.appendChild(menu)
