@@ -244,9 +244,9 @@ config_schema:
     description: Show the session's lifetime token total
   discord_bar_width:
     type: int
-    default: 5
+    default: 10
     label: Bar width
-    description: Bar cells (3-20). Discord's member list truncates long statuses, so keep it short there.
+    description: Bar cells (3-20). Ten by default; narrow it if Discord's member list truncates the status.
   discord_separator:
     type: str
     default: " · "
