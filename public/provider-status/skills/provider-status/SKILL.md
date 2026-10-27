@@ -61,16 +61,17 @@ below is a checkbox or field in that form.
 | Setting | Default | What it turns off |
 | --- | --- | --- |
 | `discord_show_tokens_per_second` | on | `84 tok/s` |
-| `discord_show_context` | on | `▰▰▱▱▱ · 6% ctx · 12.0K/200.0K` |
-| `discord_show_quota` | on | `▰▰▱▱▱ · 61% Grok` |
+| `discord_show_context` | on | `▰▰▱▱▱▱▱▱▱▱ · 6% ctx · 12.0K/200.0K` |
+| `discord_show_quota` | on | `▰▰▱▱▱▱▱▱▱▱ · 61% Grok` |
 | `discord_show_balance` | on | `DeepSeek $12.40` (credit providers only) |
 
 Each bar also has its own switch so you can keep the number and drop the art:
 
-| Setting | Default |
-| --- | --- |
-| `discord_show_context_bar` | on |
-| `discord_show_quota_bar` | on |
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `discord_show_context_bar` | on | draw the context bar |
+| `discord_show_quota_bar` | on | draw the quota bar |
+| `discord_bar_width` | 10 | cells per bar (3-20); both bars share it |
 
 Opt-in extras, off because they eat the status length: `discord_show_cache_hit`,
 `discord_show_tool`, `discord_show_model`, `discord_show_latency`,
@@ -82,7 +83,7 @@ Each metric line wears its own emoji, and its settings entry sits immediately
 before that line's switches. The default layout reads:
 
 ```
-↯ 84 tok/s · ▤ ▰▰▱▱▱ · 6% ctx · 12.0K/200.0K · ◍ ▰▰▱▱▱ · 61% Grok
+↯ 84 tok/s · ▤ ▰▰▱▱▱▱▱▱▱▱ · 6% ctx · 12.0K/200.0K · ◍ ▰▰▱▱▱▱▱▱▱▱ · 61% Grok
 ```
 
 | Line | Emoji setting | Default |

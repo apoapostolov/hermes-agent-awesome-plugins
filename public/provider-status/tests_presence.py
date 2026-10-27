@@ -152,9 +152,9 @@ class TestRender(unittest.TestCase):
         self.assertIn("Grok", text)
         self.assertIn("61%", text)
 
-    def test_default_bar_width_is_five(self):
-        # Discord's member list truncates the state, so the shipped bar is short.
-        self.assertEqual(self.config.PresenceConfig().bar_width, 5)
+    def test_default_bar_width_is_ten(self):
+        # Ten cells by default; discord_bar_width narrows it for a tight surface.
+        self.assertEqual(self.config.PresenceConfig().bar_width, 10)
 
     def test_bar_width_is_configurable_and_drives_render(self):
         ctx = FakeCtx({"discord_bar_width": 8})
@@ -372,7 +372,8 @@ class TestLineEmoji(unittest.TestCase):
         self.assertEqual(first, "84 tok/s")
         cfg2 = self._cfg(discord_presence_mode="rotate", discord_emoji_context="")
         second = self.render.render_status(self._snap(), cfg2, 1)
-        self.assertTrue(second.startswith("▱"), second)
+        # No glyph, and no stray leading space where it would have been.
+        self.assertTrue(second.startswith(("▰", "▱")), second)
         self.assertNotIn("  ", second)
 
     def test_state_emoji_covers_only_idle_and_thinking(self):

@@ -103,11 +103,10 @@ class PresenceConfig:
     show_latency: bool = False
     show_totals: bool = False
 
-    # Discord's member-list sidebar truncates the presence state well before the
-    # 128-character cap, so the bar stays short: 5 cells reads at a glance where
-    # 10 gets cut off. Widen it with discord_bar_width (3-20) when the status is
-    # read somewhere with room, such as /pulse or a full profile.
-    bar_width: int = 5
+    # Ten cells is the shipped width: a gauge that reads at a glance in the
+    # status row. Discord's member-list sidebar truncates long statuses, so
+    # discord_bar_width stays bounded at 3-20 for a reader who needs it shorter.
+    bar_width: int = 10
     fill: str = "▰"
     empty: str = "▱"
     separator: str = " · "
@@ -163,7 +162,7 @@ class PresenceConfig:
             show_model=_bool(cfg("discord_show_model", False), False),
             show_latency=_bool(cfg("discord_show_latency", False), False),
             show_totals=_bool(cfg("discord_show_totals", False), False),
-            bar_width=_int(cfg("discord_bar_width", 5), 5, 3, 20),
+            bar_width=_int(cfg("discord_bar_width", 10), 10, 3, 20),
             fill=str(cfg("discord_bar_fill", "▰") or "▰")[:2],
             empty=str(cfg("discord_bar_empty", "▱") or "▱")[:2],
             separator=str(cfg("discord_separator", " · ") or " · ")[:8],
@@ -318,7 +317,7 @@ CONFIG_SCHEMA: dict = {
         "default": False,
         "description": "Show lifetime token totals",
     },
-    "discord_bar_width": {"type": "int", "default": 5, "description": "Bar cells (3-20)"},
+    "discord_bar_width": {"type": "int", "default": 10, "description": "Bar cells (3-20)"},
     "discord_separator": {"type": "str", "default": " · ", "description": "Segment separator"},
 }
 
