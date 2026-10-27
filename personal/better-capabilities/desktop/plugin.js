@@ -1,1339 +1,970 @@
 /**
- * Better Capabilities
+ * Better Capabilities — one page in Settings ▸ Plugins.
  *
- * Capabilities → Plugins: a delete control to the right of the folder icon.
- * Capabilities → Skills (learned skills): Package (zip) between Edit and Archive,
- * plus a folder reveal and a delete control on that same row.
- * Installed | Presets | Browse: save and restore on/off sets for skills, tools, plugins.
+ * Three of the four things the plugin used to paint onto the Capabilities page
+ * have no native equivalent, so they live here instead of in app markup:
  *
- * Delete sends the on-disk folder to the Recycle Bin through the plugin API.
- * Package downloads a zip of the skill folder (SKILL.md, references, scripts).
+ *   Skills   — delete a skill folder (Recycle Bin), package it as a zip, reveal
+ *              it in the file manager, and read its other markdown files.
+ *   Presets  — save and restore on/off sets for skills, toolsets and agent
+ *              plugins, in the same store `/preset` reads from chat.
+ *   Overview — what this profile currently has on, and the one hop to the
+ *              native page for everything it already owns.
+ *
+ * Everything goes through the plugin SDK: `host.skills` / `host.toolsets` (the
+ * same endpoints the page uses), `host.request` for the `plugins.manage` RPC,
+ * `ctx.rest` for this plugin's own routes, and `ctx.os` for the OS door. No app
+ * DOM is queried, restyled, hidden or clicked, so the desktop-surface admission
+ * check passes and no Desktop release can break the page.
  */
-import { host } from '@hermes/plugin-sdk'
+import {
+  Button,
+  Codicon,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Switch,
+  Tip,
+  cn,
+  host
+} from '@hermes/plugin-sdk'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { jsx, jsxs } from 'react/jsx-runtime'
 
 const ID = 'better-capabilities'
-const STYLE_ID = 'better-capabilities-style'
-const BTN = 'data-bc-btn'
-const MARK = 'data-bc-row'
-const PRESET_STORE = 'hermes.better-capabilities.presets.v1'
-const PRESET_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 ._'-]{0,59}$/
+const KINDS = [
+  { id: 'skills', label: 'Skills' },
+  { id: 'tools', label: 'Tools' },
+  { id: 'plugins', label: 'Plugins' }
+]
+const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 ._'-]{0,59}$/
+const ICON_BTN = cn(
+  'inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-(--ui-stroke-tertiary)',
+  'text-(--ui-text-secondary) transition-colors',
+  'hover:text-foreground hover:bg-(--chrome-action-hover) disabled:opacity-40'
+)
+const ROW = 'flex items-center gap-2 rounded-md px-2 py-1.5'
+const MUTED = 'text-xs text-(--ui-text-tertiary)'
+const PILL =
+  'inline-flex items-center rounded border border-(--ui-stroke-tertiary) px-1 text-[0.65rem] text-(--ui-text-tertiary)'
 
+/** Only the plugin's OWN backend is assigned here, at register time. */
 let rest = null
-let painting = false
+let osDoor = null
 
-function onCapabilities() {
-  const hash = String(window.location.hash || '')
-  return hash.includes('/skills')
+const el = (type, props, ...kids) => {
+  const merged = { ...(props || {}) }
+  if (kids.length === 1) merged.children = kids[0]
+  else if (kids.length > 1) merged.children = kids
+  return kids.length > 1 ? jsxs(type, merged) : jsx(type, merged)
 }
 
-function pageKind() {
-  const hash = String(window.location.hash || '')
-  if (!hash.includes('/skills')) return null
-  const query = hash.split('?')[1] || ''
-  const tab = new URLSearchParams(query).get('tab')
-  if (tab === 'plugins') return 'plugins'
-  if (tab === 'toolsets') return 'tools'
-  if (tab === 'mcp') return null
-  return 'skills'
-}
+const message = err => String((err && err.message) || err || 'Unknown error')
 
-function kindLabel(kind) {
-  if (kind === 'plugins') return 'Plugins'
-  if (kind === 'tools') return 'Tools'
-  return 'Skills'
-}
-
-function notify(kind, title, message) {
+function toast(kind, title, body) {
   try {
-    host.notify({ kind, title, message })
+    host.notify({ kind, message: body, title })
   } catch {
-    // toast is optional
+    // Toasts are optional on older shells; the page also shows inline errors.
   }
 }
 
 async function api(path, body) {
-  if (typeof rest !== 'function') throw new Error('Plugin API is not ready.')
-  const opts = body ? { method: 'POST', body } : undefined
-  return rest(path, opts)
+  if (typeof rest !== 'function') {
+    throw new Error('This plugin’s backend is not ready. Reopen Settings if it persists.')
+  }
+  return body === undefined ? rest(path) : rest(path, { method: 'POST', body })
 }
 
-async function desktopApi(opts) {
-  const fn = window.hermesDesktop && window.hermesDesktop.api
-  if (typeof fn !== 'function') throw new Error('Desktop API is not available.')
-  return fn(opts)
+/** Subscribe to a readonly app atom (`host.state.*`). */
+function useAtom(atom) {
+  const read = useCallback(() => {
+    try {
+      return atom && typeof atom.get === 'function' ? atom.get() : undefined
+    } catch {
+      return undefined
+    }
+  }, [atom])
+  const [value, setValue] = useState(read)
+
+  useEffect(() => {
+    if (!atom || typeof atom.subscribe !== 'function') {
+      return undefined
+    }
+    setValue(atom.get())
+    const off = atom.subscribe(next => setValue(next))
+    return typeof off === 'function' ? off : undefined
+  }, [atom])
+
+  return value
 }
 
 function downloadZip(filename, b64) {
-  const bin = atob(b64)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-  const blob = new Blob([bytes], { type: 'application/zip' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 4000)
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.rel = 'noopener'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000)
 }
 
-function iconButton(codicon, label) {
-  const btn = document.createElement('button')
-  btn.type = 'button'
-  btn.setAttribute('aria-label', label)
-  btn.title = label
-  btn.setAttribute(BTN, '1')
-  btn.className = 'bc-icon-btn'
-  const i = document.createElement('i')
-  i.className = 'codicon ' + codicon
-  i.setAttribute('aria-hidden', 'true')
-  btn.appendChild(i)
-  return btn
-}
-
-function textButton(label) {
-  const btn = document.createElement('button')
-  btn.type = 'button'
-  btn.textContent = label
-  btn.setAttribute(BTN, '1')
-  btn.className = 'bc-text-btn'
-  return btn
-}
-
-function closeOverlay() {
-  document.getElementById('bc-overlay')?.remove()
-}
-
-function confirmDanger(title, body, onYes) {
-  closeOverlay()
-  const overlay = document.createElement('div')
-  overlay.id = 'bc-overlay'
-  overlay.innerHTML =
-    '<div class="bc-dialog" role="dialog" aria-modal="true">' +
-    '<div class="bc-dialog-title">' +
-    escapeHtml(title) +
-    '</div>' +
-    '<div class="bc-dialog-body">' +
-    escapeHtml(body) +
-    '</div>' +
-    '<div class="bc-dialog-actions">' +
-    '<button type="button" class="bc-text-btn" data-bc-cancel="1">Cancel</button>' +
-    '<button type="button" class="bc-text-btn bc-danger" data-bc-ok="1">Delete</button>' +
-    '</div></div>'
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeOverlay()
-  })
-  overlay.querySelector('[data-bc-cancel]').addEventListener('click', closeOverlay)
-  overlay.querySelector('[data-bc-ok]').addEventListener('click', () => {
-    closeOverlay()
-    onYes()
-  })
-  document.body.appendChild(overlay)
-}
-
-function confirmRemoveFolder(kind, name, onYes) {
-  const noun = kind === 'plugin' ? 'plugin' : 'skill'
-  confirmDanger(
-    'Delete ' + name + '?',
-    'Are you sure you want to delete this ' +
-      noun +
-      '? This action cannot be undone and will permanently remove this ' +
-      noun +
-      ' from your collection.',
-    onYes,
+function IconButton({ disabled, icon, label, onClick, tone }) {
+  return el(
+    Tip,
+    { label },
+    el('button', {
+      'aria-label': label,
+      className: cn(ICON_BTN, tone === 'danger' && 'hover:text-(--ui-danger)'),
+      disabled: Boolean(disabled),
+      onClick,
+      type: 'button'
+    }, el(Codicon, { name: icon, size: '0.8rem' }))
   )
 }
 
-function confirmRemovePreset(kind, name, onYes) {
-  const noun =
-    kind === 'plugins' ? 'plugin preset' : kind === 'tools' ? 'tool preset' : 'skill preset'
-  confirmDanger(
-    'Delete ' + name + '?',
-    'Are you sure you want to delete this ' +
-      noun +
-      '? This action cannot be undone and will permanently remove this preset from your collection.',
-    onYes,
+function Section({ children, title, hint }) {
+  return el(
+    'section',
+    { className: 'flex flex-col gap-2 rounded-lg border border-(--ui-stroke-tertiary) p-3' },
+    el(
+      'header',
+      { className: 'flex flex-wrap items-baseline gap-2' },
+      el('h3', { className: 'text-sm font-medium text-foreground' }, title),
+      hint ? el('span', { className: MUTED }, hint) : null
+    ),
+    children
   )
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+function Empty({ children }) {
+  return el('p', { className: cn(MUTED, 'px-2 py-3') }, children)
 }
 
-async function doDelete(kind, name) {
-  try {
-    const res = await api('/delete', { kind, name })
-    const moved = res && res.result === 'moved'
-    notify(
-      'success',
-      'Removed ' + name,
-      moved
-        ? 'The folder could not go to the Recycle Bin, so it was moved aside.'
-        : 'The folder is in the Recycle Bin. Refresh Capabilities if the row is still listed.'
+function ConfirmDialog({ body, confirmLabel, onCancel, onConfirm, title }) {
+  return el(
+    Dialog,
+    { onOpenChange: open => { if (!open) onCancel() }, open: true },
+    el(
+      DialogContent,
+      { className: 'max-w-md' },
+      el(DialogHeader, null, el(DialogTitle, null, title)),
+      el(DialogDescription, null, body),
+      el(
+        DialogFooter,
+        null,
+        el(Button, { onClick: onCancel, size: 'sm', variant: 'ghost' }, 'Cancel'),
+        el(Button, { onClick: onConfirm, size: 'sm', variant: 'destructive' }, confirmLabel || 'Delete')
+      )
     )
-  } catch (err) {
-    notify('error', 'Could not remove ' + name, String(err && err.message ? err.message : err))
-  }
+  )
 }
 
-async function doZip(name) {
-  try {
-    const res = await api('/zip', { kind: 'skill', name })
-    if (!res || !res.b64 || !res.filename) throw new Error('Zip response was empty.')
-    downloadZip(res.filename, res.b64)
-    notify('success', 'Packaged ' + name, res.filename + ' is downloading.')
-  } catch (err) {
-    notify('error', 'Could not package ' + name, String(err && err.message ? err.message : err))
-  }
+// ── capability snapshots through the SDK doors ────────────────────────────
+
+async function listSkills() {
+  const rows = await host.skills.list()
+  return Array.isArray(rows) ? rows : []
 }
 
-async function doReveal(kind, name) {
-  try {
-    const res = await api('/resolve', { kind, name })
-    const path = res && res.path
-    if (!path) throw new Error('No folder path.')
-    const reveal = window.hermesDesktop && window.hermesDesktop.revealPath
-    if (typeof reveal === 'function') {
-      await reveal(path)
-      return
-    }
-    notify('info', name, path)
-  } catch (err) {
-    notify('error', 'Could not open folder', String(err && err.message ? err.message : err))
-  }
+async function listToolsets() {
+  const rows = await host.toolsets.list()
+  return Array.isArray(rows) ? rows : []
 }
 
-function isHidden(el) {
-  return Boolean(el && el.closest('[data-pane-hidden]'))
-}
-
-function pluginKeyFromRow(row) {
-  const testid = row.getAttribute('data-testid') || ''
-  const m = /^plugin-row-(.+)$/.exec(testid)
-  if (m) return m[1]
-  const id = row.getAttribute('id') || ''
-  if (id.startsWith('plugin-')) return id.slice('plugin-'.length)
-  return ''
-}
-
-function pluginKeyFromButton(btn) {
-  const row = btn && btn.closest('[data-testid^="plugin-row-"]')
-  return row ? pluginKeyFromRow(row) : ''
-}
-
-function paintPluginRows() {
-  const folders = document.querySelectorAll('[data-testid^="plugin-row-"] .codicon-folder-opened')
-  for (const icon of folders) {
-    const row = icon.closest('[data-testid^="plugin-row-"]')
-    if (!row) continue
-    const name = pluginKeyFromRow(row)
-    if (!name) continue
-    const folderBtn = icon.closest('button')
-    if (!folderBtn) continue
-    const slot = folderBtn.parentElement
-    if (!slot) continue
-    const hostSlot = slot.parentElement
-    if (!hostSlot) continue
-    if (hostSlot.querySelector('[' + BTN + '="delete"]')) continue
-    const del = iconButton('codicon-trash', 'Remove plugin')
-    del.setAttribute(BTN, 'delete')
-    del.addEventListener('click', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      const liveName = pluginKeyFromButton(e.currentTarget) || name
-      if (!liveName) return
-      confirmRemoveFolder('plugin', liveName, () => void doDelete('plugin', liveName))
-    })
-    const wrap = document.createElement('span')
-    wrap.className = slot.className
-    wrap.setAttribute(BTN, 'wrap')
-    wrap.appendChild(del)
-    slot.insertAdjacentElement('afterend', wrap)
-  }
-}
-
-function skillNameFromActionRow(row) {
-  if (!row) return ''
-  let sib = row.previousElementSibling
-  while (sib) {
-    const title = sib.tagName === 'H3' ? sib : sib.querySelector && sib.querySelector('h3')
-    const text = title ? String(title.textContent || '').trim() : ''
-    if (text) return text
-    sib = sib.previousElementSibling
-  }
-  const pane = row.parentElement
-  const fallback = pane && pane.querySelector('header h3, h3')
-  return fallback ? String(fallback.textContent || '').trim() : ''
-}
-
-function liveSkillName(btn) {
-  const row = btn && btn.parentElement
-  return skillNameFromActionRow(row)
-}
-
-function skillMdDir(skillMdPath) {
-  return String(skillMdPath || '').replace(/[\\/]+SKILL\.md$/i, '')
-}
-
-function isSkillMdRel(rel) {
-  return !rel || /^SKILL\.md$/i.test(rel)
-}
-
-async function listSkillMarkdown(skillName) {
-  const info = await desktopApi({ path: '/api/skills/content?name=' + encodeURIComponent(skillName) })
-  const skillMd = info && info.path
-  if (!skillMd) throw new Error('No SKILL.md path')
-  const root = skillMdDir(skillMd)
-  const files = [{ rel: 'SKILL.md', folder: '', label: 'SKILL.md', abs: skillMd }]
-  const skip = { '.git': 1, __pycache__: 1, node_modules: 1 }
-  const readDir = window.hermesDesktop && window.hermesDesktop.readDir
-  if (typeof readDir !== 'function') return files
-  async function walk(dir, prefix) {
-    const res = await readDir(dir)
-    const entries = (res && res.entries) || []
-    const dirs = []
-    const mds = []
-    for (const ent of entries) {
-      if (!ent || skip[ent.name]) continue
-      if (ent.isDirectory) dirs.push(ent)
-      else if (/\.md$/i.test(ent.name) && !(prefix === '' && /^SKILL\.md$/i.test(ent.name))) mds.push(ent)
-    }
-    mds.sort((a, b) => a.name.localeCompare(b.name))
-    for (const file of mds) {
-      const rel = prefix ? prefix + '/' + file.name : file.name
-      files.push({
-        rel,
-        folder: prefix,
-        label: prefix.includes('/') ? rel.slice(rel.indexOf('/') + 1) : file.name,
-        abs: file.path,
-      })
-    }
-    dirs.sort((a, b) => a.name.localeCompare(b.name))
-    for (const dirEnt of dirs) {
-      await walk(dirEnt.path, prefix ? prefix + '/' + dirEnt.name : dirEnt.name)
+async function listAgentPlugins(profile) {
+  const res = await host.request('plugins.manage', profile ? { action: 'list', profile } : { action: 'list' })
+  const map = {}
+  for (const row of (res && res.plugins) || []) {
+    if (row && row.key) {
+      map[row.key] = row.status === 'enabled'
     }
   }
-  await walk(root, '')
-  return files
-}
-
-function nativeSkillBlocks(row) {
-  const box = []
-  let el = row.nextElementSibling
-  while (el) {
-    if (el.getAttribute && el.getAttribute('data-bc-preview')) {
-      el = el.nextElementSibling
-      continue
-    }
-    box.push(el)
-    el = el.nextElementSibling
-  }
-  return box
-}
-
-function setNativeSkillVisible(row, visible) {
-  for (const el of nativeSkillBlocks(row)) {
-    if (visible) {
-      if (el.getAttribute('data-bc-hid') === '1') {
-        el.style.display = ''
-        el.removeAttribute('data-bc-hid')
-      }
-    } else if (el.getAttribute('data-bc-hid') !== '1') {
-      el.setAttribute('data-bc-hid', '1')
-      el.style.display = 'none'
-    }
-  }
-}
-
-function previewEl(row) {
-  let pre = row.parentElement && row.parentElement.querySelector('pre[data-bc-preview="1"]')
-  if (pre) return pre
-  pre = document.createElement('pre')
-  pre.setAttribute('data-bc-preview', '1')
-  pre.setAttribute(BTN, 'preview')
-  pre.setAttribute('data-selectable-text', 'true')
-  pre.className = 'overflow-auto whitespace-pre-wrap wrap-break-word rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3 font-mono text-[0.68rem] leading-relaxed'
-  pre.style.display = 'none'
-  const pane = row.parentElement
-  if (pane) pane.appendChild(pre)
-  return pre
-}
-
-function showSkillMd(row) {
-  setNativeSkillVisible(row, true)
-  const pre = row.parentElement && row.parentElement.querySelector('pre[data-bc-preview="1"]')
-  if (pre) pre.style.display = 'none'
-}
-
-async function showOtherMd(row, absPath) {
-  const readText = window.hermesDesktop && window.hermesDesktop.readFileText
-  if (typeof readText !== 'function') throw new Error('Cannot read skill files in this desktop build.')
-  const res = await readText(absPath)
-  const text = res && res.text != null ? res.text : ''
-  setNativeSkillVisible(row, false)
-  const pre = previewEl(row)
-  pre.textContent = text
-  pre.style.display = ''
-}
-
-function closeFileMenus() {
-  document.querySelectorAll('[data-bc-file-menu]').forEach((menu) => {
-    menu.style.display = 'none'
-  })
-}
-
-function placeFileMenu(trigger, menu) {
-  const rect = trigger.getBoundingClientRect()
-  const pad = 8
-  menu.style.position = 'fixed'
-  menu.style.top = rect.bottom + 4 + 'px'
-  menu.style.left = rect.left + 'px'
-  menu.style.right = 'auto'
-  menu.style.width = 'max-content'
-  menu.style.maxWidth = Math.max(160, window.innerWidth - pad * 2) + 'px'
-  menu.style.maxHeight = Math.max(120, window.innerHeight - rect.bottom - pad) + 'px'
-  requestAnimationFrame(() => {
-    const box = menu.getBoundingClientRect()
-    if (box.right > window.innerWidth - pad) {
-      menu.style.left = Math.max(pad, window.innerWidth - pad - box.width) + 'px'
-    }
-    if (box.left < pad) menu.style.left = pad + 'px'
-  })
-}
-
-function paintSkillFilePicker(row, editBtn, skillName) {
-  let wrap = row.querySelector('[data-bc-files]')
-  if (!wrap) {
-    wrap = document.createElement('span')
-    wrap.setAttribute('data-bc-files', '1')
-    wrap.setAttribute(BTN, 'files')
-    wrap.className = 'bc-file-wrap'
-    const trigger = document.createElement('button')
-    trigger.type = 'button'
-    trigger.className = 'bc-file-trigger'
-    trigger.setAttribute(BTN, 'files-trigger')
-    trigger.textContent = 'SKILL.md'
-    const menu = document.createElement('div')
-    menu.className = 'bc-file-menu'
-    menu.setAttribute('data-bc-file-menu', '1')
-    menu.style.display = 'none'
-    trigger.addEventListener('click', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      const open = menu.style.display !== 'none'
-      closeFileMenus()
-      if (!open) {
-        menu.style.display = 'block'
-        placeFileMenu(trigger, menu)
-      }
-    })
-    wrap.append(trigger, menu)
-    editBtn.insertAdjacentElement('afterend', wrap)
-  }
-  if (wrap.getAttribute('data-bc-skill') !== skillName) {
-    wrap.setAttribute('data-bc-skill', skillName)
-    wrap.setAttribute('data-bc-rel', 'SKILL.md')
-    const trigger = wrap.querySelector('.bc-file-trigger')
-    if (trigger) trigger.textContent = 'SKILL.md'
-    showSkillMd(row)
-    void fillSkillFileMenu(wrap, row, skillName)
-  } else if (!isSkillMdRel(wrap.getAttribute('data-bc-rel'))) {
-    setNativeSkillVisible(row, false)
-  }
-}
-
-async function fillSkillFileMenu(wrap, row, skillName) {
-  const menu = wrap.querySelector('[data-bc-file-menu]')
-  const trigger = wrap.querySelector('.bc-file-trigger')
-  if (!menu || !trigger) return
-  menu.replaceChildren()
-  let files
-  try {
-    files = await listSkillMarkdown(skillName)
-  } catch (err) {
-    const empty = document.createElement('div')
-    empty.className = 'bc-file-head'
-    empty.textContent = 'Could not list markdown files'
-    menu.appendChild(empty)
-    return
-  }
-  if (wrap.getAttribute('data-bc-skill') !== skillName) return
-  let lastFolder = null
-  for (const file of files) {
-    const folderKey = file.folder || (isSkillMdRel(file.rel) ? '' : '/')
-    if (folderKey && folderKey !== lastFolder) {
-      lastFolder = folderKey
-      const head = document.createElement('div')
-      head.className = 'bc-file-head'
-      head.textContent = folderKey === '/' ? '/' : '/' + file.folder
-      menu.appendChild(head)
-    }
-    const item = document.createElement('button')
-    item.type = 'button'
-    item.className = 'bc-file-item'
-    if (folderKey) item.classList.add('bc-file-item-in')
-    item.setAttribute(BTN, 'file-item')
-    item.textContent = file.label
-    item.addEventListener('click', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      menu.style.display = 'none'
-      wrap.setAttribute('data-bc-rel', file.rel)
-      trigger.textContent = isSkillMdRel(file.rel) ? 'SKILL.md' : file.label
-      if (isSkillMdRel(file.rel)) showSkillMd(row)
-      else void showOtherMd(row, file.abs).catch((err) => {
-        notify('error', 'Could not preview', String(err && err.message ? err.message : err))
-      })
-    })
-    menu.appendChild(item)
-  }
-}
-
-function paintSkillRow() {
-  const buttons = document.querySelectorAll('button')
-  for (const btn of buttons) {
-    if (btn.getAttribute(BTN)) continue
-    if (isHidden(btn)) continue
-    const label = String(btn.textContent || '').trim()
-    if (label !== 'Edit') continue
-    const row = btn.parentElement
-    if (!row) continue
-    const sibs = row.querySelectorAll('button')
-    let archive = null
-    for (const sib of sibs) {
-      if (String(sib.textContent || '').trim() === 'Archive') archive = sib
-    }
-    if (!archive) continue
-    const name = skillNameFromActionRow(row)
-    if (!name) continue
-    if (row.getAttribute('data-bc-skill') !== name) row.setAttribute('data-bc-skill', name)
-    paintSkillFilePicker(row, btn, name)
-
-    if (!row.querySelector('[' + BTN + '="zip"]')) {
-      const zip = textButton('Package (zip)')
-      zip.setAttribute(BTN, 'zip')
-      zip.addEventListener('click', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        const liveName = liveSkillName(e.currentTarget)
-        if (!liveName) {
-          notify('error', 'Could not package', 'No skill name on this row.')
-          return
-        }
-        void doZip(liveName)
-      })
-      row.insertBefore(zip, archive)
-    }
-
-    if (!row.querySelector('[' + BTN + '="folder"]')) {
-      const folder = iconButton('codicon-folder-opened', 'Open skill folder')
-      folder.setAttribute(BTN, 'folder')
-      folder.addEventListener('click', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        const liveName = liveSkillName(e.currentTarget)
-        if (!liveName) return
-        void doReveal('skill', liveName)
-      })
-      const del = iconButton('codicon-trash', 'Remove skill')
-      del.setAttribute(BTN, 'delete')
-      del.addEventListener('click', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        const liveName = liveSkillName(e.currentTarget)
-        if (!liveName) return
-        confirmRemoveFolder('skill', liveName, () => void doDelete('skill', liveName))
-      })
-      row.appendChild(folder)
-      row.appendChild(del)
-    }
-
-    row.setAttribute(MARK, '1')
-  }
-}
-
-function loadPresetStore() {
-  try {
-    const raw = window.localStorage.getItem(PRESET_STORE)
-    const parsed = raw ? JSON.parse(raw) : null
-    if (parsed && typeof parsed === 'object') return parsed
-  } catch {
-    // fall through
-  }
-  return { skills: {}, tools: {}, plugins: {} }
-}
-
-function savePresetStore(store) {
-  window.localStorage.setItem(PRESET_STORE, JSON.stringify(store))
-  void persistPresetStore(store)
-}
-
-async function persistPresetStore(store) {
-  try {
-    if (typeof rest === 'function') await rest('/presets', { method: 'PUT', body: store })
-  } catch {
-    // disk copy is optional until Python remounts
-  }
-}
-
-async function hydratePresetStore() {
-  try {
-    if (typeof rest !== 'function') return
-    const res = await rest('/presets')
-    const remote = res && res.store
-    if (!remote || typeof remote !== 'object') return
-    const local = loadPresetStore()
-    const merged = { skills: {}, tools: {}, plugins: {} }
-    for (const kind of ['skills', 'tools', 'plugins']) {
-      const a = remote[kind] && typeof remote[kind] === 'object' ? remote[kind] : {}
-      const b = local[kind] && typeof local[kind] === 'object' ? local[kind] : {}
-      const bucket = { ...a, ...b }
-      const order = []
-      for (const name of [].concat(a._order || [], b._order || [])) {
-        if (name && name !== '_order' && bucket[name] && !order.includes(name)) order.push(name)
-      }
-      for (const name of Object.keys(bucket)) {
-        if (name !== '_order' && !order.includes(name)) order.push(name)
-      }
-      bucket._order = order
-      merged[kind] = bucket
-    }
-    window.localStorage.setItem(PRESET_STORE, JSON.stringify(merged))
-    void persistPresetStore(merged)
-  } catch {
-    // keep localStorage
-  }
-}
-
-async function consumePendingPreset() {
-  try {
-    if (typeof rest !== 'function') return
-    const res = await rest('/presets/pending')
-    const pending = res && res.pending
-    if (!pending || !pending.kind || !pending.name) return
-    await rest('/presets/pending', { method: 'DELETE' })
-    const payload = presetsFor(pending.kind)[pending.name]
-    if (payload) await applyKind(pending.kind, payload)
-  } catch {
-    // slash apply still changed agent/skills even if desktop lags
-  }
-}
-
-function presetsFor(kind) {
-  const store = loadPresetStore()
-  const map = store[kind] && typeof store[kind] === 'object' ? store[kind] : {}
   return map
 }
 
-function presetOrder(kind) {
-  const map = presetsFor(kind)
-  const raw = Array.isArray(map._order) ? map._order : []
-  const order = []
-  for (const name of raw) {
-    if (name && name !== '_order' && map[name] && !order.includes(name)) order.push(name)
-  }
-  for (const name of Object.keys(map)) {
-    if (name === '_order') continue
-    if (!order.includes(name)) order.push(name)
-  }
-  return order
-}
-
-function setPresetOrder(kind, order) {
-  const store = loadPresetStore()
-  if (!store[kind] || typeof store[kind] !== 'object') store[kind] = {}
-  store[kind]._order = order.filter((name) => name && name !== '_order')
-  savePresetStore(store)
-}
-
-function writePreset(kind, name, payload) {
-  const store = loadPresetStore()
-  if (!store[kind] || typeof store[kind] !== 'object') store[kind] = {}
-  store[kind][name] = payload
-  const order = Array.isArray(store[kind]._order) ? store[kind]._order.slice() : []
-  if (!order.includes(name)) order.push(name)
-  store[kind]._order = order
-  savePresetStore(store)
-}
-
-function removePreset(kind, name) {
-  const store = loadPresetStore()
-  if (store[kind] && typeof store[kind] === 'object') {
-    delete store[kind][name]
-    if (Array.isArray(store[kind]._order)) {
-      store[kind]._order = store[kind]._order.filter((item) => item !== name)
-    }
-  }
-  savePresetStore(store)
-}
-
-function renamePreset(kind, from, to) {
-  const store = loadPresetStore()
-  const map = store[kind] && typeof store[kind] === 'object' ? store[kind] : {}
-  if (!map[from]) throw new Error('No preset named ' + from)
-  if (map[to] && to !== from) throw new Error('A preset named ' + to + ' already exists.')
-  map[to] = map[from]
-  if (to !== from) delete map[from]
-  if (Array.isArray(map._order)) {
-    map._order = map._order.map((item) => (item === from ? to : item))
-    if (!map._order.includes(to)) map._order.push(to)
-  }
-  store[kind] = map
-  savePresetStore(store)
-}
-
-function switchOn(el) {
-  return el && el.getAttribute('data-state') === 'checked'
-}
-
-function clickSwitchTo(el, on) {
-  if (!el) return false
-  if (switchOn(el) === on) return true
-  el.click()
-  return true
-}
-
-function switchInTitleRow(title) {
-  const rows = document.querySelectorAll('.row-hover')
-  for (const row of rows) {
-    if (isHidden(row)) continue
-    const label = row.querySelector('span.block.truncate')
-    if (!label) continue
-    if (String(label.textContent || '').trim() !== title) continue
-    return row.querySelector('[data-slot="switch"]')
-  }
-  return null
-}
-
-function currentProfileName() {
+async function profileNames() {
   try {
-    const atom = host.state && host.state.profile
-    const value = atom && typeof atom.get === 'function' ? atom.get() : ''
-    return String(value || 'default').trim() || 'default'
-  } catch {
-    return 'default'
-  }
-}
-
-async function listProfileNames() {
-  const names = []
-  const seen = {}
-  function add(name) {
-    const n = String(name || '').trim()
-    if (!n || seen[n]) return
-    seen[n] = 1
-    names.push(n)
-  }
-  add('default')
-  add(currentProfileName())
-  try {
-    const res = await desktopApi({ path: '/api/profiles' })
-    for (const row of (res && res.profiles) || []) {
-      if (row && row.name) add(row.name)
+    const res = await host.profiles.list()
+    const rows = Array.isArray(res) ? res : (res && Array.isArray(res.profiles) ? res.profiles : [])
+    const names = []
+    for (const row of rows) {
+      const name = typeof row === 'string' ? row : row && (row.name || row.profile)
+      if (name && !names.includes(String(name))) {
+        names.push(String(name))
+      }
     }
+    return names
   } catch {
-    // profile list is optional
+    return []
   }
-  return names
 }
 
-async function snapshotAgentForProfile(profile) {
-  const agent = {}
-  const listed = await host.request('plugins.manage', { action: 'list', profile })
-  for (const row of listed && listed.plugins ? listed.plugins : []) {
-    if (row && row.key) agent[row.key] = row.status === 'enabled'
-  }
-  return agent
-}
-
-async function snapshotKind(kind) {
+async function snapshotKind(kind, profile) {
   if (kind === 'skills') {
-    const rows = await desktopApi({ path: '/api/skills' })
+    const rows = await listSkills()
     const enabled = {}
-    for (const row of rows || []) {
-      if (row && row.name) enabled[row.name] = !!row.enabled
+    for (const row of rows) {
+      if (row && row.name) {
+        enabled[row.name] = Boolean(row.enabled)
+      }
     }
     return { enabled }
   }
   if (kind === 'tools') {
-    const rows = await desktopApi({ path: '/api/tools/toolsets' })
+    const rows = await listToolsets()
     const enabled = {}
-    for (const row of rows || []) {
-      if (row && row.name) enabled[row.name] = !!row.enabled
+    for (const row of rows) {
+      if (row && row.name) {
+        enabled[row.name] = Boolean(row.enabled)
+      }
     }
     return { enabled }
   }
-  const desktop = {}
-  try {
-    const raw = window.localStorage.getItem('hermes.desktop.pluginDecisions.v2')
-    const decisions = raw ? JSON.parse(raw) : {}
-    if (decisions && typeof decisions === 'object') {
-      for (const [id, on] of Object.entries(decisions)) desktop[id] = !!on
+  const current = await listAgentPlugins()
+  const maps = { [profile || 'default']: current }
+  for (const name of await profileNames()) {
+    if (name === (profile || 'default') || Object.keys(maps).length > 12) {
+      continue
     }
-  } catch {
-    // ignore
-  }
-  document.querySelectorAll('[data-testid^="plugin-row-"]').forEach((row) => {
-    if (isHidden(row)) return
-    const key = pluginKeyFromRow(row)
-    const switches = [...row.querySelectorAll('[data-slot="switch"]')]
-    if (key && switches[0]) desktop[key] = switchOn(switches[0])
-  })
-  const agentByProfile = {}
-  const profiles = await listProfileNames()
-  for (const profile of profiles) {
     try {
-      agentByProfile[profile] = await snapshotAgentForProfile(profile)
+      maps[name] = await listAgentPlugins(name)
     } catch {
-      // skip profiles the gateway cannot list
+      // A profile the backend cannot answer for keeps its previous row.
     }
   }
-  const current = currentProfileName()
-  const agent = agentByProfile[current] || agentByProfile.default || {}
-  return { desktop, agent, agentByProfile }
+  return { agent: current, agentByProfile: maps }
 }
 
+/** Flip one kind to the preset's state. Returns how many switches changed. */
 async function applyKind(kind, payload) {
   if (kind === 'skills' || kind === 'tools') {
-    const enabled = (payload && payload.enabled) || {}
-    for (const [name, on] of Object.entries(enabled)) {
-      const sw = switchInTitleRow(name)
-      if (clickSwitchTo(sw, on)) continue
-      if (kind === 'skills') {
-        await desktopApi({ path: '/api/skills/toggle', method: 'PUT', body: { name, enabled: on } })
-      } else {
-        await desktopApi({
-          path: '/api/tools/toolsets/' + encodeURIComponent(name),
-          method: 'PUT',
-          body: { enabled: on },
-        })
+    const wanted = (payload && payload.enabled) || {}
+    const rows = kind === 'skills' ? await listSkills() : await listToolsets()
+    let changed = 0
+    for (const row of rows) {
+      const name = row && row.name
+      if (!name || !(name in wanted)) {
+        continue
+      }
+      const want = Boolean(wanted[name])
+      if (Boolean(row.enabled) === want) {
+        continue
+      }
+      try {
+        if (kind === 'skills') {
+          await host.skills.setEnabled(name, want)
+        } else {
+          await host.toolsets.setEnabled(name, want)
+        }
+        changed += 1
+      } catch {
+        // One refused key must not stop the rest of the preset.
       }
     }
-    return
+    return changed
   }
-  const desktop = (payload && payload.desktop) || {}
-  const agent = (payload && payload.agent) || {}
-  const agentByProfile =
+
+  const maps =
     payload && payload.agentByProfile && typeof payload.agentByProfile === 'object'
       ? payload.agentByProfile
-      : null
-  for (const [id, on] of Object.entries(desktop)) {
-    const row = document.querySelector('[data-testid="plugin-row-' + id + '"]')
-    const sw = row && row.querySelector('[data-slot="switch"]')
-    if (clickSwitchTo(sw, on)) continue
-    try {
-      const raw = window.localStorage.getItem('hermes.desktop.pluginDecisions.v2')
-      const decisions = raw ? JSON.parse(raw) : {}
-      decisions[id] = on
-      window.localStorage.setItem('hermes.desktop.pluginDecisions.v2', JSON.stringify(decisions))
-    } catch {
-      // ignore
+      : { default: (payload && payload.agent) || {} }
+  let changed = 0
+  for (const [profileName, mapping] of Object.entries(maps)) {
+    if (!mapping || typeof mapping !== 'object') {
+      continue
     }
-  }
-  const current = currentProfileName()
-  const maps = agentByProfile || { [current]: agent }
-  for (const [profile, map] of Object.entries(maps)) {
-    if (!map || typeof map !== 'object') continue
-    for (const [key, on] of Object.entries(map)) {
-      const row = document.querySelector('[data-testid="plugin-row-' + key + '"]')
-      const switches = row ? [...row.querySelectorAll('[data-slot="switch"]')] : []
-      const agentSw = switches.length > 1 ? switches[1] : null
-      if (profile === current && clickSwitchTo(agentSw, on)) continue
+    let current = {}
+    try {
+      current = await listAgentPlugins(profileName === 'default' ? undefined : profileName)
+    } catch {
+      continue
+    }
+    for (const [key, on] of Object.entries(mapping)) {
+      const want = Boolean(on)
+      if (current[key] === undefined || current[key] === want) {
+        continue
+      }
       try {
-        await host.request('plugins.manage', { action: 'toggle', key, enable: on, profile })
+        await host.request('plugins.manage', {
+          action: 'toggle',
+          enable: want,
+          key,
+          ...(profileName === 'default' ? {} : { profile: profileName })
+        })
+        changed += 1
       } catch {
         // skip keys the backend rejects
       }
     }
   }
+  return changed
 }
 
-function presetNames(kind) {
-  return presetOrder(kind)
-}
+// ── Skills ────────────────────────────────────────────────────────────────
 
-function persistPresetListOrder(kind, listEl) {
-  const order = []
-  listEl.querySelectorAll('.bc-preset-row[data-bc-preset]').forEach((row) => {
-    const name = row.getAttribute('data-bc-preset')
-    if (name) order.push(name)
-  })
-  setPresetOrder(kind, order)
-}
+function SkillRow({ busy, onDelete, onPackage, onReveal, onToggle, profile, row }) {
+  const [open, setOpen] = useState(false)
+  const [files, setFiles] = useState(null)
+  const [activeRel, setActiveRel] = useState('SKILL.md')
+  const [text, setText] = useState('')
+  const [error, setError] = useState('')
 
-function bindPresetReorder(listEl, kind) {
-  if (listEl.getAttribute('data-bc-drag') === '1') return
-  listEl.setAttribute('data-bc-drag', '1')
-  let dragName = ''
-  listEl.addEventListener('dragstart', (e) => {
-    const grip = e.target.closest('[data-bc-grip]')
-    if (!grip) {
-      e.preventDefault()
-      return
+  const loadFiles = useCallback(async () => {
+    setError('')
+    try {
+      const res = await api('/files', { name: row.name })
+      setFiles(Array.isArray(res && res.files) ? res.files : [])
+    } catch (err) {
+      setFiles([])
+      setError(message(err))
     }
-    const row = grip.closest('.bc-preset-row')
-    dragName = row ? row.getAttribute('data-bc-preset') || '' : ''
-    if (!dragName) {
-      e.preventDefault()
-      return
-    }
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', dragName)
-    row.classList.add('bc-preset-dragging')
-  })
-  listEl.addEventListener('dragend', () => {
-    listEl.querySelectorAll('.bc-preset-dragging').forEach((row) => row.classList.remove('bc-preset-dragging'))
-    if (dragName) persistPresetListOrder(kind, listEl)
-    dragName = ''
-  })
-  listEl.addEventListener('dragover', (e) => {
-    e.preventDefault()
-    if (!dragName) return
-    const over = e.target.closest('.bc-preset-row')
-    if (!over) return
-    let dragging = null
-    listEl.querySelectorAll('.bc-preset-row').forEach((row) => {
-      if (row.getAttribute('data-bc-preset') === dragName) dragging = row
-    })
-    if (!dragging || dragging === over) return
-    const rect = over.getBoundingClientRect()
-    const before = e.clientY < rect.top + rect.height / 2
-    listEl.insertBefore(dragging, before ? over : over.nextSibling)
-  })
-}
+  }, [row.name])
 
-function renderPresetList(kind, listEl, nameInput) {
-  listEl.replaceChildren()
-  const names = presetNames(kind)
-  if (names.length === 0) {
-    const empty = document.createElement('div')
-    empty.className = 'bc-dialog-body'
-    empty.textContent = 'No presets yet.'
-    listEl.appendChild(empty)
-    return
+  const loadFile = useCallback(
+    async rel => {
+      setError('')
+      setActiveRel(rel)
+      try {
+        const res = await api('/file', { name: row.name, rel })
+        setText(String((res && res.text) || ''))
+      } catch (err) {
+        setText('')
+        setError(message(err))
+      }
+    },
+    [row.name]
+  )
+
+  const toggleOpen = () => {
+    const next = !open
+    setOpen(next)
+    if (next) {
+      if (!files) {
+        void loadFiles()
+      }
+      if (!text) {
+        void loadFile('SKILL.md')
+      }
+    }
   }
-  for (const name of names) {
-    const row = document.createElement('div')
-    row.className = 'bc-preset-row'
-    row.setAttribute('data-bc-preset', name)
-    const grip = document.createElement('span')
-    grip.className = 'bc-grip'
-    grip.setAttribute('data-bc-grip', '1')
-    grip.setAttribute('title', 'Reorder')
-    grip.setAttribute('aria-label', 'Reorder')
-    grip.draggable = true
-    const gripIcon = document.createElement('i')
-    gripIcon.className = 'codicon codicon-gripper'
-    gripIcon.setAttribute('aria-hidden', 'true')
-    grip.appendChild(gripIcon)
-    const label = document.createElement('div')
-    label.className = 'bc-preset-name'
-    label.textContent = name
-    const actions = document.createElement('div')
-    actions.className = 'bc-preset-actions'
-    const apply = iconButton('codicon-play', 'Apply')
-    apply.addEventListener('click', () => void onApplyPreset(kind, name))
-    const overwrite = iconButton('codicon-replace', 'Overwrite')
-    overwrite.addEventListener('click', () => void onSavePreset(kind, name, true, nameInput))
-    const rename = iconButton('codicon-edit', 'Rename')
-    rename.addEventListener('click', () => void onRenamePreset(kind, name, nameInput, listEl))
-    const del = iconButton('codicon-trash', 'Delete')
-    del.classList.add('bc-danger')
-    del.addEventListener('click', () => {
-      confirmRemovePreset(kind, name, () => {
-        removePreset(kind, name)
-        renderPresetList(kind, listEl, nameInput)
-        notify('success', 'Deleted ' + name, 'The ' + kindLabel(kind).toLowerCase() + ' preset is gone.')
+
+  const provenance = row.provenance && row.provenance !== 'agent' ? row.provenance : ''
+
+  return el(
+    'div',
+    { className: 'flex flex-col' },
+    el(
+      'div',
+      { className: ROW },
+      el(Switch, {
+        'aria-label': 'Enable ' + row.name,
+        checked: Boolean(row.enabled),
+        disabled: busy === row.name,
+        onCheckedChange: next => onToggle(row, next),
+        size: 'xs'
+      }),
+      el('div', { className: 'flex min-w-0 flex-1 flex-col' },
+        el('span', { className: 'truncate text-sm text-foreground' }, row.name),
+        row.description ? el('span', { className: cn(MUTED, 'truncate') }, row.description) : null
+      ),
+      provenance ? el('span', { className: PILL }, provenance) : null,
+      el(IconButton, { icon: open ? 'chevron-down' : 'chevron-right', label: 'Files', onClick: toggleOpen }),
+      el(IconButton, {
+        disabled: Boolean(busy),
+        icon: 'file-zip',
+        label: 'Package (zip)',
+        onClick: () => onPackage(row)
+      }),
+      el(IconButton, { icon: 'folder-opened', label: 'Open folder', onClick: () => onReveal(row) }),
+      el(IconButton, { icon: 'trash', label: 'Delete skill', onClick: () => onDelete(row), tone: 'danger' })
+    ),
+    open
+      ? el(
+          'div',
+          { className: 'mb-2 ml-2 flex flex-col gap-2 rounded-md border border-(--ui-stroke-tertiary) p-2' },
+          files === null
+            ? el('span', { className: MUTED }, 'Reading files…')
+            : files.length === 0
+              ? el('span', { className: MUTED }, 'No markdown files beyond SKILL.md.')
+              : el(
+                  'div',
+                  { className: 'flex flex-wrap gap-1' },
+                  files.map(file =>
+                    el(
+                      'button',
+                      {
+                        className: cn(
+                          'rounded border px-1.5 py-0.5 text-[0.7rem]',
+                          file.rel === activeRel
+                            ? 'border-(--ui-stroke-tertiary) bg-(--chrome-action-hover) text-foreground'
+                            : 'border-transparent text-(--ui-text-tertiary) hover:text-foreground'
+                        ),
+                        key: file.rel,
+                        onClick: () => void loadFile(file.rel),
+                        type: 'button'
+                      },
+                      file.label
+                    )
+                  )
+                ),
+          error ? el('span', { className: cn(MUTED, 'text-(--ui-danger)') }, error) : null,
+          el('pre', {
+            className: 'max-h-72 overflow-auto whitespace-pre-wrap rounded bg-(--ui-bg-quinary) p-2 font-mono text-[0.7rem] text-(--ui-text-secondary)',
+            children: text || (error ? '' : 'Loading…')
+          })
+        )
+      : null
+  )
+}
+
+function SkillsPage() {
+  const [rows, setRows] = useState(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState('')
+  const [query, setQuery] = useState('')
+  const [pendingDelete, setPendingDelete] = useState(null)
+
+  const load = useCallback(async () => {
+    setError('')
+    try {
+      setRows(await listSkills())
+    } catch (err) {
+      setRows([])
+      setError(message(err))
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const filtered = useMemo(() => {
+    const list = rows || []
+    const needle = query.trim().toLowerCase()
+    const visible = needle
+      ? list.filter(row =>
+          [row.name, row.category, row.description, row.provenance]
+            .filter(Boolean)
+            .some(value => String(value).toLowerCase().includes(needle))
+        )
+      : list
+    return visible.slice().sort((a, b) => String(a.name).localeCompare(String(b.name)))
+  }, [query, rows])
+
+  const onToggle = async (row, next) => {
+    setBusy(row.name)
+    setRows(current => (current || []).map(item => (item.name === row.name ? { ...item, enabled: next } : item)))
+    try {
+      await host.skills.setEnabled(row.name, next)
+    } catch (err) {
+      setRows(current =>
+        (current || []).map(item => (item.name === row.name ? { ...item, enabled: !next } : item))
+      )
+      toast('error', 'Could not switch ' + row.name, message(err))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const onPackage = async row => {
+    setBusy(row.name)
+    try {
+      const res = await api('/zip', { name: row.name })
+      if (!res || !res.b64 || !res.filename) {
+        throw new Error('The zip came back empty.')
+      }
+      downloadZip(res.filename, res.b64)
+      toast('success', 'Packaged ' + row.name, res.filename + ' is downloading.')
+    } catch (err) {
+      toast('error', 'Could not package ' + row.name, message(err))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const onReveal = async row => {
+    try {
+      const res = await api('/resolve', { name: row.name })
+      const path = res && res.path
+      if (!path) {
+        throw new Error('No folder path came back.')
+      }
+      const shown = osDoor ? await osDoor.revealPath(path) : false
+      if (!shown) {
+        toast('info', row.name, path)
+      }
+    } catch (err) {
+      toast('error', 'Could not open the folder', message(err))
+    }
+  }
+
+  const onDelete = async row => {
+    setBusy(row.name)
+    try {
+      const res = await api('/delete', { name: row.name })
+      const moved = res && res.result === 'moved'
+      toast(
+        'success',
+        'Deleted ' + row.name,
+        moved
+          ? 'The Recycle Bin was unavailable, so the folder was moved to better-capabilities-trash.'
+          : 'The folder is in the Recycle Bin.'
+      )
+      await load()
+    } catch (err) {
+      toast('error', 'Could not delete ' + row.name, message(err))
+    } finally {
+      setBusy('')
+      setPendingDelete(null)
+    }
+  }
+
+  return el(
+    'div',
+    { className: 'flex flex-col gap-3 p-4' },
+    el(
+      'div',
+      { className: 'flex flex-wrap items-center gap-2' },
+      el(Input, {
+        'aria-label': 'Filter skills',
+        className: 'h-7 max-w-xs text-xs',
+        onChange: event => setQuery(event.target.value),
+        placeholder: 'Filter skills',
+        value: query
+      }),
+      el(Button, { onClick: () => void load(), size: 'sm', variant: 'ghost' }, 'Refresh'),
+      el('span', { className: MUTED }, (rows ? filtered.length : 0) + ' shown')
+    ),
+    el(
+      'p',
+      { className: MUTED },
+      'Delete, package and folder actions only reach skills under this Hermes home’s skills folder. Bundled and hub skills resolve outside it and are left alone.'
+    ),
+    error ? el('p', { className: cn(MUTED, 'text-(--ui-danger)') }, error) : null,
+    el(
+      Section,
+      { hint: 'read from the same list the Capabilities page shows' },
+      rows === null
+        ? el('span', { className: MUTED }, 'Loading skills…')
+        : filtered.length === 0
+          ? el(Empty, null, 'No skills match.')
+          : filtered.map(row =>
+              el(SkillRow, {
+                busy,
+                key: row.name,
+                onDelete: setPendingDelete,
+                onPackage: row2 => void onPackage(row2),
+                onReveal: row2 => void onReveal(row2),
+                onToggle: (row2, next) => void onToggle(row2, next),
+                row
+              })
+            )
+    ),
+    pendingDelete
+      ? el(ConfirmDialog, {
+          body:
+            '“' +
+            pendingDelete.name +
+            '” goes to the Recycle Bin, or to better-capabilities-trash when the bin is unavailable. Nothing else is touched.',
+          onCancel: () => setPendingDelete(null),
+          onConfirm: () => void onDelete(pendingDelete),
+          title: 'Delete ' + pendingDelete.name + '?'
+        })
+      : null
+  )
+}
+
+// ── Presets ───────────────────────────────────────────────────────────────
+
+function PresetRow({ busy, entry, kind, onApply, onDelete, onMove, onOverwrite, onRename }) {
+  return el(
+    'div',
+    { className: ROW },
+    el('div', { className: 'flex min-w-0 flex-1 flex-col' },
+      el('span', { className: 'truncate text-sm text-foreground' }, entry.name),
+      el('span', { className: cn(MUTED, 'truncate') }, entry.summary)
+    ),
+    el(IconButton, { disabled: Boolean(busy), icon: 'chevron-up', label: 'Move up', onClick: () => onMove(entry.name, -1) }),
+    el(IconButton, { disabled: Boolean(busy), icon: 'chevron-down', label: 'Move down', onClick: () => onMove(entry.name, 1) }),
+    el(IconButton, { disabled: Boolean(busy), icon: 'play', label: 'Apply', onClick: () => onApply(kind, entry.name) }),
+    el(IconButton, { disabled: Boolean(busy), icon: 'replace', label: 'Overwrite', onClick: () => onOverwrite(kind, entry.name) }),
+    el(IconButton, { disabled: Boolean(busy), icon: 'edit', label: 'Rename', onClick: () => onRename(kind, entry.name) }),
+    el(IconButton, { disabled: Boolean(busy), icon: 'trash', label: 'Delete preset', onClick: () => onDelete(kind, entry.name), tone: 'danger' })
+  )
+}
+
+function PresetsPage() {
+  const profile = useAtom(host.state.profile)
+  const [kind, setKind] = useState('skills')
+  const [store, setStore] = useState(null)
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState('')
+  const [error, setError] = useState('')
+  const [pendingDelete, setPendingDelete] = useState(null)
+
+  const load = useCallback(async () => {
+    setError('')
+    try {
+      const res = await api('/presets', undefined)
+      setStore((res && res.store) || { skills: {}, tools: {}, plugins: {} })
+    } catch (err) {
+      setStore({ skills: {}, tools: {}, plugins: {} })
+      setError(message(err))
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const persist = useCallback(async next => {
+    setStore(next)
+    try {
+      await rest('/presets', { method: 'PUT', body: next })
+    } catch (err) {
+      toast('error', 'Could not save the preset store', message(err))
+    }
+  }, [])
+
+  const bucket = (store && store[kind]) || {}
+  const order = useMemo(() => {
+    const names = (Array.isArray(bucket._order) ? bucket._order : []).filter(item => item && bucket[item])
+    for (const item of Object.keys(bucket)) {
+      if (item !== '_order' && !names.includes(item)) {
+        names.push(item)
+      }
+    }
+    return names
+  }, [bucket])
+
+  const entries = useMemo(
+    () =>
+      order.map(item => {
+        const payload = bucket[item] || {}
+        let summary = ''
+        if (kind === 'plugins') {
+          const maps = payload.agentByProfile || {}
+          const keys = Object.keys(maps)
+          const on = Object.values(maps).reduce(
+            (total, map) => total + Object.values(map || {}).filter(Boolean).length,
+            0
+          )
+          summary = keys.length + ' profile' + (keys.length === 1 ? '' : 's') + ' · ' + on + ' plugin switches on'
+        } else {
+          const enabled = payload.enabled || {}
+          const keys = Object.keys(enabled)
+          const on = keys.filter(key => enabled[key]).length
+          summary = on + ' of ' + keys.length + ' on'
+        }
+        return { name: item, payload, summary }
+      }),
+    [bucket, kind, order]
+  )
+
+  const saveOne = async (label, overwrite) => {
+    const trimmed = String(label || '').trim()
+    if (!NAME_RE.test(trimmed)) {
+      toast('error', 'Name is not valid', 'Letters, numbers, spaces, dots, underscores, apostrophes or hyphens. Start with a letter or number.')
+      return
+    }
+    if (bucket[trimmed] && !overwrite) {
+      toast('error', trimmed + ' already exists', 'Use Overwrite on that row, or pick another name.')
+      return
+    }
+    setBusy(trimmed)
+    setError('')
+    try {
+      const payload = await snapshotKind(kind, profile)
+      payload.savedAt = Date.now()
+      const nextBucket = { ...bucket, [trimmed]: payload }
+      const nextOrder = order.filter(item => item !== trimmed)
+      nextOrder.push(trimmed)
+      nextBucket._order = nextOrder
+      await persist({ ...store, [kind]: nextBucket })
+      setName(trimmed)
+      toast('success', (overwrite ? 'Overwrote ' : 'Saved ') + trimmed, 'The ' + kind + ' on/off state is stored.')
+    } catch (err) {
+      setError(message(err))
+      toast('error', 'Could not save the preset', message(err))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const applyOne = async (targetKind, presetName) => {
+    const payload = ((store && store[targetKind]) || {})[presetName]
+    if (!payload) {
+      toast('error', 'Missing preset', presetName)
+      return
+    }
+    setBusy(presetName)
+    try {
+      const changed = await applyKind(targetKind, payload)
+      toast('success', 'Applied ' + presetName, changed + ' switch' + (changed === 1 ? '' : 'es') + ' changed.')
+      if (targetKind === 'plugins') {
+        try {
+          await rest('/presets/pending', { method: 'DELETE' })
+        } catch {
+          // pending marker is best-effort
+        }
+      }
+    } catch (err) {
+      toast('error', 'Could not apply ' + presetName, message(err))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const renameOne = async (targetKind, from, nameInput) => {
+    const to = String(name || '').trim()
+    if (!to || to === from) {
+      toast('error', 'Type the new name first', 'Put the new name in the field above, then click Rename.')
+      return
+    }
+    if (!NAME_RE.test(to)) {
+      toast('error', 'Name is not valid', 'Letters, numbers, spaces, dots, underscores, apostrophes or hyphens.')
+      return
+    }
+    const targetBucket = (store && store[targetKind]) || {}
+    if (targetBucket[to] && to !== from) {
+      toast('error', to + ' already exists', 'Pick another name.')
+      return
+    }
+    const nextBucket = { ...targetBucket }
+    nextBucket[to] = targetBucket[from]
+    delete nextBucket[from]
+    nextBucket._order = order.map(item => (item === from ? to : item))
+    await persist({ ...store, [targetKind]: nextBucket })
+    setName(to)
+  }
+
+  const moveOne = async (targetKind, presetName, delta) => {
+    const targetBucket = (store && store[targetKind]) || {}
+    const list = (Array.isArray(targetBucket._order) ? targetBucket._order : Object.keys(targetBucket)).filter(
+      item => item !== '_order'
+    )
+    const index = list.indexOf(presetName)
+    const next = index + delta
+    if (index < 0 || next < 0 || next >= list.length) {
+      return
+    }
+    list.splice(index, 1)
+    list.splice(next, 0, presetName)
+    await persist({ ...store, [targetKind]: { ...targetBucket, _order: list } })
+  }
+
+  const removeOne = async (targetKind, presetName) => {
+    const targetBucket = { ...((store && store[targetKind]) || {}) }
+    delete targetBucket[presetName]
+    targetBucket._order = (Array.isArray(targetBucket._order) ? targetBucket._order : []).filter(
+      item => item !== presetName
+    )
+    await persist({ ...store, [targetKind]: targetBucket })
+    setPendingDelete(null)
+    toast('success', 'Deleted ' + presetName, 'The ' + targetKind + ' preset is gone.')
+  }
+
+  return el(
+    'div',
+    { className: 'flex flex-col gap-3 p-4' },
+    el(
+      'div',
+      { className: 'flex flex-wrap items-center gap-1' },
+      KINDS.map(item =>
+        el(
+          'button',
+          {
+            className: cn(
+              'rounded-md px-2 py-1 text-xs',
+              item.id === kind
+                ? 'bg-(--chrome-action-hover) text-foreground'
+                : 'text-(--ui-text-tertiary) hover:text-foreground'
+            ),
+            key: item.id,
+            onClick: () => setKind(item.id),
+            type: 'button'
+          },
+          item.label
+        )
+      ),
+      el('span', { className: cn(MUTED, 'ml-2') }, 'profile: ' + (profile || 'default'))
+    ),
+    el(
+      'div',
+      { className: 'flex flex-wrap items-center gap-2' },
+      el(Input, {
+        'aria-label': 'Preset name',
+        className: 'h-7 max-w-xs text-xs',
+        maxLength: 60,
+        onChange: event => setName(event.target.value),
+        placeholder: 'Name for a new preset, or the new name when renaming',
+        value: name
+      }),
+      el(Button, { disabled: Boolean(busy), onClick: () => void saveOne(name, false), size: 'sm' }, 'Save current'),
+      el('span', { className: MUTED }, entries.length + ' preset' + (entries.length === 1 ? '' : 's'))
+    ),
+    kind === 'plugins'
+      ? el(
+          'p',
+          { className: MUTED },
+          'Agent-plugin switches are restored per profile. Desktop-plugin switches are app-wide and read-only for plugins, so a preset never claims them.'
+        )
+      : null,
+    error ? el('p', { className: cn(MUTED, 'text-(--ui-danger)') }, error) : null,
+    el(
+      Section,
+      { hint: 'the same store /preset reads from chat' },
+      store === null
+        ? el('span', { className: MUTED }, 'Loading presets…')
+        : entries.length === 0
+          ? el(Empty, null, 'No ' + kind + ' presets yet. Turn things on or off, then save the set here.')
+          : entries.map(entry =>
+              el(PresetRow, {
+                busy,
+                entry: { ...entry, name: entry.name },
+                key: entry.name,
+                kind,
+                nameInput: name,
+                onApply: (targetKind, presetName) => void applyOne(targetKind, presetName),
+                onDelete: (targetKind, presetName) => setPendingDelete({ kind: targetKind, name: presetName }),
+                onMove: (presetName, delta) => void moveOne(kind, presetName, delta),
+                onOverwrite: (targetKind, presetName) => void saveOne(presetName, true),
+                onRename: (targetKind, presetName) => void renameOne(targetKind, presetName, name)
+              })
+            )
+    ),
+    el(
+      'p',
+      { className: MUTED },
+      'From chat: /preset save skills|tools|plugins <name>, then /preset skills|tools|plugins <name>.'
+    ),
+    pendingDelete
+      ? el(ConfirmDialog, {
+          body: 'Delete the preset “' + pendingDelete.name + '”? Capability switches already applied stay as they are.',
+          onCancel: () => setPendingDelete(null),
+          onConfirm: () => void removeOne(pendingDelete.kind, pendingDelete.name),
+          title: 'Delete ' + pendingDelete.name + '?'
+        })
+      : null
+  )
+}
+
+// ── Overview ──────────────────────────────────────────────────────────────
+
+function OverviewPage() {
+  const profile = useAtom(host.state.profile)
+  const [counts, setCounts] = useState(null)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    setError('')
+    try {
+      const [skills, toolsets, plugins] = await Promise.all([
+        listSkills(),
+        listToolsets(),
+        listAgentPlugins()
+      ])
+      const on = rows => rows.filter(row => row && row.enabled).length
+      setCounts({
+        plugins: [Object.values(plugins).filter(Boolean).length, Object.keys(plugins).length],
+        skills: [skills.filter(row => row && row.enabled).length, skills.length],
+        toolsets: [on(toolsets), toolsets.length]
       })
-    })
-    actions.append(apply, overwrite, rename, del)
-    row.append(grip, label, actions)
-    listEl.appendChild(row)
-  }
+    } catch (err) {
+      setCounts(null)
+      setError(message(err))
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const line = (label, pair) =>
+    el(
+      'div',
+      { className: 'flex items-baseline gap-2' },
+      el('span', { className: 'w-24 text-xs text-(--ui-text-tertiary)' }, label),
+      el('span', { className: 'text-sm text-foreground' }, pair ? pair[0] + ' on · ' + pair[1] + ' installed' : '…')
+    )
+
+  return el(
+    'div',
+    { className: 'flex flex-col gap-3 p-4' },
+    el(
+      'p',
+      { className: 'text-sm text-(--ui-text-secondary)' },
+      'Skill delete, packaging and file browsing, plus saved on/off presets — the parts the Capabilities page does not cover. Everything else stays on the native page.'
+    ),
+    el(
+      Section,
+      { hint: 'profile: ' + (profile || 'default') },
+      error ? el('p', { className: cn(MUTED, 'text-(--ui-danger)') }, error) : null,
+      line('Skills', counts && counts.skills),
+      line('Toolsets', counts && counts.toolsets),
+      line('Plugins', counts && counts.plugins),
+      el(
+        'div',
+        { className: 'flex flex-wrap gap-2 pt-1' },
+        el(Button, { onClick: () => void load(), size: 'sm', variant: 'ghost' }, 'Refresh'),
+        el(
+          Button,
+          {
+            onClick: () => {
+              try {
+                host.navigate('/capabilities?tab=plugins')
+              } catch {
+                toast('error', 'Could not open Capabilities', 'Use the sidebar entry instead.')
+              }
+            },
+            size: 'sm',
+            variant: 'ghost'
+          },
+          'Open Capabilities'
+        )
+      )
+    ),
+    el(
+      Section,
+      { hint: 'what each sub-page does' },
+      el('p', { className: MUTED }, 'Skills — filter the list, flip a skill on or off, read its other markdown files, package it as a zip, reveal it, or delete the folder.'),
+      el('p', { className: MUTED }, 'Presets — save the current skills / toolsets / agent-plugin switches under a name, then reapply, overwrite, rename, reorder or delete it.')
+    )
+  )
 }
 
-async function onSavePreset(kind, name, overwrite, nameInput) {
-  const trimmed = String(name || '').trim()
-  if (!PRESET_NAME_RE.test(trimmed)) {
-    notify('error', 'Name is not valid', 'Use letters, numbers, spaces, or hyphens. Start with a letter or number.')
-    return
-  }
-  const existing = presetsFor(kind)[trimmed]
-  if (existing && !overwrite) {
-    notify('error', trimmed + ' already exists', 'Use Overwrite on that row, or pick another name.')
-    return
-  }
-  try {
-    const payload = await snapshotKind(kind)
-    payload.savedAt = Date.now()
-    writePreset(kind, trimmed, payload)
-    if (nameInput) nameInput.value = trimmed
-    const listEl = document.getElementById('bc-preset-list')
-    if (listEl) renderPresetList(kind, listEl, nameInput)
-    notify('success', overwrite ? 'Overwrote ' + trimmed : 'Saved ' + trimmed, kindLabel(kind) + ' on/off state is stored.')
-  } catch (err) {
-    notify('error', 'Could not save preset', String(err && err.message ? err.message : err))
-  }
-}
-
-async function onApplyPreset(kind, name) {
-  const payload = presetsFor(kind)[name]
-  if (!payload) {
-    notify('error', 'Missing preset', name)
-    return
-  }
-  try {
-    await applyKind(kind, payload)
-    notify('success', 'Applied ' + name, kindLabel(kind) + ' switches now match that preset.')
-  } catch (err) {
-    notify('error', 'Could not apply ' + name, String(err && err.message ? err.message : err))
-  }
-}
-
-function onRenamePreset(kind, from, nameInput, listEl) {
-  const to = String((nameInput && nameInput.value) || '').trim()
-  if (!to || to === from) {
-    notify('error', 'Type the new name', 'Put the new name in the field, then click Rename.')
-    return
-  }
-  if (!PRESET_NAME_RE.test(to)) {
-    notify('error', 'Name is not valid', 'Use letters, numbers, spaces, or hyphens.')
-    return
-  }
-  try {
-    renamePreset(kind, from, to)
-    nameInput.value = to
-    renderPresetList(kind, listEl, nameInput)
-    notify('success', 'Renamed preset', from + ' is now ' + to + '.')
-  } catch (err) {
-    notify('error', 'Could not rename', String(err && err.message ? err.message : err))
-  }
-}
-
-function openPresetDialog(kind) {
-  closeOverlay()
-  const overlay = document.createElement('div')
-  overlay.id = 'bc-overlay'
-  overlay.className = 'bc-overlay-center'
-  overlay.innerHTML =
-    '<div class="bc-dialog bc-dialog-wide" role="dialog" aria-modal="true">' +
-    '<div class="bc-dialog-title">' +
-    escapeHtml(kindLabel(kind)) +
-    ' presets</div>' +
-    '<div class="bc-dialog-body">Save the current on/off set, or apply one you already stored.</div>' +
-    '<div class="bc-preset-save">' +
-    '<input class="bc-input" data-bc-name="1" maxlength="60" placeholder="Name" />' +
-    '</div>' +
-    '<div id="bc-preset-list" class="bc-preset-list"></div>' +
-    '<div class="bc-dialog-actions"><button type="button" class="bc-text-btn" data-bc-cancel="1">Close</button></div>' +
-    '</div>'
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeOverlay()
-  })
-  overlay.querySelector('[data-bc-cancel]').addEventListener('click', closeOverlay)
-  const nameInput = overlay.querySelector('[data-bc-name]')
-  const listEl = overlay.querySelector('#bc-preset-list')
-  const saveRow = overlay.querySelector('.bc-preset-save')
-  const saveBtn = iconButton('codicon-save', 'Save')
-  saveBtn.setAttribute('data-bc-save', '1')
-  saveBtn.addEventListener('click', () => {
-    void onSavePreset(kind, nameInput.value, false, nameInput)
-  })
-  saveRow.appendChild(saveBtn)
-  nameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      void onSavePreset(kind, nameInput.value, false, nameInput)
-    }
-  })
-  bindPresetReorder(listEl, kind)
-  renderPresetList(kind, listEl, nameInput)
-  document.body.appendChild(overlay)
-  nameInput.focus()
-}
-
-function makePresetTab() {
-  const sample = document.querySelector('[data-capability-tabs] button')
-  const btn = document.createElement('button')
-  btn.type = 'button'
-  btn.setAttribute(BTN, 'presets')
-  btn.setAttribute('data-bc-presets', '1')
-  btn.setAttribute('aria-pressed', 'false')
-  if (sample) {
-    btn.className = sample.className
-    const sampleSpan = sample.querySelector('span')
-    const span = document.createElement('span')
-    if (sampleSpan) span.className = sampleSpan.className
-    span.textContent = 'Presets'
-    btn.appendChild(span)
-  } else {
-    btn.className = 'bc-text-tab'
-    const span = document.createElement('span')
-    span.className = 'bc-text-tab-label'
-    span.textContent = 'Presets'
-    btn.appendChild(span)
-  }
-  btn.addEventListener('click', (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const kind = pageKind()
-    if (!kind) return
-    openPresetDialog(kind)
-  })
-  return btn
-}
-
-function browseButton(bar) {
-  const buttons = bar.querySelectorAll('button')
-  for (const btn of buttons) {
-    if (btn.getAttribute('data-bc-presets')) continue
-    if (String(btn.textContent || '').trim() === 'Browse') return btn
-  }
-  return null
-}
-
-function paintPresetTab() {
-  const kind = pageKind()
-  if (!kind) return
-  if (kind === 'tools') ensureToolsPresetBar()
-  const bars = document.querySelectorAll('[data-capability-tabs], [data-bc-tools-tabs]')
-  for (const bar of bars) {
-    if (isHidden(bar)) continue
-    if (bar.querySelector('[data-bc-presets]')) continue
-    const tab = makePresetTab()
-    const browse = browseButton(bar)
-    if (browse) bar.insertBefore(tab, browse)
-    else bar.appendChild(tab)
-  }
-}
-
-function ensureToolsPresetBar() {
-  if (document.querySelector('[data-bc-tools-tabs]')) return
-  const section = document.querySelector('section.flex.h-full.min-w-0.flex-col')
-  if (!section) return
-  const col = section.querySelector(':scope > div.flex.h-full.flex-col')
-  if (!col) return
-  const bar = document.createElement('div')
-  bar.className = 'flex shrink-0 items-center gap-4 px-3 py-1'
-  bar.setAttribute('data-bc-tools-tabs', '1')
-  bar.setAttribute(BTN, 'tools-tabs')
-  const profile = col.querySelector(':scope > div.border-b')
-  if (profile) profile.insertAdjacentElement('afterend', bar)
-  else col.insertBefore(bar, col.firstChild)
-}
-
-function sweep() {
-  if (!onCapabilities() || painting) return
-  painting = true
-  try {
-    paintPresetTab()
-    paintPluginRows()
-    paintSkillRow()
-  } finally {
-    painting = false
-  }
-}
-
-function injectStyle() {
-  document.getElementById(STYLE_ID)?.remove()
-  const style = document.createElement('style')
-  style.id = STYLE_ID
-  style.textContent = `
-    .bc-icon-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.75rem;
-      height: 1.75rem;
-      border: none;
-      background: transparent;
-      color: var(--ui-text-tertiary, inherit);
-      cursor: pointer;
-      border-radius: 0.375rem;
-    }
-    .bc-icon-btn:hover { color: var(--foreground, inherit); background: var(--chrome-action-hover, transparent); }
-    .bc-icon-btn .codicon { font-size: 0.85rem; }
-    .bc-text-btn {
-      border: none;
-      background: transparent;
-      color: var(--ui-text-secondary, inherit);
-      cursor: pointer;
-      font: inherit;
-      font-size: 0.75rem;
-      padding: 0.15rem 0.4rem;
-      border-radius: 0.375rem;
-    }
-    .bc-text-btn:hover { color: var(--foreground, inherit); }
-    .bc-danger { color: var(--ui-danger, #f87171); }
-    .bc-danger:hover { color: var(--ui-danger, #f87171); }
-    .bc-text-tab {
-      display: inline-flex;
-      align-items: center;
-      height: 1.75rem;
-      padding: 0 0.25rem;
-      border: none;
-      background: transparent;
-      color: var(--ui-text-tertiary, inherit);
-      cursor: pointer;
-      font: inherit;
-      font-size: var(--conversation-caption-font-size, 0.75rem);
-      font-weight: 500;
-    }
-    .bc-text-tab-label { text-decoration: underline; text-underline-offset: 4px; text-decoration-color: color-mix(in srgb, currentColor 25%, transparent); }
-    .bc-text-tab:hover { color: var(--foreground, inherit); }
-    #bc-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      padding: 2rem;
-      background: color-mix(in srgb, black 22%, transparent);
-    }
-    #bc-overlay.bc-overlay-center {
-      justify-content: center;
-    }
-    .bc-dialog {
-      min-width: 16rem;
-      max-width: 22rem;
-      padding: 0.9rem 1rem;
-      border: 1px solid var(--ui-stroke-tertiary, var(--border));
-      border-radius: 0.6rem;
-      background: var(--ui-bg-elevated, var(--card, var(--background)));
-      color: var(--foreground);
-    }
-    .bc-dialog-wide { min-width: 22rem; max-width: 28rem; }
-    .bc-dialog-title { font-size: 0.9rem; font-weight: 600; }
-    .bc-dialog-body { margin-top: 0.35rem; font-size: 0.75rem; color: var(--ui-text-tertiary, inherit); }
-    .bc-dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.75rem; }
-    .bc-preset-save { display: flex; gap: 0.4rem; align-items: center; margin-top: 0.7rem; }
-    .bc-input {
-      flex: 1;
-      min-width: 0;
-      height: 1.7rem;
-      border: 1px solid var(--ui-stroke-tertiary, var(--border));
-      border-radius: 0.375rem;
-      background: var(--ui-bg-quinary, transparent);
-      color: var(--foreground);
-      padding: 0 0.45rem;
-      font: inherit;
-      font-size: 0.75rem;
-    }
-    .bc-preset-list { margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.2rem; max-height: 14rem; overflow: auto; }
-    .bc-preset-row { display: flex; align-items: center; gap: 0.15rem; }
-    .bc-preset-row.bc-preset-dragging { opacity: 0.45; }
-    .bc-grip {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.15rem;
-      height: 1.5rem;
-      color: var(--ui-text-tertiary, inherit);
-      cursor: grab;
-    }
-    .bc-grip:active { cursor: grabbing; }
-    .bc-grip .codicon { font-size: 0.85rem; }
-    .bc-preset-name { flex: 1; min-width: 0; font-size: 0.78rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .bc-preset-actions { display: flex; flex-wrap: nowrap; justify-content: flex-end; }
-    .bc-file-wrap { position: relative; display: inline-flex; }
-    .bc-file-trigger {
-      border: 1px solid var(--ui-stroke-tertiary, var(--border));
-      background: transparent;
-      color: var(--ui-text-secondary, inherit);
-      cursor: pointer;
-      font: inherit;
-      font-size: 0.72rem;
-      padding: 0.12rem 0.45rem;
-      border-radius: 0.375rem;
-      max-width: 10rem;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .bc-file-trigger:hover { color: var(--foreground, inherit); }
-    .bc-file-menu {
-      z-index: 40;
-      min-width: 12rem;
-      width: max-content;
-      overflow: auto;
-      padding: 0.25rem 0;
-      border: 1px solid var(--ui-stroke-tertiary, var(--border));
-      border-radius: 0.45rem;
-      background: var(--ui-bg-elevated, var(--card, var(--background)));
-    }
-    .bc-file-head {
-      padding: 0.28rem 0.55rem 0.1rem 5px;
-      font-size: 0.62rem;
-      font-weight: 600;
-      color: var(--ui-text-tertiary, inherit);
-      white-space: nowrap;
-    }
-    .bc-file-item {
-      display: block;
-      width: 100%;
-      text-align: left;
-      border: none;
-      background: transparent;
-      color: var(--foreground);
-      cursor: pointer;
-      font: inherit;
-      font-size: 0.72rem;
-      padding: 0.22rem 0.7rem 0.22rem 5px;
-      white-space: nowrap;
-    }
-    .bc-file-item-in { padding-left: 10px; }
-    .bc-file-item:hover { background: var(--chrome-action-hover, color-mix(in srgb, var(--foreground) 8%, transparent)); }
-  `
-  document.head.appendChild(style)
-}
+// ── plugin ────────────────────────────────────────────────────────────────
 
 export default {
   id: ID,
   name: 'Better Capabilities',
-  description:
-    'Delete plugins and skills from Capabilities, zip a learned skill, and save on/off presets.',
+  description: 'Skill delete, packaging and file browsing, plus saved on/off presets for skills, toolsets and plugins.',
   defaultEnabled: false,
   register(ctx) {
     rest = typeof ctx.rest === 'function' ? ctx.rest : null
-    injectStyle()
-    void hydratePresetStore()
-    void consumePendingPreset()
-    const pendingTimer = window.setInterval(() => {
-      void consumePendingPreset()
-    }, 2000)
-    sweep()
-    let scheduled = false
-    const observer = new MutationObserver(() => {
-      if (scheduled) return
-      scheduled = true
-      requestAnimationFrame(() => {
-        scheduled = false
-        sweep()
-      })
+    osDoor = ctx.os || null
+    ctx.registerSettingsPage({
+      id: 'better-capabilities',
+      title: 'Better Capabilities',
+      icon: 'sparkle',
+      order: 40,
+      render: () => el(OverviewPage, null),
+      children: [
+        { id: 'skills', title: 'Skills', render: () => el(SkillsPage, null) },
+        { id: 'presets', title: 'Presets', render: () => el(PresetsPage, null) }
+      ]
     })
-    observer.observe(document.body, { childList: true, subtree: true })
-    const onHash = () => sweep()
-    const onDocDown = (e) => {
-      if (e.target && e.target.closest && e.target.closest('[data-bc-files]')) return
-      closeFileMenus()
-    }
-    window.addEventListener('hashchange', onHash)
-    document.addEventListener('mousedown', onDocDown, true)
-    ctx.onDispose(() => {
-      observer.disconnect()
-      window.clearInterval(pendingTimer)
-      window.removeEventListener('hashchange', onHash)
-      document.removeEventListener('mousedown', onDocDown, true)
-      document.getElementById(STYLE_ID)?.remove()
-      closeOverlay()
-      document.querySelectorAll('[' + BTN + ']').forEach((el) => el.remove())
-      document.querySelectorAll('[' + MARK + ']').forEach((el) => el.removeAttribute(MARK))
-    })
-  },
+  }
 }

@@ -1,8 +1,8 @@
-"""Better Capabilities — dashboard + desktop plugin package.
+"""Better Capabilities — Python half (slash command) + Desktop settings page.
 
-Registers /preset so chat can save or apply Skills and Plugins presets.
-The desktop UI is desktop/plugin.js. Recycle/zip/preset routes live in
-dashboard/plugin_api.py.
+``/preset`` saves or applies on/off sets for skills, toolsets and agent plugins.
+The shared store is ``presets.py``; the Desktop page in ``desktop/plugin.js``
+reads and writes the same file through the routes in ``dashboard/plugin_api.py``.
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ def register(ctx: Any = None):
     ctx.register_command(
         "preset",
         handler=_handle_preset,
-        description="Save or apply a Skills or Plugins on/off preset.",
-        args_hint="save skills|plugins <name> | skills|plugins <name>",
+        description="Save or apply a skills, tools or plugins on/off preset.",
+        args_hint="save skills|tools|plugins <name> | skills|tools|plugins <name>",
         argument_mode="text",
     )
     return None

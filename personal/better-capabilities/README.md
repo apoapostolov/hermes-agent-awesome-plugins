@@ -1,9 +1,8 @@
 <div align="center">
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
   <h1>Better Capabilities</h1>
-  <strong>Delete plugins and skills, zip a skill, save on/off presets.</strong>
-  <p>Recycle Bin delete, Package (zip) for learned skills, and `/preset` apply from chat.</p>
-  <p><strong>On hold.</strong> The Capabilities page uninstalls plugins itself now, and the rest waits on a skill-file and preset seam. See <a href="../../RETIRED.md">RETIRED.md</a>.</p>
+  <strong>Delete and package skills, browse their files, save on/off presets.</strong>
+  <p>A Settings ▸ Plugins page plus a <code>/preset</code> command, for the things the Capabilities page does not cover.</p>
   <p>
     <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
@@ -14,24 +13,41 @@
   <img src="docs/hero.png" width="100%" alt="Better Capabilities" />
 </div>
 
-## Screenshot
+## Where it lives
 
-<div align="center">
-  <img src="docs/screenshot-presets.png" alt="Skills presets dialog on the Capabilities Presets tab" />
-  <img src="docs/screenshot-skill-files.png" alt="Learned skill with Package zip and SKILL.md file dropdown" />
-</div>
+**Settings → Plugins → Better Capabilities**, with three entries: an overview, **Skills**, and
+**Presets**. The page renders inside Settings, so it is reachable from the Settings rail and from
+the gear on the plugin's own row in Capabilities → Plugins.
 
-## What You Can Do
+It does not add buttons to the Capabilities page. That page gives plugins no slot to contribute
+to, and reaching into its markup would break on any Desktop release. Everything here is drawn by
+this plugin.
 
-- Delete a plugin or skill from Capabilities. The folder goes to the Recycle Bin; if that fails, it is moved aside under `plugins-disabled/`.
-- Package (zip) a learned skill, including `references/` and other supporting files. `__pycache__` and `.git` stay out.
-- Browse other markdown files in a skill after Edit (folder headers like `/references`). Switching skills returns to SKILL.md.
-- Save on/off presets on a Presets tab. Apply, overwrite, rename, or delete them from the UI.
-- Snapshot and apply from chat: `/preset save skills {name}`, `/preset save plugins {name}`, `/preset skills {name}`, `/preset plugins {name}`. Plugin presets keep Agent on/off for every profile that existed at save time.
+## What you can do
+
+- **Skills.** Filter the list, flip a skill on or off, and read the other markdown files in its
+  folder (`references/`, `docs/`, and so on) without leaving the page. Each row also offers
+  Package (zip), Open folder, and Delete.
+- **Package (zip).** Saves `SKILL.md` plus `references/` and the rest of the folder as a zip.
+  `__pycache__`, `.git`, virtualenvs and compiled files stay out, and symlinks are skipped.
+- **Delete.** The skill folder goes to the Recycle Bin. When the bin is unavailable — a
+  non-Windows host, or a locked folder — it is moved to
+  `<hermes home>/better-capabilities-trash/` and the page says which happened.
+- **Presets.** Save the current on/off set for skills, toolsets, or agent plugins under a name,
+  then apply, overwrite, rename, reorder, or delete it. Presets live in one store, so the page and
+  chat see the same list.
+- **From chat.** `/preset save skills|tools|plugins {name}` and
+  `/preset skills|tools|plugins {name}`.
+
+A plugins preset restores every profile that existed when it was saved. Desktop-plugin switches
+are not part of it: the Desktop keeps those app-wide and exposes them to plugins read-only, so a
+preset never claims to restore them.
 
 ## Install
 
-Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) **0.21.0 or newer**.
+Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) with the plugin SDK doors
+this page uses — `ctx.registerSettingsPage`, `host.skills`, `host.toolsets`, `host.request`,
+`ctx.os` — which is any Desktop build from October 2026 onward.
 
 ```bash
 hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
@@ -43,11 +59,19 @@ Or install just this plugin:
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/better-capabilities
 ```
 
-Enable **Better Capabilities** under **Capabilities → Plugins**. Zip and delete need the plugin's Python routes, which mount when Desktop starts. If those buttons error after a first install, fully quit and reopen Hermes Desktop once.
+Enable **Better Capabilities** under **Capabilities → Plugins**. Zip, delete and the skill file
+list need the plugin's Python routes, which mount when Desktop starts; if those actions error
+right after a first install, fully quit and reopen Hermes Desktop once.
 
-## Requirements / Limits
+## Requirements and limits
 
-Desktop plugin with a small Python API. Acts only on folders under the local Hermes `plugins/`, `desktop-plugins/`, and `skills/` trees. Recycle Bin is preferred; `plugins-disabled/` is the fallback when trash is unavailable.
+Desktop plugin with a small Python API. Skill actions reach only skills under this Hermes home's
+`skills/` folder — bundled and hub skills resolve elsewhere and are left alone. Presets cover
+skills, toolsets and agent plugins; desktop-plugin switches stay in the app's hands.
+
+See [LIMITATIONS.md](LIMITATIONS.md) for what still keeps this tree off the public catalog, and
+[AUDIT.md](AUDIT.md) for the comparison against the current Capabilities page that produced this
+design.
 
 ## License
 

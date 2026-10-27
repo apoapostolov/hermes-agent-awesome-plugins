@@ -1,54 +1,60 @@
 # LIMITATIONS
 
-Personal edition of **Better Capabilities** (`better-capabilities`). This file is why that edition cannot be listed in the Hermes Plugin Catalog as-is.
+Personal edition of **Better Capabilities** (`better-capabilities`). This file tracks what
+still stands between this tree and a Hermes Plugin Catalog listing, and what the 1.1.0 rebuild
+resolved.
 
-There is no `public/` copy. The product is Capabilities-page reach-in. A listed edition would be a stub until the hooks below exist.
-
-Before you pin personal to the catalog, or recreate a public edition, walk every blocker below. Either still comply, or confirm the linked Hermes issue or PR is resolved and the SDK hook exists in the Desktop build you target.
+There is no `public/` copy. The product is a plugin-owned Settings page plus this plugin's own
+Python routes, so an edition that dropped either half would be a stub.
 
 ## Catalog bar
 
-- Admission rule: catalog README [rule 8](https://github.com/NousResearch/hermes-agent/blob/main/plugin-catalog/README.md). A listed Desktop bundle stays inside `ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`.
-- The `desktop surface` lint is the floor. Reviewers also reject app-owned DOM selectors, React fiber props, app `localStorage` keys, and raw bridge calls (`apps/desktop/src/contrib/runtime-loader.ts`).
-- Shared hook wishlist: [NousResearch/hermes-agent#116305](https://github.com/NousResearch/hermes-agent/issues/116305)
+- Admission rule: catalog README [rule 8](https://github.com/NousResearch/hermes-agent/blob/main/plugin-catalog/README.md).
+  A listed Desktop bundle stays inside `ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`.
+- The `desktop surface` lint is the floor: no app DOM reach, no `document.body` observer, no
+  dynamic code, no remote imports. Reviewers also read raw bridge calls and app `localStorage`
+  keys by hand (`apps/desktop/src/contrib/runtime-loader.ts`).
 - Catalog intake PR: [NousResearch/hermes-agent#115960](https://github.com/NousResearch/hermes-agent/pull/115960)
+  (closed on the old DOM-based design; a fresh PR needs this clean tree).
 
-## Blockers
+## Resolved in 1.1.0
 
-### 1. Raw Desktop bridge instead of the SDK
+- **Raw Desktop bridge.** The page now uses `host.skills`, `host.toolsets`, `host.profiles`,
+  `host.request('plugins.manage')`, `ctx.rest` and `ctx.os`. No `window.hermesDesktop` call
+  remains in the renderer.
+- **App-store write and synthetic clicks.** `hermes.desktop.pluginDecisions.v2` is neither read
+  nor written from the renderer. Desktop-plugin switches are read-only for plugins by design
+  (`sdk/bridge.ts`), so presets cover agent halves only and the page says so.
+- **App DOM reach.** Every control is rendered by this plugin inside its own Settings page: no
+  `data-slot` / `data-testid` selector, no injected tab, no mutation observer. `hermes plugins
+  validate` reports `desktop surface — stays inside the plugin SDK surface`.
+- **Delete off-Windows.** A non-Windows host, or one whose Recycle Bin helper is unavailable, now
+  falls back to `<hermes home>/better-capabilities-trash/` instead of raising first.
+- **Zip symlinks.** `_zip_dir` skips symlinks and non-regular files, so a link to `~/.ssh` cannot
+  ride along in the export.
+- **Wrong-profile paths.** Every filesystem path resolves per request through
+  `hermes_constants.get_hermes_home()`, which honors the backend's context-local home override.
 
-- **Personal behavior:** calls `window.hermesDesktop.api`, `readDir`, and `readFileText`. Hits `/api/skills/toggle`, `/api/tools/toolsets`, and `/api/profiles` as the user.
-- **Why it fails:** the SDK door for gateway RPC is `host.request`. Typed skills / toolsets / profiles are not a public plugin contract yet.
-- **Needed hook:** `host.request` plus a typed skills/toolsets/profiles surface ([#116305](https://github.com/NousResearch/hermes-agent/issues/116305) item 6).
-- **Public edition:** none.
+## Still open
 
-### 2. App-store write and synthetic clicks
+1. **Private core imports (warning, not a failure).** `presets.py` reads plugin, skill and profile
+   state through `hermes_cli.config`, `hermes_cli.skills_config`, `hermes_cli.tools_config`,
+   `hermes_cli.plugins*` and `hermes_cli.web_server_profiles`. `hermes plugins validate` warns on
+   each one under catalog rule 9. Closing this needs a `ctx`-side door for snapshotting capability
+   state, or for the plugin to call `hermes` CLI verbs instead.
+2. **The Capabilities page has no contribution area.** Row actions on the native page remain
+   impossible for any plugin, so this one does not try. If one lands, the Skills sub-page can move
+   its per-row controls back onto the native rows.
+3. **`/preset` applies to the launch profile.** The slash command takes no profile argument, so it
+   writes the profile its process runs as. The Settings page covers whichever profile the page is
+   scoped to.
 
-- **Personal behavior:** writes `hermes.desktop.pluginDecisions.v2` and fires synthetic clicks on app switches.
-- **Why it fails:** app persisted keys and app-owned controls are not a plugin contract.
-- **Needed hook:** `host.pluginDecisions` or equivalent from [#116305](https://github.com/NousResearch/hermes-agent/issues/116305). No synthetic clicks.
-- **Public edition:** none.
+## Checklist before a fresh listing
 
-### 3. Delete path off-Windows
-
-- **Personal behavior:** the delete route can 500 off-Windows before its fallback runs (`plugin_api.py`).
-- **Why it fails:** listing asks for a working delete path on every supported OS. This is a defect, independent of rule 8.
-- **Needed hook:** none. Fix the fallback so non-Windows delete never 500s first.
-- **Public edition:** none.
-
-### 4. Zip follows symlinks
-
-- **Personal behavior:** `_zip_dir` follows symlinks inside a skill dir. A symlink to `~/.ssh` can land in the export zip.
-- **Why it fails:** LOW security finding on the intake. Listed builds must skip symlinks in the zip.
-- **Needed hook:** none. Skip symlinks in `_zip_dir` before any listing attempt.
-- **Public edition:** none.
-
-## Checklist before listing personal
-
-- [ ] SDK bridge only. No `window.hermesDesktop.api`, `readDir`, or `readFileText`.
-- [ ] No writes to `hermes.desktop.pluginDecisions.v2`.
-- [ ] No synthetic clicks on app switches.
-- [ ] Skills / toolsets / profiles go through item 6 in #116305 once merged.
-- [ ] Delete works off-Windows without a 500-before-fallback.
-- [ ] `_zip_dir` does not follow symlinks.
-- [ ] Re-pin catalog `sha:` to the clean tree and comment on #115960.
+- [x] SDK doors only. No `window.hermesDesktop.*`, `readDir`, or `readFileText`.
+- [x] No writes to `hermes.desktop.pluginDecisions.v2`, no synthetic clicks.
+- [x] `desktop surface` lint clean.
+- [x] Delete works off-Windows without a 500-before-fallback.
+- [x] `_zip_dir` does not follow symlinks.
+- [ ] Private core imports reduced, or accepted by a reviewer.
+- [ ] Pin the catalog `sha:` to the clean tree and open a fresh intake PR.

@@ -40,7 +40,7 @@ This repository keeps two trees.
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
-**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. Fifteen of the sixteen active plugins have one; [`better-capabilities`](RETIRED.md) is on hold.
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. Fifteen of the sixteen active plugins have one; [`better-capabilities`](personal/better-capabilities/README.md) is personal-only and has no public copy.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>

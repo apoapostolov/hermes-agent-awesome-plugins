@@ -10,6 +10,12 @@ A retired or held plugin keeps its `personal/<id>/` tree so it can be revived. I
 
 | Plugin | State | Since | Why | Revives when |
 | --- | --- | --- | --- | --- |
-| [better-capabilities](personal/better-capabilities/README.md) | On hold | 2026-10-20 | The Capabilities page uninstalls a plugin itself now, which was the headline feature. What is left, deleting and zipping a skill folder and saving on/off presets, has no plugin seam: `host.skills` exposes `list` and `setEnabled` only, and presets have no API. Its dashboard half reaches desktop internals, so it cannot list as it stands. | The plugin SDK exposes skill file operations (delete, package) and a preset set, or Desktop grows a sanctioned seam for both. |
+| _(none)_ | — | — | — | — |
+
+**Revived:** [better-capabilities](personal/better-capabilities/README.md) came back on
+2026-10-27 as a plugin-owned Settings ▸ Plugins page built only on the plugin SDK
+(`ctx.registerSettingsPage`, `host.skills`, `host.toolsets`, `host.request`, `ctx.rest`,
+`ctx.os`). Its rows no longer touch the Capabilities page's markup, which is what retired it.
+The pack does not pin it yet.
 
 Nothing here is deleted. A retired tree is read-only history that a future API can bring back.

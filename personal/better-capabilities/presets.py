@@ -1,4 +1,9 @@
-"""Named Skills/Plugins presets, shared by /preset and the Capabilities UI."""
+"""Named Skills/Tools/Plugins presets, shared by /preset and the Desktop page.
+
+The JSON store is the single source of truth: the slash command and the
+Settings ▸ Plugins page read and write the same file, so a preset saved in chat
+shows up in the page and the other way round.
+"""
 
 from __future__ import annotations
 
@@ -9,26 +14,30 @@ from pathlib import Path
 from typing import Any
 
 PRESET_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._'-]{0,59}$")
-KINDS = ("skills", "plugins")
+KINDS = ("skills", "tools", "plugins")
 USAGE = (
     "Usage:\n"
-    "  /preset save skills <name>\n"
-    "  /preset save plugins <name>\n"
-    "  /preset skills <name>\n"
-    "  /preset plugins <name>"
+    "  /preset save skills|tools|plugins <name>\n"
+    "  /preset skills|tools|plugins <name>"
 )
 
 
 def hermes_home() -> Path:
-    env = os.environ.get("HERMES_HOME")
-    if env:
-        return Path(env)
-    local = os.environ.get("LOCALAPPDATA")
-    if local:
-        win = Path(local) / "hermes"
-        if win.exists():
-            return win
-    return Path.home() / ".hermes"
+    """The active profile's Hermes home, resolved per call."""
+    try:
+        from hermes_constants import get_hermes_home
+
+        return Path(get_hermes_home())
+    except Exception:
+        env = os.environ.get("HERMES_HOME")
+        if env:
+            return Path(env)
+        local = os.environ.get("LOCALAPPDATA")
+        if local:
+            win = Path(local) / "hermes"
+            if win.exists():
+                return win
+        return Path.home() / ".hermes"
 
 
 def store_path() -> Path:
@@ -52,7 +61,7 @@ def load_store() -> dict[str, Any]:
     if not isinstance(raw, dict):
         return empty_store()
     store = empty_store()
-    for kind in ("skills", "tools", "plugins"):
+    for kind in KINDS:
         value = raw.get(kind)
         store[kind] = value if isinstance(value, dict) else {}
     return store
@@ -81,7 +90,7 @@ def read_pending() -> dict[str, str] | None:
         return None
     kind = str(raw.get("kind") or "")
     name = str(raw.get("name") or "")
-    if kind not in ("skills", "tools", "plugins") or not name:
+    if kind not in KINDS or not name:
         return None
     return {"kind": kind, "name": name}
 
@@ -110,7 +119,7 @@ def parse_command(raw_args: str) -> dict[str, str]:
         name = " ".join(tokens[1:]).strip()
         action = "apply"
     if kind not in KINDS:
-        return {"error": "Kind must be skills or plugins.\n" + USAGE}
+        return {"error": "Kind must be skills, tools, or plugins.\n" + USAGE}
     if not PRESET_NAME_RE.match(name):
         return {
             "error": (
@@ -145,12 +154,12 @@ def read_preset(kind: str, name: str) -> dict[str, Any] | None:
 def snapshot_skills() -> dict[str, Any]:
     from hermes_cli.config import load_config
     from hermes_cli.skills_config import get_disabled_skills
-    from tools.skills_tool import _find_all_skills
+    from tools.skills_tool import find_all_skills
 
     config = load_config()
     disabled = get_disabled_skills(config)
     enabled: dict[str, bool] = {}
-    for row in _find_all_skills(skip_disabled=True):
+    for row in find_all_skills(skip_disabled=True):
         name = row.get("name")
         if name:
             enabled[str(name)] = str(name) not in disabled
@@ -179,6 +188,90 @@ def apply_skills(payload: dict[str, Any]) -> int:
                 disabled.add(key)
                 changed += 1
         save_disabled_skills(config, disabled)
+    return changed
+
+
+def _toolset_rows() -> list[str]:
+    from hermes_cli.tools_config import _get_effective_configurable_toolsets
+
+    return [name for name, _label, _desc in _get_effective_configurable_toolsets()]
+
+
+def snapshot_tools() -> dict[str, Any]:
+    """Read every configurable toolset's enabled state the way the Toolsets tab does."""
+    from hermes_cli.config import load_config
+    from hermes_cli.tools_config import (
+        _CONFIG_ONLY_TOOLSETS,
+        _get_platform_tools,
+        _toolset_configuration_platform,
+    )
+
+    config = load_config()
+    enabled: dict[str, bool] = {}
+    for name in _toolset_rows():
+        try:
+            if name in _CONFIG_ONLY_TOOLSETS:
+                section = config.get(name)
+                enabled[name] = bool(isinstance(section, dict) and section.get("enabled"))
+                continue
+            platform = _toolset_configuration_platform(name)
+            current = set(
+                _get_platform_tools(config, platform, include_default_mcp_servers=False)
+            )
+            enabled[name] = name in current
+        except Exception:
+            continue
+    return {"enabled": enabled}
+
+
+def apply_tools(payload: dict[str, Any]) -> int:
+    """Write the toolset switches through the same helpers the Toolsets tab uses."""
+    from hermes_cli.config import load_config, save_config
+    from hermes_cli.tools_config import (
+        _CONFIG_ONLY_TOOLSETS,
+        _get_platform_tools,
+        _save_platform_tools,
+        _toolset_configuration_platform,
+    )
+    from hermes_cli.web_routers._common import config_write_scope
+
+    enabled = (payload or {}).get("enabled") or {}
+    if not isinstance(enabled, dict):
+        return 0
+    known = set(_toolset_rows())
+    changed = 0
+    with config_write_scope(None):
+        config = load_config()
+        for name, on in enabled.items():
+            key = str(name)
+            if key not in known:
+                continue
+            want = bool(on)
+            try:
+                if key in _CONFIG_ONLY_TOOLSETS:
+                    section = config.get(key)
+                    if not isinstance(section, dict):
+                        section = {}
+                        config[key] = section
+                    if bool(section.get("enabled")) != want:
+                        section["enabled"] = want
+                        changed += 1
+                        save_config(config)
+                    continue
+                platform = _toolset_configuration_platform(key)
+                current = set(
+                    _get_platform_tools(config, platform, include_default_mcp_servers=False)
+                )
+                if want and key not in current:
+                    current.add(key)
+                    _save_platform_tools(config, platform, current)
+                    changed += 1
+                elif not want and key in current:
+                    current.discard(key)
+                    _save_platform_tools(config, platform, current)
+                    changed += 1
+            except Exception:
+                continue
     return changed
 
 
@@ -241,6 +334,12 @@ def snapshot_agent_for_profile(profile: str) -> dict[str, bool]:
 
 
 def snapshot_plugins() -> dict[str, Any]:
+    """Agent-plugin switches for every profile that exists at save time.
+
+    Desktop-plugin switches are deliberately absent: the Desktop keeps them in
+    renderer-local storage behind a read-only plugin door, so a plugin cannot set
+    them. The page says so instead of pretending to restore them.
+    """
     agent_by_profile = {}
     for profile in _profile_names():
         try:
@@ -248,7 +347,7 @@ def snapshot_plugins() -> dict[str, Any]:
         except Exception:
             continue
     current = agent_by_profile.get("default") or next(iter(agent_by_profile.values()), {})
-    return {"desktop": {}, "agent": current, "agentByProfile": agent_by_profile}
+    return {"agent": current, "agentByProfile": agent_by_profile}
 
 
 def apply_plugins(payload: dict[str, Any]) -> int:
@@ -274,27 +373,29 @@ def apply_plugins(payload: dict[str, Any]) -> int:
     return changed
 
 
+SNAPSHOTTERS = {"skills": snapshot_skills, "tools": snapshot_tools, "plugins": snapshot_plugins}
+APPLIERS = {"skills": apply_skills, "tools": apply_tools, "plugins": apply_plugins}
+
+
 def handle_preset_command(raw_args: str) -> str:
     parsed = parse_command(raw_args)
     if parsed.get("error"):
         return parsed["error"]
-    action = parsed["action"]
     kind = parsed["kind"]
     name = parsed["name"]
-    if action == "save":
-        payload = snapshot_skills() if kind == "skills" else snapshot_plugins()
-        if kind == "plugins":
-            existing = read_preset(kind, name) or {}
-            if isinstance(existing.get("desktop"), dict) and existing["desktop"]:
-                payload["desktop"] = existing["desktop"]
+    if parsed["action"] == "save":
+        try:
+            payload = SNAPSHOTTERS[kind]()
+        except Exception as exc:  # a broken snapshot must not save an empty preset
+            return f"Could not read the current {kind} state: {exc}"
+        if not payload:
+            return f"Could not read the current {kind} state."
         write_preset(kind, name, payload)
         return f"Saved {kind} preset '{name}'."
     payload = read_preset(kind, name)
     if payload is None:
         return f"No {kind} preset named '{name}'."
-    if kind == "skills":
-        apply_skills(payload)
-    else:
-        apply_plugins(payload)
+    changed = APPLIERS[kind](payload)
+    if kind == "plugins":
         write_pending(kind, name)
-    return f"Applied {kind} preset '{name}'."
+    return f"Applied {kind} preset '{name}' ({changed} switch{'es' if changed != 1 else ''} changed)."
