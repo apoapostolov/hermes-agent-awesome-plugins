@@ -59,9 +59,12 @@ Or install just this plugin:
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/better-capabilities
 ```
 
-Enable **Better Capabilities** under **Capabilities → Plugins**. Zip, delete and the skill file
-list need the plugin's Python routes, which mount when Desktop starts; if those actions error
-right after a first install, fully quit and reopen Hermes Desktop once.
+The personal edition loads enabled. After Desktop starts, open **Settings → Plugins → Better
+Capabilities** — the same page is reachable from the gear on the plugin's row in
+**Capabilities → Plugins**. Zip, delete and the skill file list need the plugin's Python routes,
+and those mount when the Desktop backend starts: after adding or updating this plugin, fully quit
+and reopen Hermes Desktop once so the routes exist. `/preset` works from chat without that, because
+the agent half registers with the running gateway.
 
 ## Requirements and limits
 

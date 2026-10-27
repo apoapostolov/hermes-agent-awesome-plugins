@@ -951,7 +951,7 @@ export default {
   id: ID,
   name: 'Better Capabilities',
   description: 'Skill delete, packaging and file browsing, plus saved on/off presets for skills, toolsets and plugins.',
-  defaultEnabled: false,
+  defaultEnabled: true,
   register(ctx) {
     rest = typeof ctx.rest === 'function' ? ctx.rest : null
     osDoor = ctx.os || null
