@@ -229,8 +229,6 @@ const STATUS_STATES = [
   { key: 'draft', label: 'Draft', test: cls => cls.includes('--ui-text-quaternary') }
 ]
 
-const QUIET_STATUS_STATES = new Set(['background', 'draft'])
-
 const STATUS_SUGGESTIONS = {
   working: 'sync',
   'needs-input': 'bell-dot',
@@ -1508,9 +1506,10 @@ function paintStatusGlyph(row) {
     resetStatusDot(dot)
     return
   }
-  // A quiet state paints grey whatever the session is; when the session has a
-  // color, that color is the honest one there.
-  const sessionTint = QUIET_STATUS_STATES.has(state) ? sessionColorFor(row, rowSessionId(row)) : null
+  // A session's own color outranks the state's: the row already wears it, so a
+  // dot in a different hue reads as a second, unrelated signal. The shape still
+  // carries the state, and a session with no color keeps the app's own tint.
+  const sessionTint = sessionColorFor(row, rowSessionId(row))
   const src = sessionTint || ''
   if (dot.dataset.bcSgState !== state || (dot.dataset.bcSgSrc || '') !== src) {
     // New state (or a new session color) on a reused span: unblank first, so
