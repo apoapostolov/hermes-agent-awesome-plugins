@@ -24,7 +24,7 @@
 - Color the session title for idle rows. Lightness adjusts for light and dark themes so one hue stays readable.
 - Bold a session name per chat.
 - Pick an idle icon from the Codicon set (search included).
-- Give each status dot its own icon: working, needs input, stalled, background, unread, and draft. The icon keeps the state's own color, so amber still reads as "answer me". Suggest fills the six with a starting set; Clear returns them to plain dots.
+- Give each status dot its own icon: **Status Dots** opens a panel beside the Appearance menu, one state is selected at a time, and the icon grid below it edits that state. The icon keeps the state's own color, so amber still reads as "answer me"; the quiet states (background, draft) take the session's color when it has one. Suggest fills the six with a starting set; Clear returns them to plain dots.
 - Save Auto Rules: color, bold, and icon keyed to title keywords (comma or space; all words must match; case-insensitive). Future sessions that match pick up that look. Edit or remove rules from the list.
 
 ## Install

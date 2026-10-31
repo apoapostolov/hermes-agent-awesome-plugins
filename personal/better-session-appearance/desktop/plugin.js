@@ -229,6 +229,8 @@ const STATUS_STATES = [
   { key: 'draft', label: 'Draft', test: cls => cls.includes('--ui-text-quaternary') }
 ]
 
+const QUIET_STATUS_STATES = new Set(['background', 'draft'])
+
 const STATUS_SUGGESTIONS = {
   working: 'sync',
   'needs-input': 'bell-dot',
@@ -310,6 +312,7 @@ function matchRule(title, rules) {
 // existing and freshly listed sessions silently keep the stock look.
 const appliedRules = new Map()
 let rulesUi = null
+let statusUi = null
 
 function holdMenu(el) {
   const stop = event => event.stopPropagation()
@@ -359,6 +362,39 @@ function writeSessionColorOverride(durableId, color) {
   } catch {
     // storage is best-effort
   }
+}
+
+// The quiet status dots have no colour of their own in the app, so a session
+// with a colour reads grey there. This is the session's color, in the order the
+// plugin can trust it: what this pass sampled, the rule it applied, then the
+// app's own map (which is what still knows the color after a reload).
+let colorMapCache = { at: 0, map: {} }
+
+function storedSessionColors() {
+  const now = Date.now()
+  if (now - colorMapCache.at < 400) return colorMapCache.map
+  let map = {}
+  try {
+    map = JSON.parse(localStorage.getItem('hermes.desktop.sessionColors') || '{}')
+  } catch {
+    map = {}
+  }
+  if (!map || typeof map !== 'object' || Array.isArray(map)) map = {}
+  colorMapCache = { at: now, map }
+  return map
+}
+
+function sessionColorFor(row, sid) {
+  if (row?._bcCached) return row._bcCached
+  const auto = sid ? loadAutoColors()[sid] : null
+  if (auto) return auto
+  if (!row) return null
+  if (!row.dataset.bcDurable) {
+    const durable = durableIdFrom(row)
+    if (durable) row.dataset.bcDurable = durable
+  }
+  const durable = row.dataset.bcDurable
+  return durable ? storedSessionColors()[durable] || null : null
 }
 
 function currentAppearance(sid, host) {
@@ -422,10 +458,9 @@ function closeRulesPanel() {
   })
 }
 
-function placeRulesPanel(host) {
-  if (!rulesUi?.panel) return
+function placeSidePanel(host, panel) {
+  if (!panel) return
   const shell = appearanceShell(host)
-  const panel = rulesUi.panel
   const box = shell.getBoundingClientRect()
   const width = panel.offsetWidth || 248
   const flip = box.right + 8 + width > window.innerWidth - 8
@@ -552,6 +587,7 @@ function openRulesPanel(host, sid) {
     return
   }
   closeRulesPanel()
+  closeStatusPanel()
   const panel = document.createElement('div')
   panel.setAttribute(EXTRA_ATTR, 'rules')
   holdMenu(panel)
@@ -620,9 +656,179 @@ function openRulesPanel(host, sid) {
   })
 
   renderRulesList()
-  placeRulesPanel(host)
+  placeSidePanel(host, panel)
   const autoBtn = host.querySelector(`[${EXTRA_ATTR}="auto-btn"]`)
   if (autoBtn) autoBtn.dataset.on = '1'
+}
+
+function closeStatusPanel() {
+  statusUi?.panel?.remove()
+  statusUi = null
+  document.querySelectorAll(`[${EXTRA_ATTR}="status-btn"]`).forEach(btn => {
+    btn.dataset.on = '0'
+  })
+}
+
+function selectedStateGlyph() {
+  return statusUi ? loadStateGlyphs()[statusUi.selected] || '' : ''
+}
+
+// One state is selected at a time and reads as such: bold, on the active
+// background. The icon grid below always edits the selected one.
+function renderStatusPanel() {
+  if (!statusUi) return
+  const { list, panel, selected } = statusUi
+  list.replaceChildren()
+  STATUS_STATES.forEach(def => {
+    const item = document.createElement('button')
+    item.type = 'button'
+    item.setAttribute(EXTRA_ATTR, 'status-item')
+    item.dataset.state = def.key
+    item.dataset.on = def.key === selected ? '1' : '0'
+    item.setAttribute('aria-pressed', def.key === selected ? 'true' : 'false')
+    const configured = loadStateGlyphs()[def.key]
+    const icon = document.createElement('i')
+    icon.className = `codicon codicon-${configured || 'circle-slash'}`
+    item.appendChild(icon)
+    const label = document.createElement('span')
+    label.textContent = def.label
+    item.appendChild(label)
+    item.addEventListener('click', event => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (!statusUi) return
+      statusUi.selected = def.key
+      renderStatusPanel()
+      syncGlyphButtons(panel, selectedStateGlyph())
+    })
+    list.appendChild(item)
+  })
+}
+
+function openStatusPanel(host) {
+  if (statusUi?.host === host) {
+    closeStatusPanel()
+    return
+  }
+  closeStatusPanel()
+  closeRulesPanel()
+
+  const panel = document.createElement('div')
+  panel.setAttribute(EXTRA_ATTR, 'status-panel')
+  holdMenu(panel)
+  panel.addEventListener('keydown', event => event.stopPropagation())
+
+  const head = document.createElement('div')
+  head.setAttribute(EXTRA_ATTR, 'status-panel-head')
+  const title = document.createElement('span')
+  title.setAttribute(EXTRA_ATTR, 'status-panel-title')
+  title.textContent = 'Status Dots'
+  head.appendChild(title)
+
+  const suggestBtn = glyphBtn('lightbulb', 'Suggest glyphs')
+  suggestBtn.setAttribute(EXTRA_ATTR, 'status-tool')
+  suggestBtn.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!statusUi) return
+    const next = { ...loadStateGlyphs() }
+    Object.entries(STATUS_SUGGESTIONS).forEach(([key, glyph]) => {
+      if (!next[key]) next[key] = glyph
+    })
+    store.set('stateGlyphs', next)
+    paintSessionTitles()
+    renderStatusPanel()
+    syncGlyphButtons(statusUi.panel, selectedStateGlyph())
+  })
+  head.appendChild(suggestBtn)
+
+  const clearAllBtn = glyphBtn('circle-slash', 'Clear status glyphs')
+  clearAllBtn.setAttribute(EXTRA_ATTR, 'status-tool')
+  clearAllBtn.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!statusUi) return
+    store.set('stateGlyphs', {})
+    paintSessionTitles()
+    renderStatusPanel()
+    syncGlyphButtons(statusUi.panel, selectedStateGlyph())
+  })
+  head.appendChild(clearAllBtn)
+  panel.appendChild(head)
+
+  const list = document.createElement('div')
+  list.setAttribute(EXTRA_ATTR, 'status-list')
+  panel.appendChild(list)
+
+  const search = document.createElement('input')
+  search.type = 'search'
+  search.setAttribute(EXTRA_ATTR, 'search')
+  search.placeholder = 'Search icons'
+  search.autocomplete = 'off'
+  search.addEventListener('keydown', event => event.stopPropagation())
+  search.addEventListener('mousedown', event => event.stopPropagation())
+  search.addEventListener('input', () => filterGlyphs(panel, search.value))
+  panel.appendChild(search)
+
+  const grid = document.createElement('div')
+  grid.setAttribute(EXTRA_ATTR, 'glyphs')
+  const clear = document.createElement('button')
+  clear.type = 'button'
+  clear.setAttribute(EXTRA_ATTR, 'glyph-clear')
+  clear.setAttribute('aria-label', 'Default dot')
+  clear.title = 'Default dot'
+  clear.dataset.words = 'default none empty dot bullet'
+  clear.innerHTML = '<i class="codicon codicon-circle-slash"></i>'
+  clear.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!statusUi) return
+    saveStateGlyph(statusUi.selected, null)
+    paintSessionTitles()
+    renderStatusPanel()
+    syncGlyphButtons(statusUi.panel, selectedStateGlyph())
+  })
+  grid.appendChild(clear)
+
+  GLYPH_NAMES.forEach(name => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.setAttribute(EXTRA_ATTR, 'glyph-btn')
+    btn.dataset.glyph = name
+    btn.dataset.words = wordsFor(name)
+    btn.setAttribute('aria-label', name)
+    btn.title = name.replace(/-/g, ' ')
+    const icon = document.createElement('i')
+    icon.className = `codicon codicon-${name}`
+    btn.appendChild(icon)
+    btn.addEventListener('click', event => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (!statusUi) return
+      saveStateGlyph(statusUi.selected, name)
+      paintSessionTitles()
+      renderStatusPanel()
+      syncGlyphButtons(statusUi.panel, selectedStateGlyph())
+    })
+    grid.appendChild(btn)
+  })
+  panel.appendChild(grid)
+
+  const shell = appearanceShell(host)
+  if (shell !== host) {
+    const pos = getComputedStyle(shell).position
+    if (pos === 'static') shell.style.position = 'relative'
+  }
+  shell.appendChild(panel)
+
+  const filled = STATUS_STATES.find(def => loadStateGlyphs()[def.key])
+  statusUi = { host, panel, list, grid, search, selected: filled?.key || STATUS_STATES[0].key }
+
+  renderStatusPanel()
+  syncGlyphButtons(panel, selectedStateGlyph())
+  placeSidePanel(host, panel)
+  const trigger = host.querySelector(`[${EXTRA_ATTR}="status-btn"]`)
+  if (trigger) trigger.dataset.on = '1'
 }
 
 function isDark() {
@@ -830,7 +1036,8 @@ function ensureStyle() {
       font-weight: 600;
       color: var(--ui-text-secondary);
     }
-    [${EXTRA_ATTR}="auto-btn"] {
+    [${EXTRA_ATTR}="auto-btn"],
+    [${EXTRA_ATTR}="status-btn"] {
       display: inline-flex;
       align-items: center;
       gap: 0.1rem;
@@ -846,13 +1053,20 @@ function ensureStyle() {
       white-space: nowrap;
     }
     [${EXTRA_ATTR}="auto-btn"]:hover,
-    [${EXTRA_ATTR}="auto-btn"][data-on="1"] {
+    [${EXTRA_ATTR}="auto-btn"][data-on="1"],
+    [${EXTRA_ATTR}="status-btn"]:hover,
+    [${EXTRA_ATTR}="status-btn"][data-on="1"] {
       color: var(--foreground, var(--ui-text-primary));
     }
-    [${EXTRA_ATTR}="auto-btn"] .codicon {
+    [${EXTRA_ATTR}="auto-btn"] .codicon,
+    [${EXTRA_ATTR}="status-btn"] .codicon {
       font-size: 0.7rem;
     }
-    [${EXTRA_ATTR}="rules"] {
+    [${EXTRA_ATTR}="status-btn"] {
+      margin-left: 0.6rem;
+    }
+    [${EXTRA_ATTR}="rules"],
+    [${EXTRA_ATTR}="status-panel"] {
       display: flex;
       flex-direction: column;
       gap: 0.4rem;
@@ -1100,15 +1314,16 @@ function ensureStyle() {
       font-size: 11px !important;
       line-height: 1 !important;
     }
-    [${EXTRA_ATTR}="status-head"] {
+    [${EXTRA_ATTR}="status-panel-head"] {
       display: flex;
       align-items: center;
-      gap: 0.25rem;
-      margin: 0.35rem 0 0.2rem;
-      font-size: 0.6875rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--ui-text-tertiary);
+      gap: 0.2rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ui-text-secondary);
+    }
+    [${EXTRA_ATTR}="status-panel-title"] {
+      flex: 1;
     }
     [${EXTRA_ATTR}="status-tool"] {
       display: grid;
@@ -1149,6 +1364,7 @@ function ensureStyle() {
     }
     [${EXTRA_ATTR}="status-item"][data-on="1"] {
       background: var(--ui-control-active-background);
+      font-weight: 700;
     }
     [${EXTRA_ATTR}="status-item"] i {
       width: 0.9rem;
@@ -1172,6 +1388,7 @@ function liveApplyColor(hex, stockBtn) {
   if (!row) return
   if (sid) row.dataset.bcSid = sid
   row._bcCached = hex
+  colorMapCache.at = 0
   const idle = row.querySelector(IDLE_DOT)
   if (idle) idle.style.backgroundColor = hex
   paintTitle(row, hex)
@@ -1185,6 +1402,7 @@ function liveClearColor(stockBtn) {
   if (!row) return
   if (sid) row.dataset.bcSid = sid
   delete row._bcCached
+  colorMapCache.at = 0
   saveAutoColor(sid, null)
   const idle = row.querySelector(IDLE_DOT)
   if (idle) {
@@ -1254,6 +1472,7 @@ function statusDotTint(dot) {
 function resetStatusDot(dot) {
   delete dot.dataset.bcStatusGlyph
   delete dot.dataset.bcSgState
+  delete dot.dataset.bcSgSrc
   delete dot.dataset.bcSgTint
 }
 
@@ -1268,13 +1487,18 @@ function paintStatusGlyph(row) {
     resetStatusDot(dot)
     return
   }
-  if (dot.dataset.bcSgState !== state) {
-    // New state on a reused span: unblank first, so the color this state
-    // actually uses is readable, then blank again with the glyph in place.
+  // A quiet state paints grey whatever the session is; when the session has a
+  // color, that color is the honest one there.
+  const sessionTint = QUIET_STATUS_STATES.has(state) ? sessionColorFor(row, rowSessionId(row)) : null
+  const src = sessionTint || ''
+  if (dot.dataset.bcSgState !== state || (dot.dataset.bcSgSrc || '') !== src) {
+    // New state (or a new session color) on a reused span: unblank first, so
+    // the paint this state actually uses is readable, then blank it again.
     icon?.remove()
     resetStatusDot(dot)
     dot.dataset.bcSgState = state
-    dot.dataset.bcSgTint = statusDotTint(dot)
+    dot.dataset.bcSgSrc = src
+    dot.dataset.bcSgTint = sessionTint ? adaptColor(sessionTint) : statusDotTint(dot)
     dot.dataset.bcStatusGlyph = '1'
   }
   const tint = dot.dataset.bcSgTint || 'currentColor'
@@ -1461,8 +1685,7 @@ function injectPanel(host, stockBtn) {
 
   const heading = document.createElement('div')
   heading.setAttribute(EXTRA_ATTR, 'icon-label')
-  const headingText = document.createTextNode('Icon')
-  heading.appendChild(headingText)
+  heading.appendChild(document.createTextNode('Icon'))
   const autoBtn = document.createElement('button')
   autoBtn.type = 'button'
   autoBtn.setAttribute(EXTRA_ATTR, 'auto-btn')
@@ -1478,80 +1701,19 @@ function injectPanel(host, stockBtn) {
   heading.appendChild(autoBtn)
   panel.appendChild(heading)
 
-  // Icon target: this session's idle dot, or one of the six status dots. One
-  // grid serves both, and the heading says which one is being edited.
-  const statusHead = document.createElement('div')
-  statusHead.setAttribute(EXTRA_ATTR, 'status-head')
-  statusHead.appendChild(document.createTextNode('Status dots'))
-
-  const suggestBtn = glyphBtn('lightbulb', 'Suggest glyphs')
-  suggestBtn.setAttribute(EXTRA_ATTR, 'status-tool')
-  suggestBtn.addEventListener('click', event => {
+  const statusBtn = document.createElement('button')
+  statusBtn.type = 'button'
+  statusBtn.setAttribute(EXTRA_ATTR, 'status-btn')
+  statusBtn.appendChild(document.createTextNode('Status Dots'))
+  const statusArrow = document.createElement('i')
+  statusArrow.className = 'codicon codicon-chevron-right'
+  statusBtn.appendChild(statusArrow)
+  statusBtn.addEventListener('click', event => {
     event.preventDefault()
     event.stopPropagation()
-    const next = { ...loadStateGlyphs() }
-    Object.entries(STATUS_SUGGESTIONS).forEach(([key, glyph]) => {
-      if (!next[key]) next[key] = glyph
-    })
-    store.set('stateGlyphs', next)
-    paintSessionTitles()
-    renderStatusList()
+    openStatusPanel(host)
   })
-  statusHead.appendChild(suggestBtn)
-
-  const resetStatusBtn = glyphBtn('circle-slash', 'Clear status glyphs')
-  resetStatusBtn.setAttribute(EXTRA_ATTR, 'status-tool')
-  resetStatusBtn.addEventListener('click', event => {
-    event.preventDefault()
-    event.stopPropagation()
-    store.set('stateGlyphs', {})
-    paintSessionTitles()
-    renderStatusList()
-  })
-  statusHead.appendChild(resetStatusBtn)
-  panel.appendChild(statusHead)
-
-  const statusList = document.createElement('div')
-  statusList.setAttribute(EXTRA_ATTR, 'status-list')
-  panel.appendChild(statusList)
-
-  let target = { kind: 'session', id: sid }
-  const currentGlyph = () =>
-    target.kind === 'session' ? loadGlyphs()[target.id] || '' : loadStateGlyphs()[target.state] || ''
-  const applyGlyph = name => {
-    if (target.kind === 'session') saveGlyph(target.id, name)
-    else saveStateGlyph(target.state, name)
-    paintSessionTitles()
-    syncGlyphButtons(panel, currentGlyph())
-  }
-
-  function renderStatusList() {
-    statusList.replaceChildren()
-    STATUS_STATES.forEach(def => {
-      const item = document.createElement('button')
-      item.type = 'button'
-      item.setAttribute(EXTRA_ATTR, 'status-item')
-      item.dataset.state = def.key
-      item.dataset.on = target.kind === 'state' && target.state === def.key ? '1' : '0'
-      const configured = loadStateGlyphs()[def.key]
-      const icon = document.createElement('i')
-      icon.className = `codicon codicon-${configured || 'circle-slash'}`
-      item.appendChild(icon)
-      const label = document.createElement('span')
-      label.textContent = def.label
-      item.appendChild(label)
-      item.addEventListener('click', event => {
-        event.preventDefault()
-        event.stopPropagation()
-        const same = target.kind === 'state' && target.state === def.key
-        target = same ? { kind: 'session', id: sid } : { kind: 'state', state: def.key }
-        headingText.nodeValue = same ? 'Icon' : `Icon · ${def.label}`
-        renderStatusList()
-        syncGlyphButtons(panel, currentGlyph())
-      })
-      statusList.appendChild(item)
-    })
-  }
+  autoBtn.before(statusBtn)
 
   const search = document.createElement('input')
   search.type = 'search'
@@ -1576,7 +1738,9 @@ function injectPanel(host, stockBtn) {
   clear.addEventListener('click', event => {
     event.preventDefault()
     event.stopPropagation()
-    applyGlyph(null)
+    saveGlyph(sid, null)
+    paintSessionTitles()
+    syncGlyphButtons(panel, loadGlyphs()[sid] || '')
   })
   grid.appendChild(clear)
 
@@ -1594,13 +1758,14 @@ function injectPanel(host, stockBtn) {
     btn.addEventListener('click', event => {
       event.preventDefault()
       event.stopPropagation()
-      applyGlyph(name)
+      saveGlyph(sid, name)
+      paintSessionTitles()
+      syncGlyphButtons(panel, loadGlyphs()[sid] || '')
     })
     grid.appendChild(btn)
   })
   panel.appendChild(grid)
-  syncGlyphButtons(panel, currentGlyph())
-  renderStatusList()
+  syncGlyphButtons(panel, loadGlyphs()[sid] || '')
   host.appendChild(panel)
 }
 
@@ -1657,7 +1822,11 @@ function enhancePickers() {
   })
   if (rulesUi) {
     if (!document.body.contains(rulesUi.host)) closeRulesPanel()
-    else placeRulesPanel(rulesUi.host)
+    else placeSidePanel(rulesUi.host, rulesUi.panel)
+  }
+  if (statusUi) {
+    if (!document.body.contains(statusUi.host)) closeStatusPanel()
+    else placeSidePanel(statusUi.host, statusUi.panel)
   }
 }
 
@@ -1692,6 +1861,7 @@ function start() {
   return () => {
     observer.disconnect()
     closeRulesPanel()
+    closeStatusPanel()
     document.querySelector(`[${EXTRA_ATTR}="confirm"]`)?.remove()
     document.getElementById(STYLE_ID)?.remove()
     document.querySelectorAll(`[${EXTRA_ATTR}]`).forEach(node => node.remove())
