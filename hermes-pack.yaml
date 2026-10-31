@@ -41,4 +41,4 @@ plugins:
     ref: cc0e9116c62c836e1fe039e38785268340af9f5e
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/hermes-agent-desktop
-    ref: a7ccc48b34701724f0ecdba1573ec1bf7fb24dcb
+    ref: e878a71cb7440195794cf372fcd0aab2e44a2697
