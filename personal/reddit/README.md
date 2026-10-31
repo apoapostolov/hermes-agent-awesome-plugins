@@ -121,10 +121,12 @@ page with `invalid scope requested`. Ask for less with `--scope "read identity"`
 ## Tests
 
 ```bash
-uv run --with pytest python -m pytest tests -q
+uv run --with pytest --with fastapi --with httpx python -m pytest tests -q
 ```
 
-Offline only: no network, no real credentials.
+Offline only: no network, no real credentials. `fastapi` and `httpx` are what the
+settings-API tests need; without them that whole file skips and a green run says
+less than it looks.
 
 ## Layout
 

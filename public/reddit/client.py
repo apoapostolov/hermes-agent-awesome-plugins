@@ -213,8 +213,31 @@ def validate_app(client_id: str, client_secret: str, user_agent: str) -> dict:
             "User-Agent": user_agent,
         },
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        listing = json.loads(response.read().decode("utf-8", "replace"))
+    # The app token can be granted and the read still fail (a rate limit, a
+    # network drop, an HTML error page). Those used to escape as a raw
+    # urllib/JSON exception, so the settings page showed a type name instead of
+    # what Reddit said.
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            body = response.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:300]
+        raise RedditError(
+            f"Credentials were accepted, but the read-only check failed "
+            f"({exc.code}): {detail}"
+        ) from exc
+    except OSError as exc:
+        raise RedditError(
+            f"Credentials were accepted, but the read-only check could not reach "
+            f"Reddit: {exc}"
+        ) from exc
+    try:
+        listing = json.loads(body)
+    except ValueError as exc:
+        raise RedditError(
+            f"Credentials were accepted, but Reddit answered with something other "
+            f"than JSON: {body[:160]}"
+        ) from exc
     children = (listing.get("data") or {}).get("children") or []
     return {
         "app_token": "ok",

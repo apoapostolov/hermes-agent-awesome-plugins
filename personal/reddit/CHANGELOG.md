@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0
+
+First stable release. Same twelve tools, editions and login flow as 0.3.0.
+
+### Fixed
+
+- Saving credentials with verification reported a raw `urllib` or JSON exception
+  when the app token was granted and the follow-up read failed (rate limit, an
+  HTML error page, no network). It now reports what Reddit answered, or that the
+  read could not reach Reddit, and says the credentials themselves were accepted.
+
 ## 0.3.0
 
 First public release.
