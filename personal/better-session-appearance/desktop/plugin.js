@@ -475,6 +475,14 @@ function placeSidePanel(host, panel) {
     panel.style.right = 'auto'
     panel.style.left = 'calc(100% + 8px)'
   }
+  // Neither side fits a narrow window: keep the panel inside the viewport
+  // rather than off the edge. Solved from the shell box, not from the rendered
+  // rect, so an already-shifted panel cannot drive the next shift back.
+  const intendedLeft = flip ? box.left - 8 - width : box.right + 8
+  const maxLeft = Math.max(8, window.innerWidth - 8 - width)
+  const shift = Math.round(Math.min(Math.max(intendedLeft, 8), maxLeft) - intendedLeft)
+  const nextTransform = shift ? `translateX(${shift}px)` : ''
+  if ((panel.style.transform || '') !== nextTransform) panel.style.transform = nextTransform
 }
 
 function escapeHtml(value) {
@@ -826,6 +834,18 @@ function openStatusPanel(host) {
 
   renderStatusPanel()
   syncGlyphButtons(panel, selectedStateGlyph())
+  // Same grid geometry as the panel it flies out of: an icon should be the same
+  // size here as there. The grid bleeds one padding past its panel on the right,
+  // so the width is solved rather than guessed.
+  const mainGrid = host.querySelector(`[${EXTRA_ATTR}="panel"] [${EXTRA_ATTR}="glyphs"]`)
+  const gridWidth = mainGrid ? mainGrid.getBoundingClientRect().width : 0
+  if (gridWidth) {
+    const panelStyle = getComputedStyle(panel)
+    const padL = parseFloat(panelStyle.paddingLeft) || 0
+    const padR = parseFloat(panelStyle.paddingRight) || 0
+    const bleed = Math.max(0, -(parseFloat(getComputedStyle(grid).marginRight) || 0))
+    panel.style.width = `${Math.round(gridWidth + padL + padR - bleed)}px`
+  }
   placeSidePanel(host, panel)
   const trigger = host.querySelector(`[${EXTRA_ATTR}="status-btn"]`)
   if (trigger) trigger.dataset.on = '1'
@@ -1858,8 +1878,17 @@ function start() {
     attributeFilter: ['style', 'class', 'data-theme']
   })
 
+  // A flyout keeps its side until something moves it; the window moving is that
+  // something, and a wider panel reaches the screen edge sooner than before.
+  const onResize = () => {
+    if (rulesUi) placeSidePanel(rulesUi.host, rulesUi.panel)
+    if (statusUi) placeSidePanel(statusUi.host, statusUi.panel)
+  }
+  window.addEventListener('resize', onResize)
+
   return () => {
     observer.disconnect()
+    window.removeEventListener('resize', onResize)
     closeRulesPanel()
     closeStatusPanel()
     document.querySelector(`[${EXTRA_ATTR}="confirm"]`)?.remove()
