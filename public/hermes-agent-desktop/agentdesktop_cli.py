@@ -15,6 +15,9 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from . import agentdesktop_config as settings
+from . import agentdesktop_install as install
+
 ENV_BIN = "AGENT_DESKTOP_BIN"
 DEFAULT_TIMEOUT = 30.0
 # a real interactive snapshot of a dense window runs 40-70 KB; cutting that
@@ -27,7 +30,19 @@ _FALLBACK_NAMES = ("agent-desktop-win32-x64.exe", "agent-desktop-win32-arm64.exe
 
 
 def _candidate_paths() -> List[Path]:
+    """Where the binary may live, most specific first.
+
+    The plugin's own setting wins, then its installed copy, then whatever the
+    host already had, so a user who points the plugin at a specific build gets
+    that build.
+    """
     candidates: List[Path] = []
+    configured = str(settings.get("bin_path") or "").strip()
+    if configured:
+        candidates.append(Path(configured))
+    own = install.installed_binary()
+    if own is not None:
+        candidates.append(own)
     override = os.environ.get(ENV_BIN)
     if override:
         candidates.append(Path(override))
@@ -122,12 +137,23 @@ def run(
 ) -> str:
     """Run one agent-desktop command and return its envelope as JSON text."""
     binary = resolve_binary()
+    install_error = None
+    if not binary and settings.as_bool("auto_install"):
+        outcome = install.install()
+        binary = resolve_binary()
+        if not binary:
+            install_error = outcome.get("error")
     if not binary:
+        extra: Dict[str, Any] = {
+            "suggestion": "run desktop_install with action=install, or npm install -g agent-desktop",
+            "env_var": ENV_BIN,
+        }
+        if install_error:
+            extra["auto_install_error"] = install_error
         return _envelope_error(
             "BINARY_NOT_FOUND",
             "agent-desktop is not installed or not on PATH",
-            suggestion="npm install -g agent-desktop, then run the package's scripts/postinstall.js",
-            env_var=ENV_BIN,
+            **extra,
         )
 
     argv = build_argv(binary, command, flags, positional)

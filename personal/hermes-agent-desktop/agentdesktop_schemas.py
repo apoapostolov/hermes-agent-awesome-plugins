@@ -136,7 +136,6 @@ SNAPSHOT: Dict[str, Any] = {
                 "description": "Poll until an element matching a 'role:text' selector appears, then return the snapshot.",
             },
             "wait_timeout_ms": {"type": "integer", "description": "Budget for wait_for (default 30000)."},
-            "headed": _HEADED,
             "timeout_ms": _TIMEOUT_MS,
             "max_chars": _MAX_CHARS,
         },
@@ -310,6 +309,28 @@ BATCH: Dict[str, Any] = {
     },
 }
 
+INSTALL: Dict[str, Any] = {
+    "name": "desktop_install",
+    "description": (
+        "Install or check the agent-desktop binary this plugin drives. The plugin bundles no binary: "
+        "action='install' downloads the official release archive from the upstream GitHub release for this "
+        "Windows target, verifies its sha256 against a digest pinned in the plugin for the releases it was "
+        "tested with (or the release's own checksums.txt otherwise), extracts only the expected executable "
+        "into the plugin's bin directory, and then proves the install by running 'version' and 'status' "
+        "against it. Re-running is safe and reports already_installed. action='status' shows the settings, "
+        "the resolved paths and the pinned versions without touching the network. action='verify' probes the "
+        "binary that would actually be used. Run install when any tool returns BINARY_NOT_FOUND."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": ["status", "install", "verify"], "description": "What to do (default 'status')."},
+            "version": {"type": "string", "description": "Release to install, e.g. '1.0.2'. Defaults to the plugin setting."},
+            "force": {"type": "boolean", "description": "Reinstall even when a working binary is already present."},
+        },
+    },
+}
+
 ALL = {
     "desktop_status": STATUS,
     "desktop_apps": APPS,
@@ -319,4 +340,5 @@ ALL = {
     "desktop_window": WINDOW,
     "desktop_clipboard": CLIPBOARD,
     "desktop_batch": BATCH,
+    "desktop_install": INSTALL,
 }

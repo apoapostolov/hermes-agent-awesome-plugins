@@ -16,26 +16,39 @@
 - Verify instead of hoping. Every action reports whether it was delivered and verified, and whether a retry is safe.
 - Read what an app actually shows, as text with roles and refs, instead of a screenshot.
 - Run several steps in one call, and reach anything without a dedicated tool through `desktop_batch`.
+- Install the binary it drives from the plugin itself: `desktop_install` downloads the upstream release, verifies its checksum, and proves it works.
 
 ## Requirements
 
 - Windows 10 1809+ or Windows Server 2019+, x64 or ARM64, in the signed-in user's interactive session.
-- The [`agent-desktop`](https://github.com/vercel-labs/agent-desktop) binary. This plugin does not bundle it and does not download it; install it once:
-
-```powershell
-npm install -g agent-desktop --allow-scripts=agent-desktop
-```
-
-  If npm blocks that install script, the package still works through a slower Node launcher. Link the native binary with:
-
-```powershell
-node "$env:APPDATA\npm\node_modules\agent-desktop\scripts\postinstall.js"
-```
-
+- The [`agent-desktop`](https://github.com/vercel-labs/agent-desktop) binary. You do not have to install it by hand: `desktop_install` fetches it from the upstream release and proves it works. See [Install the binary](#install-the-binary).
 - Built and verified against Hermes Agent 0.22.5. It needs a build whose plugin host exposes `ctx.register_tool`, and it declares no Python dependencies.
 - No permission grant is needed on Windows. `desktop_status` reporting `accessibility: granted` and `automation: not_required` is normal.
 
-The plugin finds the binary on `PATH`, then through `AGENT_DESKTOP_BIN`, then at the npm global location.
+The tools look for the binary in this order: the `bin_path` setting, the copy `desktop_install` put in the plugin's `bin/`, `AGENT_DESKTOP_BIN`, `PATH`, then the npm global install.
+
+## Install the binary
+
+Ask Hermes to run `desktop_install`, or let it install on first use by turning on **Install on first use** in the plugin settings.
+
+`desktop_install` with `action: "install"`:
+
+1. Downloads `agent-desktop-v<version>-<target>.tar.gz` and `checksums.txt` from the upstream GitHub release for this machine's Windows target.
+2. Verifies the archive's sha256 against the digest pinned in the plugin for that release. A version that is not pinned is checked against the release's own `checksums.txt` instead, and the result says `checksum_source: upstream-checksums` so the difference is visible.
+3. Extracts only `agent-desktop.exe`, refusing any other entry or nested path, and confirms the payload is a Windows executable.
+4. Writes it to the plugin's `bin/` folder with its digest beside it.
+5. Proves the install by running `version` and `status` against the new binary and reporting what they answered.
+
+Re-running is safe: a working install reports `already_installed`, and `force: true` reinstalls.
+
+| Setting | What it does |
+| --- | --- |
+| `bin_path` | Use this executable instead of the installed copy |
+| `install_dir` | Where to write the binary; empty uses the plugin's `bin/` |
+| `version` | Which upstream release to install (default `1.0.2`) |
+| `auto_install` | Install automatically when the binary is missing (default off) |
+
+If you prefer npm, `npm install -g agent-desktop --allow-scripts=agent-desktop` still works, and so does the package's own postinstall when npm blocks that script.
 
 ## Install
 
@@ -63,6 +76,7 @@ New tools land on the next session; the gateway rebuilds the tool registry rathe
 | `desktop_window` | Launch or quit an app; focus, resize, move, minimize, maximize or restore a window |
 | `desktop_clipboard` | Read, replace or clear the system clipboard |
 | `desktop_batch` | Several commands in one process, and commands without a dedicated tool |
+| `desktop_install` | Install, inspect or re-verify the agent-desktop binary |
 
 ## The Loop
 
@@ -89,7 +103,8 @@ desktop_snapshot   {"app": "Discord.exe", "interactive_only": true, "compact": t
 
 - The plugin runs the `agent-desktop` executable as a child process with the arguments it builds, and returns that program's JSON unchanged. That is the only shell execution it performs.
 - It reads whatever the accessibility tree exposes: window titles, labels, field values, and the clipboard when asked. All of that can contain private content. It is returned to the model as tool output and is not written to disk by this plugin.
-- No network calls, no telemetry, no credentials, no file writes outside what the binary itself keeps in `~/.agent-desktop`.
+- No telemetry, no credentials, and no file writes outside the plugin's own `bin/` folder and what the binary itself keeps in `~/.agent-desktop`.
+- `desktop_install` is the one tool that uses the network: it fetches the release archive and, for an unpinned version, `checksums.txt`, both from the upstream GitHub release. The archive is verified against a sha256 pinned in this plugin before anything is written.
 - Actions change the apps they target. `desktop_act`, `desktop_window` and `desktop_clipboard` are the tools that write.
 
 ## Verification

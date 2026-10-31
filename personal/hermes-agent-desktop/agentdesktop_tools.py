@@ -11,6 +11,7 @@ import json
 from typing import Any, Dict, List
 
 from . import agentdesktop_cli as cli
+from . import agentdesktop_install as install
 
 # commands that take a ref and nothing else
 _REF_ONLY = {
@@ -156,6 +157,12 @@ def desktop_act(args: Dict[str, Any], **kwargs: Any) -> str:
         return _error("INVALID_ARGS", f"{action} needs a 'ref' from a snapshot")
 
     if action == "hover":
+        if not headed:
+            return _error(
+                "HEADED_REQUIRED",
+                "hover moves the real cursor, so it needs headed=true",
+                suggestion="prefer click or scroll, which are semantic; set headed=true only when physical input is intended",
+            )
         return cli.run("hover", cli.flags(timeout_ms=args.get("timeout_ms")), [str(ref)], headed=True, timeout=timeout, max_chars=_max_chars(args))
 
     if action == "scroll":
@@ -247,4 +254,23 @@ def desktop_batch(args: Dict[str, Any], **kwargs: Any) -> str:
         return _error("INVALID_ARGS", "batch needs a non-empty 'commands' array of {command, args}")
     payload = json.dumps(commands, ensure_ascii=False)
     flags = cli.flags(stop_on_error=bool(args.get("stop_on_error")), timeout_ms=args.get("timeout_ms"))
-    return cli.run("batch", flags, [payload], timeout=_timeout(args, 60.0), max_chars=_max_chars(args))
+    # the batch budget is the tool's own wall clock; the process must outlive it,
+    # or the kill lands before the batch can report what it did
+    budget = _timeout(args, 60.0)
+    return cli.run("batch", flags, [payload], timeout=budget + 30.0, max_chars=_max_chars(args))
+
+
+def desktop_install(args: Dict[str, Any], **kwargs: Any) -> str:
+    args = _args(args)
+    action = str(args.get("action") or "status").strip().lower()
+    if action == "status":
+        return json.dumps(install.status(), ensure_ascii=False)
+    if action == "verify":
+        return json.dumps(install.verify(), ensure_ascii=False)
+    if action == "install":
+        outcome = install.install(
+            version=args.get("version") or None,
+            force=bool(args.get("force")),
+        )
+        return json.dumps(outcome, ensure_ascii=False)
+    return _error("INVALID_ARGS", f"unknown install action {action!r}", allowed=["status", "install", "verify"])
