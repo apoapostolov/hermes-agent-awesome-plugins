@@ -1,6 +1,6 @@
 name: provider-status
 label: Provider Quota Status
-version: 1.6.6
+version: 1.6.7
 description: "Unified multi-provider quota usage tracking in the status bar, with support for OAuth, color-based warnings, and multiple accounts per provider with Hermes key rotation on exhaust. Publishes the current session's tokens/sec, context occupancy, and that provider's remaining quota as the Discord bot presence."
 author: Apostol Apostolov
 license: MIT

@@ -26,6 +26,23 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [provider-status 1.6.7] - 2026-10-31
+
+One login can no longer fill the account pool with copies of itself.
+
+### Fixed
+
+- Grok and Codex rotate the refresh token on every use, and the pool matched an
+  account by that token. Every refresh therefore looked like a fresh login and
+  appended a duplicate: one Grok account reached 338 entries (336 of them
+  already expired) and one Codex account reached six, which grew `config.json`
+  to 416 KB that every poll parsed. Accounts now match on the token's subject
+  claim, then email, then a digest of an opaque token.
+- Every pool write collapses the pool to one entry per identity, keeps the
+  newest expiry and points `account_index` at it, and caps the pool at 24
+  accounts. A pool that already holds duplicates heals itself at plugin load,
+  so an existing `config.json` shrinks on the first start after the update.
+
 ## [provider-status 1.6.6] - 2026-10-31
 
 The trash glyph on a provider row deletes one key instead of the whole provider.
