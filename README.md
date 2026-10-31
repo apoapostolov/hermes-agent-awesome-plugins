@@ -80,7 +80,7 @@ Retired and on-hold plugins live in [RETIRED.md](RETIRED.md).
 
 | Plugin | What you get |
 | --- | --- |
-| [better-session-appearance](personal/better-session-appearance/README.md) · [public](public/better-session-appearance/README.md) | Idle color, bold, and icon. Auto Rules by title keywords. |
+| [better-session-appearance](personal/better-session-appearance/README.md) · [public](public/better-session-appearance/README.md) | Idle color, bold, and icons: one for the idle dot, or one for each of the six status dots. Auto Rules by title keywords. |
 | [sidebar-manager](personal/sidebar-manager/README.md) · [public](public/sidebar-manager/README.md) | Hide and reorder nav rows and session sections. |
 | [drag-to-pin-session](personal/drag-to-pin-session/README.md) · [public](public/drag-to-pin-session/README.md) | Drag pin/unpin with lasting order. |
 | [sessionretitler](personal/sessionretitler/README.md) · [public](public/sessionretitler/README.md) | Retitles the session every N titleable user messages, from the latest exchanges. A title you set yourself is never touched. |
