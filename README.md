@@ -10,13 +10,13 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Seventeen plugins. Every one has a public edition.</p>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Eighteen plugins. Every one has a public edition.</p>
 
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
     <a href="./package.json"><img src="https://img.shields.io/badge/Language-JavaScript-555" alt="Language: JavaScript"></a>
-    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases/tag/v1.22.0"><img src="https://img.shields.io/badge/Version-v1.22.0-blue" alt="Version: v1.22.0"></a>
-    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases/tag/v1.22.0"><img src="https://img.shields.io/badge/Last%20release-2026--09--24-blue" alt="Last release: 2026-09-24"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.24.0-blue" alt="Pack: 1.24.0"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Last%20release-2026--10--31-blue" alt="Last release: 2026-10-31"></a>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a>
   </p>
 
@@ -28,11 +28,11 @@
 
 ## Latest plugin update
 
-Provider Status 1.5.14 signs a provider off in one Log out click, opens Connect in the system browser, and keeps the chip line up when Grok has a large account pool. Intelligent Tool Break 1.3.4 moves the public edition's settings onto the plugin SDK storage hook.
+Reddit 0.3.0 is the first release. It runs on your own Reddit app: save the client id and secret, log in through the loopback catcher, then read listings, search, threads and the inbox, or post, comment, vote, save and subscribe under that account. `reddit_api` reaches everything else. The settings page under Settings, Plugins reports the stored app, the connected account and the scopes, and follows the app theme.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
-The pack remains at 1.22.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
+The pack is at 1.24.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
 ## Settings pages
 
@@ -52,7 +52,7 @@ This repository keeps two trees.
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
-**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All seventeen active plugins have one.
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All eighteen active plugins have one.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
@@ -67,7 +67,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.23.0). **reasoning-switch**, **prompt-enhance**, and **hermes-jev-routing** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all thirteen.
+Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reasoning-switch**, **prompt-enhance**, and **hermes-jev-routing** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all fourteen.
 
 ### Status Bar
 
@@ -104,13 +104,14 @@ Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.23.0). **reaso
 | [opaque-composer](personal/opaque-composer/README.md) · [public](public/opaque-composer/README.md) | Solid composer while the transcript scrolls behind it. |
 | [prompt-enhance](personal/prompt-enhance/README.md) · [public](public/prompt-enhance/README.md) | Rewrite a composer draft from a saved prompt library and put the finished prompt back in the field. **Not in the pack; enable separately.** |
 
-### Reading
+### Reading and posting
 
 | Plugin | What you get |
 | --- | --- |
 | [rss-reader](personal/rss-reader/README.md) · [public](public/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
+| [reddit](personal/reddit/README.md) · [public](public/reddit/README.md) | Your own Reddit app and account: OAuth login, subreddit and search reads, threads, posts, comments, votes, saves, subscriptions, the inbox, plus `reddit_api` for any other endpoint. |
 
-Two plugins in this repo are not in the pack and are installed separately: **reasoning-switch** (Status Bar table) and **prompt-enhance** (Composer table). Every other plugin above is pinned by the pack.
+Three plugins in this repo are not in the pack and are installed separately: **reasoning-switch** (Status Bar table), **prompt-enhance** (Composer table), and **hermes-jev-routing** (Tools and Memory table). Every other plugin above is pinned by the pack.
 
 Retired and on-hold plugins live in [RETIRED.md](RETIRED.md).
 
