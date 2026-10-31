@@ -1,0 +1,27 @@
+name: hermes-agent-desktop
+version: 1.0.0
+description: "Hermes Agent Desktop: operate Windows apps through the accessibility tree instead of the screen. Read a window's real UI, then click, fill a field, select an option, toggle a checkbox, scroll, send a key combo, and manage windows and the clipboard. Actions are semantic and headless by default, so they do not take focus, move the cursor or synthesize keystrokes, and they fail closed rather than guess. Backed by the Vercel Labs agent-desktop binary, which this plugin wraps and does not bundle."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/hermes-agent-desktop
+tags:
+  - windows
+  - desktop-automation
+  - computer-use
+  - accessibility
+  - tools
+provides_tools:
+  - desktop_status
+  - desktop_apps
+  - desktop_snapshot
+  - desktop_find
+  - desktop_act
+  - desktop_window
+  - desktop_clipboard
+  - desktop_batch
+provides_hooks: []
+provides_middleware: []
+requires_env: []
+pip_dependencies: []

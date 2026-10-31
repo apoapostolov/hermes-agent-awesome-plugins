@@ -10,7 +10,7 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, and memory. Sixteen plugins. Fifteen have a public edition. One stays personal until a catalog hook exists.</p>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Seventeen plugins. Every one has a public edition.</p>
 
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
@@ -40,7 +40,7 @@ This repository keeps two trees.
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
-**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All sixteen active plugins have one.
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All seventeen active plugins have one.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
@@ -55,7 +55,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reasoning-switch**, **prompt-enhance**, and **hermes-jev-routing** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all thirteen.
+Twelve plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reasoning-switch**, **prompt-enhance**, and **hermes-jev-routing** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all twelve.
 
 ### Status Bar
 
@@ -70,6 +70,7 @@ Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reaso
 | Plugin | What you get |
 | --- | --- |
 | [intelligent-tool-break](personal/intelligent-tool-break/README.md) · [public](public/intelligent-tool-break/README.md) | `/break`, `/break {msg}`, and `/again`. Desktop strip. Turn stays alive. |
+| [hermes-agent-desktop](personal/hermes-agent-desktop/README.md) · [public](public/hermes-agent-desktop/README.md) | Operate Windows apps through the accessibility tree: click, fill, select, toggle, scroll, key combos, windows, clipboard. Headless by default, so it never takes focus or the cursor. **Windows only.** |
 | [memory-review](personal/memory-review/README.md) · [public](public/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
 | [cdp-manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar. The `cdp` tool does the same from chat, on your preferred port. |
 | [hermes-jev-routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. Both editions switch the live session; the personal one also reads the provider catalogue and Codex quota. **Not in the pack; enable separately.** |
