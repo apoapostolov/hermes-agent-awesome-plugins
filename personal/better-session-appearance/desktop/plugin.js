@@ -306,20 +306,14 @@ function AppearanceSettingsPage() {
     el(ToggleControl, {
       checked: on,
       description:
-        'Working, needs input, stalled and unread dots take the color set for that session instead of the app\u2019s own blue, amber and green. The icon shape still carries the state.',
-      hint: 'Off: the app\u2019s state colors, so amber still means \u201canswer me\u201d.',
+        'Working, needs input, stalled and unread dots take the color set for that session instead of the app\u2019s own blue, amber and green. The icon shape still carries the state. Background and draft dots follow the session color either way, and a session with no color always keeps the app\u2019s state colors.',
       id: 'in-progress-session-color',
       label: 'In-Progress Status Dots use Session Color',
       onChange: next => {
         setOn(next)
         setInProgressUsesSessionColor(next)
       }
-    }),
-    el(
-      'div',
-      { className: 'text-xs text-(--ui-text-tertiary)' },
-      'Background and draft dots follow the session color either way, and a session with no color always keeps the app\u2019s state colors.'
-    )
+    })
   )
 }
 
