@@ -87,8 +87,6 @@ Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.23.0). **reaso
 | [cdp-manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar. The `cdp` tool does the same from chat, on your preferred port. |
 | [hermes-jev-routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. Both editions switch the live session; the personal one also reads the provider catalogue and Codex quota. **Not in the pack; enable separately.** |
 
-Retired and on-hold plugins live in [RETIRED.md](RETIRED.md).
-
 ### Sessions and Sidebar
 
 | Plugin | What you get |
@@ -113,6 +111,8 @@ Retired and on-hold plugins live in [RETIRED.md](RETIRED.md).
 | [rss-reader](personal/rss-reader/README.md) · [public](public/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
 
 Two plugins in this repo are not in the pack and are installed separately: **reasoning-switch** (Status Bar table) and **prompt-enhance** (Composer table). Every other plugin above is pinned by the pack.
+
+Retired and on-hold plugins live in [RETIRED.md](RETIRED.md).
 
 ## Install
 
