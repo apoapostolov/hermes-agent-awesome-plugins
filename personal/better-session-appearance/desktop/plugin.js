@@ -721,6 +721,12 @@ function openStatusPanel(host) {
   closeStatusPanel()
   closeRulesPanel()
 
+  // The popup's own width, measured BEFORE this panel joins it: a static block
+  // child would otherwise stretch the popup to fit the panel and the panel would
+  // then size itself to that stretched width.
+  const shell = appearanceShell(host)
+  const popupWidth = shell !== host ? shell.getBoundingClientRect().width : 0
+
   const panel = document.createElement('div')
   panel.setAttribute(EXTRA_ATTR, 'status-panel')
   holdMenu(panel)
@@ -822,7 +828,6 @@ function openStatusPanel(host) {
   })
   panel.appendChild(grid)
 
-  const shell = appearanceShell(host)
   if (shell !== host) {
     const pos = getComputedStyle(shell).position
     if (pos === 'static') shell.style.position = 'relative'
@@ -834,18 +839,14 @@ function openStatusPanel(host) {
 
   renderStatusPanel()
   syncGlyphButtons(panel, selectedStateGlyph())
-  // Same grid geometry as the panel it flies out of: an icon should be the same
-  // size here as there. The grid bleeds one padding past its panel on the right,
-  // so the width is solved rather than guessed.
-  const mainGrid = host.querySelector(`[${EXTRA_ATTR}="panel"] [${EXTRA_ATTR}="glyphs"]`)
-  const gridWidth = mainGrid ? mainGrid.getBoundingClientRect().width : 0
-  if (gridWidth) {
-    const panelStyle = getComputedStyle(panel)
-    const padL = parseFloat(panelStyle.paddingLeft) || 0
-    const padR = parseFloat(panelStyle.paddingRight) || 0
-    const bleed = Math.max(0, -(parseFloat(getComputedStyle(grid).marginRight) || 0))
-    panel.style.width = `${Math.round(gridWidth + padL + padR - bleed)}px`
-  }
+  // As wide as the popup it belongs to. That also matches the two grids: the
+  // popup is the panel plus its padding, and a grid bleeds that same padding on
+  // the right, so equal shells land on equal columns.
+  const mainPanel = host.querySelector(`[${EXTRA_ATTR}="panel"]`)
+  const target = popupWidth || (mainPanel ? mainPanel.getBoundingClientRect().width : 0)
+  // Fractional on purpose: the popup's width is not a round number, and rounding
+  // it here would put the two grids a fraction apart.
+  if (target) panel.style.width = `${target.toFixed(2)}px`
   placeSidePanel(host, panel)
   const trigger = host.querySelector(`[${EXTRA_ATTR}="status-btn"]`)
   if (trigger) trigger.dataset.on = '1'
