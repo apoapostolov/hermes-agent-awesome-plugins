@@ -26,6 +26,23 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [better-session-appearance 1.2.4] - 2026-10-31
+
+The status dots can wear the session's own colour while a turn is running, if
+you ask for it.
+
+### Added
+
+- **Settings ▸ Plugins ▸ Better Session Appearance** and the one switch on it,
+  **In-Progress Status Dots use Session Color**. Off, as shipped: working, needs
+  input, stalled and unread keep the app's blue, amber and green. On: those four
+  take the colour set for that session, and the icon shape still carries the
+  state. Background and draft dots follow the session colour either way, and a
+  session with no colour always keeps the app's state colours.
+
+The listed edition has no status dots to colour, so it takes the version line
+and nothing else this time.
+
 ## [better-session-appearance 1.2.3] - 2026-10-31
 
 Every status dot can carry its own icon, not only the idle one.
