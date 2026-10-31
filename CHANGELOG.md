@@ -26,6 +26,22 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [provider-status 1.6.6] - 2026-10-31
+
+The trash glyph on a provider row deletes one key instead of the whole provider.
+
+### Changed
+
+- A provider that holds two or more keys keeps its row when you press the trash
+  glyph. The press deletes KEY #1 and the row stays with the remaining keys, so
+  one click cannot throw away accounts you still have; the last key still deletes
+  the provider. The active-key mark follows the cut: a key after the removed one
+  shifts up, and an active first key becomes the new first key. The glyph's
+  tooltip names the action it will take.
+- The removed key travels with the save. In the personal edition its library slot
+  and its Hermes `.env` carrier are purged and the value is tombstoned, so the
+  next poll cannot put it back into the pool.
+
 ## [provider-status 1.6.5] - 2026-10-27
 
 The Discord presence draws a ten-cell bar, and the listed edition stays inside
