@@ -8,6 +8,7 @@ observe, act on a ref, observe again.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Dict, List
 
 from . import agentdesktop_cli as cli
@@ -276,9 +277,14 @@ def desktop_install(args: Dict[str, Any], **kwargs: Any) -> str:
     args = _args(args)
     action = str(args.get("action") or "status").strip().lower()
     if action == "status":
-        return json.dumps(install.status(), ensure_ascii=False)
+        payload = install.status()
+        payload["resolved_binary"] = cli.resolve_binary()
+        return json.dumps(payload, ensure_ascii=False)
     if action == "verify":
-        return json.dumps(install.verify(), ensure_ascii=False)
+        # probe the binary the tools would actually use, not only the plugin's
+        # own copy: a host that already had agent-desktop on PATH must verify true
+        resolved = cli.resolve_binary()
+        return json.dumps(install.verify(Path(resolved) if resolved else None), ensure_ascii=False)
     if action == "install":
         outcome = install.install(
             version=args.get("version") or None,

@@ -176,3 +176,33 @@ def test_apps_surfaces_a_failed_half_instead_of_an_empty_list(monkeypatch):
     payload = json.loads(tools.desktop_apps({"include_windows": True}))
     assert payload["ok"] is False
     assert payload["error"]["code"] == "TIMEOUT"
+
+
+def test_install_verify_probes_the_binary_the_tools_use(monkeypatch, tmp_path):
+    binary = tmp_path / "agent-desktop-win32-x64.exe"
+    binary.write_bytes(FAKE_BINARY)
+    probed = {}
+
+    def fake_probe(target, command, timeout=20.0):
+        probed["path"] = str(target)
+        return {"ok": True, "command": command, "data": {"version": "1.0.2"}}
+
+    monkeypatch.setattr(installer, "_probe", fake_probe)
+    monkeypatch.setattr(cli, "resolve_binary", lambda: str(binary))
+    payload = json.loads(tools.desktop_install({"action": "verify"}))
+    assert payload["ok"] is True
+    assert probed["path"] == str(binary)
+
+
+def test_install_verify_without_any_binary_says_so(monkeypatch):
+    monkeypatch.setattr(cli, "resolve_binary", lambda: None)
+    payload = json.loads(tools.desktop_install({"action": "verify"}))
+    assert payload["ok"] is False
+    assert "no installed binary" in payload["error"]
+
+
+def test_install_status_reports_the_binary_in_use(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli, "resolve_binary", lambda: str(tmp_path / "x.exe"))
+    payload = json.loads(tools.desktop_install({"action": "status"}))
+    assert payload["resolved_binary"] == str(tmp_path / "x.exe")
+    assert payload["pinned_versions"] == ["1.0.2"]
