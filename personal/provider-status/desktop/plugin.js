@@ -1176,6 +1176,28 @@ function SignalDot({ pid, tone, reason, age, quotas, onCheck }) {
   })
 }
 
+// TRASH_HELPERS_START
+// The provider row carries one trash button. With a single key it still deletes
+// the provider; with two or more it deletes KEY #1 only, so one click cannot
+// throw away accounts the user still has. The index follows the cut: an active
+// key after the removed one shifts up, and the active first key falls to the
+// new first key.
+function trashTarget(conf) {
+  const pool = ((conf && conf.pool) || [])
+    .map(v => (v == null ? '' : String(v)).trim())
+    .filter(Boolean)
+  if (pool.length < 2) return { kind: 'provider', pool, pool_index: 0, removed: [] }
+  const raw = Number(conf && conf.pool_index)
+  const idx = Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 0
+  return {
+    kind: 'key',
+    pool: pool.slice(1),
+    pool_index: Math.min(Math.max(idx - 1, 0), pool.length - 2),
+    removed: [pool[0]],
+  }
+}
+// TRASH_HELPERS_END
+
 function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, variant, dragging, dropOver, onDragStart, onDragOver, onDrop, onDragEnd, onRemove }) {
   const [enabled, setEnabled] = useState(!!pc.enabled)
   const [keys, setKeys] = useState(pc.pool?.length ? [...pc.pool] : [''])
@@ -1415,6 +1437,9 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
   }
 
   const ph = pmeta.has_env ? 'Key used from Hermes secrets.' : ''
+  // Server-side pool size, not the local key inputs: the trash decides on what
+  // is actually stored, so the tooltip has to name the same action.
+  const storedKeys = (pc.pool || []).filter(k => k).length
 
   const [poolStrategy, setPoolStrategy] = useState(() => pc.pool_strategy || 'fill_first')
   useEffect(() => {
@@ -1504,8 +1529,9 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
         !isOAuth && pmeta.env?.length ? jsx(Button, { variant: 'outline', size: 'icon-xs', className: 'shrink-0 items-center justify-center', onClick: addKey, title: 'add another key', children: jsx(Codicon, { name: 'add', size: '0.75rem' }) }) : null,
         // checkbox
         jsx(Checkbox, { checked: enabled, onCheckedChange: v => { setEnabled(v); persist(v) }, className: 'shrink-0', size: 'sm' }),
-        // delete provider — rightmost. Removes the row + key entirely.
-        jsx(Button, { variant: 'ghost', size: 'icon-xs', className: 'shrink-0 text-(--ui-text-quaternary) hover:text-destructive', onClick: () => onRemove && onRemove(pid), title: 'delete provider', children: jsx(Codicon, { name: 'trash', size: '0.75rem' }) }),
+        // delete — rightmost. Two or more stored keys mean this deletes KEY #1
+        // and keeps the provider; the last key removes the row.
+        jsx(Button, { variant: 'ghost', size: 'icon-xs', className: 'shrink-0 text-(--ui-text-quaternary) hover:text-destructive', onClick: () => onRemove && onRemove(pid), title: storedKeys > 1 ? 'delete key #1' : 'delete provider', children: jsx(Codicon, { name: 'trash', size: '0.75rem' }) }),
       ]}),
       // ── extra key rows ──
       keys.slice(1).map((k, i) => jsxs('div', { className: 'flex items-center gap-2', style: { paddingLeft: '1.75rem' }, children: [
@@ -1542,7 +1568,7 @@ function SetupBody({ variant } = {}) {
   const saveChain = useRef(Promise.resolve())
   const savingN = useRef(0)
 
-  const persistNow = async (extra = {}) => {
+  const persistNow = async (extra = {}, removeKeys = null) => {
     const latest = [...orderRef.current]
     const gone = [...pendingRemove.current]
     const rest = { ...extra }
@@ -1553,7 +1579,7 @@ function SetupBody({ variant } = {}) {
     for (const k of Object.keys(rest)) {
       if (!latest.includes(k)) delete rest[k]
     }
-    await postJson('config', { providers: rest, remove: gone, order: latest, poll_minutes: cfg.poll_minutes || undefined })
+    await postJson('config', { providers: rest, remove: gone, order: latest, poll_minutes: cfg.poll_minutes || undefined, remove_keys: removeKeys || undefined })
     postJson('refresh')
     await refetchCfg()
     if (savingN.current <= 1) {
@@ -1583,6 +1609,19 @@ function SetupBody({ variant } = {}) {
   }
 
   const removeProvider = (pid) => {
+    const conf = provCfg[pid] || {}
+    const target = trashTarget(conf)
+    // Two or more keys: drop KEY #1 and keep the row. The removed VALUE travels
+    // with the save so the backend purges its library slot and Hermes .env
+    // carrier and tombstones it; without that the next poll re-adds the key and
+    // the row comes back.
+    if (target.kind === 'key') {
+      enqueueCfg(() => persistNow(
+        { [pid]: { ...conf, pool: target.pool, pool_index: target.pool_index } },
+        { [pid]: target.removed },
+      ))
+      return
+    }
     pendingRemove.current.add(pid)
     const next = orderRef.current.filter(p => p !== pid)
     orderRef.current = next

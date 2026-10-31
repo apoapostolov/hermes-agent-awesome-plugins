@@ -4,7 +4,7 @@
   <strong>See provider quota without leaving Hermes.</strong>
   <p>Status-bar used/remaining, multi-account pools, and rotation when a key runs low or hits its reset day.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.6.5-2ea44f" alt="Version 1.6.5" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.6.6-2ea44f" alt="Version 1.6.6" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -25,7 +25,7 @@
 - Publish this session's tokens/sec, context occupancy, and the backing provider's remaining quota (or credit balance) as the Discord bot presence. `/pulse` and `hermes session-pulse` report the same numbers. Disable the standalone `discord-presence` plugin while this one is publishing so two bots do not fight over the status.
 - When a pet is on screen, one quota line appears in its speech bubble: the active model's remaining balance, or the worst enabled provider if none is active. Near a ceiling it uses a wait tone; at exhaustion it uses an error tone. Turn the bubble off, pick current vs worst, and rewrite the line under Settings → Plugins → Provider Quota Status (the pet settings sit above the Discord ones). Older hosts without the pet door keep the status-bar chips only.
 - Keep multiple accounts per provider, reorder them, and set a reset day per key.
-- Delete a key you no longer use. The removal clears the key library entry and the Hermes `.env` carriers, and a later poll will not bring it back.
+- Delete a key you no longer use. The trash glyph on a provider row deletes that row's first key while the provider still holds more than one, and deletes the provider itself with its last key. The removal clears the key library entry and the Hermes `.env` carriers, and a later poll will not bring it back.
 - Rotate to the next healthy key when remaining quota hits your threshold or a renewal day passes.
 - Start Grok and Codex OAuth from the setup dialog.
 - See [DeepSeek's pricing window](https://api-docs.deepseek.com/quick_start/pricing) beside its name, including full-day Chinese public-holiday overrides. The plugin applies official 2025 and 2026 State Council holiday dates; the built-in calendar ends on 2026-12-31.
