@@ -55,7 +55,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Twelve plugins are pinned in `hermes-pack.yaml` (pack version 1.22.0). **reasoning-switch**, **prompt-enhance**, and **hermes-jev-routing** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all twelve.
+Thirteen plugins are pinned in `hermes-pack.yaml` (pack version 1.23.0). **reasoning-switch**, **prompt-enhance**, and **hermes-jev-routing** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all thirteen.
 
 ### Status Bar
 
