@@ -1,0 +1,31 @@
+# Changelog
+
+## 0.3.0
+
+First public release.
+
+### Added
+
+- Reddit login with OAuth: the authorization-code flow runs from chat, a
+  command, or Settings > Plugins, with a loopback catcher on
+  `http://localhost:8080`, a permanent refresh token, and automatic access-token
+  renewal.
+- Bring your own Reddit app. Client id, secret, redirect URI and user agent are
+  stored per profile; setup verifies them against Reddit before saving.
+- Tools for the whole API: `reddit_setup`, `reddit_login`, `reddit_status`,
+  `reddit_api`, `reddit_subreddit`, `reddit_search`, `reddit_thread`,
+  `reddit_submit`, `reddit_comment`, `reddit_vote`, `reddit_manage`,
+  `reddit_inbox`.
+- `reddit_api` for everything the curated tools do not cover: moderator queues,
+  modmail, wiki, flair, multireddits and account preferences.
+- Desktop settings page with credential form, login, account check and logout,
+  served by the plugin's own backend at `/api/plugins/reddit/`. The page uses the
+  plugin SDK's fields and buttons, so it follows the app theme.
+- `hermes reddit setup|login|complete|status|logout|smoke|api` commands.
+
+### Notes
+
+- Reads use the account token, so private subreddits, saved items, moderator
+  views and the inbox work. Writes publish under the logged-in account.
+- The plugin requests every scope Reddit grants. Narrow it with `--scope`.
+- No third-party dependencies.

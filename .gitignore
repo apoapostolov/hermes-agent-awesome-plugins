@@ -10,6 +10,7 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+.pytest_cache/
 
 # Env/secrets — never ship
 config.json

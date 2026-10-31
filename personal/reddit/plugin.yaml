@@ -1,0 +1,27 @@
+name: reddit
+version: 0.3.0
+manifest_version: 2
+description: "Reddit with a real account behind it: bring your own Reddit app, log in with OAuth and a loopback callback, then use the full API from chat. Reads use the account token, so private subreddits, saved items, mod queues and the inbox work; writes publish under the logged-in account. Includes curated list, search, thread, submit, comment, vote, save/subscribe and inbox tools plus a generic reddit_api passthrough for moderator, wiki, flair, modmail and preference endpoints. Each user stores their own client id and secret; nothing is shared or hardcoded."
+author: Apostol Apostolov
+kind: general
+license: MIT
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins
+tags: [reddit, social, api, oauth]
+provides_tools:
+  - reddit_setup
+  - reddit_login
+  - reddit_status
+  - reddit_api
+  - reddit_subreddit
+  - reddit_search
+  - reddit_thread
+  - reddit_submit
+  - reddit_comment
+  - reddit_vote
+  - reddit_manage
+  - reddit_inbox
+provides_hooks: []
+provides_middleware: []
+requires_env: []
+requires_hermes: ">=0.21.0,<1.0.0"
+pip_dependencies: []
