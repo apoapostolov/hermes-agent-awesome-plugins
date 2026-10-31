@@ -12,6 +12,10 @@
 <div align="center">
   <img src="docs/hero.png" width="100%" alt="Provider Quota Status" />
 </div>
+<div align="center">
+  <img src="docs/screenshot-settings.png" width="520" alt="Provider Status settings in Hermes Desktop" />
+</div>
+
 
 ## Screenshot
 

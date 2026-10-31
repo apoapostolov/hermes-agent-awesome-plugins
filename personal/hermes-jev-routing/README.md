@@ -3,6 +3,10 @@
 <div align="center">
   <img src="docs/hero.png" width="100%" alt="Jev Routing" />
 </div>
+<div align="center">
+  <img src="docs/screenshot-settings.png" width="520" alt="Jev Routing settings in Hermes Desktop" />
+</div>
+
 
 Per-turn model routing from TypeSafe Jev. Apostol Apostolov.
 

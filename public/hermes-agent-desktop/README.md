@@ -9,6 +9,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/screenshot-settings.png" width="520" alt="Hermes Agent Desktop settings in Hermes Desktop" />
+</div>
+
 ## What You Can Do
 
 - Ask Hermes to operate a desktop app that has no CLI: fill a field, press a button, tick a checkbox, pick a menu item, switch a tab, resize a window.

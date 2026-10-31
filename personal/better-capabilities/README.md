@@ -12,6 +12,10 @@
 <div align="center">
   <img src="docs/hero.png" width="100%" alt="Better Capabilities" />
 </div>
+<div align="center">
+  <img src="docs/screenshot-settings.png" width="520" alt="Better Capabilities settings in Hermes Desktop" />
+</div>
+
 
 ## Where it lives
 

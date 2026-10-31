@@ -34,6 +34,18 @@ Restart Hermes Desktop after updating; the Python and desktop halves do not relo
 
 The pack remains at 1.22.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
+## Settings pages
+
+Each plugin that has a settings page shows it under Settings, Plugins in Hermes Desktop. The screenshots below are captured from the running app.
+
+<div align="center">
+  <a href="personal/provider-status"><img src="docs/screenshots/provider-status-settings.png" width="240" alt="Provider Status settings" /></a>
+  <a href="personal/better-capabilities"><img src="docs/screenshots/better-capabilities-settings.png" width="240" alt="Better Capabilities settings" /></a>
+  <a href="personal/better-session-appearance"><img src="docs/screenshots/better-session-appearance-settings.png" width="240" alt="Better Session Appearance settings" /></a>
+  <a href="personal/hermes-jev-routing"><img src="docs/screenshots/hermes-jev-routing-settings.png" width="240" alt="Jev Routing settings" /></a>
+  <a href="personal/hermes-agent-desktop"><img src="docs/screenshots/hermes-agent-desktop-settings.png" width="240" alt="Agent Desktop settings" /></a>
+</div>
+
 ## Personal and public
 
 This repository keeps two trees.
