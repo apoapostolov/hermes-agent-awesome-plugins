@@ -213,6 +213,43 @@ function saveGlyph(sessionId, glyph) {
   store.set('glyphs', next)
 }
 
+
+// --- status-dot glyphs ------------------------------------------------------
+// The six non-idle dots are one span painted by the app
+// (apps/desktop/src/app/chat/session-status-dot.tsx). Their COLOR is the
+// urgency signal — amber means "answer me" — so a glyph only ever rides on top:
+// same tint, and the shape carries the state. The app's own classes are the
+// only per-state marker in the DOM, so they are what we match on.
+const STATUS_STATES = [
+  { key: 'working', label: 'Working', test: cls => cls.includes('--ui-accent') && cls.includes('bg-') },
+  { key: 'needs-input', label: 'Needs input', test: cls => cls.includes('amber-500') },
+  { key: 'stalled', label: 'Stalled', test: cls => cls.includes('--ui-accent') },
+  { key: 'background', label: 'Background', test: cls => cls.includes('--ui-text-tertiary') },
+  { key: 'unread', label: 'Unread', test: cls => cls.includes('--ui-success') },
+  { key: 'draft', label: 'Draft', test: cls => cls.includes('--ui-text-quaternary') }
+]
+
+const STATUS_SUGGESTIONS = {
+  working: 'sync',
+  'needs-input': 'bell-dot',
+  stalled: 'clockface',
+  background: 'terminal',
+  unread: 'pass-filled',
+  draft: 'edit'
+}
+
+function loadStateGlyphs() {
+  const raw = store.get('stateGlyphs', {})
+  return raw && typeof raw === 'object' ? raw : {}
+}
+
+function saveStateGlyph(state, glyph) {
+  const next = { ...loadStateGlyphs() }
+  if (glyph) next[state] = glyph
+  else delete next[state]
+  store.set('stateGlyphs', next)
+}
+
 function loadRules() {
   const raw = store.get('autoRules', [])
   return Array.isArray(raw) ? raw : []
@@ -1037,6 +1074,90 @@ function ensureStyle() {
       font-size: 11px !important;
       line-height: 1 !important;
     }
+    span[data-bc-status-glyph="1"] {
+      width: 0.875rem !important;
+      height: 0.875rem !important;
+      min-width: 0.875rem !important;
+      min-height: 0.875rem !important;
+      display: grid !important;
+      place-items: center !important;
+      overflow: hidden !important;
+      border-radius: 0 !important;
+      border-color: transparent !important;
+      line-height: 0 !important;
+      background: none !important;
+      background-color: transparent !important;
+      box-shadow: none !important;
+    }
+    span[data-bc-status-glyph="1"] [${EXTRA_ATTR}="sglyph"] {
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      width: 11px;
+      height: 11px;
+      overflow: hidden;
+      font: 11px/1 codicon !important;
+      font-size: 11px !important;
+      line-height: 1 !important;
+    }
+    [${EXTRA_ATTR}="status-head"] {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin: 0.35rem 0 0.2rem;
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--ui-text-tertiary);
+    }
+    [${EXTRA_ATTR}="status-tool"] {
+      display: grid;
+      place-items: center;
+      width: 1.1rem;
+      height: 1.1rem;
+      padding: 0;
+      border: 0;
+      border-radius: 0.25rem;
+      background: transparent;
+      color: var(--ui-text-tertiary);
+      cursor: pointer;
+    }
+    [${EXTRA_ATTR}="status-tool"]:hover {
+      background: var(--ui-control-hover-background);
+      color: var(--foreground, var(--ui-text-primary));
+    }
+    [${EXTRA_ATTR}="status-list"] {
+      display: grid;
+      gap: 0.05rem;
+    }
+    [${EXTRA_ATTR}="status-item"] {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      width: 100%;
+      padding: 0.15rem 0.3rem;
+      border: 0;
+      border-radius: 0.25rem;
+      background: transparent;
+      color: var(--ui-text-primary);
+      font-size: 0.75rem;
+      text-align: left;
+      cursor: pointer;
+    }
+    [${EXTRA_ATTR}="status-item"]:hover {
+      background: var(--ui-control-hover-background);
+    }
+    [${EXTRA_ATTR}="status-item"][data-on="1"] {
+      background: var(--ui-control-active-background);
+    }
+    [${EXTRA_ATTR}="status-item"] i {
+      width: 0.9rem;
+      font-size: 0.75rem;
+      text-align: center;
+    }
+    [${EXTRA_ATTR}="status-item"] .codicon-circle-slash {
+      opacity: 0.45;
+    }
   `
 }
 
@@ -1102,6 +1223,73 @@ function clearGlyphNode(el) {
   }
 }
 
+function activeStatusDot(row) {
+  for (const dot of row.querySelectorAll('span.rounded-full')) {
+    if (dot.className.includes('size-1.5')) return dot
+  }
+  return null
+}
+
+function statusDotState(dot) {
+  const cls = dot.className
+  const hit = STATUS_STATES.find(def => def.test(cls))
+  return hit ? hit.key : ''
+}
+
+// A state is expressed as a fill (background) or as an outline (border), so the
+// tint has to be sampled from whichever one that state actually uses.
+function statusDotTint(dot) {
+  const cs = getComputedStyle(dot)
+  const bg = cs.backgroundColor
+  if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') return bg
+  if (parseFloat(cs.borderTopWidth) > 0) {
+    const border = cs.borderTopColor
+    if (border && border !== 'rgba(0, 0, 0, 0)') return border
+  }
+  return cs.color || 'currentColor'
+}
+
+// Geometry and the blanked fill come from the stylesheet, keyed off this
+// attribute, so dropping it restores the app's own dot exactly.
+function resetStatusDot(dot) {
+  delete dot.dataset.bcStatusGlyph
+  delete dot.dataset.bcSgState
+  delete dot.dataset.bcSgTint
+}
+
+function paintStatusGlyph(row) {
+  const dot = activeStatusDot(row)
+  if (!dot) return
+  const state = statusDotState(dot)
+  const glyph = state ? loadStateGlyphs()[state] || '' : ''
+  const icon = dot.querySelector(`[${EXTRA_ATTR}="sglyph"]`)
+  if (!glyph) {
+    icon?.remove()
+    resetStatusDot(dot)
+    return
+  }
+  if (dot.dataset.bcSgState !== state) {
+    // New state on a reused span: unblank first, so the color this state
+    // actually uses is readable, then blank again with the glyph in place.
+    icon?.remove()
+    resetStatusDot(dot)
+    dot.dataset.bcSgState = state
+    dot.dataset.bcSgTint = statusDotTint(dot)
+    dot.dataset.bcStatusGlyph = '1'
+  }
+  const tint = dot.dataset.bcSgTint || 'currentColor'
+  if (icon && icon.classList.contains(`codicon-${glyph}`)) {
+    if (icon.style.color !== tint) icon.style.color = tint
+    return
+  }
+  icon?.remove()
+  const node = document.createElement('i')
+  node.className = `codicon codicon-${glyph}`
+  node.setAttribute(EXTRA_ATTR, 'sglyph')
+  node.style.color = tint
+  dot.appendChild(node)
+}
+
 function rowIsBusy(row) {
   if (row.getAttribute('data-working') === 'true') return true
   if (row.querySelector('[role="status"]')) return true
@@ -1156,6 +1344,9 @@ function paintGlyph(row, color) {
 
 function paintSessionTitles() {
   document.querySelectorAll(ROW).forEach(row => {
+    // Runs before the early return below: status glyphs do not depend on a
+    // session having a color or bold set.
+    paintStatusGlyph(row)
     const sid = rowSessionId(row)
     if (sessionBold(sid)) {
       if (row.dataset.bcBold !== '1') row.dataset.bcBold = '1'
@@ -1270,7 +1461,8 @@ function injectPanel(host, stockBtn) {
 
   const heading = document.createElement('div')
   heading.setAttribute(EXTRA_ATTR, 'icon-label')
-  heading.appendChild(document.createTextNode('Icon'))
+  const headingText = document.createTextNode('Icon')
+  heading.appendChild(headingText)
   const autoBtn = document.createElement('button')
   autoBtn.type = 'button'
   autoBtn.setAttribute(EXTRA_ATTR, 'auto-btn')
@@ -1285,6 +1477,81 @@ function injectPanel(host, stockBtn) {
   })
   heading.appendChild(autoBtn)
   panel.appendChild(heading)
+
+  // Icon target: this session's idle dot, or one of the six status dots. One
+  // grid serves both, and the heading says which one is being edited.
+  const statusHead = document.createElement('div')
+  statusHead.setAttribute(EXTRA_ATTR, 'status-head')
+  statusHead.appendChild(document.createTextNode('Status dots'))
+
+  const suggestBtn = glyphBtn('lightbulb', 'Suggest glyphs')
+  suggestBtn.setAttribute(EXTRA_ATTR, 'status-tool')
+  suggestBtn.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    const next = { ...loadStateGlyphs() }
+    Object.entries(STATUS_SUGGESTIONS).forEach(([key, glyph]) => {
+      if (!next[key]) next[key] = glyph
+    })
+    store.set('stateGlyphs', next)
+    paintSessionTitles()
+    renderStatusList()
+  })
+  statusHead.appendChild(suggestBtn)
+
+  const resetStatusBtn = glyphBtn('circle-slash', 'Clear status glyphs')
+  resetStatusBtn.setAttribute(EXTRA_ATTR, 'status-tool')
+  resetStatusBtn.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    store.set('stateGlyphs', {})
+    paintSessionTitles()
+    renderStatusList()
+  })
+  statusHead.appendChild(resetStatusBtn)
+  panel.appendChild(statusHead)
+
+  const statusList = document.createElement('div')
+  statusList.setAttribute(EXTRA_ATTR, 'status-list')
+  panel.appendChild(statusList)
+
+  let target = { kind: 'session', id: sid }
+  const currentGlyph = () =>
+    target.kind === 'session' ? loadGlyphs()[target.id] || '' : loadStateGlyphs()[target.state] || ''
+  const applyGlyph = name => {
+    if (target.kind === 'session') saveGlyph(target.id, name)
+    else saveStateGlyph(target.state, name)
+    paintSessionTitles()
+    syncGlyphButtons(panel, currentGlyph())
+  }
+
+  function renderStatusList() {
+    statusList.replaceChildren()
+    STATUS_STATES.forEach(def => {
+      const item = document.createElement('button')
+      item.type = 'button'
+      item.setAttribute(EXTRA_ATTR, 'status-item')
+      item.dataset.state = def.key
+      item.dataset.on = target.kind === 'state' && target.state === def.key ? '1' : '0'
+      const configured = loadStateGlyphs()[def.key]
+      const icon = document.createElement('i')
+      icon.className = `codicon codicon-${configured || 'circle-slash'}`
+      item.appendChild(icon)
+      const label = document.createElement('span')
+      label.textContent = def.label
+      item.appendChild(label)
+      item.addEventListener('click', event => {
+        event.preventDefault()
+        event.stopPropagation()
+        const same = target.kind === 'state' && target.state === def.key
+        target = same ? { kind: 'session', id: sid } : { kind: 'state', state: def.key }
+        headingText.nodeValue = same ? 'Icon' : `Icon · ${def.label}`
+        renderStatusList()
+        syncGlyphButtons(panel, currentGlyph())
+      })
+      statusList.appendChild(item)
+    })
+  }
 
   const search = document.createElement('input')
   search.type = 'search'
@@ -1309,9 +1576,7 @@ function injectPanel(host, stockBtn) {
   clear.addEventListener('click', event => {
     event.preventDefault()
     event.stopPropagation()
-    saveGlyph(sid, null)
-    paintSessionTitles()
-    syncGlyphButtons(panel, sid)
+    applyGlyph(null)
   })
   grid.appendChild(clear)
 
@@ -1329,14 +1594,13 @@ function injectPanel(host, stockBtn) {
     btn.addEventListener('click', event => {
       event.preventDefault()
       event.stopPropagation()
-      saveGlyph(sid, name)
-      paintSessionTitles()
-      syncGlyphButtons(panel, sid)
+      applyGlyph(name)
     })
     grid.appendChild(btn)
   })
   panel.appendChild(grid)
-  syncGlyphButtons(panel, sid)
+  syncGlyphButtons(panel, currentGlyph())
+  renderStatusList()
   host.appendChild(panel)
 }
 
@@ -1349,8 +1613,7 @@ function filterGlyphs(panel, query) {
   })
 }
 
-function syncGlyphButtons(panel, sid) {
-  const current = loadGlyphs()[sid] || ''
+function syncGlyphButtons(panel, current) {
   panel.querySelectorAll(`[${EXTRA_ATTR}="glyph-btn"]`).forEach(btn => {
     btn.dataset.on = btn.dataset.glyph === current ? '1' : '0'
   })
@@ -1432,6 +1695,7 @@ function start() {
     document.querySelector(`[${EXTRA_ATTR}="confirm"]`)?.remove()
     document.getElementById(STYLE_ID)?.remove()
     document.querySelectorAll(`[${EXTRA_ATTR}]`).forEach(node => node.remove())
+    document.querySelectorAll('[data-bc-status-glyph]').forEach(resetStatusDot)
     document.querySelectorAll(`${ROW}[data-bc-color]`).forEach(clearTitle)
     document.querySelectorAll(`${ROW}[data-bc-bold]`).forEach(row => delete row.dataset.bcBold)
   }

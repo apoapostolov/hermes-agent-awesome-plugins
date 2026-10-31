@@ -2,7 +2,7 @@
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
   <h1>Better Session Appearance</h1>
   <strong>Make session names easier to scan.</strong>
-  <p>Idle color, bold, and icon — plus Auto Rules that match title keywords.</p>
+  <p>Idle color, bold, and icons — for idle rows and every status dot — plus Auto Rules that match title keywords.</p>
   <p>
     <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.1-2ea44f" alt="Version 1.2.1" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
@@ -23,7 +23,8 @@
 
 - Color the session title for idle rows. Lightness adjusts for light and dark themes so one hue stays readable.
 - Bold a session name per chat.
-- Pick an idle icon from the Codicon set (search included). Working and finished-unread status dots stay Hermes's.
+- Pick an idle icon from the Codicon set (search included).
+- Give each status dot its own icon: working, needs input, stalled, background, unread, and draft. The icon keeps the state's own color, so amber still reads as "answer me". Suggest fills the six with a starting set; Clear returns them to plain dots.
 - Save Auto Rules: color, bold, and icon keyed to title keywords (comma or space; all words must match; case-insensitive). Future sessions that match pick up that look. Edit or remove rules from the list.
 
 ## Install
@@ -38,7 +39,7 @@ Enable **Better Session Appearance** under **Capabilities → Plugins**.
 
 ## Requirements / Limits
 
-Desktop-only. Appearance applies to idle session rows. Hermes keeps ownership of working and unread status dots.
+Desktop-only. Appearance applies to idle session rows, and status icons replace the dot only while a session is in that state. Hermes still owns which state a session is in, and its colors.
 
 ## License
 
