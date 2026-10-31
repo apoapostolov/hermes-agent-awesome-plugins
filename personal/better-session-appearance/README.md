@@ -26,6 +26,7 @@
 - Pick an idle icon from the Codicon set (search included).
 - Give each status dot its own icon: **Status Dots** opens a panel beside the Appearance menu, one state is selected at a time, and the icon grid below it edits that state. An icon takes the session's own color when the session has one; a session with no color keeps the app's state color, so amber still reads as "answer me". Suggest fills the six with a starting set; Clear returns them to plain dots.
 - Save Auto Rules: color, bold, and icon keyed to title keywords (comma or space; all words must match; case-insensitive). Future sessions that match pick up that look. Edit or remove rules from the list.
+- **In-Progress Status Dots use Session Color** is a switch on the plugin's own page in Settings ▸ Plugins. It is off by default, so working, needs input, stalled and unread keep the app's blue, amber and green. Turn it on and those four dots take the color set for that session instead; the icon shape still carries the state, and background and draft dots follow the session color either way.
 
 ## Install
 

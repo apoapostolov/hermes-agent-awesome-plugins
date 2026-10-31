@@ -8,6 +8,10 @@
  * Live door: desktop-plugins/better-session-appearance/plugin.js (auto-on).
  */
 
+import { useState } from 'react'
+import { jsx } from 'react/jsx-runtime'
+import * as pluginSdk from '@hermes/plugin-sdk'
+
 const ID = 'better-session-appearance'
 const ROW = '[data-sessions-mode] .row-hover'
 const TITLE = '.hover-marquee'
@@ -229,6 +233,8 @@ const STATUS_STATES = [
   { key: 'draft', label: 'Draft', test: cls => cls.includes('--ui-text-quaternary') }
 ]
 
+const QUIET_STATUS_STATES = new Set(['background', 'draft'])
+
 const STATUS_SUGGESTIONS = {
   working: 'sync',
   'needs-input': 'bell-dot',
@@ -236,6 +242,85 @@ const STATUS_SUGGESTIONS = {
   background: 'terminal',
   unread: 'pass-filled',
   draft: 'edit'
+}
+
+// Off by default. The state colors are the app's urgency signal (amber means
+// "answer me"), so wearing the session's own color is a choice, not a default.
+function inProgressUsesSessionColor() {
+  return store.get('inProgressSessionColor', false) === true
+}
+
+function setInProgressUsesSessionColor(on) {
+  store.set('inProgressSessionColor', !!on)
+  // The tint is cached per state + color source; the source is what flips, but
+  // drop the cache anyway so a repaint never depends on that ordering.
+  document.querySelectorAll('span[data-bc-status-glyph]').forEach(resetStatusDot)
+  paintSessionTitles()
+}
+
+const el = (type, props, ...kids) => {
+  const merged = { ...(props || {}) }
+  if (kids.length === 1) merged.children = kids[0]
+  else if (kids.length > 1) merged.children = kids
+  return jsx(type, merged)
+}
+
+// Settings ▸ Plugins renders this with the app's own ListRow/Switch, so the
+// page matches core Settings. Both are read off the live SDK namespace: a build
+// that predates them must not fail the whole module over a settings row.
+function ToggleControl({ checked, description, id, label, onChange }) {
+  const { Switch, ToggleRow } = pluginSdk
+  if (ToggleRow) return el(ToggleRow, { checked, description, id, label, onChange })
+  const copy = el(
+    'div',
+    { className: 'min-w-0' },
+    el('div', { className: 'text-sm font-medium text-foreground' }, label),
+    el('div', { className: 'mt-1 text-xs text-(--ui-text-tertiary)' }, description)
+  )
+  if (Switch) {
+    return el(
+      'div',
+      { className: 'flex items-center justify-between gap-3' },
+      copy,
+      el(Switch, { 'aria-label': label, checked, onCheckedChange: onChange })
+    )
+  }
+  return el(
+    'label',
+    { className: 'flex items-center gap-2 text-sm' },
+    el('input', {
+      checked,
+      id,
+      onChange: event => onChange(event.currentTarget.checked),
+      type: 'checkbox'
+    }),
+    copy
+  )
+}
+
+function AppearanceSettingsPage() {
+  const [on, setOn] = useState(() => inProgressUsesSessionColor())
+  return el(
+    'div',
+    { className: 'flex flex-col gap-4 p-4' },
+    el(ToggleControl, {
+      checked: on,
+      description:
+        'Working, needs input, stalled and unread dots take the color set for that session instead of the app\u2019s own blue, amber and green. The icon shape still carries the state.',
+      hint: 'Off: the app\u2019s state colors, so amber still means \u201canswer me\u201d.',
+      id: 'in-progress-session-color',
+      label: 'In-Progress Status Dots use Session Color',
+      onChange: next => {
+        setOn(next)
+        setInProgressUsesSessionColor(next)
+      }
+    }),
+    el(
+      'div',
+      { className: 'text-xs text-(--ui-text-tertiary)' },
+      'Background and draft dots follow the session color either way, and a session with no color always keeps the app\u2019s state colors.'
+    )
+  )
 }
 
 function loadStateGlyphs() {
@@ -1506,10 +1591,12 @@ function paintStatusGlyph(row) {
     resetStatusDot(dot)
     return
   }
-  // A session's own color outranks the state's: the row already wears it, so a
-  // dot in a different hue reads as a second, unrelated signal. The shape still
-  // carries the state, and a session with no color keeps the app's own tint.
-  const sessionTint = sessionColorFor(row, rowSessionId(row))
+  // Quiet states have no color of their own, so they always read the session's.
+  // The in-progress ones keep the app's state colors unless the switch says the
+  // session color wins: on a row already wearing that color, a dot in another
+  // hue reads as a second, unrelated signal.
+  const wantsSessionColor = QUIET_STATUS_STATES.has(state) || inProgressUsesSessionColor()
+  const sessionTint = wantsSessionColor ? sessionColorFor(row, rowSessionId(row)) : null
   const src = sessionTint || ''
   if (dot.dataset.bcSgState !== state || (dot.dataset.bcSgSrc || '') !== src) {
     // New state (or a new session color) on a reused span: unblank first, so
@@ -1907,6 +1994,15 @@ export default {
   defaultEnabled: true,
   register(ctx) {
     store = ctx.storage
+    if (typeof ctx.registerSettingsPage === 'function') {
+      ctx.registerSettingsPage({
+        icon: 'paintcan',
+        id: 'appearance',
+        order: 60,
+        render: () => el(AppearanceSettingsPage, null),
+        title: 'Better Session Appearance'
+      })
+    }
     ctx.onDispose(start())
   }
 }
