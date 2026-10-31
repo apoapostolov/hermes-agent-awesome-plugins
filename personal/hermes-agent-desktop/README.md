@@ -4,7 +4,7 @@
   <strong>Hands on Windows apps without taking over the screen.</strong>
   <p>Read any app's real UI and act on it by ref: click, fill, select, toggle, scroll, key combos, windows, clipboard.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.1-2ea44f" alt="Version 1.0.1" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>

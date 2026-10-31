@@ -15,7 +15,6 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ### Fixed
 
-- hermes-agent-desktop. `desktop_apps` reported a failed `list-apps` as an empty list under `ok: true`, so a broken enumeration read as nothing running. A failed half now returns its own error envelope. `desktop_install` with `action: "verify"` probed only the plugin's own copy, so a host that already had the binary on PATH was reported as broken; it now probes the binary the tools actually use, and `status` reports that path.
 - hermes-jev-routing. The listed edition's desktop half mounted a strip under the user message with app DOM, so `hermes plugins validate` failed the desktop surface check and the plugin could not be catalogued. The line and its approve row now render as a React contribution at `COMPOSER_AREAS.underside`, with no app-owned nodes, no injected style tag and no line cache in `localStorage`. 1.0.2.
 - hermes-jev-routing. `/jev-routing on|off|mode` wrote one process-wide `_LAST`, so an override in one chat changed routing for every session and its "for this session" wording was false. Overrides now live per session and survive the config read that reset the mode on every turn; `why` and `status` read that session's own prompt and decision, and `on_session_delete` drops a deleted session's state.
 - better-capabilities. Zipping or deleting a skill resolved the name through a private `tools.skill_manager_tool._find_skill` plus a directory walk of its own. It uses the public `tools.skills_tool` helpers now, so a name resolves with the host's tier precedence and an ambiguous name is refused instead of guessed, while the result stays inside the user skills tree this panel may change.
@@ -24,9 +23,16 @@ the component that changed; a plugin patch does not imply a new pack release.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
 
+
 ### Added
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
+
+## [hermes-agent-desktop 1.0.1] - 2026-10-31
+
+### Fixed
+
+- hermes-agent-desktop. `desktop_apps` reported a failed `list-apps` as an empty list under `ok: true`, so a broken enumeration read as nothing running. A failed half now returns its own error envelope. `desktop_install` with `action: "verify"` probed only the plugin's own copy, so a host that already had the binary on PATH was reported as broken; it now probes the binary the tools actually use, and `status` reports that path.
 
 ## [hermes-agent-desktop 1.0.0] - 2026-10-31
 
