@@ -153,3 +153,26 @@ def test_batch_process_outlives_its_own_budget(monkeypatch):
     monkeypatch.setattr(cli, "run", fake_run)
     tools.desktop_batch({"commands": [{"command": "status"}], "timeout_ms": 5000})
     assert seen["timeout"] == pytest.approx(35.0)
+
+
+def test_apps_merges_both_halves(monkeypatch):
+    replies = {
+        "list-apps": json.dumps({"ok": True, "data": {"apps": [{"name": "Code.exe"}]}}),
+        "list-windows": json.dumps({"ok": True, "data": [{"id": "w-1", "title": "Code"}]}),
+    }
+    monkeypatch.setattr(cli, "run", lambda command, *a, **k: replies[command])
+    payload = json.loads(tools.desktop_apps({"include_windows": True}))
+    assert payload["ok"] is True
+    assert payload["data"]["apps"][0]["name"] == "Code.exe"
+    assert payload["data"]["windows"][0]["id"] == "w-1"
+
+
+def test_apps_surfaces_a_failed_half_instead_of_an_empty_list(monkeypatch):
+    replies = {
+        "list-apps": json.dumps({"ok": False, "error": {"code": "TIMEOUT", "message": "inventory timed out"}}),
+        "list-windows": json.dumps({"ok": True, "data": []}),
+    }
+    monkeypatch.setattr(cli, "run", lambda command, *a, **k: replies[command])
+    payload = json.loads(tools.desktop_apps({"include_windows": True}))
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "TIMEOUT"

@@ -83,12 +83,24 @@ def desktop_apps(args: Dict[str, Any], **kwargs: Any) -> str:
 
     apps_raw = cli.run("list-apps", timeout=20.0, max_chars=_max_chars(args))
     windows_raw = cli.run("list-windows", cli.flags(app=app), timeout=20.0, max_chars=_max_chars(args))
-    try:
-        apps = json.loads(apps_raw).get("data") or []
-        windows = json.loads(windows_raw).get("data") or []
-    except json.JSONDecodeError:
-        return apps_raw if app is None else windows_raw
-    return json.dumps({"ok": True, "command": "list-apps+list-windows", "data": {"apps": apps, "windows": windows}}, ensure_ascii=False)[: _max_chars(args)]
+    parsed_apps = json.loads(apps_raw)
+    parsed_windows = json.loads(windows_raw)
+    # a failed half must surface as a failure: an empty list under ok:true reads
+    # as "nothing is running", which is a wrong answer, not a missing one
+    if not parsed_apps.get("ok"):
+        return apps_raw
+    if not parsed_windows.get("ok"):
+        return windows_raw
+    apps_payload = parsed_apps.get("data") or {}
+    apps = apps_payload.get("apps", []) if isinstance(apps_payload, dict) else apps_payload
+    return json.dumps(
+        {
+            "ok": True,
+            "command": "list-apps+list-windows",
+            "data": {"apps": apps, "windows": parsed_windows.get("data") or []},
+        },
+        ensure_ascii=False,
+    )[: _max_chars(args)]
 
 
 def desktop_snapshot(args: Dict[str, Any], **kwargs: Any) -> str:
