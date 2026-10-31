@@ -8,6 +8,10 @@
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Hermes Agent Desktop" />
+</div>
+
 
 <div align="center">
   <img src="docs/screenshot-settings.png" width="520" alt="Hermes Agent Desktop settings in Hermes Desktop" />
