@@ -1176,45 +1176,163 @@ def _cli_grok_entry() -> dict | None:
     return best
 
 
+# One pool entry per real account. Grok and Codex rotate the refresh token on
+# every use, so an account matched by its refresh_token looked brand new after
+# each refresh and got appended again: one Grok login reached 338 entries with
+# 336 dead ones, and 6 Codex entries for a single account. Identity comes from
+# the token's stable subject claim, never from the rotating secret.
+_OAUTH_MAX_ACCOUNTS = 24
+
+
+def _token_identity(token: str) -> str:
+    claims = _jwt_payload(token)
+    for key in ("sub", "principal_id", "preferred_username", "email"):
+        value = str(claims.get(key) or "").strip()
+        if value:
+            return value.lower()
+    return ""
+
+
+def _account_identity(acc: dict) -> str:
+    """Stable key for one OAuth account: token subject, then email, then a
+    digest of the token so an opaque (non-JWT) account still dedupes."""
+    for field in ("access_token", "id_token", "refresh_token"):
+        ident = _token_identity(str(acc.get(field) or "").strip())
+        if ident:
+            return ident
+    email = str(acc.get("email") or "").strip().lower()
+    if email:
+        return email
+    for field in ("access_token", "refresh_token"):
+        tok = str(acc.get(field) or "").strip()
+        if tok:
+            return hashlib.sha1(tok.encode("utf-8")).hexdigest()
+    return ""
+
+
+def _collapse_oauth_accounts(accounts: list[dict]) -> tuple[list[dict], list[int]]:
+    """Keep the freshest entry per identity. Returns (kept, source indexes)."""
+    slots: dict[str, int] = {}
+    kept: list[dict] = []
+    origin: list[int] = []
+    for src, acc in enumerate(accounts):
+        key = _account_identity(acc) or f"#{src}"
+        if key in slots:
+            pos = slots[key]
+            if float(acc.get("expires_at") or 0) >= float(kept[pos].get("expires_at") or 0):
+                kept[pos] = acc
+                origin[pos] = src
+            continue
+        slots[key] = len(kept)
+        kept.append(acc)
+        origin.append(src)
+    return kept, origin
+
+
 def _upsert_oauth_account(pid: str, result: dict, client_id: str, issuer: str, email: str = "") -> None:
-    """Add or update (by refresh_token) an account in the provider's account
-    pool and make it active. New logins append; re-logins refresh in place."""
+    """Add or update one account in the provider's account pool and make it
+    active. Accounts match on the subject claim or email, because both providers
+    rotate the refresh token on use; matching the secret appended a duplicate
+    per refresh."""
     def _m(c: dict) -> None:
         p = c.setdefault("providers", {}).setdefault(pid, {})
         new_rt = str(result.get("refresh_token") or "")
         new_at = str(result.get("access_token") or "")
-        accounts = [a for a in (p.get("accounts") or []) if isinstance(a, dict)]
-        idx = None
-        for i, a in enumerate(accounts):
-            if new_rt and a.get("refresh_token") == new_rt:
-                idx = i
-                break
-            if not new_rt and a.get("access_token") == new_at and new_at:
-                idx = i
-                break
-        entry = {f: a.get(f) for f in _OAUTH_FIELDS if a.get(f) is not None} if idx is not None else {}
-        entry.update({
+        fresh = {
             "access_token": new_at,
             "refresh_token": new_rt,
             "expires_at": time.time() + result.get("expires_in", 3600),
             "client_id": client_id,
-        })
+        }
         if issuer:
-            entry["issuer"] = issuer
+            fresh["issuer"] = issuer
         if email:
-            entry["email"] = email
+            fresh["email"] = email
+        new_key = _account_identity(fresh)
+        accounts = [a for a in (p.get("accounts") or []) if isinstance(a, dict)]
+        idx = None
+        for i, a in enumerate(accounts):
+            if new_key and _account_identity(a) == new_key:
+                idx = i
+                break
+            if new_rt and a.get("refresh_token") == new_rt:
+                idx = i
+                break
+            if not new_rt and new_at and a.get("access_token") == new_at:
+                idx = i
+                break
         if idx is None:
-            accounts.append(entry)
-            idx = len(accounts) - 1
+            accounts.append(fresh)
         else:
-            accounts[idx] = entry
+            merged = {f: accounts[idx].get(f) for f in _OAUTH_FIELDS
+                      if accounts[idx].get(f) is not None}
+            merged.update(fresh)
+            accounts[idx] = merged
+        accounts, _origin = _collapse_oauth_accounts(accounts)
+        active = 0
+        for pos, a in enumerate(accounts):
+            if (new_key and _account_identity(a) == new_key) or \
+                    (new_rt and a.get("refresh_token") == new_rt):
+                active = pos
+                break
+        if len(accounts) > _OAUTH_MAX_ACCOUNTS:
+            older = sorted((pos for pos in range(len(accounts)) if pos != active),
+                           key=lambda pos: float(accounts[pos].get("expires_at") or 0),
+                           reverse=True)
+            keep = {active, *older[:_OAUTH_MAX_ACCOUNTS - 1]}
+            accounts = [a for pos, a in enumerate(accounts) if pos in keep]
+            active = min(active, len(accounts) - 1)
         p["accounts"] = accounts
-        p["account_index"] = idx
+        p["account_index"] = active
+        active_acc = accounts[active] if accounts else {}
         for f in _OAUTH_FIELDS:
-            if f in entry:
-                p[f] = entry[f]
+            if f in active_acc:
+                p[f] = active_acc[f]
         p["enabled"] = True
     mutate_config(_m)
+
+
+def _heal_oauth_pools() -> None:
+    """Rewrite pools that hold one entry per token refresh. Runs once at plugin
+    load, so an already bloated config.json heals itself."""
+    try:
+        provs = load_config().get("providers") or {}
+    except Exception:
+        return
+    bloated = [pid for pid, p in provs.items()
+               if isinstance(p, dict) and len(p.get("accounts") or []) > 1]
+    if not bloated:
+        return
+
+    def _m(c: dict) -> None:
+        for pid in bloated:
+            p = (c.get("providers") or {}).get(pid)
+            if not isinstance(p, dict):
+                continue
+            accounts = [a for a in (p.get("accounts") or []) if isinstance(a, dict)]
+            if len(accounts) < 2:
+                continue
+            active = int(p.get("account_index") or 0)
+            active_key = (_account_identity(accounts[active])
+                          if 0 <= active < len(accounts) else "")
+            kept, _origin = _collapse_oauth_accounts(accounts)
+            if len(kept) == len(accounts):
+                continue
+            pos = next((i for i, a in enumerate(kept)
+                        if active_key and _account_identity(a) == active_key), None)
+            p["account_index"] = pos if pos is not None else max(0, min(active, len(kept) - 1))
+            p["accounts"] = kept
+            active_acc = kept[int(p["account_index"])]
+            for f in _OAUTH_FIELDS:
+                if f in active_acc:
+                    p[f] = active_acc[f]
+            log.info("provider-status %s: account pool collapsed %d -> %d",
+                     pid, len(accounts), len(kept))
+
+    try:
+        mutate_config(_m)
+    except Exception:
+        log.exception("provider-status account pool heal failed")
 
 
 def _persist_grok_tokens(access: str, refresh: str, expires_in: int, client_id: str, email: str = "") -> None:
@@ -2699,5 +2817,9 @@ def codex_browser_callback_ep(body: CodexCallbackBody):
 
 
 
-# ── background probe sweeper autostart ─────────────────────────────
-_start_probe_sweeper()
+# ── autostart ──────────────────────────────────────────────────────
+# Heal pools that grew one entry per token refresh before serving requests.
+# Tests set PI_PROVIDER_STATUS_NO_AUTOSTART=1 to keep imports offline.
+if os.environ.get("PI_PROVIDER_STATUS_NO_AUTOSTART") != "1":
+    _heal_oauth_pools()
+    _start_probe_sweeper()
