@@ -4,7 +4,7 @@
   <strong>Make session names easier to scan.</strong>
   <p>Give each session its own color and idle icon in the session list.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.2-2ea44f" alt="Version 1.2.2" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.3-2ea44f" alt="Version 1.2.3" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>

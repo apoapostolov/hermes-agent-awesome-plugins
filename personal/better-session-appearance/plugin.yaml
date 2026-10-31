@@ -1,5 +1,5 @@
 name: better-session-appearance
-version: 1.2.2
+version: 1.2.3
 description: "Better Session Appearance: improve your session list with full name color, bolding, a Codicon icon for idle sessions, and per-status icons for working, needs input, stalled, background, unread, and draft."
 author: Apostol Apostolov
 license: MIT

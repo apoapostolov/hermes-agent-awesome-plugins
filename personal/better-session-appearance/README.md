@@ -4,7 +4,7 @@
   <strong>Make session names easier to scan.</strong>
   <p>Idle color, bold, and icons — for idle rows and every status dot — plus Auto Rules that match title keywords.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.1-2ea44f" alt="Version 1.2.1" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.3-2ea44f" alt="Version 1.2.3" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>

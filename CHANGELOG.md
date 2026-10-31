@@ -26,6 +26,19 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [better-session-appearance 1.2.3] - 2026-10-31
+
+Every status dot can carry its own icon, not only the idle one.
+
+### Added
+
+- **Status Dots** in the Appearance panel. Working, needs input, stalled, background, unread and draft each take a Codicon, picked from the same searchable grid as the idle icon: the link opens its own panel beside the Appearance menu, one state is selected at a time, and the grid below edits that state. The icon rides on the state's own colour rather than replacing it, so amber still reads as a prompt waiting for you. **Suggest** fills the six with a starting set, **Clear** returns them to plain dots. The panel takes the Appearance popup's width, so its grid lands on the same columns as the icon grid next to it.
+- Background and draft dots take the session's own colour when the session has one, instead of the app's grey.
+
+### Fixed
+
+- The listed edition's README described bold titles and Auto Rules, and its screenshot was the personal UI with both on show. The page now documents the color and idle icon that the edition actually installs, and the mismatched image is gone.
+
 ## [provider-status 1.6.7] - 2026-10-31
 
 One login can no longer fill the account pool with copies of itself.
