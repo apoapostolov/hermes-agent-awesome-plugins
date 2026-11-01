@@ -30,6 +30,7 @@ try:
         crosses_provider,
         current_from,
         rewrite,
+        set_thinking_level,
         sticky_keep,
         tier_index_for,
     )
@@ -405,12 +406,7 @@ def on_llm_request(**kwargs):
             return None
         updated = dict(request)
         updated["model"] = str(pin["model"])
-        level = str(pin.get("thinking") or "").strip().lower()
-        if level and level not in {"off", "none", "false", "disabled"}:
-            for field in ("reasoning_effort", "reasoning"):
-                if field in updated:
-                    updated[field] = level
-                    break
+        set_thinking_level(updated, pin.get("thinking"))
         _LAST.pop("pin", None)
         slot.pop("pin", None)
         _LAST["applied"] = str(pin["model"])

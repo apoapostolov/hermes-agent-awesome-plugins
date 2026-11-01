@@ -15,6 +15,8 @@ TIERS = ("quick", "standard", "high", "premium", "xpremium")
 # Wire fields that carry a reasoning level. Set only a field the request already
 # has: adding one to a provider that does not accept it fails the send.
 REASONING_FIELDS = ("reasoning_effort", "reasoning")
+# Levels that mean "do not think", so they never land as an effort name.
+NO_LEVELS = {"off", "none", "false", "disabled"}
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,35 @@ def crosses_provider(decision, bound_provider: str) -> bool:
     return bool(decision is not None and bound_provider and decision.target.provider != bound_provider)
 
 
+def set_thinking_level(updated: dict, level: object) -> bool:
+    """Land a thinking level on the reasoning field the request already carries.
+
+    A plain string field takes the level. A Responses-style object keeps every
+    other key it carries (``summary``, ``generate_summary``) and has only
+    ``effort`` replaced, so the wire shape the provider expects survives.
+    Returns True when the request actually changed.
+    """
+    name = str(level or "").strip().lower()
+    if not name or name in NO_LEVELS:
+        return False
+    for field in REASONING_FIELDS:
+        if field not in updated:
+            continue
+        current = updated[field]
+        if isinstance(current, Mapping):
+            if str(current.get("effort") or "").strip().lower() == name:
+                continue
+            carried = dict(current)
+            carried["effort"] = name
+            updated[field] = carried
+            return True
+        if isinstance(current, str) and current.strip().lower() == name:
+            continue
+        updated[field] = name
+        return True
+    return False
+
+
 def rewrite(
     request: Mapping[str, Any], decision, bound_provider: str, mode: str = "auto"
 ) -> Optional[dict]:
@@ -83,13 +114,8 @@ def rewrite(
     updated = dict(request)
     changed = updated.get("model") != decision.target.model
     updated["model"] = decision.target.model
-    level = str(decision.target.thinking_level or "").strip().lower()
-    if level and level not in {"off", "none", "false", "disabled"}:
-        for field in REASONING_FIELDS:
-            if field in updated and str(updated[field]).lower() != level:
-                updated[field] = level
-                changed = True
-                break
+    if set_thinking_level(updated, decision.target.thinking_level):
+        changed = True
     # Already on the pick: report nothing rather than claiming a change that
     # carries the same model. Hermes records a trace entry for every replacement.
     return updated if changed else None

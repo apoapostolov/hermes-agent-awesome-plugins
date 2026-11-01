@@ -15,6 +15,7 @@ from route import (  # noqa: E402
     crosses_provider,
     current_from,
     rewrite,
+    set_thinking_level,
     sticky_keep,
     tier_index_for,
 )
@@ -86,10 +87,74 @@ class RewriteTests(unittest.TestCase):
         )
         self.assertEqual(updated["reasoning_effort"], "high")
 
+    def test_a_responses_object_keeps_its_other_keys(self):
+        request = {"model": "gpt-6-astra", "reasoning": {"effort": "high", "summary": "auto"}}
+        updated = rewrite(
+            request, _decision(provider="openai-codex", model="gpt-6-luna", thinking="low"), "openai-codex", "auto"
+        )
+        self.assertEqual(updated["model"], "gpt-6-luna")
+        self.assertEqual(updated["reasoning"], {"effort": "low", "summary": "auto"})
+        self.assertEqual(request["reasoning"], {"effort": "high", "summary": "auto"})
+
+    def test_a_matching_object_effort_reports_nothing(self):
+        request = {"model": "gpt-6-luna", "reasoning": {"effort": "low", "summary": "auto"}}
+        self.assertIsNone(
+            rewrite(
+                request,
+                _decision(provider="openai-codex", model="gpt-6-luna", thinking="low"),
+                "openai-codex",
+                "auto",
+            )
+        )
+
+    def test_a_level_change_inside_the_object_still_rewrites(self):
+        updated = rewrite(
+            {"model": "gpt-6-luna", "reasoning": {"effort": "high", "summary": "auto"}},
+            _decision(provider="openai-codex", model="gpt-6-luna", thinking="low"),
+            "openai-codex",
+            "auto",
+        )
+        self.assertEqual(updated, {"model": "gpt-6-luna", "reasoning": {"effort": "low", "summary": "auto"}})
+
     def test_the_original_request_is_not_mutated(self):
         request = {"model": "glm-5.3-flash"}
         rewrite(request, _decision(), "opencode-go", "auto")
         self.assertEqual(request["model"], "glm-5.3-flash")
+
+
+class ThinkingLevelTests(unittest.TestCase):
+    def test_a_string_field_takes_the_level(self):
+        request = {"reasoning_effort": "low"}
+        self.assertTrue(set_thinking_level(request, "High"))
+        self.assertEqual(request["reasoning_effort"], "high")
+
+    def test_an_equal_string_field_reports_no_change(self):
+        request = {"reasoning_effort": "high"}
+        self.assertFalse(set_thinking_level(request, "high"))
+        self.assertEqual(request["reasoning_effort"], "high")
+
+    def test_an_object_is_copied_and_only_effort_moves(self):
+        request = {"reasoning": {"effort": "high", "summary": "auto", "generate_summary": "concise"}}
+        original = request["reasoning"]
+        self.assertTrue(set_thinking_level(request, "low"))
+        self.assertEqual(request["reasoning"], {"effort": "low", "summary": "auto", "generate_summary": "concise"})
+        self.assertEqual(original, {"effort": "high", "summary": "auto", "generate_summary": "concise"})
+
+    def test_an_object_without_effort_gains_one(self):
+        request = {"reasoning": {"summary": "auto"}}
+        self.assertTrue(set_thinking_level(request, "medium"))
+        self.assertEqual(request["reasoning"], {"summary": "auto", "effort": "medium"})
+
+    def test_an_off_level_is_not_an_effort_name(self):
+        request = {"reasoning": {"effort": "high"}}
+        for level in ("off", "none", "false", "disabled", "", None):
+            self.assertFalse(set_thinking_level(request, level))
+        self.assertEqual(request["reasoning"], {"effort": "high"})
+
+    def test_a_request_without_a_field_is_left_alone(self):
+        request = {"model": "glm-5.3"}
+        self.assertFalse(set_thinking_level(request, "high"))
+        self.assertEqual(request, {"model": "glm-5.3"})
 
 
 class BoundModelTests(unittest.TestCase):
