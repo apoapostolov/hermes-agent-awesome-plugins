@@ -348,6 +348,20 @@ def _clip(text: str, size: int) -> str:
     return text if len(text) <= size else text[: size - 1].rstrip() + "…"
 
 
+def rate_limit_wait(headers, cap: int = 30) -> int:
+    """Seconds to wait before retrying a 429, read from Reddit's own headers."""
+    for key in ("retry-after", "x-ratelimit-reset"):
+        value = headers.get(key) if headers else None
+        if not value:
+            continue
+        try:
+            seconds = int(float(value)) + 1
+        except (TypeError, ValueError):
+            continue
+        return max(1, min(seconds, cap))
+    return 5
+
+
 def compact_item(item: dict, body_chars: int = 400) -> dict:
     """Flatten one Reddit listing child into a compact dict."""
     kind = item.get("kind")
@@ -426,6 +440,52 @@ def compact_listing(payload: dict, body_chars: int = 400, limit: int = 0) -> dic
     }
 
 
+def flatten_comments(
+    children: list,
+    depth: int = 0,
+    body_chars: int = 500,
+    out: list | None = None,
+    more: list | None = None,
+) -> tuple[list, list]:
+    """Flatten a comment tree into compact items that keep their reply depth.
+
+    ``more`` nodes are Reddit's "load more comments" placeholders; they are
+    collected separately because each one carries the number of hidden
+    comments and the ids needed to fetch them from ``/api/morechildren``.
+    Without that step a thread read silently stops at whatever the first page
+    returned.
+    """
+    out = [] if out is None else out
+    more = [] if more is None else more
+    for child in children or []:
+        kind = child.get("kind")
+        data = child.get("data") or {}
+        if kind == "t1":
+            item = compact_item(child, body_chars=body_chars)
+            item["depth"] = depth
+            out.append(item)
+            replies = data.get("replies")
+            if isinstance(replies, dict):
+                flatten_comments(
+                    (replies.get("data") or {}).get("children") or [],
+                    depth + 1,
+                    body_chars,
+                    out,
+                    more,
+                )
+        elif kind == "more":
+            ids = data.get("children") or []
+            more.append(
+                {
+                    "count": data.get("count") or len(ids),
+                    "depth": depth,
+                    "parent": data.get("parent_id"),
+                    "ids": ids,
+                }
+            )
+    return out, more
+
+
 class Reddit:
     """Authenticated Reddit API session backed by a stored refresh token."""
 
@@ -439,6 +499,8 @@ class Reddit:
         self._app_access = ""
         self._app_expires_at = 0.0
         self.last_rate: dict[str, str] = {}
+        # Which grant served the last call: "account" or "app" (read-only).
+        self.last_backend: str = ""
 
     # ---- auth -------------------------------------------------------
     @property
@@ -502,6 +564,32 @@ class Reddit:
         self._app_expires_at = time.time() + float(payload.get("expires_in", 3600))
         return self._app_access
 
+    def _token_for(self, method: str, app_only: bool) -> tuple[str, str]:
+        """Pick the token for this call and name the grant it came from.
+
+        A GET falls back to the app-only ``client_credentials`` token when no
+        account is linked, so a configured app can read public subreddits,
+        searches and threads without a login. Writes still need the account.
+        """
+        if app_only:
+            return self.app_only_token(), "app"
+        if self.has_refresh_token:
+            return self.refresh(), "account"
+        if method == "GET" and self.creds.get("client_id") and self.creds.get("client_secret"):
+            return self.app_only_token(), "app"
+        if method == "GET":
+            raise RedditError(
+                "Neither a Reddit login nor an app credential is stored. Run "
+                "reddit_setup with the client id and secret from "
+                "reddit.com/prefs/apps to read public Reddit, or reddit_login to "
+                "act as your account."
+            )
+        raise RedditError(
+            f"{method} needs a Reddit login: run reddit_login. Reading with the "
+            "app-only token can see public subreddits but cannot post, vote, save "
+            "or touch your account."
+        )
+
     # ---- transport --------------------------------------------------
     def request(
         self,
@@ -521,7 +609,8 @@ class Reddit:
         if path.startswith("/api/v1/authorize"):
             raise RedditError("Pass an API path such as /r/hermesagent/new")
 
-        token = self.app_only_token() if app_only else self.refresh()
+        token, backend = self._token_for(method, app_only)
+        self.last_backend = backend
         query = dict(params or {})
         body = None
         if method in ("GET", "DELETE"):
@@ -537,7 +626,7 @@ class Reddit:
                 query, doseq=True
             )
 
-        for attempt in (0, 1):
+        for attempt in range(3):
             headers = {
                 "Authorization": f"bearer {token}",
                 "User-Agent": self.creds["user_agent"],
@@ -561,10 +650,16 @@ class Reddit:
                 if exc.code == 401 and attempt == 0:
                     token = (
                         self.app_only_token(force=True)
-                        if app_only
+                        if backend == "app"
                         else self.refresh(force=True)
                     )
                     continue
+                if exc.code == 429 and attempt < 2:
+                    wait = rate_limit_wait(exc.headers)
+                    if wait:
+                        self.last_rate["waited"] = str(wait)
+                        time.sleep(wait)
+                        continue
                 if exc.code == 403:
                     raise RedditError(
                         "403 from Reddit: token lacks the scope for this call, or "
@@ -580,7 +675,7 @@ class Reddit:
                     raise RedditError(
                         f"Reddit API {method} {path} -> {exc.code}: {detail[:500]}"
                     ) from None
-        raise RedditError("Reddit API request failed after refresh retry")
+        raise RedditError("Reddit API request failed after retries")
 
     def _capture_rate(self, headers) -> None:
         if headers is None:
@@ -596,13 +691,24 @@ class Reddit:
 
     def identity(self) -> dict:
         if not self.has_refresh_token:
-            return {"logged_in": False, "token_file": str(token_path())}
+            has_app = bool(
+                self.creds.get("client_id") and self.creds.get("client_secret")
+            )
+            return {
+                "logged_in": False,
+                "read_only": has_app,
+                "backend": "app" if has_app else "none",
+                "token_file": str(token_path()),
+                "rate": self.last_rate,
+            }
         try:
             profile = self.me()
         except RedditError as exc:
             return {"logged_in": False, "error": str(exc)}
         return {
             "logged_in": True,
+            "read_only": False,
+            "backend": "account",
             "username": profile.get("name"),
             "id": profile.get("id"),
             "link_karma": profile.get("link_karma"),
@@ -659,7 +765,13 @@ class Reddit:
         return compact_listing(payload, body_chars=body_chars, limit=limit)
 
     def thread(
-        self, id_or_url: str, sort: str = "best", comment_limit: int = 50, depth: int = 4
+        self,
+        id_or_url: str,
+        sort: str = "best",
+        comment_limit: int = 50,
+        depth: int = 4,
+        expand_more: bool = True,
+        body_chars: int = 500,
     ) -> dict:
         article = normalize_thread_id(id_or_url)
         payload = self.request(
@@ -675,8 +787,126 @@ class Reddit:
         if not isinstance(payload, list) or len(payload) < 2:
             return {"error": "unexpected thread payload", "payload": payload}
         post = compact_item(payload[0]["data"]["children"][0], body_chars=4000)
-        comments = compact_listing(payload[1], body_chars=500, limit=comment_limit)
-        return {"post": post, "comments": comments}
+        comments, more = flatten_comments(
+            payload[1]["data"]["children"], body_chars=body_chars
+        )
+        comments = comments[:comment_limit]
+        hidden = sum(int(entry["count"] or 0) for entry in more)
+        expanded = 0
+        if expand_more and more and len(comments) < comment_limit:
+            known = {c["name"]: c["depth"] for c in comments if c.get("name")}
+            extra, more = self.more_children(
+                article, more, comment_limit - len(comments), body_chars, known
+            )
+            expanded = len(extra)
+            comments = (comments + extra)[:comment_limit]
+        return {
+            "post": post,
+            "backend": self.last_backend,
+            "count": len(comments),
+            "depth_reached": max((c.get("depth") or 0) for c in comments) if comments else 0,
+            "hidden_comments": hidden,
+            "expanded": expanded,
+            "more": [{k: v for k, v in entry.items() if k != "ids"} for entry in more],
+            "comments": comments,
+        }
+
+    def more_children(
+        self,
+        article: str,
+        more: list,
+        budget: int,
+        body_chars: int = 500,
+        known: dict | None = None,
+    ) -> tuple[list, list]:
+        """Fetch the comments behind ``more`` placeholders and rebuild their depth.
+
+        One request covers up to 100 ids; anything left over stays in the
+        returned ``more`` list so the caller can see what is still hidden.
+        """
+        wanted = []
+        for entry in more:
+            for comment_id in entry.get("ids") or []:
+                if comment_id not in wanted:
+                    wanted.append(comment_id)
+        take = wanted[: max(0, min(int(budget or 0), 100))]
+        leftover = []
+        if not take:
+            return [], [dict(entry, ids=[]) for entry in more]
+        article = normalize_thread_id(article)
+        payload = self.request(
+            "GET",
+            "/api/morechildren",
+            params={
+                "api_type": "json",
+                "link_id": f"t3_{article}",
+                "children": ",".join(take),
+                "limit_children": "false",
+            },
+        )
+        things = ((payload.get("json") or {}).get("data") or {}).get("things") or []
+        parent_depth = {f"t3_{article}": -1}
+        for name, depth in (known or {}).items():
+            parent_depth.setdefault(name, depth)
+        items: list = []
+        for entry in more:
+            for comment_id in entry.get("ids") or []:
+                if comment_id in take:
+                    parent_depth.setdefault(comment_id, 0)
+        for thing in things:
+            data = thing.get("data") or {}
+            kind = thing.get("kind")
+            if kind == "more":
+                leftover.append(
+                    {
+                        "count": data.get("count") or 0,
+                        "depth": 0,
+                        "parent": data.get("parent_id"),
+                        "ids": data.get("children") or [],
+                    }
+                )
+                continue
+            if kind != "t1":
+                continue
+            item = compact_item(thing, body_chars=body_chars)
+            parent = data.get("parent_id") or ""
+            item["depth"] = parent_depth.get(parent, 0) + 1
+            parent_depth[item.get("name") or ""] = item["depth"]
+            items.append(item)
+        remaining = [cid for cid in wanted if cid not in take]
+        if remaining:
+            leftover.append({"count": len(remaining), "depth": 0, "parent": None, "ids": remaining})
+        return items, leftover
+
+    def user(
+        self,
+        username: str,
+        kind: str = "overview",
+        limit: int = 25,
+        sort: str = "new",
+        time_filter: str = "all",
+        body_chars: int = 300,
+    ) -> dict:
+        name = (username or "").strip()
+        if name.lower().startswith("u/"):
+            name = name[2:]
+        if not name:
+            raise RedditError("username required")
+        where = kind if kind in ("overview", "submitted", "comments") else "overview"
+        payload = self.request(
+            "GET",
+            f"/user/{name}/{where}",
+            params={
+                "limit": max(1, min(int(limit or 25), 100)),
+                "sort": sort,
+                "t": time_filter,
+            },
+        )
+        listing = compact_listing(payload, body_chars=body_chars, limit=limit)
+        listing["username"] = name
+        listing["kind"] = where
+        listing["backend"] = self.last_backend
+        return listing
 
     def submit(
         self,

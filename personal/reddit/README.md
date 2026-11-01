@@ -11,6 +11,11 @@ on the agent talks to the full Reddit API as you.
 Reads use your account token, so private subreddits, saved items, moderation queues
 and the inbox are reachable. Writes publish under your account.
 
+With only the app configured and no login, reads of public content still work: the
+plugin asks Reddit for a read-only application token, which sees public subreddits,
+search, threads and user pages but no private community, saved item or inbox, and
+cannot post, vote or save.
+
 ## Before you start
 
 Create a Reddit app at <https://www.reddit.com/prefs/apps>:
@@ -86,7 +91,8 @@ hermes reddit complete "http://localhost:8080/?code=...&state=..."
 | `reddit_api` | any endpoint on `oauth.reddit.com`: mod, wiki, flair, modmail, prefs |
 | `reddit_subreddit` | listings: hot, best, new, top, rising, controversial |
 | `reddit_search` | posts, comments or subreddits, optionally inside one subreddit |
-| `reddit_thread` | one post with its comment tree |
+| `reddit_thread` | one post with its comment tree: every comment keeps its reply depth, and hidden "more" comments are fetched |
+| `reddit_user` | one user's public posts and comments: overview, submitted or comments |
 | `reddit_submit` | create a self or link post |
 | `reddit_comment` | reply to a post, comment or private message |
 | `reddit_vote` | upvote, downvote or clear |
@@ -100,6 +106,22 @@ hermes reddit api GET /api/v1/me
 hermes reddit api GET /subreddits/mine/moderator --param limit=10
 hermes reddit api POST /api/distinguish --data id=t1_abc --data how=yes
 ```
+
+## Reading and rate limits
+
+A read with no login uses the app-only token. `reddit_status` reports
+`read_only: true`, and `reddit_subreddit`, `reddit_search`, `reddit_thread`,
+`reddit_user` and `reddit_api` (`app_only=true`) all work. Private subreddits,
+saved items, the inbox and every write need `reddit_login`.
+
+`reddit_thread` gives each comment a `depth`, plus `hidden_comments` (how many
+Reddit still holds back) and `more` (where they sit). `expand_more` defaults to
+true and spends one extra request on `/api/morechildren` to pull those comments
+into the same list, still capped by `comment_limit`.
+
+Reddit answers a 429 with `X-Ratelimit-Reset` or `Retry-After`; the client waits
+that window once (at most 30 seconds) and retries the call instead of failing.
+`reddit_status` shows the last rate-limit headers it saw.
 
 ## Scopes
 

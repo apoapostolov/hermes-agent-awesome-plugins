@@ -162,16 +162,36 @@ SEARCH = {
 
 THREAD = {
     "name": "reddit_thread",
-    "description": "Fetch one post with its comment tree. Accepts a fullname, bare id or any Reddit URL.",
+    "description": "Fetch one post with its comment tree, keeping reply depth and expanding Reddit's hidden 'more' comments.",
     "parameters": {
         "type": "object",
         "properties": {
             "id": {"type": "string", "description": "Post fullname (t3_...), id, or URL."},
             "sort": {"type": "string", "description": "best (default), top, new, controversial, old, qa."},
-            "comment_limit": {"type": "integer", "description": "1-100 top-level comments (default 50)."},
-            "depth": {"type": "integer", "description": "Reply nesting depth (default 4)."},
+            "comment_limit": {"type": "integer", "description": "1-100 comments across the whole tree (default 50)."},
+            "depth": {"type": "integer", "description": "Reply nesting depth to request (default 4)."},
+            "expand_more": {
+                "type": "boolean",
+                "description": "Fetch comments behind Reddit's 'more' placeholders (default true). One extra request.",
+            },
         },
         "required": ["id"],
+    },
+}
+
+USER = {
+    "name": "reddit_user",
+    "description": "Read one Reddit user's public posts and comments: overview, submitted or comments.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "username": {"type": "string", "description": "Username with or without the u/ prefix."},
+            "kind": {"type": "string", "description": "overview (default), submitted or comments."},
+            "sort": {"type": "string", "description": "new (default), hot or top."},
+            "time": {"type": "string", "description": "For top: hour, day, week, month, year, all."},
+            "limit": {"type": "integer", "description": "1-100 items (default 25)."},
+        },
+        "required": ["username"],
     },
 }
 
@@ -269,7 +289,7 @@ INBOX = {
     },
 }
 
-SCHEMAS = [SETUP, LOGIN, STATUS, API, SUBREDDIT, SEARCH, THREAD, SUBMIT, COMMENT, VOTE, MANAGE, INBOX]
+SCHEMAS = [SETUP, LOGIN, STATUS, API, SUBREDDIT, SEARCH, THREAD, USER, SUBMIT, COMMENT, VOTE, MANAGE, INBOX]
 
 # --------------------------------------------------------------- handlers
 
@@ -395,11 +415,16 @@ def reddit_login(args: dict, **kwargs) -> str:
 def reddit_status(args: dict, **kwargs) -> str:
     try:
         session = client.session()
-        state = session.identity() if session.has_refresh_token else {
-            "logged_in": False,
-            "token_file": str(client.token_path()),
-            "hint": "Run reddit_login with action='start' to authorize an account.",
-        }
+        state = session.identity()
+        if not state.get("logged_in"):
+            state["hint"] = (
+                "Public subreddits, searches, threads and user pages already work "
+                "through the configured app (read-only). Run reddit_login with "
+                "action='start' for private subreddits, your inbox and writes."
+                if state.get("read_only")
+                else "Run reddit_setup with the app id and secret from "
+                "reddit.com/prefs/apps, then reddit_login to authorize an account."
+            )
         creds = session.creds
         state["credentials"] = {
             "source": creds.get("source") or None,
@@ -480,6 +505,23 @@ def reddit_thread(args: dict, **kwargs) -> str:
                 sort=args.get("sort") or "best",
                 comment_limit=int(args.get("comment_limit") or 50),
                 depth=int(args.get("depth") or 4),
+                expand_more=args.get("expand_more") is not False,
+            )
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _err(exc)
+
+
+def reddit_user(args: dict, **kwargs) -> str:
+    try:
+        session = client.session()
+        return _ok(
+            session.user(
+                args["username"],
+                kind=args.get("kind") or "overview",
+                sort=args.get("sort") or "new",
+                time_filter=args.get("time") or "all",
+                limit=int(args.get("limit") or 25),
             )
         )
     except Exception as exc:  # noqa: BLE001

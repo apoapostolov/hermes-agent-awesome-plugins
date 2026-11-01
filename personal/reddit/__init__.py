@@ -1,8 +1,12 @@
 """Reddit plugin — OAuth login plus the full Reddit API as tools.
 
-Registers twelve tools on the ``reddit`` toolset: login/logout, status, a generic
+Registers thirteen tools on the ``reddit`` toolset: login/logout, status, a generic
 ``reddit_api`` passthrough and curated read/write helpers for subreddits, search,
-threads, posts, comments, votes and the inbox.
+threads, users, posts, comments, votes and the inbox.
+
+Reads fall back to the app-only ``client_credentials`` token when no account is
+linked, so public subreddits, search, threads and user pages work with just the
+app configured; writes still require the login.
 
 Login is the published-app authorization-code flow with a loopback catcher on
 ``http://localhost:8080``; the resulting permanent refresh token is stored in
@@ -19,6 +23,7 @@ _HANDLERS = {
     "reddit_subreddit": _tools.reddit_subreddit,
     "reddit_search": _tools.reddit_search,
     "reddit_thread": _tools.reddit_thread,
+    "reddit_user": _tools.reddit_user,
     "reddit_submit": _tools.reddit_submit,
     "reddit_comment": _tools.reddit_comment,
     "reddit_vote": _tools.reddit_vote,

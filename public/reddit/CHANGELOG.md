@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `reddit_user` reads one user's public posts and comments: overview, submitted
+  or comments, with an optional subreddit-agnostic sort and time window.
+- Reads work without a login. When no account token is stored, the plugin asks
+  Reddit for an app-only `client_credentials` token and reads public
+  subreddits, search, threads and user pages with it. `reddit_status` reports
+  `read_only: true`; writes and private data still require `reddit_login`.
+- `reddit_thread` keeps the reply tree: every comment carries its `depth`, the
+  response reports `hidden_comments` and where those comments sit in `more`, and
+  `expand_more` (default true) fetches them from `/api/morechildren` into the
+  same list.
+
+### Fixed
+
+- A `429` from Reddit no longer fails the call. The client waits the
+  `Retry-After` / `X-Ratelimit-Reset` window once (at most 30 seconds) and
+  retries, and reports what it waited in `reddit_status`'s rate headers.
+- A thread read with more replies than the first page used to return an empty
+  `{"kind": "more"}` stub with no count, no ids and no way to reach them.
+
 ## 1.0.0
 
 First stable release. Same twelve tools, editions and login flow as 0.3.0.
