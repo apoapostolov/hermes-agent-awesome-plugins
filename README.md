@@ -85,7 +85,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reaso
 | [hermes-agent-desktop](personal/hermes-agent-desktop/README.md) · [public](public/hermes-agent-desktop/README.md) | Operate Windows apps through the accessibility tree: click, fill, select, toggle, scroll, key combos, windows, clipboard. Headless by default, so it never takes focus or the cursor. **Windows only.** |
 | [memory-review](personal/memory-review/README.md) · [public](public/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
 | [cdp-manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar. The `cdp` tool does the same from chat, on your preferred port. |
-| [hermes-jev-routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. Both editions switch the live session; the personal one also reads the provider catalogue and Codex quota. **Not in the pack; enable separately.** |
+| [hermes-jev-routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. The listed edition rewrites the model and the reasoning level on the request the turn is already bound to, and reports a pick on another provider rather than sending it; the personal edition moves the live session and also reads the provider catalogue, Codex quota and private pricing. **Not in the pack; enable separately.** |
 
 ### Sessions and Sidebar
 
