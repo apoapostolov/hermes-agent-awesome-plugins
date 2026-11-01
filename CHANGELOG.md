@@ -25,6 +25,11 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [cdp-manager 1.0.2] - 2026-11-01
+
+### Added
+
+- **cdp-manager:** version `1.0.2`. First public release; the `1.0.1` tag was retired before it shipped, so the version reads `1.0.2`. The status-bar chip and its dialog show every local Chrome DevTools Protocol port's health (normal when down, bold when up, amber on issues, red when a port needs a reboot) and launch, stop or recheck each one, windowed or headless per port, restarting a live port when its mode changes. Each port remembers a profile: Hermes (isolated), a personal Chrome profile when that Chrome is closed, or Guest. One port can be marked managed, and a backend supervisor keeps it up, auto-starting it when down and force-rebooting it after repeated launch failures. The `cdp` agent tool does all of it from chat - `status`, `launch`, `stop`, `recheck`, `prefer`, `wedged`, `unwedge` - targeting the managed port when none is named. Launches always pass a startup URL and pin `--profile-directory=Default` on isolated dirs, so a fresh instance never boots into Chrome's profile picker, a browser_ui-only state where every CDP client fails with `Failed to open a new tab`; `wedged` detects that state on a live port and `unwedge` stops and relaunches. State lives in the plugin's own `config.json` inside the plugin directory.
 ## [hermes-jev-routing 1.1.1] - 2026-11-01
 
 ### Changed
