@@ -19,6 +19,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 - The three cache-guard branches were a boolean arrangement whose fast path only worked by accident. They are written explicitly now: a same-tier swap needs an affordable miss, a move inside the current band always holds, and a move out of the band holds unless it is a big upgrade or cheap.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
+- provider-status. The renewal-day menu and the add-provider picker were absolutely positioned inside the setup dialog's scroll body, and the provider rows sit inside a second clipping box, so an open list was cut off at the dialog edge instead of spilling past it: the day menu measured 266px tall with 123px visible. Both are house `Popover`s now, portalled into the dialog shell that `DialogContent` deliberately leaves unclipped, so they paint outside the dialog and flip upward when the row is near the bottom edge. The old workaround that lifted the inline overflow of every scroll ancestor is gone, and Radix owns the outside press and Escape. `tests_popover_clip.mjs` guards the structure and fails against the previous markup.
 
 
 ### Added
