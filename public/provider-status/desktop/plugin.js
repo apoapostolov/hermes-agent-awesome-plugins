@@ -1250,7 +1250,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
             align: 'end',
             side: 'bottom',
             sideOffset: 4,
-            className: 'w-auto p-0',
+            className: 'w-auto',
             style: { maxHeight: '16rem', overflowY: 'auto', minWidth: '4rem' },
             children: [jsx('button', {
               key: 'n', type: 'button',
@@ -1787,7 +1787,7 @@ function SetupBody({ variant } = {}) {
               align: 'start',
               side: 'bottom',
               sideOffset: 4,
-              className: 'p-0',
+              className: 'p-0.5',
               style: { width: 'var(--radix-popover-trigger-width)', maxHeight: '16rem', overflowY: 'auto' },
               children: addable.map(p => jsx('button', {
                 key: p, type: 'button',
