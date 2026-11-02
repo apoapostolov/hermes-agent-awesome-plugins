@@ -43,3 +43,4 @@ def register(ctx):
             schema=schemas.ALL[name],
             handler=getattr(tools, handler_name),
         )
+    ctx.register_hook("pre_tool_call", tools.approval_gate)

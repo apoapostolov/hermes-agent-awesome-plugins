@@ -22,7 +22,8 @@ provides_tools:
   - desktop_clipboard
   - desktop_batch
   - desktop_install
-provides_hooks: []
+provides_hooks:
+  - pre_tool_call
 provides_middleware: []
 requires_env: []
 pip_dependencies: []
@@ -41,7 +42,7 @@ config_schema:
     type: str
     default: "1.0.2"
     label: "Release to install"
-    description: "Upstream agent-desktop release that desktop_install fetches. Digests for 1.0.2 are pinned in the plugin; another version verifies against that release's checksums.txt."
+    description: "Upstream agent-desktop release that desktop_install fetches. Must be a release whose digest is pinned in the plugin (1.0.2); any other version is refused."
   auto_install:
     type: bool
     default: false

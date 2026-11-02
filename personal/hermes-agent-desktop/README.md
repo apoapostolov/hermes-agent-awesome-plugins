@@ -41,8 +41,8 @@ Ask Hermes to run `desktop_install`, or let it install on first use by turning o
 
 `desktop_install` with `action: "install"`:
 
-1. Downloads `agent-desktop-v<version>-<target>.tar.gz` and `checksums.txt` from the upstream GitHub release for this machine's Windows target.
-2. Verifies the archive's sha256 against the digest pinned in the plugin for that release. A version that is not pinned is checked against the release's own `checksums.txt` instead, and the result says `checksum_source: upstream-checksums` so the difference is visible.
+1. Downloads `agent-desktop-v<version>-<target>.tar.gz` from the upstream GitHub release for this machine's Windows target.
+2. Verifies the archive's sha256 against the digest pinned in the plugin for that release. A version without a pinned digest is refused.
 3. Extracts only `agent-desktop.exe`, refusing any other entry or nested path, and confirms the payload is a Windows executable.
 4. Writes it to the plugin's `bin/` folder with its digest beside it.
 5. Proves the install by running `version` and `status` against the new binary and reporting what they answered.
@@ -112,8 +112,9 @@ desktop_snapshot   {"app": "Discord.exe", "interactive_only": true, "compact": t
 - The plugin runs the `agent-desktop` executable as a child process with the arguments it builds, and returns that program's JSON unchanged. That is the only shell execution it performs.
 - It reads whatever the accessibility tree exposes: window titles, labels, field values, and the clipboard when asked. All of that can contain private content. It is returned to the model as tool output and is not written to disk by this plugin.
 - No telemetry, no credentials, and no file writes outside the plugin's own `bin/` folder and what the binary itself keeps in `~/.agent-desktop`.
-- `desktop_install` is the one tool that uses the network: it fetches the release archive and, for an unpinned version, `checksums.txt`, both from the upstream GitHub release. The archive is verified against a sha256 pinned in this plugin before anything is written.
+- `desktop_install` is the one tool that uses the network: it fetches the release archive from the upstream GitHub release. The archive is verified against a sha256 pinned in this plugin before anything is written.
 - Actions change the apps they target. `desktop_act`, `desktop_window` and `desktop_clipboard` are the tools that write.
+- Starting or stopping a program asks first: `desktop_window` launch/close, a `desktop_batch` containing `launch` or `close-app`, and `desktop_install` install go through Hermes's approval prompt (a `pre_tool_call` hook), so the model cannot run an executable without you.
 
 ## Verification
 

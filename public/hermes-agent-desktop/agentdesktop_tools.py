@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from . import agentdesktop_cli as cli
+from . import agentdesktop_config as settings
 from . import agentdesktop_install as install
 
 # commands that take a ref and nothing else
@@ -273,6 +274,33 @@ def desktop_batch(args: Dict[str, Any], **kwargs: Any) -> str:
     return cli.run("batch", flags, [payload], timeout=budget + 30.0, max_chars=_max_chars(args))
 
 
+# batch commands that start or stop a program: the same reach as desktop_window launch/close
+_BATCH_GATED = {"launch", "close-app"}
+
+
+def approval_gate(tool_name: str = "", args: Any = None, **kwargs: Any) -> Any:
+    """pre_tool_call: send program launches and binary installs to Hermes's approval prompt.
+
+    These are the calls that run a program the user did not start: launch takes
+    any executable and arguments, and install downloads and runs a binary.
+    """
+    args = args if isinstance(args, dict) else {}
+    action = str(args.get("action") or "").strip().lower()
+    if tool_name == "desktop_window" and action in {"launch", "close"}:
+        app_args = " ".join(str(a) for a in args.get("app_args") or [])
+        message = f"desktop_window {action} {args.get('app')!r}" + (f" with arguments {app_args!r}" if app_args else "")
+    elif tool_name == "desktop_install" and action == "install":
+        message = f"desktop_install: download and run agent-desktop {settings.get('version')} from GitHub"
+    elif tool_name == "desktop_batch" and any(
+        isinstance(c, dict) and str(c.get("command") or "").strip().lower() in _BATCH_GATED
+        for c in args.get("commands") or []
+    ):
+        message = "desktop_batch starts or stops a program: " + json.dumps(args.get("commands"), ensure_ascii=False)[:400]
+    else:
+        return None
+    return {"action": "approve", "message": message}
+
+
 def desktop_install(args: Dict[str, Any], **kwargs: Any) -> str:
     args = _args(args)
     action = str(args.get("action") or "status").strip().lower()
@@ -286,9 +314,6 @@ def desktop_install(args: Dict[str, Any], **kwargs: Any) -> str:
         resolved = cli.resolve_binary()
         return json.dumps(install.verify(Path(resolved) if resolved else None), ensure_ascii=False)
     if action == "install":
-        outcome = install.install(
-            version=args.get("version") or None,
-            force=bool(args.get("force")),
-        )
+        outcome = install.install(force=bool(args.get("force")))
         return json.dumps(outcome, ensure_ascii=False)
     return _error("INVALID_ARGS", f"unknown install action {action!r}", allowed=["status", "install", "verify"])
