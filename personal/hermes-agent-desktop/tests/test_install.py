@@ -13,6 +13,7 @@ import pytest
 from hermes_agent_desktop import agentdesktop_cli as cli
 from hermes_agent_desktop import agentdesktop_config as settings
 from hermes_agent_desktop import agentdesktop_install as installer
+from hermes_agent_desktop import agentdesktop_schemas as schemas
 from hermes_agent_desktop import agentdesktop_tools as tools
 
 FAKE_BINARY = b"MZ" + b"\x00" * 64
@@ -192,6 +193,61 @@ def test_install_verify_probes_the_binary_the_tools_use(monkeypatch, tmp_path):
     payload = json.loads(tools.desktop_install({"action": "verify"}))
     assert payload["ok"] is True
     assert probed["path"] == str(binary)
+
+
+def test_install_refuses_a_version_without_a_pinned_digest(monkeypatch, tmp_path):
+    monkeypatch.setattr(installer.sys, "platform", "win32")
+    monkeypatch.setattr(installer.platform, "machine", lambda: "AMD64")
+    monkeypatch.setattr(settings, "_settings", {**settings.DEFAULTS, "install_dir": str(tmp_path), "version": "9.9.9"})
+    fetched = []
+    monkeypatch.setattr(installer, "_download", lambda url, timeout=120.0: fetched.append(url) or b"")
+
+    outcome = installer.install()
+    assert outcome["ok"] is False
+    assert "no digest pinned" in outcome["error"]
+    assert fetched == []
+    assert "version" not in schemas.ALL["desktop_install"]["parameters"]["properties"]
+
+
+@pytest.mark.parametrize(
+    "tool, args, gated",
+    [
+        ("desktop_window", {"action": "launch", "app": "notepad", "app_args": ["a.txt"]}, True),
+        ("desktop_window", {"action": "close", "app": "notepad"}, True),
+        ("desktop_window", {"action": "focus", "app": "notepad"}, False),
+        ("desktop_install", {"action": "install"}, True),
+        ("desktop_install", {"action": "status"}, False),
+        ("desktop_batch", {"commands": [{"command": "snapshot"}, {"command": "launch", "args": {"app": "x"}}]}, True),
+        ("desktop_batch", {"commands": [{"command": "snapshot"}]}, False),
+        ("desktop_snapshot", {}, False),
+    ],
+)
+def test_program_launch_and_install_ask_for_approval(tool, args, gated):
+    directive = tools.approval_gate(tool_name=tool, args=args)
+    if gated:
+        assert directive["action"] == "approve"
+        assert directive["message"]
+    else:
+        assert directive is None
+
+
+def test_auto_install_asks_before_it_downloads(monkeypatch):
+    """With auto_install on, a read-only call still fetches and runs a binary first."""
+    monkeypatch.setattr(settings, "_settings", {**settings.DEFAULTS, "auto_install": True})
+    monkeypatch.setattr(cli, "resolve_binary", lambda: None)
+
+    directive = tools.approval_gate(tool_name="desktop_snapshot", args={})
+    assert directive["action"] == "approve"
+    assert "download and run agent-desktop" in directive["message"]
+
+    # an installed binary asks nothing, and neither does another plugin's tool
+    monkeypatch.setattr(cli, "resolve_binary", lambda: "C:/bin/agent-desktop.exe")
+    assert tools.approval_gate(tool_name="desktop_snapshot", args={}) is None
+    monkeypatch.setattr(cli, "resolve_binary", lambda: None)
+    assert tools.approval_gate(tool_name="write_file", args={}) is None
+
+    monkeypatch.setattr(settings, "_settings", {**settings.DEFAULTS, "auto_install": False})
+    assert tools.approval_gate(tool_name="desktop_snapshot", args={}) is None
 
 
 def test_install_verify_without_any_binary_says_so(monkeypatch):

@@ -12,7 +12,13 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from . import agentdesktop_cli as cli
+from . import agentdesktop_config as settings
 from . import agentdesktop_install as install
+from . import agentdesktop_schemas as schemas
+
+# the tools this plugin registers: a hook sees every tool in the process, so the
+# auto-install check below must not fire for someone else's call
+_OWN_TOOLS = frozenset(schemas.ALL)
 
 # commands that take a ref and nothing else
 _REF_ONLY = {
@@ -273,6 +279,54 @@ def desktop_batch(args: Dict[str, Any], **kwargs: Any) -> str:
     return cli.run("batch", flags, [payload], timeout=budget + 30.0, max_chars=_max_chars(args))
 
 
+# batch commands that start or stop a program: the same reach as desktop_window launch/close
+_BATCH_GATED = {"launch", "close-app"}
+
+
+def _approval_message(tool_name: str, args: Dict[str, Any]) -> Any:
+    """The prompt text for a call that starts, stops or installs a program, else ``None``."""
+    action = str(args.get("action") or "").strip().lower()
+    if tool_name == "desktop_window" and action in {"launch", "close"}:
+        app_args = " ".join(str(a) for a in args.get("app_args") or [])
+        return f"desktop_window {action} {args.get('app')!r}" + (
+            f" with arguments {app_args!r}" if app_args else ""
+        )
+    if tool_name == "desktop_install" and action == "install":
+        return f"desktop_install: download and run agent-desktop {settings.get('version')} from GitHub"
+    if tool_name == "desktop_batch" and any(
+        isinstance(c, dict) and str(c.get("command") or "").strip().lower() in _BATCH_GATED
+        for c in args.get("commands") or []
+    ):
+        return "desktop_batch starts or stops a program: " + json.dumps(
+            args.get("commands"), ensure_ascii=False
+        )[:400]
+    return None
+
+
+def approval_gate(tool_name: str = "", args: Any = None, **kwargs: Any) -> Any:
+    """pre_tool_call: send program launches and binary installs to Hermes's approval prompt.
+
+    These are the calls that run a program the user did not start: launch takes
+    any executable and arguments, install downloads and runs a binary, and with
+    ``auto_install`` on, any tool call on a missing binary downloads one first.
+    """
+    args = args if isinstance(args, dict) else {}
+    message = _approval_message(tool_name, args) or _auto_install_message(tool_name)
+    return {"action": "approve", "message": message} if message else None
+
+
+def _auto_install_message(tool_name: str) -> Any:
+    """A read-only call still fetches and runs a binary when auto_install fills a gap."""
+    if tool_name not in _OWN_TOOLS or not settings.as_bool("auto_install"):
+        return None
+    if cli.resolve_binary():
+        return None
+    return (
+        f"{tool_name} will first download and run agent-desktop {settings.get('version')} "
+        "from GitHub: auto_install is on and no binary is installed"
+    )
+
+
 def desktop_install(args: Dict[str, Any], **kwargs: Any) -> str:
     args = _args(args)
     action = str(args.get("action") or "status").strip().lower()
@@ -286,9 +340,6 @@ def desktop_install(args: Dict[str, Any], **kwargs: Any) -> str:
         resolved = cli.resolve_binary()
         return json.dumps(install.verify(Path(resolved) if resolved else None), ensure_ascii=False)
     if action == "install":
-        outcome = install.install(
-            version=args.get("version") or None,
-            force=bool(args.get("force")),
-        )
+        outcome = install.install(force=bool(args.get("force")))
         return json.dumps(outcome, ensure_ascii=False)
     return _error("INVALID_ARGS", f"unknown install action {action!r}", allowed=["status", "install", "verify"])

@@ -314,8 +314,8 @@ INSTALL: Dict[str, Any] = {
     "description": (
         "Install or check the agent-desktop binary this plugin drives. The plugin bundles no binary: "
         "action='install' downloads the official release archive from the upstream GitHub release for this "
-        "Windows target, verifies its sha256 against a digest pinned in the plugin for the releases it was "
-        "tested with (or the release's own checksums.txt otherwise), extracts only the expected executable "
+        "Windows target, verifies its sha256 against a digest pinned in the plugin (a release without a pinned "
+        "digest is refused), extracts only the expected executable "
         "into the plugin's bin directory, and then proves the install by running 'version' and 'status' "
         "against it. Re-running is safe and reports already_installed. action='status' shows the settings, "
         "the resolved paths and the pinned versions without touching the network. action='verify' probes the "
@@ -325,7 +325,6 @@ INSTALL: Dict[str, Any] = {
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": ["status", "install", "verify"], "description": "What to do (default 'status')."},
-            "version": {"type": "string", "description": "Release to install, e.g. '1.0.2'. Defaults to the plugin setting."},
             "force": {"type": "boolean", "description": "Reinstall even when a working binary is already present."},
         },
     },

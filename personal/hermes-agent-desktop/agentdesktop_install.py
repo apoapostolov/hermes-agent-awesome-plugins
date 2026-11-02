@@ -2,9 +2,10 @@
 
 The plugin does not bundle the binary. This module downloads the release archive
 for the running Windows target, checks it against a digest pinned here for every
-release the plugin was tested with (and against the release's own checksums.txt
-for any other version), extracts only the expected entry, and then proves the
-install by running ``version`` and ``status`` against the new binary.
+release the plugin was tested with, extracts only the expected entry, and then
+proves the install by running ``version`` and ``status`` against the new binary.
+A version without a pinned digest is refused: a release's own checksums.txt only
+proves the archive matches its neighbour, not that it is the build tested here.
 """
 
 from __future__ import annotations
@@ -40,9 +41,7 @@ TARGETS: Dict[str, Tuple[str, str]] = {
 }
 
 # sha256 of agent-desktop-v<version>-<target>.tar.gz, taken from the release's
-# checksums.txt and verified locally. A version absent here is not trusted on
-# the release's word alone: the install still verifies upstream's checksum, but
-# the result says pinned=false so a caller can see the difference.
+# checksums.txt and verified locally. Only versions listed here can be installed.
 PINS: Dict[str, Dict[str, str]] = {
     "1.0.2": {
         "win32-x64": "2186c76e7df197c0e67365e45d36d869f74714c56bb8a73817e2a66f3e18e222",
@@ -83,14 +82,6 @@ def _download(url: str, timeout: float = 120.0) -> bytes:
     if len(data) > MAX_ARCHIVE_BYTES:
         raise ValueError(f"download exceeded {MAX_ARCHIVE_BYTES} bytes")
     return data
-
-
-def _checksum_from_listing(text: str, name: str) -> Optional[str]:
-    for line in text.splitlines():
-        parts = line.strip().split()
-        if len(parts) == 2 and parts[1].lstrip("*") == name:
-            return parts[0].lower()
-    return None
 
 
 def _sha256(data: bytes) -> str:
@@ -175,13 +166,19 @@ def status() -> Dict[str, Any]:
     }
 
 
-def install(version: Optional[str] = None, force: bool = False) -> Dict[str, Any]:
+def install(force: bool = False) -> Dict[str, Any]:
     """Download, verify, install and prove the binary. Safe to re-run."""
     key = platform_key()
     if not key:
         return {"ok": False, "error": "this plugin supports Windows x64 and arm64 only", "platform": sys.platform}
 
-    target_version = str(version or settings.get("version") or DEFAULT_VERSION)
+    target_version = str(settings.get("version") or DEFAULT_VERSION).strip()
+    if target_version not in PINS:
+        return {
+            "ok": False,
+            "error": f"agent-desktop {target_version!r} has no digest pinned in this plugin",
+            "pinned_versions": sorted(PINS),
+        }
     target_name, binary_name = TARGETS[key]
     destination = install_dir() / binary_name
 
@@ -199,27 +196,17 @@ def install(version: Optional[str] = None, force: bool = False) -> Dict[str, Any
 
     archive_name = f"agent-desktop-v{target_version}-{target_name}.tar.gz"
     archive_url = RELEASE_BASE.format(version=target_version, name=archive_name)
-    checksums_url = RELEASE_BASE.format(version=target_version, name="checksums.txt")
 
     steps = []
     try:
         archive = _download(archive_url)
         steps.append({"step": "download", "url": archive_url, "bytes": len(archive)})
         actual = _sha256(archive)
-        pinned = PINS.get(target_version, {}).get(key)
-        if pinned:
-            if actual != pinned:
-                raise ValueError(f"checksum mismatch: expected pinned {pinned}, got {actual}")
-            source = "pinned"
-        else:
-            listing = _download(checksums_url).decode("utf-8", "replace")
-            expected = _checksum_from_listing(listing, archive_name)
-            if not expected:
-                raise ValueError(f"no checksum published for {archive_name}")
-            if actual != expected:
-                raise ValueError(f"checksum mismatch: expected {expected}, got {actual}")
-            source = "upstream-checksums"
-        steps.append({"step": "checksum", "sha256": actual, "source": source, "pinned": bool(pinned)})
+        pinned = PINS[target_version][key]
+        if actual != pinned:
+            raise ValueError(f"checksum mismatch: expected pinned {pinned}, got {actual}")
+        source = "pinned"
+        steps.append({"step": "checksum", "sha256": actual, "source": source, "pinned": True})
 
         payload = _extract_binary(archive)
         steps.append({"step": "extract", "entry": ARCHIVE_ENTRY, "bytes": len(payload)})
