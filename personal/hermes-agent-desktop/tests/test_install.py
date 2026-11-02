@@ -231,6 +231,25 @@ def test_program_launch_and_install_ask_for_approval(tool, args, gated):
         assert directive is None
 
 
+def test_auto_install_asks_before_it_downloads(monkeypatch):
+    """With auto_install on, a read-only call still fetches and runs a binary first."""
+    monkeypatch.setattr(settings, "_settings", {**settings.DEFAULTS, "auto_install": True})
+    monkeypatch.setattr(cli, "resolve_binary", lambda: None)
+
+    directive = tools.approval_gate(tool_name="desktop_snapshot", args={})
+    assert directive["action"] == "approve"
+    assert "download and run agent-desktop" in directive["message"]
+
+    # an installed binary asks nothing, and neither does another plugin's tool
+    monkeypatch.setattr(cli, "resolve_binary", lambda: "C:/bin/agent-desktop.exe")
+    assert tools.approval_gate(tool_name="desktop_snapshot", args={}) is None
+    monkeypatch.setattr(cli, "resolve_binary", lambda: None)
+    assert tools.approval_gate(tool_name="write_file", args={}) is None
+
+    monkeypatch.setattr(settings, "_settings", {**settings.DEFAULTS, "auto_install": False})
+    assert tools.approval_gate(tool_name="desktop_snapshot", args={}) is None
+
+
 def test_install_verify_without_any_binary_says_so(monkeypatch):
     monkeypatch.setattr(cli, "resolve_binary", lambda: None)
     payload = json.loads(tools.desktop_install({"action": "verify"}))
