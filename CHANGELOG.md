@@ -7,7 +7,6 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ### Added
 
-- **reddit:** version `1.0.0`. First stable release. Runs on your own Reddit app: save the client id and secret in the plugin config, log in with the published-app code flow against a loopback catcher on `http://localhost:8080`, and the permanent refresh token is stored per profile and renewed automatically. Twelve tools cover the account: `reddit_setup`, `reddit_login`, `reddit_status`, `reddit_subreddit`, `reddit_search`, `reddit_thread`, `reddit_submit`, `reddit_comment`, `reddit_vote`, `reddit_manage`, `reddit_inbox`, and `reddit_api` for any endpoint the curated set does not wrap (moderation, modmail, wiki, flair, prefs). Writes publish under the logged-in account. Reads use that token too, so private subreddits, saved items and mod queues work. The Desktop settings page saves and verifies credentials, starts and finishes the login, checks the account and logs out, through `/api/plugins/reddit/`. The page takes its fields, buttons and tags from the plugin SDK, so it follows the active theme instead of painting a light-mode form. `hermes reddit setup|login|complete|status|logout|smoke|api` does the same from a terminal. No third-party dependencies; requests share one cached session per process, and config/token writes are atomic and safe under concurrent tool calls.
 - **better-capabilities:** version `1.1.0`. Replaces the 1.0.0 design that painted delete and package controls into the Capabilities page. The plugin now owns a page under Settings ▸ Plugins with an overview, **Skills** and **Presets**: filter skills, flip them on or off, read the other markdown files in a skill folder, package a folder as a zip, reveal it, delete it to the Recycle Bin (or to a moved-aside folder when the bin is unavailable), and save, apply, overwrite, rename, reorder or delete on/off presets for skills, toolsets and agent plugins, per profile. Presets are snapshotted and applied through `host.skills`, `host.toolsets` and the `plugins.manage` RPC instead of core modules. The personal edition also carries two glyphs on the Capabilities nav row — this profile's Skills editor, and a picker that splits profiles by Skills and by Plugins — plus the `/preset` chat command. The listed edition now exists at `public/better-capabilities` and drops both of those: the command needs core capability-state modules, and the glyphs inject app markup. `LIMITATIONS.md` records each cut and why.
 
 ### Fixed
@@ -20,10 +19,19 @@ the component that changed; a plugin patch does not imply a new pack release.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
 
-
 ### Added
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
+
+## [reddit 1.0.1] - 2026-11-02
+
+Reads work before a login now: with only the Reddit app saved, the plugin asks for an app-only `client_credentials` token and reads public subreddits, search, threads and user history. Writes and private data still require the account login. `reddit_thread` keeps each comment's reply depth, reports how many comments Reddit still holds back and where, and fetches them from `/api/morechildren` when `expand_more` is on. New `reddit_user` tool reads a user's overview, submitted posts or comments. A `429` waits out `Retry-After` / `X-Ratelimit-Reset` once instead of failing the call, and a thread with more replies than the first page no longer returns an empty `more` stub with no count and no ids.
+
+## [reddit 1.0.0] - 2026-10-31
+
+### Added
+
+- **reddit:** version `1.0.0`. First stable release. Runs on your own Reddit app: save the client id and secret in the plugin config, log in with the published-app code flow against a loopback catcher on `http://localhost:8080`, and the permanent refresh token is stored per profile and renewed automatically. Twelve tools cover the account: `reddit_setup`, `reddit_login`, `reddit_status`, `reddit_subreddit`, `reddit_search`, `reddit_thread`, `reddit_submit`, `reddit_comment`, `reddit_vote`, `reddit_manage`, `reddit_inbox`, and `reddit_api` for any endpoint the curated set does not wrap (moderation, modmail, wiki, flair, prefs). Writes publish under the logged-in account. Reads use that token too, so private subreddits, saved items and mod queues work. The Desktop settings page saves and verifies credentials, starts and finishes the login, checks the account and logs out, through `/api/plugins/reddit/`. The page takes its fields, buttons and tags from the plugin SDK, so it follows the active theme instead of painting a light-mode form. `hermes reddit setup|login|complete|status|logout|smoke|api` does the same from a terminal. No third-party dependencies; requests share one cached session per process, and config/token writes are atomic and safe under concurrent tool calls.
 
 ## [provider-status 1.6.8] - 2026-11-01
 
@@ -385,7 +393,6 @@ Two more defects from a live report.
 
 
 
-
 ## [reasoning-switch 1.1.3] - 2026-10-03
 
 Two defects from a live report.
@@ -394,7 +401,6 @@ Two defects from a live report.
 
 - Clicking the chip on a session running a level outside the rotation no longer does nothing. The session's level comes from the gateway, so an external pick (`/reasoning`, the composer menu) or a row unchecked in the dialog left `displayed` absent from the rotation; the old code bailed out and the chip was dead until the dialog was reopened. It now steps up to the nearest rotation entry, or to the bottom when the session sits above every entry, so there is always a way off.
 - The chip label no longer wraps on `Extra High`. The statusbar reuses the app's own compact spellings (`XHigh`, `Med`, `Min`, `Off`) and the label and counter carry `whitespace-nowrap`. The dialog keeps the full names.
-
 
 ## [reasoning-switch 1.1.2] - 2026-10-03
 
@@ -410,7 +416,6 @@ The chip now reads the level the session is actually running, instead of guessin
 - Overlapping reads share one promise per session, so a slow read started before a click cannot repaint a level the user rotated away from.
 
 The auto-demote path settles on the accepted level for the same reason.
-
 
 ### Removed
 

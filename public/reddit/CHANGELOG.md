@@ -1,11 +1,11 @@
 # Changelog
 
-## Unreleased
+## [reddit 1.0.1] - 2026-11-02
 
 ### Added
 
 - `reddit_user` reads one user's public posts and comments: overview, submitted
-  or comments, with an optional subreddit-agnostic sort and time window.
+  or comments, with a sort and time-window option.
 - Reads work without a login. When no account token is stored, the plugin asks
   Reddit for an app-only `client_credentials` token and reads public
   subreddits, search, threads and user pages with it. `reddit_status` reports

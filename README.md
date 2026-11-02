@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Reddit 0.3.0 is the first release. It runs on your own Reddit app: save the client id and secret, log in through the loopback catcher, then read listings, search, threads and the inbox, or post, comment, vote, save and subscribe under that account. `reddit_api` reaches everything else. The settings page under Settings, Plugins reports the stored app, the connected account and the scopes, and follows the app theme.
+Reddit 1.0.1 reads without a login. With only a Reddit app saved, the plugin asks for an app-only token and reads public subreddits, search, threads and user history; logging in adds private subreddits, saved items, moderation queues, the inbox and every write. Thread reads keep each comment's reply depth and fetch the comments Reddit hides behind "more", `reddit_user` reads one user's posts and comments, and a rate-limited call waits out Reddit's window instead of failing. The settings page under Settings, Plugins still saves and verifies the app, runs the login, checks the account and reports the scopes.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
@@ -109,7 +109,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reaso
 | Plugin | What you get |
 | --- | --- |
 | [rss-reader](personal/rss-reader/README.md) · [public](public/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
-| [reddit](personal/reddit/README.md) · [public](public/reddit/README.md) | Your own Reddit app and account: OAuth login, subreddit and search reads, threads, posts, comments, votes, saves, subscriptions, the inbox, plus `reddit_api` for any other endpoint. |
+| [reddit](personal/reddit/README.md) · [public](public/reddit/README.md) | Your own Reddit app and account: OAuth login, reads of public subreddits, search, user history and threads that keep their reply tree before any login, then private subreddits, saved items, the inbox, posts, comments, votes and subscriptions as the account, plus `reddit_api` for any other endpoint. |
 
 Three plugins in this repo are not in the pack and are installed separately: **reasoning-switch** (Status Bar table), **prompt-enhance** (Composer table), and **hermes-jev-routing** (Tools and Memory table). Every other plugin above is pinned by the pack.
 
