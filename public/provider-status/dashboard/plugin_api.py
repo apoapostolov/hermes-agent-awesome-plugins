@@ -654,10 +654,23 @@ def fetch_glm(cfg: dict) -> dict:
             windows.append({"label": "wk", "pct": weekly_pct, "direction": "exhaust"})
         if has_monthly:
             windows.append({"label": "mo", "pct": monthly_pct, "direction": "exhaust"})
+        # Multi-window arrow detail, same convention as fetch_opencode: the
+        # backend sends REMAINING for every arrow, and the desktop chip turns
+        # the leading ↑ back into a used% (burst window) while ↓ stays
+        # remaining. A window the API did not report contributes no segment,
+        # so there is no "5h" fallback: `multi` is gated on a non-empty detail
+        # and a bare label would render as one junk segment.
+        segs = []
+        if has_session:
+            segs.append(f"↑{max(0.0, 100 - session_pct):.0f}%")
+        if has_weekly:
+            segs.append(f"↓{max(0.0, 100 - weekly_pct):.0f}%")
+        if has_monthly:
+            segs.append(f"↓{max(0.0, 100 - monthly_pct):.0f}%")
         status = {"ok": True,
                   "exhaust_percent": exhaust,
                   "resets_at": session_reset,
-                  "detail": "5h",
+                  "detail": " ".join(segs),
                   "windows": windows}
         # The headline number is only meaningful once a burst window was
         # actually reported. Omit the key rather than sending null: the

@@ -349,8 +349,10 @@ function ProviderChip({ id, name, status, onRefresh, active }) {
     : id === 'grok' ? 'exhaust'
     : 'exhaust'                             // glm default (worst across windows)
 
-  // codex: multi-window (↑5h · ↓weekly) rendered like opencode
-  const multi = (id === 'opencode' || id === 'codex') && status?.detail
+  // codex and public GLM: multi-window (↑5h · ↓weekly) rendered like opencode.
+  // Personal GLM keeps a single headline value by design, so its detail never
+  // reaches this branch there.
+  const multi = (id === 'opencode' || id === 'codex' || id === 'glm') && status?.detail
 
   let valueCls = ''
   let valueStyle = { color: 'var(--ui-accent)' }
