@@ -41,7 +41,7 @@ plugins:
     ref: cc0e9116c62c836e1fe039e38785268340af9f5e
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/vercel-agent-desktop-support
-    ref: ad144128a8d669d07260cedbb1e803f6fd53cdad
+    ref: ac71ce3260607481d4ccaf19982afd7ae80b065f
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/reddit
     ref: 18b40e2e827dbb1ed58a917ab2d8464f61764fe7
