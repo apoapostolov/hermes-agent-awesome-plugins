@@ -42,6 +42,8 @@ hermes plugins enable voice-gate
 
 A profile is looked up by name in `HERMES_HOME/voice-profiles/`, most specific first, then in the plugin's own `profiles/` directory. A path also works. `profiles/example.yaml` is a commented template.
 
+The home is resolved rather than assumed: `HERMES_HOME` when it is set, then the Windows install under `%LOCALAPPDATA%\hermes`, then `~/.hermes`, choosing the first that holds a `voice-profiles` folder. A host that starts without the variable, which the desktop backend does, still finds the profile written next to its config.
+
 ```yaml
 name: my-voice
 applies_to: [default]

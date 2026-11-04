@@ -40,7 +40,24 @@ _CTX: Any = None
 
 
 def _home() -> Path:
-    return Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+    """The Hermes home, resolved even when this process inherits no HERMES_HOME.
+
+    The desktop backend starts without the variable, so a plugin that reads it
+    alone silently falls back to ``~/.hermes`` and loses the settings and the
+    profiles written under the Windows install.
+    """
+    candidates: List[Path] = []
+    raw = os.environ.get("HERMES_HOME")
+    if raw:
+        candidates.append(Path(raw))
+    local = os.environ.get("LOCALAPPDATA")
+    if local:
+        candidates.append(Path(local) / "hermes")
+    candidates.append(Path.home() / ".hermes")
+    for candidate in candidates:
+        if (candidate / "config.yaml").is_file():
+            return candidate
+    return candidates[0]
 
 
 def _current_profile() -> str:

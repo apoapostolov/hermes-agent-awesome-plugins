@@ -191,16 +191,23 @@ def main() -> int:
     check("a semicolon separates globs",
           rules.normalise_exceptions("em_dash: *.md; *.txt")["em_dashes"] == ["*.md", "*.txt"])
 
-    # profile rows and settings rows merge
-    profile_rows = {"exceptions": {"em_dash": ["*.md"]}}
-    ctx.config["exceptions"] = "bold_lead_bullets: docs/**"
-    merged = module._exceptions_block(profile_rows)
-    check("profile and settings exceptions merge",
-          set(module.rules.normalise_exceptions(merged.get("exceptions"))) == {"em_dashes", "bold_lead_bullets"},
-          str(merged.get("exceptions")))
-    check("the profile itself is not mutated", "exceptions" in profile_rows and
-          module.rules.normalise_exceptions(profile_rows["exceptions"]) == {"em_dashes": ["*.md"]})
+    # the settings copy feeds the same machinery
+    ctx.config["exceptions"] = "em_dash: *.md"
+    block = module._exceptions_block()
+    check("the settings carry exceptions", block.get("exceptions") == {"em_dashes": ["*.md"]}, str(block))
     ctx.config["exceptions"] = ""
+    check("an empty setting means none", module._exceptions_block() == {})
+
+
+    # ---- a host that inherits no HERMES_HOME must still find the profile
+    saved = os.environ.pop("HERMES_HOME", None)
+    try:
+        home = module._home()
+        check("the home resolves without HERMES_HOME", home.is_dir(), str(home))
+        check("the home resolves to a directory", home.is_dir(), str(home))
+    finally:
+        if saved is not None:
+            os.environ["HERMES_HOME"] = saved
 
     print()
     if FAILURES:

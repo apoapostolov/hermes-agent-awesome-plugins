@@ -198,6 +198,17 @@ def main() -> int:
     ctx.config["exceptions"] = ""
     check("an empty setting means none", module._exceptions_block() == {})
 
+
+    # ---- a host that inherits no HERMES_HOME must still find the profile
+    saved = os.environ.pop("HERMES_HOME", None)
+    try:
+        home = module._home()
+        check("the home resolves without HERMES_HOME", home.is_dir(), str(home))
+        check("the home resolves to a directory", home.is_dir(), str(home))
+    finally:
+        if saved is not None:
+            os.environ["HERMES_HOME"] = saved
+
     print()
     if FAILURES:
         print(f"{len(FAILURES)} check(s) failed: {', '.join(FAILURES)}")

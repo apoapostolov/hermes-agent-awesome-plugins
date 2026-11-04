@@ -36,13 +36,43 @@ def plugin_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
+def home_candidates() -> List[Path]:
+    """Every place a Hermes home can live on this machine, best first.
+
+    ``HERMES_HOME`` is unset in some hosts (the desktop backend runs without it),
+    so a profile written under the Windows install must still be found when the
+    process inherits no environment at all.
+    """
+    seen: set = set()
+    out: List[Path] = []
+    for raw in (
+        os.environ.get("HERMES_HOME"),
+        str(Path(os.environ["LOCALAPPDATA"]) / "hermes") if os.environ.get("LOCALAPPDATA") else "",
+        str(Path.home() / ".hermes"),
+    ):
+        if not raw:
+            continue
+        candidate = Path(raw)
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        out.append(candidate)
+    return out
+
+
 def hermes_home() -> Path:
-    return Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+    """The home that actually holds profiles, falling back to the first candidate."""
+    for candidate in home_candidates():
+        if (candidate / "voice-profiles").is_dir():
+            return candidate
+    return home_candidates()[0]
 
 
 def search_dirs() -> List[Path]:
     """Where a bare profile name is looked up, most specific first."""
-    return [hermes_home() / "voice-profiles", plugin_dir() / "profiles"]
+    dirs = [Path(raw) / "voice-profiles" for raw in home_candidates()]
+    dirs.append(plugin_dir() / "profiles")
+    return dirs
 
 
 def resolve(target: str) -> Optional[Path]:
