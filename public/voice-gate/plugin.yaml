@@ -1,6 +1,6 @@
 name: voice-gate
 label: Voice Gate
-version: 1.0.0
+version: 1.1.0
 description: "Checks the Markdown a turn changed for the AI tells that make writing sound machine made, and reports them before the turn finishes. The rules ship with the plugin, so nothing is fetched and no other package is required."
 author: Apostol Apostolov
 license: MIT
@@ -13,6 +13,10 @@ tags:
   - hooks
 requires_hermes: ">=0.22.0"
 config_schema:
+  vale_path:
+    type: str
+    label: Vale binary
+    description: "Path to a Vale binary. Empty uses the plugin's own copy, then PATH."
   mode:
     type: str
     label: Mode
@@ -27,3 +31,6 @@ config_schema:
     description: "Documents shorter than this are ignored. Default 200."
 provides_hooks:
   - pre_verify
+  - pre_tool_call
+provides_tools:
+  - voice_gate_vale

@@ -37,6 +37,7 @@ Settings → Plugins → Voice Gate.
 | --- | --- | --- |
 | Mode | `warn`, `improve`, `skip` | `warn` asks once per turn. `improve` keeps asking until the tells are gone or the host's nudge budget for the turn runs out. `skip` turns the gate off. |
 | Minimum words | number, default 200 | Documents shorter than this are ignored, so a stub note does not trigger a review. |
+| Vale binary | path | Path to a Vale binary. Empty uses the plugin's own copy under `HERMES_HOME/plugin-data`, then `PATH`. |
 
 ## What it checks
 
@@ -46,16 +47,37 @@ A finding turns into a nudge when one of these crosses its threshold:
 
 | Tell | Fires when |
 | --- | --- |
-| Verdict opener | The opening prose starts a sentence with a verdict phrase such as `The real question` or `The honest headline` |
+| Verdict opener | The opening prose starts with a verdict phrase such as `The real question` or `The honest headline` |
 | Closing offer | The text offers more work: `let me know if`, `would you like me to`, `I hope this helps` |
-| Cliche opener | The first line starts with `In today's`, `Let's dive in`, or `It's worth noting` |
+| Cliché opener | The first line starts with `In today's`, `Let's dive in`, or `It's worth noting` |
 | Conclusion signpost | Two or more sentences open with `In conclusion`, `To sum up`, or `At the end of the day` |
-| Negation triad | Two or more `not just X, but Y` constructions |
+| Significance inflation | Two or more phrases that inflate an ordinary detail: `plays a pivotal role`, `serves as a`, `a reminder that`, `turning point` |
+| AI vocabulary | Five or more, or one per 150 words in a longer document: `delve`, `tapestry`, `testament`, `realm`, `underscore`, `meticulous`, `seamless`, `game-changer`, `intricacies`, `ever-evolving`, `synergy`, `myriad`, and the rest of the list in `rules.py` |
+| Promotional adjective | Three or more: `robust`, `cutting-edge`, `world-class`, `revolutionary`, `stunning`, `groundbreaking`, `effortless`, `next-generation` |
+| Hedge stack | Four or more: `perhaps`, `arguably`, `somewhat`, `in some ways`, `to an extent`, `it could be argued` |
+| Signposting | One or more: `here's what you need to know`, `before we dive`, `in this article`, `let's break`, `buckle up` |
+| Wordy construction | Three or more: `in order to`, `due to the fact that`, `it is important to note`, `a number of`, `with regard to` |
+| Chained transition | Three or more: `moreover`, `furthermore`, `additionally`, `in addition`, `that said` |
+| Trailing qualifier | Two or more: `for the most part`, `to a degree`, `where possible`, `in many ways` |
+| Negation triad | Two or more `not just X, but Y` constructions, or a `is not about X. It is about Y` frame |
+| Gerund opening | Two or more paragraphs opening on `Having`, `Knowing`, `Feeling`, `Realising` |
 | Bold pseudo-heading | Two or more lines that are nothing but bold text |
 | Bold lead-in bullets | Three or more bullets that open with a bold label, at 60% or more of the list |
-| AI buzzword | Five or more, or one per 150 words in a longer document: `leverage`, `seamless`, `robust`, `delve`, `tapestry`, `testament`, `realm`, `unlock`, `empower`, and the rest of the list in `rules.py` |
+| Em dash cluster | Four or more em dashes, unless a profile flags every one |
 
 One bold heading or one buzzword is normal writing, which is why the thresholds are set where a pattern starts rather than where a single word appears.
+
+## Vale
+
+`voice_gate_vale` installs and runs [Vale](https://vale.sh), the prose linter, on Markdown you name. The release is pinned, the sha256 is checked against the digest in `vale.py` before anything is unpacked, and the copy lives under `HERMES_HOME/plugin-data/voice-gate/`. The install call goes to the approval prompt, because it downloads and runs a binary.
+
+```text
+voice_gate_vale(action="status")
+voice_gate_vale(action="install")
+voice_gate_vale(action="check", paths=["docs/release-notes.md"])
+```
+
+Status resolves an existing binary from the `Vale binary` setting, then the plugin's own copy, then `PATH`, so a Vale you already installed is used as-is. Checks return Vale's own report and a count per severity.
 
 ## Limits
 

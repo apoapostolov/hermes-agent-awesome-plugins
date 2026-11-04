@@ -28,6 +28,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ### Added
 
+- **voice-gate:** version `1.1.0`, unreleased pending a live test. The generic rule set grew from eight families to seventeen, drawn from the humanizer pattern catalog and its vocabulary tiers: significance inflation, copula avoidance, promotional adjectives, hedge stacking, signposting, wordy constructions, chained transitions, trailing qualifiers, gerund openings, and the negation-then-positive frame, alongside the existing verdict openers, closing offers, cliché openers, conclusion signposts, AI vocabulary, bold pseudo-headings and bold lead-in bullets. Thresholds sit at the density where a pattern starts rather than where a single word lands, and four real documents, including an 8,390-word changelog, report nothing at the new settings. New tool `voice_gate_vale` installs and runs Vale 3.26.0 from a pinned release whose sha256 is checked before anything is unpacked, keeps the copy under `HERMES_HOME/plugin-data/voice-gate/`, and routes the download through the `pre_tool_call` approval prompt; an existing binary from the setting or from `PATH` is used as-is. Both editions carry the same engine and the same tool, and a personal profile can replace any family it names.
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
 ## [voice-gate 1.0.0] - 2026-11-04

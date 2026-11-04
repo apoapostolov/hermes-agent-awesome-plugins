@@ -23,6 +23,7 @@ It also ships three tools and a skill, so an agent can work the gate on purpose 
 | `voice_gate_check` | Runs the active profile over text or Markdown files and returns the findings and the raw counts. Use it before sending something long, or to explain an objection. |
 | `voice_gate_profile` | Shows the active profile with its rule counts and thresholds, lists the profiles on disk, or validates one. |
 | `voice_gate_learn` | Reads a corpus of somebody's writing and returns a draft profile with measured habits and candidate openings and closings. With `save`, it writes the draft for editing. |
+| `voice_gate_vale` | Installs and runs [Vale](https://vale.sh) on Markdown you name. The release is pinned, the sha256 is checked before unpacking, the copy lives under `HERMES_HOME/plugin-data/voice-gate/`, and the install goes to the approval prompt because it downloads and runs a binary. |
 
 The `voice-profile-builder` skill walks the whole procedure: what to collect, how to read the measurements, which candidates to keep, and how to check the result against writing the person is happy with.
 

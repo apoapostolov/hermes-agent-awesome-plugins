@@ -19,11 +19,13 @@ checking, default 200.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import rules
+from . import vale
 
 log = logging.getLogger(__name__)
 
@@ -122,7 +124,81 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
         return None
 
 
+VALE_SCHEMA = {
+    "name": "voice_gate_vale",
+    "description": (
+        "Install and run Vale, the prose linter, on Markdown you name. action=status reports what is "
+        "installed; action=install downloads the pinned release after the digest is checked; "
+        "action=check runs it over files and returns the alerts."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": ["status", "install", "check"],
+                       "description": "status, install, or check."},
+            "paths": {"type": "array", "items": {"type": "string"},
+                      "description": "Markdown files for action=check."},
+            "path": {"type": "string",
+                     "description": "Optional path to a Vale binary to use instead of the plugin's copy."},
+        },
+        "required": ["action"],
+    },
+}
+
+
+def _vale_path() -> str:
+    return str(_setting("vale_path", "") or "").strip()
+
+
+def _tool_vale(args: Dict[str, Any]) -> Dict[str, Any]:
+    action = str(args.get("action") or "status").strip().lower()
+    override = str(args.get("path") or "").strip() or _vale_path()
+    if action == "status":
+        return vale.status(override)
+    if action == "install":
+        return vale.install(override)
+    if action == "check":
+        return vale.run([str(p) for p in (args.get("paths") or [])], override)
+    return {"ok": False, "error": f"unknown action {action!r}"}
+
+
+def _on_pre_tool_call(tool_name: str = "", args: Any = None, **_kwargs: Any) -> Optional[Dict[str, Any]]:
+    """Send the one call that downloads and runs a binary to the approval prompt."""
+    if tool_name != VALE_SCHEMA["name"] or not isinstance(args, dict):
+        return None
+    if str(args.get("action") or "").strip().lower() != "install":
+        return None
+    name, digest, _kind = vale.asset()
+    return {
+        "action": "approve",
+        "message": (
+            f"voice_gate_vale install will download {name} from GitHub "
+            f"(vale {vale.VERSION}), check sha256 {digest[:16]}…, and run the unpacked binary from "
+            f"{vale.data_dir()}"
+        ),
+    }
+
+
+def _as_handler(fn, name: str):
+    def handler(args: Optional[dict] = None, **_kwargs) -> str:
+        try:
+            return json.dumps(fn(dict(args or {})), ensure_ascii=False)
+        except Exception as exc:
+            log.exception("voice-gate tool %s failed", name)
+            return json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    return handler
+
+
 def register(ctx: Any) -> None:
     global _CTX
     _CTX = ctx
     ctx.register_hook("pre_verify", _on_pre_verify)
+    ctx.register_hook("pre_tool_call", _on_pre_tool_call)
+    ctx.register_tool(
+        name=VALE_SCHEMA["name"],
+        toolset="voice_gate",
+        schema=VALE_SCHEMA,
+        handler=_as_handler(_tool_vale, VALE_SCHEMA["name"]),
+        emoji="🪶",
+    )
