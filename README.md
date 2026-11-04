@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Voice Gate 1.3.3 corrects what the plugin says about itself. Two manifest descriptions and four tool descriptions still called it a Markdown checker three releases after it learned to read plain text, reStructuredText, AsciiDoc, Org, LaTeX, HTML and PDF; the manifest description is what Capabilities, the settings form and the catalog card show, and tool descriptions shape the action forms, so they now name those formats. Nothing about the rules, the hooks or the tools changed.
+Voice Gate 1.3.4 works through the humanizer references. The rules now cover 46 families: 20 word and phrase lists, plus the sentence and paragraph shapes around them, from narrated candor and shadowboxed objections to negative listings, stacked hedges and template residue. Every family has its own switch in Settings, so a project can turn off what does not fit it; documentation paths are judged by a documentation register, where bold field labels and arrows are conventions rather than tells. The remaining catalog patterns, and what each would need before a rule could decide them, are written down in `docs/HUMANIZER-COVERAGE.md`.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
@@ -115,7 +115,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reaso
 
 | Plugin | What you get |
 | --- | --- |
-| [Voice Gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reads the prose a turn changed, in Markdown, plain text, reStructuredText, AsciiDoc, Org, LaTeX, HTML and PDF, and reports the AI tells in seventeen families: verdict openers, closing offers, cliché openers, significance inflation, buzzword runs, promotional adjectives, hedge stacks, signposting, wordy constructions and the structural shapes around bold text and negation. Exceptions silence a family for the files a glob names. Modes `warn`, `improve` or `skip`, a word floor, and a switch per bot. Ships a Vale style pack and an optional second opinion in the turn, and the personal edition loads a writing profile with four tools to check, inspect and build one. **Not in the pack; install separately.** |
+| [Voice Gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reads the prose a turn changed, in Markdown, plain text, reStructuredText, AsciiDoc, Org, LaTeX, HTML and PDF, and reports the AI tells in 46 families: verdict openers, closing offers, cliché openers, significance inflation, buzzword runs, promotional adjectives, hedge stacks, signposting, wordy constructions, narrated candor, shadowboxed objections, negative listing, stacked hedges, template residue and the sentence and paragraph shapes around them. Exceptions silence a family for the files a glob names. Modes `warn`, `improve` or `skip`, a word floor, a switch per bot and a switch per family. Ships a Vale style pack and an optional second opinion in the turn, and the personal edition loads a writing profile with four tools to check, inspect and build one. **Not in the pack; install separately.** |
 
 ### Reading and posting
 

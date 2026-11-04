@@ -331,6 +331,18 @@ def _exceptions_block(data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     return block
 
 
+def _family_off(key: str) -> bool:
+    """A family switched off in settings never fires, whatever the profile says."""
+    value = _setting(f"tell_{key}", True)
+    if isinstance(value, str):
+        return value.strip().lower() in {"0", "false", "off", "no", "skip"}
+    return value is False
+
+
+def _disabled_families() -> List[str]:
+    return [key for key in rules.TELL_KEYS if _family_off(key)]
+
+
 def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
     try:
         mode = _mode()
@@ -346,6 +358,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
         floor = _min_words(data)
         found: List[Tuple[str, List[str]]] = []
         checked: List[Path] = []
+        disabled = _disabled_families()
         for raw in kwargs.get("changed_paths") or []:
             path = _resolve_path(str(raw))
             if path is None:
@@ -358,7 +371,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
             if int(result.get("words") or 0) < floor:
                 continue
             checked.append(path)
-            calls = rules.gate_findings(result, block, str(path))
+            calls = rules.gate_findings(result, block, str(path), disabled=disabled)
             if calls:
                 found.append((path.name, calls))
         advisory = _vale_advisory(checked) or ""
@@ -425,13 +438,14 @@ def _tool_check(args: Dict[str, Any]) -> Dict[str, Any]:
             continue
     if not texts:
         return {"ok": False, "error": "nothing to check: pass text or paths"}
+    disabled = _disabled_families()
     reports = []
     for label, body, where in texts:
         result = rules.lint(body, data)
         reports.append({
             "source": label,
             "words": result["words"],
-            "findings": rules.gate_findings(result, block, where),
+            "findings": rules.gate_findings(result, block, where, disabled=disabled),
             "exceptions": rules.suppressed(block, where),
             "tells": result["tells"],
         })

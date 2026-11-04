@@ -1,0 +1,22 @@
+extends: existence
+message: "Rhetorical setup: '%s'. Make the point."
+level: suggestion
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "here's what i mean"
+  - "think about it"
+  - "and that's okay"
+  - "the catch is"
+  - "plot twist"
+  - "let that sink in"
+  - "full stop"
+  - "that's not nothing"
+  - "sit with that"
+  - "that's the whole point"
+  - "the punchline is"
+  - "worth naming"
+  - "don't take my word for it"
+  - "that's the part nobody mentions"
+  - "the only metric that matters"

@@ -1,0 +1,7 @@
+extends: existence
+message: "Hashtag block: tags instead of a sentence."
+level: warning
+scope: sentence
+nonword: true
+tokens:
+  - "(?<![\\w#])#[A-Za-z][A-Za-z0-9_]{1,30}\\b"

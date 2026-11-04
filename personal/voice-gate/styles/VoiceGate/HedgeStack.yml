@@ -1,0 +1,7 @@
+extends: existence
+message: "Stacked hedge: quantifier inside a modal."
+level: suggestion
+scope: sentence
+nonword: true
+tokens:
+  - "(?i)\\b(?:could|may|might|would|can)\\s+(?:potentially|possibly|eventually|ultimately)\\b"

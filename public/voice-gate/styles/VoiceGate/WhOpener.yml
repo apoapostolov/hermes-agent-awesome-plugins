@@ -1,0 +1,7 @@
+extends: existence
+message: "Wh- opener: 'What/Why/How ... is' frame."
+level: warning
+scope: sentence
+nonword: true
+tokens:
+  - "(?i)(?:^|[.!?]\\s+)\\s*(?:what|why|how)\\b[^.!?\\n]{0,60}\\b(?:is|was|are)\\b"

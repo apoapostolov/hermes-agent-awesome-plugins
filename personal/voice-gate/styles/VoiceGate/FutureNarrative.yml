@@ -1,0 +1,7 @@
+extends: existence
+message: "Future-narrative closer."
+level: warning
+scope: sentence
+nonword: true
+tokens:
+  - "(?i)\\b(?:will|would|could)\\s+(?:become|be)\\s+(?:one of\\s+)?the (?:most|next|defining)\\s+(?:important|significant|influential|transformative)\\b"

@@ -1,0 +1,21 @@
+extends: existence
+message: "Narrated candor: '%s'. Disclose the thing instead."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "to be fully transparent"
+  - "to be completely honest"
+  - "i want to be upfront"
+  - "let's be honest"
+  - "let's be real"
+  - "real talk"
+  - "if i'm being honest"
+  - "to be candid"
+  - "i'll say it plainly"
+  - "rather than bury this"
+  - "being honest about the limitations"
+  - "i would rather flag"
+  - "i could have left this out"
+  - "two caveats i would rather"

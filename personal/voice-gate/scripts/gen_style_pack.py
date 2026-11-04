@@ -42,6 +42,46 @@ PACK = [
      "Wordy construction: '%s'.", "sentence"),
     ("transitions", "Transitions.yml", "suggestion",
      "Transition that announces structure: '%s'.", "sentence"),
+    ("candor_frames", "Candor.yml", "warning",
+     "Narrated candor: '%s'. Disclose the thing instead.", "sentence"),
+    ("objection_frames", "Objections.yml", "warning",
+     "Objection nobody raised: '%s'. Answer what was asked.", "sentence"),
+    ("rhetorical_setup", "Setup.yml", "suggestion",
+     "Rhetorical setup: '%s'. Make the point.", "sentence"),
+    ("emphasis_crutches", "Emphasis.yml", "suggestion",
+     "Emphasis crutch: '%s'. Say what the stakes are.", "sentence"),
+    ("dev_slogans", "Slogans.yml", "warning",
+     "Slogan instead of a property: '%s'.", "sentence"),
+    ("template_phrases", "Templates.yml", "suggestion",
+     "Template phrase: '%s'.", "sentence"),
+    ("copula_avoidance", "Copula.yml", "suggestion",
+     "Copula avoidance: '%s'. Use 'is' or 'has'.", "sentence"),
+]
+
+# Shape families: the token is a regex, and each needs no surrounding context.
+SHAPES = [
+    ("WhOpener.yml", "warning", "Wh- opener: 'What/Why/How ... is' frame.",
+     r"(?i)(?:^|[.!?]\s+)\s*(?:what|why|how)\b[^.!?\n]{0,60}\b(?:is|was|are)\b"),
+    ("HedgeStack.yml", "suggestion", "Stacked hedge: quantifier inside a modal.",
+     r"(?i)\b(?:could|may|might|would|can)\s+(?:potentially|possibly|eventually|ultimately)\b"),
+    ("FutureNarrative.yml", "warning", "Future-narrative closer.",
+     r"(?i)\b(?:will|would|could)\s+(?:become|be)\s+(?:one of\s+)?the (?:most|next|defining)\s+"
+     r"(?:important|significant|influential|transformative)\b"),
+    ("NumberedList.yml", "warning", "Numbered-list inflation: 'three key takeaways'.",
+     r"(?i)\b(?:three|four|five|six|seven|eight|nine|ten)\s+(?:key\s+|main\s+|simple\s+)?"
+     r"(?:things|ways|takeaways|lessons|steps|reasons|tips|rules|habits|signs|mistakes)\b"),
+    ("Hashtags.yml", "warning", "Hashtag block: tags instead of a sentence.",
+     r"(?<![\w#])#[A-Za-z][A-Za-z0-9_]{1,30}\b"),
+    ("Compression.yml", "suggestion", "Over-compressed shorthand: arrows in prose.",
+     r"\u2192|=>"),
+    ("ToolFingerprint.yml", "warning", "Tool fingerprint in a URL.",
+     r"(?i)(?:[?&]utm_source=(?:chatgpt|openai|claude|perplexity|gemini|copilot)"
+     r"|[?&]referrer=(?:gpt|claude|ai|chatgpt))"),
+    ("AssistantResidue.yml", "error", "Assistant residue in published text.",
+     r"(?i)\b(?:as an ai|as a language model|my knowledge cutoff|as of my last (?:update|training)"
+     r"|i cannot browse|great question|you're absolutely right)\b"),
+    ("TemplateResidue.yml", "error", "Template residue: placeholder left in the text.",
+     r"\[(?:insert|your|name|company|topic)[^\]\n]{0,40}\]|\b[Tt][Bb][Dd]\b|\blorem ipsum\b"),
 ]
 
 NEGATION = """extends: existence
@@ -110,6 +150,16 @@ def build(rules_module: Any) -> Dict[Path, str]:
     for family, filename, level, message, scope in PACK:
         out[STYLE / filename] = _existence(level, message, rules_module.BASE_RULES[family], scope)
     out[STYLE / "NegationTriad.yml"] = NEGATION
+    for filename, level, message, token in SHAPES:
+        out[STYLE / filename] = (
+            "extends: existence\n"
+            f"message: {json.dumps(message)}\n"
+            f"level: {level}\n"
+            "scope: sentence\n"
+            "nonword: true\n"
+            "tokens:\n"
+            f"  - {json.dumps(token)}\n"
+        )
     out[Path(".vale.ini")] = INI
     return out
 

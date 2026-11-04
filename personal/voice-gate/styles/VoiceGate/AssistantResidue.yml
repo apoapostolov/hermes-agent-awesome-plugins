@@ -1,0 +1,7 @@
+extends: existence
+message: "Assistant residue in published text."
+level: error
+scope: sentence
+nonword: true
+tokens:
+  - "(?i)\\b(?:as an ai|as a language model|my knowledge cutoff|as of my last (?:update|training)|i cannot browse|great question|you're absolutely right)\\b"

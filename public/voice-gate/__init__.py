@@ -293,6 +293,18 @@ def _exceptions_block() -> Dict[str, Any]:
     return {"exceptions": rules.exceptions(raw)}
 
 
+def _family_off(key: str) -> bool:
+    """A family switched off in settings never fires, whatever the profile says."""
+    value = _setting(f"tell_{key}", True)
+    if isinstance(value, str):
+        return value.strip().lower() in {"0", "false", "off", "no", "skip"}
+    return value is False
+
+
+def _disabled_families() -> List[str]:
+    return [key for key in rules.TELL_KEYS if _family_off(key)]
+
+
 def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
     try:
         mode = _mode()
@@ -308,6 +320,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
         block = _exceptions_block()
         found: List[Tuple[str, List[str]]] = []
         checked: List[Path] = []
+        disabled = _disabled_families()
         for raw in kwargs.get("changed_paths") or []:
             path = _resolve(str(raw))
             if path is None:
@@ -320,7 +333,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
             if int(result.get("words") or 0) < min_words:
                 continue
             checked.append(path)
-            calls = rules.gate_findings(result, block, str(path))
+            calls = rules.gate_findings(result, block, str(path), disabled=disabled)
             if calls:
                 found.append((path.name, calls))
         advisory = _vale_advisory(checked) or ""
@@ -369,13 +382,14 @@ def _tool_check(args: Dict[str, Any]) -> Dict[str, Any]:
     if not chunks:
         return {"ok": False, "error": "nothing to check: pass text or readable prose paths"}
     block = _exceptions_block()
+    disabled = _disabled_families()
     checks = []
     for source, body, target in chunks:
         result = rules.lint(body)
         checks.append({
             "source": source,
             "words": result.get("words", 0),
-            "findings": rules.gate_findings(result, block, target),
+            "findings": rules.gate_findings(result, block, target, disabled=disabled),
             "exceptions": rules.suppressed(block, target),
             "tells": result.get("tells", {}),
         })

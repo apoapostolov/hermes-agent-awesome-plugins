@@ -1,0 +1,7 @@
+extends: existence
+message: "Over-compressed shorthand: arrows in prose."
+level: suggestion
+scope: sentence
+nonword: true
+tokens:
+  - "\\u2192|=>"

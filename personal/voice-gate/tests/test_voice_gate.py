@@ -209,6 +209,97 @@ def main() -> int:
         if saved is not None:
             os.environ["HERMES_HOME"] = saved
 
+
+    # ---- the extended families: each one fires on its own shape
+    def fires(text, path=None, profile=None):
+        return rules.gate_findings(rules.lint(text, profile), profile, path)
+
+    def fires_family(text, family):
+        return any(item.startswith(family) or family in item for item in fires(text))
+
+    cases = [
+        ("narrated candor", "To be fully transparent, the numbers are bad.\n", "narrated candor"),
+        ("objection nobody raised", "Some might say this is obvious.\n", "objection nobody raised"),
+        ("rhetorical setup", "Think about it. Full stop.\n", "rhetorical setup"),
+        ("emphasis crutch", "This matters because it does, and it is a feature, not a bug.\n",
+         "emphasis crutch"),
+        ("slogan instead of a property", "Batteries included. Zero config.\n",
+         "slogan instead of a property"),
+        ("template phrase", "A step towards the world of better tools.\n", "template phrase"),
+        ("copula avoidance", "It serves as a base and boasts a cache.\n", "copula avoidance"),
+        ("wh- opener", "What makes this hard is time. Why this matters is trust.\n", "wh- opener"),
+        ("stacked hedge", "It could potentially work and may eventually ship.\n", "stacked hedge"),
+        ("parenthetical hedge", "The cost (arguably the real one) stays, and the rest (increasingly the norm) follows.\n", "parenthetical hedge"),
+        ("future-narrative closer", "It will become one of the most important tools.\n",
+         "future-narrative closer"),
+        ("vague attribution", "Experts say it works. Studies show the same.\n", "vague attribution"),
+        ("real/actual inflation", "The real value shows in the real problem.\n", "real/actual"),
+        ("endorsement closer", "Bookmark this and thank me later.\n", "endorsement closer"),
+        ("launch-copy introduction", "Say hello to Notes, your new editor.\n", "launch-copy"),
+        ("assistant residue", "As an AI, I cannot browse.\n", "assistant residue"),
+        ("template residue", "[Insert your name here] and TBD.\n", "template residue"),
+        ("tool fingerprint in a URL", "See example.com/?utm_source=chatgpt for the copy.\n",
+         "tool fingerprint"),
+        ("numbered-list inflation", "Three key takeaways follow.\n", "numbered-list inflation"),
+        ("stacked questions", "Is it fast? Is it safe?\n", "stacked questions"),
+    ]
+    for name, text, expected in cases:
+        check(f"fires: {name}", expected in " ".join(fires(text)), " ".join(fires(text)))
+
+    check("fires: negative listing",
+          any(i.startswith("negative listing") for i in
+              fires("Not a dashboard. Not a portal. Not a tool. It was different.\n")))
+    check("fires: hashtag block",
+          any(i.startswith("hashtag block") for i in
+              fires("#AI #Tech #Build #Ship #Code #Tools here.\n")))
+    check("fires: over-compressed shorthand",
+          any(i.startswith("over-compressed") for i in
+              fires(" ".join(["a \u2192 b"] * 6) + "\n")))
+    check("fires: bare noun-phrase bullets",
+          any(i.startswith("bare noun-phrase") for i in
+              fires("- speed\n- scale\n- safety\n- cost\n- risk\n\n")))
+
+    # A repeated article is not a repeated opener, and a list is not a paragraph.
+    check("silent: repeated articles",
+          not any(i.startswith("same-opener") for i in
+                  fires("The gate reads it. The gate writes it. The gate stops there.\n")))
+    check("fires: repeated real opener",
+          any(i.startswith("same-opener") for i in
+              fires("Gates open early. Gates close late. Gates stay shut after dark. Gates rust.\n")))
+    check("silent: short bullets are not staccato",
+          not any(i.startswith("staccato") for i in
+                  fires("- one\n- two\n- three\n- four\n- five\n\n")))
+
+    # Register: a README keeps its bold labels, a note does not.
+    readme = "**Install** the plugin.\n\n- **Mode:** warn\n- **Floor:** 200\n- **Profile:** base\n"
+    check("register: docs keeps bold labels", not any("bold lead-in" in i for i in fires(readme, "README.md")),
+          " ".join(fires(readme, "README.md")))
+    check("register: a plain note does not",
+          any("bold lead-in" in i for i in fires(readme, "notes.txt")),
+          " ".join(fires(readme, "notes.txt")))
+    check("register: an explicit context relaxes",
+          not any("em dash" in i for i in
+                  fires("One \u2014 two \u2014 three \u2014 four \u2014 five.\n",
+                        "notes.txt", {"preferences": {"no_em_dash": True}, "context": "casual"})))
+    check("register: docs is inferred from a path",
+          rules.context_for_path("public/x/LIMITATIONS.md") == "docs")
+    check("register: chat keeps the strict rules", rules.context_for_path("") == "")
+
+
+    # ---- one switch per family, and it wins over the profile
+    ctx.config["tell_hedges"] = False
+    check("a family switch turns that family off", "hedges" in module._disabled_families(),
+          str(module._disabled_families()[:4]))
+    hedge_text = "Perhaps this is arguably fine. Maybe it is somewhat unclear. It could be argued."
+    off = module._disabled_families()
+    check("a disabled family stays silent",
+          not any("hedge" in item for item in rules.gate_findings(rules.lint(hedge_text), None, "notes.txt", disabled=off)))
+    check("the other families still fire",
+          bool(rules.gate_findings(rules.lint(SLOP), None, "notes.txt", disabled=off)))
+    ctx.config["tell_hedges"] = True
+    check("switching it back restores the family", "hedges" not in module._disabled_families())
+
+
     print()
     if FAILURES:
         print(f"{len(FAILURES)} check(s) failed: {', '.join(FAILURES)}")

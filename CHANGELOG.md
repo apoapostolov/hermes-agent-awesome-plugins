@@ -27,6 +27,24 @@ the component that changed; a plugin patch does not imply a new pack release.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
 
+## [voice-gate 1.3.4] - 2026-11-05
+
+Coverage of the humanizer references, a switch per family, and the plan for what
+still needs a reader.
+
+### Added
+
+- Rule families went from 19 to 46. The additions cover the catalog patterns a text can be judged on without guessing: narrated candor, shadowboxed objections, rhetorical setup, emphasis crutches, dev slogans, template phrases, copula avoidance, wh- openers, stacked hedges, parenthetical hedges, future-narrative closers, negative listings, numbered-list bait, hashtag blocks, over-compression, rule-of-three padding, same-opener runs, staccato runs, stacked questions, bare noun-phrase bullets, vague attribution, real/actual inflation, endorsement closers, launch copy, assistant residue, template residue and tool fingerprints in a URL.
+- One switch per family in Settings, on by default, so a family that does not fit a project can be turned off without editing a profile.
+- A register per document: README, AGENTS, CHANGELOG, LIMITATIONS, AUDIT, SKILL and `docs/` paths are judged as documentation, where bold field labels, arrows and short labelled lines are conventions rather than tells. Chat text and ordinary prose keep the strict rules. A profile's `context` overrides the inference.
+- `docs/HUMANIZER-COVERAGE.md`: every catalog pattern mapped to the family that carries it, or to the capability that would be needed. The plan names clause parsing, paragraph statistics, cross-document memory, house style, claim comparison and the fiction register, with a phase for each.
+
+### Changed
+
+- Shape families ignore lists. A block of bullet lines is no longer read as a paragraph, so a checklist of short lines does not count as staccato prose, and a repeated article is not a repeated opener.
+- The Vale pack grew from 9 rules to 25: seven new phrase families and nine regex rules for the shapes Vale can express.
+- Settings descriptions are one line each, so the page reads without wrapping.
+
 ## [voice-gate 1.3.3] - 2026-11-04
 
 What the plugin says about itself. No rule, hook or tool behaviour changed.

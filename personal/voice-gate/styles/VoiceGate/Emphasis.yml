@@ -1,0 +1,17 @@
+extends: existence
+message: "Emphasis crutch: '%s'. Say what the stakes are."
+level: suggestion
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "this matters because"
+  - "here's why that matters"
+  - "i promise"
+  - "is a feature, not a bug"
+  - "dressed up as"
+  - "the stakes are high"
+  - "the consequences are real"
+  - "the implications are significant"
+  - "the reasons are structural"
+  - "this is the deepest problem"

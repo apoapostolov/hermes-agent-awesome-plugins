@@ -1,0 +1,13 @@
+extends: existence
+message: "Slogan instead of a property: '%s'."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "batteries included"
+  - "it just works"
+  - "zero config"
+  - "sane defaults"
+  - "small enough to fit in your head"
+  - "works out of the box"

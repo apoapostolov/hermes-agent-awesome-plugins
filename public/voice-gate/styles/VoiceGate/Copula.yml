@@ -1,0 +1,23 @@
+extends: existence
+message: "Copula avoidance: '%s'. Use 'is' or 'has'."
+level: suggestion
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "serves as a"
+  - "serves as the"
+  - "stands as a"
+  - "stands as the"
+  - "functions as a"
+  - "functions as the"
+  - "represents a"
+  - "represents the"
+  - "boasts a"
+  - "boasts an"
+  - "offers a"
+  - "offers an"
+  - "presents a"
+  - "presents an"
+  - "features a"
+  - "features an"

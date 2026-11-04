@@ -1,0 +1,7 @@
+extends: existence
+message: "Tool fingerprint in a URL."
+level: warning
+scope: sentence
+nonword: true
+tokens:
+  - "(?i)(?:[?&]utm_source=(?:chatgpt|openai|claude|perplexity|gemini|copilot)|[?&]referrer=(?:gpt|claude|ai|chatgpt))"

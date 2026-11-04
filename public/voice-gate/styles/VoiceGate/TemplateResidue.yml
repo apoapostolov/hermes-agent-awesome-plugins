@@ -1,0 +1,7 @@
+extends: existence
+message: "Template residue: placeholder left in the text."
+level: error
+scope: sentence
+nonword: true
+tokens:
+  - "\\[(?:insert|your|name|company|topic)[^\\]\\n]{0,40}\\]|\\b[Tt][Bb][Dd]\\b|\\blorem ipsum\\b"

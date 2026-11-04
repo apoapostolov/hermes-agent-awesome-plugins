@@ -1,0 +1,19 @@
+extends: existence
+message: "Objection nobody raised: '%s'. Answer what was asked."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "this isn't mainly about"
+  - "this is not mainly about"
+  - "i'm not arguing that"
+  - "i am not arguing that"
+  - "don't get me wrong"
+  - "some might say"
+  - "you might think"
+  - "you could argue"
+  - "one could argue"
+  - "critics might say"
+  - "it might seem like"
+  - "it would be easy to think"
