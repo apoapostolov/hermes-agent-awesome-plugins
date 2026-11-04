@@ -503,7 +503,7 @@ def _tool_learn(args: Dict[str, Any]) -> Dict[str, Any]:
 VALE_SCHEMA = {
     "name": "voice_gate_vale",
     "description": (
-        "Install and run Vale, the prose linter, on Markdown you name. action=status reports what is "
+        "Install and run Vale, the prose linter, on prose files you name. action=status reports what is "
         "installed; action=install downloads the pinned release after the digest is checked; "
         "action=check runs it over files and returns the alerts."
     ),
@@ -513,7 +513,7 @@ VALE_SCHEMA = {
             "action": {"type": "string", "enum": ["status", "install", "check"],
                        "description": "status, install, or check."},
             "paths": {"type": "array", "items": {"type": "string"},
-                      "description": "Markdown files for action=check."},
+                      "description": "Prose files for action=check."},
             "path": {"type": "string",
                      "description": "Optional path to a Vale binary to use instead of the plugin's copy."},
         },
@@ -569,7 +569,7 @@ CHECK_SCHEMA = {
                      "description": "Optional file name for text, so exceptions written for that "
                                     "kind of file apply."},
             "paths": {"type": "array", "items": {"type": "string"},
-                      "description": "Markdown files to check instead of text."},
+                      "description": "Prose files to check instead of text."},
             "profile": {"type": "string",
                         "description": "Profile name or path to use instead of the active one."},
         },

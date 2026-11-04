@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Voice Gate 1.3.2 adds exceptions and fixes the two things the last release got wrong. A family can be silenced for the files a glob matches, so a generated page or a template keeps its own shape while the rule stays in force for everything else; the block goes in the profile or in the plugin's own Exceptions setting, and both merge. Fenced code no longer reaches the rules as prose, which means a README that quotes a phrase in a code block is not flagged for quoting it, and the gate now finds the profile in a host that starts without `HERMES_HOME`, the way the desktop backend does.
+Voice Gate 1.3.3 corrects what the plugin says about itself. Two manifest descriptions and four tool descriptions still called it a Markdown checker three releases after it learned to read plain text, reStructuredText, AsciiDoc, Org, LaTeX, HTML and PDF; the manifest description is what Capabilities, the settings form and the catalog card show, and tool descriptions shape the action forms, so they now name those formats. Nothing about the rules, the hooks or the tools changed.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 

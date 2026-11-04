@@ -3,7 +3,7 @@
   <strong>Finds the AI tells in Markdown.</strong>
   <p>Names them, file by file, before the turn ends.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.2-2ea44f" alt="Version 1.3.2" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.3-2ea44f" alt="Version 1.3.3" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -74,7 +74,7 @@ One bold heading or one buzzword is normal writing, which is why the thresholds 
 
 ## Tools
 
-`voice_gate_check` runs the bundled rules over text or Markdown files and returns the findings with the counts behind them, so you can see what the gate would say without waiting for a turn to end.
+`voice_gate_check` runs the bundled rules over text, or over any prose file it can read, and returns the findings with the counts behind them, so you can see what the gate would say without waiting for a turn to end.
 
 ```text
 voice_gate_check(text="...")
@@ -107,7 +107,7 @@ An exception needs a path to test. Text passed to `voice_gate_check` without a `
 
 ## Vale
 
-`voice_gate_vale` installs and runs [Vale](https://vale.sh), the prose linter, on Markdown you name. The release is pinned, the sha256 is checked against the digest in `vale.py` before anything is unpacked, and the copy lives under `HERMES_HOME/plugin-data/voice-gate/`. The install call goes to the approval prompt, because it downloads and runs a binary.
+`voice_gate_vale` installs and runs [Vale](https://vale.sh), the prose linter, on prose files you name. The release is pinned, the sha256 is checked against the digest in `vale.py` before anything is unpacked, and the copy lives under `HERMES_HOME/plugin-data/voice-gate/`. The install call goes to the approval prompt, because it downloads and runs a binary.
 
 ```text
 voice_gate_vale(action="status")

@@ -27,6 +27,14 @@ the component that changed; a plugin patch does not imply a new pack release.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
 
+## [voice-gate 1.3.3] - 2026-11-04
+
+What the plugin says about itself. No rule, hook or tool behaviour changed.
+
+### Fixed
+
+- Two manifest descriptions and four tool descriptions still called Voice Gate a Markdown checker, which it stopped being in 1.3.1. The manifest description is what Capabilities, the settings form and the catalog card show, and tool descriptions shape the action forms, so the stale lines reached everyone who read what they were about to install or run. They now name the formats the gate actually reads.
+
 ## [voice-gate 1.3.2] - 2026-11-04
 
 Exceptions, and two fixes the last release needed. A rule can now be silenced for the files a glob matches while it stays in force everywhere else, which is what lets a generated page or a template keep its own shape without weakening the gate. Fenced code stops reaching the rules as prose, and the profile is found in a host that starts without `HERMES_HOME`.

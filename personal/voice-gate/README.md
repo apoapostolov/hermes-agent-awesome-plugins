@@ -3,7 +3,7 @@
   <strong>Finds the AI tells in Markdown, measured against your own writing.</strong>
   <p>Same checks as the public build, driven by a profile document instead of one fixed rule set.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.2-2ea44f" alt="Version 1.3.2" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.3-2ea44f" alt="Version 1.3.3" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -24,10 +24,10 @@ It also ships four tools and a skill, so an agent can work the gate on purpose r
 
 | Tool | What it does |
 | --- | --- |
-| `voice_gate_check` | Runs the active profile over text or Markdown files and returns the findings and the raw counts. Use it before sending something long, or to explain an objection. |
+| `voice_gate_check` | Runs the active profile over text or any prose file it can read, and returns the findings and the raw counts. Use it before sending something long, or to explain an objection. |
 | `voice_gate_profile` | Shows the active profile with its rule counts and thresholds, lists the profiles on disk, or validates one. |
 | `voice_gate_learn` | Reads a corpus of somebody's writing and returns a draft profile with measured habits and candidate openings and closings. With `save`, it writes the draft for editing. |
-| `voice_gate_vale` | Installs and runs [Vale](https://vale.sh) on Markdown you name. The release is pinned, the sha256 is checked before unpacking, the copy lives under `HERMES_HOME/plugin-data/voice-gate/`, and the install goes to the approval prompt because it downloads and runs a binary. |
+| `voice_gate_vale` | Installs and runs [Vale](https://vale.sh) on prose files you name. The release is pinned, the sha256 is checked before unpacking, the copy lives under `HERMES_HOME/plugin-data/voice-gate/`, and the install goes to the approval prompt because it downloads and runs a binary. |
 
 The `voice-profile-builder` skill walks the whole procedure: what to collect, how to read the measurements, which candidates to keep, and how to check the result against writing the person is happy with.
 
@@ -105,7 +105,7 @@ An exception needs a path to test. Text passed to `voice_gate_check` without a `
 
 ## Vale
 
-`voice_gate_vale` installs and runs [Vale](https://vale.sh), the prose linter, on Markdown you name. The release is pinned, the sha256 is checked against the digest in `vale.py` before anything is unpacked, and the copy lives under `HERMES_HOME/plugin-data/voice-gate/`. The install call goes to the approval prompt, because it downloads and runs a binary.
+`voice_gate_vale` installs and runs [Vale](https://vale.sh), the prose linter, on prose files you name. The release is pinned, the sha256 is checked against the digest in `vale.py` before anything is unpacked, and the copy lives under `HERMES_HOME/plugin-data/voice-gate/`. The install call goes to the approval prompt, because it downloads and runs a binary.
 
 ```text
 voice_gate_vale(action="status")
