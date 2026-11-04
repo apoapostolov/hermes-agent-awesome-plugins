@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Voice Gate 1.3.1 reads the prose a turn changed and reports the AI tells before the turn finishes. Markdown is no longer the only input: plain text, reStructuredText, AsciiDoc, Org, LaTeX and HTML documents go through the same seventeen rule families, and a PDF is decoded with the standard library rather than a package. The commit gate reads the same formats, and an optional Vale pass adds a second opinion when you ask for it.
+Voice Gate 1.3.2 adds exceptions and fixes the two things the last release got wrong. A family can be silenced for the files a glob matches, so a generated page or a template keeps its own shape while the rule stays in force for everything else; the block goes in the profile or in the plugin's own Exceptions setting, and both merge. Fenced code no longer reaches the rules as prose, which means a README that quotes a phrase in a code block is not flagged for quoting it, and the gate now finds the profile in a host that starts without `HERMES_HOME`, the way the desktop backend does.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
@@ -115,7 +115,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reaso
 
 | Plugin | What you get |
 | --- | --- |
-| [Voice Gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reads the Markdown a turn changed and reports the AI tells in seventeen families: verdict openers, closing offers, cliché openers, significance inflation, buzzword runs, promotional adjectives, hedge stacks, signposting, wordy constructions and the structural shapes around bold text and negation. Modes `warn`, `improve` or `skip`, a word floor, and a switch per bot. Ships a Vale style pack and an optional second opinion in the turn, and the personal edition loads a writing profile with four tools to check, inspect and build one. **Not in the pack; install separately.** |
+| [Voice Gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reads the prose a turn changed, in Markdown, plain text, reStructuredText, AsciiDoc, Org, LaTeX, HTML and PDF, and reports the AI tells in seventeen families: verdict openers, closing offers, cliché openers, significance inflation, buzzword runs, promotional adjectives, hedge stacks, signposting, wordy constructions and the structural shapes around bold text and negation. Exceptions silence a family for the files a glob names. Modes `warn`, `improve` or `skip`, a word floor, and a switch per bot. Ships a Vale style pack and an optional second opinion in the turn, and the personal edition loads a writing profile with four tools to check, inspect and build one. **Not in the pack; install separately.** |
 
 ### Reading and posting
 
