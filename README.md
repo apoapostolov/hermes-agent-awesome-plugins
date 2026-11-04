@@ -108,7 +108,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reaso
 
 | Plugin | What you get |
 | --- | --- |
-| [voice-gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reads the Markdown a turn changed and reports the AI tells: verdict openers, closing offers, cliché openers, bold pseudo-headings, buzzword runs. Modes `warn`, `improve` or `skip`, with a word floor. The personal edition loads a writing profile and ships three tools to check, inspect and build one. **Not in the pack; install separately.** |
+| [voice-gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reads the Markdown a turn changed and reports the AI tells in seventeen families: verdict openers, closing offers, cliché openers, significance inflation, buzzword runs, promotional adjectives, hedge stacks, signposting, wordy constructions and the structural shapes around bold text and negation. Modes `warn`, `improve` or `skip`, a word floor, and a switch per bot. Ships a Vale style pack and an optional second opinion in the turn, and the personal edition loads a writing profile with four tools to check, inspect and build one. **Not in the pack; install separately.** |
 
 ### Reading and posting
 

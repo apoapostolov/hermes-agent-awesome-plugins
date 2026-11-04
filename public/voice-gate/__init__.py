@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -37,6 +38,26 @@ _SKIP_WORDS = {"off", "skip", "false", "no", "0"}
 _CTX: Any = None
 
 
+def _home() -> Path:
+    return Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+
+
+def _current_profile() -> str:
+    """The profile this process serves, or ``default`` for the install root."""
+    try:
+        import hermes_constants
+
+        name = hermes_constants.profile_name_for_home(hermes_constants.get_hermes_home())
+        if name:
+            return str(name).strip().lower()
+    except Exception:
+        pass
+    home = _home()
+    if home.parent.name == "profiles":
+        return home.name.strip().lower()
+    return "default"
+
+
 def _setting(key: str, default: Any) -> Any:
     if _CTX is None:
         return default
@@ -47,6 +68,106 @@ def _setting(key: str, default: Any) -> Any:
         return default
 
 
+BOT_FLAGS = {
+    "default": "apply_hermes",
+    "hermes": "apply_hermes",
+    "herald": "apply_herald",
+    "keeper": "apply_keeper",
+    "steward": "apply_steward",
+    "tinker": "apply_tinker",
+}
+_TRUTHY = {"1", "true", "yes", "on", "y"}
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in _TRUTHY
+
+
+def _plugin_name() -> str:
+    try:
+        import yaml
+
+        manifest = yaml.safe_load((Path(__file__).parent / "plugin.yaml").read_text(encoding="utf-8"))
+        name = str((manifest or {}).get("name") or "").strip()
+        if name:
+            return name
+    except Exception:
+        pass
+    return "voice-gate"
+
+
+def _root_settings() -> Dict[str, Any]:
+    """The plugin's settings as the install root holds them.
+
+    A settings page opened on the Herald scope writes Herald's own config, so
+    the per-bot switches are read from the file the default profile owns. The
+    host has no PyYAML in its process, and a plugin should not reach into the
+    host's own config reader, so this reads the flat ``apply_*`` scalars under
+    ``plugins.entries.<plugin>.settings`` by indentation.
+    """
+    home = _home()
+    if home.parent.name == "profiles":
+        home = home.parent.parent
+    try:
+        lines = (home / "config.yaml").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+    names = {_plugin_name(), "voice-gate", "Voice Gate"}
+    entries_indent = None
+    entry_indent = None
+    settings_indent = None
+    found: Dict[str, Any] = {}
+    for raw in lines:
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip())
+        stripped = raw.strip()
+        if entries_indent is None:
+            if stripped == "entries:":
+                entries_indent = indent
+            continue
+        if strip_key(stripped) in names and indent > entries_indent:
+            entry_indent, settings_indent, found = indent, None, {}
+            continue
+        if entry_indent is None:
+            continue
+        if indent <= entry_indent:
+            if found:
+                return found
+            entry_indent, settings_indent = None, None
+            if stripped == "entries:":
+                entries_indent = indent
+            continue
+        if settings_indent is None:
+            if stripped == "settings:":
+                settings_indent = indent
+            continue
+        if indent <= settings_indent:
+            return found
+        key, _, value = stripped.partition(":")
+        key = key.strip().strip("\"'")
+        if key.startswith("apply_"):
+            found[key] = value.strip().strip("\"'")
+    return found
+
+
+def strip_key(line: str) -> str:
+    return line.partition(":")[0].strip().strip("\"'")
+
+
+def _bots_allow() -> bool:
+    """Which bots run the gate. No boxes set means every bot runs it."""
+    flags = {key: value for key, value in _root_settings().items() if str(key).startswith("apply_")}
+    if not flags:
+        return True
+    wanted = BOT_FLAGS.get(_current_profile())
+    if wanted is None:
+        return True
+    return wanted in flags and _truthy(flags[wanted])
+
+
 def _mode() -> str:
     raw = str(_setting("mode", "warn")).strip().lower()
     if raw in _SKIP_WORDS:
@@ -55,11 +176,14 @@ def _mode() -> str:
 
 
 def _min_words() -> int:
+    """An explicit 0 turns the floor off; unset keeps the default."""
+    raw = _setting("min_words", None)
+    if raw is None or str(raw).strip() == "":
+        return DEFAULT_MIN_WORDS
     try:
-        value = int(_setting("min_words", DEFAULT_MIN_WORDS))
+        return max(int(raw), 0)
     except (TypeError, ValueError):
         return DEFAULT_MIN_WORDS
-    return value if value > 0 else DEFAULT_MIN_WORDS
 
 
 def _resolve(raw: str) -> Optional[Path]:
@@ -147,6 +271,8 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
         attempt = int(kwargs.get("attempt") or 0)
         if mode == "warn" and attempt != 0:
             return None
+        if not _bots_allow():
+            return None
         min_words = _min_words()
         found: List[Tuple[str, List[str]]] = []
         checked: List[Path] = []
@@ -172,6 +298,50 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
     except Exception:
         log.debug("voice-gate pre_verify failed", exc_info=True)
         return None
+
+
+CHECK_SCHEMA = {
+    "name": "voice_gate_check",
+    "description": (
+        "Run the bundled rules over text or Markdown files and list the tells they find, with the "
+        "counts behind each one. Use it before sending something long, or to see what the gate would say."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string", "description": "Prose to check directly."},
+            "paths": {"type": "array", "items": {"type": "string"},
+                      "description": "Markdown files to check."},
+        },
+    },
+}
+
+
+def _tool_check(args: Dict[str, Any]) -> Dict[str, Any]:
+    chunks: List[Tuple[str, str]] = []
+    text = str(args.get("text") or "")
+    if text.strip():
+        chunks.append(("text", text))
+    for raw_path in args.get("paths") or []:
+        path = _resolve(str(raw_path))
+        if path is None:
+            continue
+        try:
+            chunks.append((path.name, path.read_text(encoding="utf-8", errors="replace")))
+        except OSError:
+            continue
+    if not chunks:
+        return {"ok": False, "error": "nothing to check: pass text or readable Markdown paths"}
+    checks = []
+    for source, body in chunks:
+        result = rules.lint(body)
+        checks.append({
+            "source": source,
+            "words": result.get("words", 0),
+            "findings": rules.gate_findings(result),
+            "tells": result.get("tells", {}),
+        })
+    return {"ok": True, "checks": checks}
 
 
 VALE_SCHEMA = {
@@ -245,6 +415,13 @@ def register(ctx: Any) -> None:
     _CTX = ctx
     ctx.register_hook("pre_verify", _on_pre_verify)
     ctx.register_hook("pre_tool_call", _on_pre_tool_call)
+    ctx.register_tool(
+        name=CHECK_SCHEMA["name"],
+        toolset="voice_gate",
+        schema=CHECK_SCHEMA,
+        handler=_as_handler(_tool_check, CHECK_SCHEMA["name"]),
+        emoji="🪶",
+    )
     ctx.register_tool(
         name=VALE_SCHEMA["name"],
         toolset="voice_gate",

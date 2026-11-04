@@ -16,7 +16,7 @@
 
 The public build carries one list of generic tells. This edition carries the same list plus a loader for profiles: small YAML or JSON files where a person writes down the openings they refuse, the offers they never make, the vocabulary they avoid, and the thresholds that match their writing. With no profile set, it behaves exactly like the public build.
 
-It also ships three tools and a skill, so an agent can work the gate on purpose rather than waiting for a turn to end.
+It also ships four tools and a skill, so an agent can work the gate on purpose rather than waiting for a turn to end.
 
 | Tool | What it does |
 | --- | --- |
@@ -70,6 +70,7 @@ Settings → Plugins → Voice Gate.
 | Setting | What it does |
 | --- | --- |
 | Mode | `warn` asks once per turn, `improve` keeps asking inside the host's nudge budget, `skip` turns the gate off. |
+| Hermes, Herald, Keeper, Steward, Tinker | boolean, default on | Which bots run the gate. Unticking one leaves that profile alone; the boxes live in the default profile's config, so one set covers the install. |
 | Profile | Name in `HERMES_HOME/voice-profiles` or a path. Empty uses the generic rules. |
 | Minimum words overrides | 0 uses the profile's floor. A positive number overrides it for every profile. |
 | Vale second opinion | `advisory` runs Vale over the same changed files and appends one line when it reports at least the minimum number of alerts; `off` leaves it out. |
@@ -115,6 +116,14 @@ voice-gate improve: fix 1 file(s) before this turn ends. notes.md: AI vocabulary
 It speaks only when Vale reports at least `Vale minimum alerts` warnings, three by default, and only when a binary resolves. An alert below that threshold, a missing binary, or a report that fails to parse leaves the nudge exactly as the engine wrote it. Vale runs on the files the engine already accepted by word count, at most six of them.
 
 The engine and the pack catch the same generic families, so the line Vale adds is position and a per-rule breakdown rather than new words. Profile-specific lists belong to the engine, which is where a person's own vocabulary is enforced without regenerating a style.
+
+## Tests
+
+```text
+python tests/test_voice_gate.py
+```
+
+The same twenty-one checks the public edition runs, plus the profile path.
 
 ## This edition ships with no personal data
 

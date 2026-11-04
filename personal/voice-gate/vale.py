@@ -181,9 +181,27 @@ def install(override: str = "") -> Dict[str, Any]:
         return {"ok": False, "error": "the binary did not report a version", "steps": steps}
     steps.append({"step": "probe", "version": version})
     (destination / (binary_name() + ".sha256")).write_text(actual + "\n", encoding="utf-8")
-    ini = destination / ".vale.ini"
-    ini.write_text(VALE_INI, encoding="utf-8")
     return {"ok": True, "already": False, "binary": str(binary), "version": version, "steps": steps}
+
+
+_REPORTS: Dict[Any, Dict[str, Any]] = {}
+_CACHE_LIMIT = 8
+
+
+def _cache_key(binary: str, ini: Path, files: List[str]) -> Any:
+    """A turn can describe the same untouched file twice; Vale need not run twice."""
+    stamps = []
+    for name in files:
+        try:
+            stat = Path(name).stat()
+            stamps.append((name, stat.st_mtime_ns, stat.st_size))
+        except OSError:
+            stamps.append((name, 0, 0))
+    try:
+        config_stamp = ini.stat().st_mtime_ns
+    except OSError:
+        config_stamp = 0
+    return (binary, str(ini), config_stamp, tuple(stamps))
 
 
 def config_path() -> Path:
@@ -207,6 +225,11 @@ def run(paths: List[str], override: str = "", timeout: float = 120.0) -> Dict[st
     if not files:
         return {"ok": False, "error": "no readable files to check"}
     ini = config_path()
+    key = _cache_key(binary, ini, files)
+    if key in _REPORTS:
+        cached = dict(_REPORTS[key])
+        cached["cached"] = True
+        return cached
     command = [binary, f"--config={ini}", "--output=JSON", *files]
     try:
         proc = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
@@ -224,4 +247,8 @@ def run(paths: List[str], override: str = "", timeout: float = 120.0) -> Dict[st
         for alert in alerts or []:
             severity = str(alert.get("Severity") or "unknown")
             counts[severity] = counts.get(severity, 0) + 1
-    return {"ok": True, "binary": binary, "files": len(files), "counts": counts, "report": report}
+    result = {"ok": True, "binary": binary, "files": len(files), "counts": counts, "report": report}
+    if len(_REPORTS) >= _CACHE_LIMIT:
+        _REPORTS.pop(next(iter(_REPORTS)))
+    _REPORTS[key] = result
+    return result

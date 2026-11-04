@@ -36,6 +36,7 @@ Settings → Plugins → Voice Gate.
 | Setting | Values | What it does |
 | --- | --- | --- |
 | Mode | `warn`, `improve`, `skip` | `warn` asks once per turn. `improve` keeps asking until the tells are gone or the host's nudge budget for the turn runs out. `skip` turns the gate off. |
+| Hermes, Herald, Keeper, Steward, Tinker | boolean, default on | Which bots run the gate. Unticking one leaves that profile alone; the boxes live in the default profile's config, so one set covers the install. |
 | Minimum words | number, default 200 | Documents shorter than this are ignored, so a stub note does not trigger a review. |
 | Vale binary | path | Path to a Vale binary. Empty uses the plugin's own copy under `HERMES_HOME/plugin-data`, then `PATH`. |
 | Vale second opinion | `off`, `advisory` | `advisory` runs Vale over the same changed files and appends one line when it reports at least the minimum number of alerts. |
@@ -68,6 +69,25 @@ A finding turns into a nudge when one of these crosses its threshold:
 | Em dash cluster | Four or more em dashes, unless a profile flags every one |
 
 One bold heading or one buzzword is normal writing, which is why the thresholds are set where a pattern starts rather than where a single word appears.
+
+## Tools
+
+`voice_gate_check` runs the bundled rules over text or Markdown files and returns the findings with the counts behind them, so you can see what the gate would say without waiting for a turn to end.
+
+```text
+voice_gate_check(text="...")
+voice_gate_check(paths=["docs/notes.md"])
+```
+
+`voice_gate_vale` is described under Vale below.
+
+## Tests
+
+```text
+python tests/test_voice_gate.py
+```
+
+Twenty-one checks covering the rule families, the code-span exemption, the bot switches, the word floor, the tool registrations and the turn path. No dependencies and no test runner, because the host process carries neither PyYAML nor pytest for plugin code.
 
 ## Vale
 
