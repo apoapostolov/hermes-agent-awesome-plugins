@@ -1,4 +1,4 @@
-name: sidebar-manager
+name: "Sidebar Manager"
 version: 1.0.1
 description: "Reorder and hide sidebar nav rows and session sections from a dim glyph next to New session."
 author: Apostol Apostolov

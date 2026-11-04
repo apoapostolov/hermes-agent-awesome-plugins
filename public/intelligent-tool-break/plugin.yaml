@@ -1,4 +1,4 @@
-name: intelligent-tool-break
+name: "Intelligent Tool Break"
 version: 1.3.6
 description: "Intelligent Tool Break: never let a stalled tool call force you to cancel a long task. You can abort an in-flight call with /break, instruct with /break {message}, or force it to repeat with /again."
 author: Apostol Apostolov

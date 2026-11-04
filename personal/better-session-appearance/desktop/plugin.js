@@ -1981,12 +1981,33 @@ function start() {
   }
 }
 
+/** The plugin id changed and localStorage keys are namespaced by it; copy the old ones once. */
+function migrateLegacyStorage() {
+  try {
+    const from = 'hermes.plugin.better-session-appearance.'
+    const to = 'hermes.plugin.Better Session Appearance.'
+    if (localStorage.getItem(to + '.__migrated')) return
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(from)) continue
+      const rest = key.slice(from.length)
+      if (localStorage.getItem(to + rest) === null) {
+        localStorage.setItem(to + rest, localStorage.getItem(key))
+      }
+    }
+    localStorage.setItem(to + '.__migrated', '1')
+  } catch {
+    // Storage unavailable: the plugin runs on its defaults.
+  }
+}
+
 export default {
   id: ID,
   name: 'Better Session Appearance',
   description: 'Session list appearance: color and bold titles, extra Appearance colors, idle-bullet glyphs.',
   defaultEnabled: true,
   register(ctx) {
+    migrateLegacyStorage()
     store = ctx.storage
     if (typeof ctx.registerSettingsPage === 'function') {
       ctx.registerSettingsPage({

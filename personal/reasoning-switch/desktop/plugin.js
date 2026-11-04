@@ -624,12 +624,33 @@ function Root() {
 let _storage = null
 let _styleEl = null
 
+/** The plugin id changed and localStorage keys are namespaced by it; copy the old ones once. */
+function migrateLegacyStorage() {
+  try {
+    const from = 'hermes.plugin.reasoning-switch.'
+    const to = 'hermes.plugin.Reasoning Switch.'
+    if (localStorage.getItem(to + '.__migrated')) return
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(from)) continue
+      const rest = key.slice(from.length)
+      if (localStorage.getItem(to + rest) === null) {
+        localStorage.setItem(to + rest, localStorage.getItem(key))
+      }
+    }
+    localStorage.setItem(to + '.__migrated', '1')
+  } catch {
+    // Storage unavailable: the plugin runs on its defaults.
+  }
+}
+
 export default {
   id: 'reasoning-switch',
   name: 'Reasoning Switch',
   description: 'Statusbar reasoning-effort rotation with per-level colors and prompt limits.',
 
   register(ctx) {
+    migrateLegacyStorage()
     _storage = ctx.storage
     _openExternal = ctx.os?.openExternal ?? null
 

@@ -6763,6 +6763,26 @@ function ReaderProfile({ ctx, owner }) {
     })
   ] });
 }
+/** The plugin id changed and localStorage keys are namespaced by it; copy the old ones once. */
+function migrateLegacyStorage() {
+  try {
+    const from = "hermes.plugin.rss-reader.";
+    const to = "hermes.plugin.RSS Reader.";
+    if (localStorage.getItem(to + ".__migrated")) return;
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(from)) continue;
+      const rest = key.slice(from.length);
+      if (localStorage.getItem(to + rest) === null) {
+        localStorage.setItem(to + rest, localStorage.getItem(key));
+      }
+    }
+    localStorage.setItem(to + ".__migrated", "1");
+  } catch {
+    // Storage unavailable: the reader starts on its defaults.
+  }
+}
+
 var plugin_default = {
   id: ID,
   name: "RSS Reader",
@@ -6770,6 +6790,7 @@ var plugin_default = {
   version: "1.0.9",
   defaultEnabled: true,
   register(ctx) {
+    migrateLegacyStorage();
     rssRest = typeof ctx.rest === "function" ? ctx.rest : null;
     if (!rssRest) throw new Error("RSS Reader requires the plugin REST API.");
     rssCtx = ctx;

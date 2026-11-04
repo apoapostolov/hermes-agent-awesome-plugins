@@ -1164,12 +1164,33 @@ const CSS = `
 [data-pe-over]{outline:1px solid var(--ui-accent);outline-offset:-1px}
 `
 
+/** The plugin id changed and localStorage keys are namespaced by it; copy the old ones once. */
+function migrateLegacyStorage() {
+  try {
+    const from = 'hermes.plugin.prompt-enhance.'
+    const to = 'hermes.plugin.Prompt Enhance.'
+    if (localStorage.getItem(to + '.__migrated')) return
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(from)) continue
+      const rest = key.slice(from.length)
+      if (localStorage.getItem(to + rest) === null) {
+        localStorage.setItem(to + rest, localStorage.getItem(key))
+      }
+    }
+    localStorage.setItem(to + '.__migrated', '1')
+  } catch {
+    // Storage unavailable: the plugin runs on its defaults.
+  }
+}
+
 export default {
   id: ID,
   name: 'Prompt Enhance',
   description: 'Send a saved prompt with the current draft as context. Folders, reorder, and a one-call model override that never writes the session.',
   defaultEnabled: true,
   register(ctx) {
+    migrateLegacyStorage()
     storage = ctx.storage
     openExternal = ctx.os && ctx.os.openExternal
     load()
