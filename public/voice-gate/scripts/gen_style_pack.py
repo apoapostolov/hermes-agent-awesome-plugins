@@ -63,6 +63,27 @@ BasedOnStyles = VoiceGate
 
 [*.markdown]
 BasedOnStyles = VoiceGate
+
+[*.mdx]
+BasedOnStyles = VoiceGate
+
+[*.txt]
+BasedOnStyles = VoiceGate
+
+[*.rst]
+BasedOnStyles = VoiceGate
+
+[*.adoc]
+BasedOnStyles = VoiceGate
+
+[*.org]
+BasedOnStyles = VoiceGate
+
+[*.html]
+BasedOnStyles = VoiceGate
+
+[*.htm]
+BasedOnStyles = VoiceGate
 """
 
 

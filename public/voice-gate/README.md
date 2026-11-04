@@ -3,7 +3,7 @@
   <strong>Finds the AI tells in Markdown.</strong>
   <p>Names them, file by file, before the turn ends.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.1-2ea44f" alt="Version 1.3.1" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -14,7 +14,7 @@
 
 ## What it does
 
-Hermes runs a `pre_verify` hook once per turn when files were edited, and a hook may answer with a message that sends the agent back for another pass. Voice Gate uses that moment to read the Markdown the turn changed and report the AI tells it finds: a verdict opener in the first line, a closing offer at the end, a run of bold pseudo-headings, a wall of AI vocabulary.
+Hermes runs a `pre_verify` hook once per turn when files were edited, and a hook may answer with a message that sends the agent back for another pass. Voice Gate uses that moment to read the prose the turn changed and report the AI tells it finds: a verdict opener in the first line, a closing offer at the end, a run of bold pseudo-headings, a wall of AI vocabulary. Voice Gate reads the prose a turn changed, not only Markdown: plain text, reStructuredText, AsciiDoc, Org and LaTeX documents, HTML pages and PDFs are all judged, and a PDF is decoded here rather than through a library. Code inside a document is ignored, so a README that quotes a banned phrase is not flagged for quoting it, and a file that is mainly source code carries no prose to judge and is skipped.
 
 It reports and asks. It never edits your files, never blocks a turn it cannot explain, and never runs when the file is too short to judge.
 

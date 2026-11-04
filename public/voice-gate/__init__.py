@@ -25,12 +25,13 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from . import extract
 from . import rules
 from . import vale
 
 log = logging.getLogger(__name__)
 
-PROSE_SUFFIXES = {".md", ".markdown", ".mdx"}
+PROSE_SUFFIXES = set(extract.TEXT_SUFFIXES) | set(extract.PDF_SUFFIXES)
 SKIP_PARTS = {".git", "node_modules", ".venv", "venv", "dist", "build", "__pycache__"}
 DEFAULT_MIN_WORDS = 200
 _SKIP_WORDS = {"off", "skip", "false", "no", "0"}
@@ -281,7 +282,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
             if path is None:
                 continue
             try:
-                text = path.read_text(encoding="utf-8", errors="replace")
+                text = (extract.read(path) or "")
             except OSError:
                 continue
             result = rules.lint(text)
@@ -327,7 +328,7 @@ def _tool_check(args: Dict[str, Any]) -> Dict[str, Any]:
         if path is None:
             continue
         try:
-            chunks.append((path.name, path.read_text(encoding="utf-8", errors="replace")))
+            chunks.append((path.name, (extract.read(path) or "")))
         except OSError:
             continue
     if not chunks:

@@ -21,12 +21,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import profile as profiles
+from . import extract
 from . import rules
 from . import vale
 
 log = logging.getLogger(__name__)
 
-PROSE_SUFFIXES = {".md", ".markdown", ".mdx"}
+PROSE_SUFFIXES = set(extract.TEXT_SUFFIXES) | set(extract.PDF_SUFFIXES)
 SAMPLE_SUFFIXES = {".md", ".markdown", ".mdx", ".txt", ".json"}
 SKIP_PARTS = {".git", "node_modules", ".venv", "venv", "dist", "build", "__pycache__"}
 _SKIP_WORDS = {"off", "skip", "false", "no", "0"}
@@ -317,7 +318,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
             if path is None:
                 continue
             try:
-                text = path.read_text(encoding="utf-8", errors="replace")
+                text = (extract.read(path) or "")
             except OSError:
                 continue
             result = rules.lint(text, data)
@@ -348,7 +349,7 @@ def _read_sample(path: Path) -> str:
     try:
         if path.stat().st_size > _MAX_SAMPLE_BYTES:
             return ""
-        return path.read_text(encoding="utf-8", errors="replace")
+        return (extract.read(path) or "")
     except OSError:
         return ""
 
@@ -384,7 +385,7 @@ def _tool_check(args: Dict[str, Any]) -> Dict[str, Any]:
         if resolved is None:
             continue
         try:
-            texts.append((resolved.name, resolved.read_text(encoding="utf-8", errors="replace")))
+            texts.append((resolved.name, (extract.read(resolved) or "")))
         except OSError:
             continue
     if not texts:
