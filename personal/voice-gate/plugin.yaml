@@ -1,0 +1,38 @@
+name: voice-gate
+label: Voice Gate
+version: 1.0.0
+description: "Checks the Markdown a turn changed against your own writing profile, then asks for one more pass before the turn finishes. The plugin ships generic rules and loads a profile document that carries your voice; with no profile loaded it behaves like the public edition."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/voice-gate
+tags:
+  - writing
+  - markdown
+  - hooks
+  - profiles
+requires_hermes: ">=0.22.0"
+config_schema:
+  mode:
+    type: str
+    label: Mode
+    description: "Warn asks once, improve keeps asking until the tells are gone, skip turns the gate off."
+    choices:
+      - "warn"
+      - "improve"
+      - "skip"
+  profile:
+    type: str
+    label: Profile
+    description: "Name of a profile in HERMES_HOME/voice-profiles, or a path to one. Empty uses the generic rules."
+  min_words:
+    type: number
+    label: Minimum words overrides
+    description: "Smallest document to check. 0 uses the profile's own floor, default 200."
+provides_hooks:
+  - pre_verify
+provides_tools:
+  - voice_gate_check
+  - voice_gate_profile
+  - voice_gate_learn

@@ -1,0 +1,55 @@
+# Example voice-gate profile.
+# Copy to HERMES_HOME/voice-profiles/<name>.yaml and edit. Every list is
+# optional: a key you leave out keeps the plugin's generic rules.
+
+name: example
+description: "A short description of whose voice this is and where it came from."
+
+# Hermes profiles the gate runs in. Leave the key out to run everywhere the
+# plugin is enabled. Names match the profile directories (default, work, ...).
+applies_to:
+  - default
+
+thresholds:
+  min_words: 200
+  conclusion_signposts: 2
+  negation_triads: 2
+  bold_pseudo_headings: 2
+  bold_lead_bullets: 3
+  bold_lead_ratio: 0.6
+  buzzwords_floor: 5
+  buzzwords_per_150_words: 1
+
+preferences:
+  # Flag em dashes as a finding. Off by default.
+  no_em_dash: false
+  # Informational: the linter reports these, the gate does not act on them.
+  no_semicolon: false
+
+rules:
+  # Phrases that must not start the opening prose.
+  verdict_openers:
+    - the real question
+    - the honest headline
+  # Offers of more work that must not appear.
+  closing_offers:
+    - let me know if
+    - i hope this helps
+  # Phrases that must not start the first sentence.
+  cliche_openers:
+    - in today's
+  # Phrases that must not open more than one sentence.
+  conclusion_signposts:
+    - in conclusion
+    - to sum up
+  # Vocabulary to count. Replace with the words this person avoids.
+  buzzwords:
+    - leverage
+    - seamless
+  # Words that are always a finding, regardless of count.
+  banned_words:
+    - synergy
+  # Praise words that read as advertising.
+  marketing_adjectives:
+    - revolutionary
+    - world-class
