@@ -45,7 +45,7 @@ _HEADED = {
     "type": "boolean",
     "description": (
         "Deliver through physical input instead of the accessibility API. This moves the cursor and can take "
-        "focus, so it interrupts Apo's work: set it only when he asked for physical input, or when a headless "
+        "focus, so it interrupts the user's work: set it only when they asked for physical input, or when a headless "
         "action returned POLICY_DENIED and there is no semantic alternative. Default false."
     ),
 }
@@ -230,7 +230,7 @@ WINDOW: Dict[str, Any] = {
     "description": (
         "Manage apps and windows without touching their content: launch an app, quit one, focus, resize, move, "
         "minimize, maximize or restore a window. 'restore' is the fix for a minimized window, which cannot be "
-        "driven at all. 'focus' brings a window to the front and takes the foreground away from Apo, so prefer "
+        "driven at all. 'focus' brings a window to the front and takes the foreground away from the user, so prefer "
         "leaving a window behind another one: a covered window is still drivable. 'launch' takes a bare name that "
         "exists under System32/Windows ('notepad') or an absolute path, not a display name, and refuses when the "
         "app is already running."
@@ -264,7 +264,7 @@ CLIPBOARD: Dict[str, Any] = {
     "name": "desktop_clipboard",
     "description": (
         "Read, replace or clear the system clipboard. Clipboard content is private: do not paste it into logs, "
-        "commits, public messages or uploads, and do not overwrite what Apo copied unless the task needs it."
+        "commits, public messages or uploads, and do not overwrite what the user copied unless the task needs it."
     ),
     "parameters": {
         "type": "object",

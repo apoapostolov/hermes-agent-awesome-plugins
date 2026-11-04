@@ -8,6 +8,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 ### Changed
 
 - **vercel-agent-desktop-support:** renamed from `hermes-agent-desktop`, at the same version `1.0.2` because no behaviour changed. In the plugin catalog the old name read as Nous's own Hermes Desktop app, so it is named for the upstream `agent-desktop` binary it wraps instead. The directory, `plugin.yaml` name, README, install commands, root screenshot and pack pin follow. The plugin id changed, so an existing install is reinstalled rather than renamed in place, and settings saved under the old id are not read; the nine tools, the `pre_tool_call` hook and the config keys are unchanged.
+- vercel-agent-desktop-support. Three tool descriptions named the author ("interrupts Apo's work", "away from Apo", "what Apo copied"), and every user's model reads those descriptions. They say "the user" now. Same 1.0.2.
 
 
 ### Added
