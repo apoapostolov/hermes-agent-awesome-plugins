@@ -118,22 +118,38 @@ def prose_lines(text: str) -> str:
     keyword or carry code punctuation on most characters. Dropping those lines
     leaves the word count that the floor already measures, which is how a
     README with code blocks stays prose while a `.txt` of Python does not.
+
+    Fenced regions go whole, delimiters included, because leaving the content
+    behind would read a YAML example as a paragraph: a profile that lists the
+    phrases it refuses must not be flagged for listing them.
     """
     kept: list[str] = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped:
+    fenced = False
+    for raw in text.splitlines():
+        head = raw.lstrip()
+        if not head:
             continue
-        if stripped.startswith(("```", "~~~", "    ", "	")):
+        if head.startswith(("```", "~~~")):
+            fenced = not fenced
             continue
-        if stripped.startswith(CODE_STARTS):
+        if fenced:
             continue
-        density = sum(char in CODE_CHARS for char in stripped) / len(stripped)
+        indent = len(raw) - len(head)
+        is_item = head.startswith(("- ", "* ", "+ ", "> ")) or head[:2].strip().isdigit()
+        if (
+            indent >= 4
+            and not is_item
+            and (":" in head or "=" in head or head.startswith(("{", "[", '"', "'")))
+        ):
+            continue  # an indented config or code block, never a paragraph
+        if head.startswith(CODE_STARTS):
+            continue
+        density = sum(char in CODE_CHARS for char in head) / len(head)
         if density > 0.12:
             continue
-        if len(stripped.split()) <= 3 and not stripped.endswith((".", "!", "?", ":", ";", ",")):
+        if len(head.split()) <= 3 and not head.endswith((".", "!", "?", ":", ";", ",")):
             continue  # a heading or a label, not a sentence
-        kept.append(stripped)
+        kept.append(head)
     return "\n".join(kept)
 
 
