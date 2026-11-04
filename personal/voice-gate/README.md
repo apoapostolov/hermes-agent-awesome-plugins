@@ -63,6 +63,8 @@ voice_gate_check(text="<a paragraph you wrote>", profile="my-voice")
 
 The learning pass measures sentence length, em dashes, semicolons, bold lines, contractions, and exclamations, then lists the opening and closing phrases that repeat. Repetition is evidence of a habit; a single sample is not. The skill covers the rest, including the rule that a profile stores shapes, never the person's own sentences.
 
+`hermes plugins doctor` resolves its argument as a directory slug, so the spaced display name does not address it; pass the path instead: `hermes plugins doctor ~/.hermes/plugins/voice-gate` (on Windows, `%LOCALAPPDATA%\hermes\plugins\voice-gate`).
+
 ## Settings
 
 Settings → Plugins → Voice Gate.

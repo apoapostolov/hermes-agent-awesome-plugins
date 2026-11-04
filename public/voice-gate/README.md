@@ -29,6 +29,8 @@ hermes plugins enable voice-gate
 
 Once the plugin is in the catalog, `hermes plugins install voice-gate` is enough.
 
+`hermes plugins doctor` resolves its argument as a directory slug, so the spaced display name does not address it; pass the path instead: `hermes plugins doctor ~/.hermes/plugins/voice-gate` (on Windows, `%LOCALAPPDATA%\hermes\plugins\voice-gate`).
+
 ## Settings
 
 Settings → Plugins → Voice Gate.
