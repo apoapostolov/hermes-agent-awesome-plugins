@@ -1,4 +1,4 @@
-name: voice-gate
+name: "Voice Gate"
 label: Voice Gate
 version: 1.1.0
 description: "Checks the Markdown a turn changed against your own writing profile, then asks for one more pass before the turn finishes. The plugin ships generic rules and loads a profile document that carries your voice; with no profile loaded it behaves like the public edition."

@@ -1,4 +1,4 @@
-name: voice-gate
+name: "Voice Gate"
 label: Voice Gate
 version: 1.1.0
 description: "Checks the Markdown a turn changed for the AI tells that make writing sound machine made, and reports them before the turn finishes. The rules ship with the plugin, so nothing is fetched and no other package is required."
