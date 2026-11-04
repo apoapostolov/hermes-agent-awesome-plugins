@@ -42,14 +42,14 @@ A finding turns into a nudge when one of these crosses its threshold:
 
 | Tell | Fires when |
 | --- | --- |
-| Verdict opener | The opening prose starts a sentence with a phrase such as "The real question" or "The honest headline" |
-| Closing offer | The text offers more work: "let me know if", "would you like me to", "I hope this helps" |
-| Cliche opener | The first line starts with "In today's", "Let's dive in", "It's worth noting" |
-| Conclusion signpost | Two or more sentences open with "In conclusion", "To sum up", "At the end of the day" |
-| Negation triad | Two or more "not just X, but Y" constructions |
+| Verdict opener | The opening prose starts a sentence with a verdict phrase such as `The real question` or `The honest headline` |
+| Closing offer | The text offers more work: `let me know if`, `would you like me to`, `I hope this helps` |
+| Cliche opener | The first line starts with `In today's`, `Let's dive in`, or `It's worth noting` |
+| Conclusion signpost | Two or more sentences open with `In conclusion`, `To sum up`, or `At the end of the day` |
+| Negation triad | Two or more `not just X, but Y` constructions |
 | Bold pseudo-heading | Two or more lines that are nothing but bold text |
 | Bold lead-in bullets | Three or more bullets that open with a bold label, at 60% or more of the list |
-| AI buzzword | Five or more, or one per 150 words in a longer document: leverage, seamless, robust, delve, tapestry, testament, realm, unlock, empower, and the rest of the list in `rules.py` |
+| AI buzzword | Five or more, or one per 150 words in a longer document: `leverage`, `seamless`, `robust`, `delve`, `tapestry`, `testament`, `realm`, `unlock`, `empower`, and the rest of the list in `rules.py` |
 
 One bold heading or one buzzword is normal writing, which is why the thresholds are set where a pattern starts rather than where a single word appears.
 
