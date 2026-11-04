@@ -27,6 +27,15 @@ the component that changed; a plugin patch does not imply a new pack release.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
 
+## [voice-gate 1.3.5] - 2026-11-05
+
+The exceptions setting is a box now, not a line.
+
+### Changed
+
+- `Exceptions` asks for a five-line field with a dim example, so a list of entries can be read and edited as a list. Manifests can only ask for this with `type: text`, a field type added to Hermes in the companion change; on a build without it the field stays a single-line string and saves exactly as before, so nothing breaks while the two arrive at different times.
+- The Vale pack and the rules are unchanged in this release.
+
 ## [voice-gate 1.3.4] - 2026-11-05
 
 Coverage of the humanizer references, a switch per family, and the plan for what

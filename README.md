@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Voice Gate 1.3.4 works through the humanizer references. The rules now cover 46 families: 20 word and phrase lists, plus the sentence and paragraph shapes around them, from narrated candor and shadowboxed objections to negative listings, stacked hedges and template residue. Every family has its own switch in Settings, so a project can turn off what does not fit it; documentation paths are judged by a documentation register, where bold field labels and arrows are conventions rather than tells. The remaining catalog patterns, and what each would need before a rule could decide them, are written down in `docs/HUMANIZER-COVERAGE.md`.
+Voice Gate 1.3.5 turns the Exceptions setting into a five-line box with a dim example, so a list of entries reads as a list instead of one long line. That needs a field type Hermes did not have, so the same release pairs with a small core change: a `text` field with `rows` and a `placeholder`. On a build without it the field stays a single line and saves as before, which means the two can arrive in either order.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 

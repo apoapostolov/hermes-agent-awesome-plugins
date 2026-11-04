@@ -3,7 +3,7 @@
   <strong>Finds the AI tells in Markdown.</strong>
   <p>Names them, file by file, before the turn ends.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.4-2ea44f" alt="Version 1.3.4" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.5-2ea44f" alt="Version 1.3.5" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
