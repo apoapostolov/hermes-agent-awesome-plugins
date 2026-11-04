@@ -72,10 +72,49 @@ Settings → Plugins → Voice Gate.
 | Mode | `warn` asks once per turn, `improve` keeps asking inside the host's nudge budget, `skip` turns the gate off. |
 | Profile | Name in `HERMES_HOME/voice-profiles` or a path. Empty uses the generic rules. |
 | Minimum words overrides | 0 uses the profile's floor. A positive number overrides it for every profile. |
+| Vale second opinion | `advisory` runs Vale over the same changed files and appends one line when it reports at least the minimum number of alerts; `off` leaves it out. |
+| Vale minimum alerts | The threshold Vale has to reach before the gate mentions it. Three by default. |
+| Vale binary | Path to a Vale binary. Empty uses the plugin's copy, then `PATH`. |
 
 ## What it checks
 
 Markdown only: `.md`, `.markdown`, `.mdx`. Paths under `.git`, `node_modules`, `.venv`, `venv`, `dist`, `build` and `__pycache__` are skipped. The tell list, the thresholds and the wording of the objection all come from the active profile, so two people running this plugin get two different gates.
+
+## Vale
+
+`voice_gate_vale` installs and runs [Vale](https://vale.sh), the prose linter, on Markdown you name. The release is pinned, the sha256 is checked against the digest in `vale.py` before anything is unpacked, and the copy lives under `HERMES_HOME/plugin-data/voice-gate/`. The install call goes to the approval prompt, because it downloads and runs a binary.
+
+```text
+voice_gate_vale(action="status")
+voice_gate_vale(action="install")
+voice_gate_vale(action="check", paths=["docs/release-notes.md"])
+```
+
+Status resolves an existing binary from the `Vale binary` setting, then the plugin's own copy, then `PATH`, so a Vale you already installed is used as-is. Checks return Vale's own report and a count per severity.
+
+### The style pack
+
+`styles/VoiceGate/` holds the rules Vale runs. Every file in it is generated from `rules.py` by `scripts/gen_style_pack.py`, so the pack cannot describe a different list than the engine; `scripts/check_style_pack.py` exits nonzero when the two drift, which makes it usable in CI.
+
+```text
+python scripts/check_style_pack.py
+```
+
+Nine rules: `Terms`, `Marketing`, `Significance`, `Signposts`, `Openers`, `Hedges`, `Filler`, `Transitions` and `NegationTriad`. The first five alert at `warning` and the rest at `suggestion`, and `.vale.ini` sets `MinAlertLevel = warning`, so the nudge is driven by the rules that matter.
+
+The pack is portable. Copy `.vale.ini` and `styles/` into a repository and Vale, the VS Code extension and any pre-commit hook judge the same prose by the same list.
+
+### A second opinion in the turn
+
+`Vale second opinion` has two states. `off`, the default, leaves Vale out of the turn entirely. `advisory` runs it over the same changed Markdown the engine read and appends one line to the nudge:
+
+```text
+voice-gate improve: fix 1 file(s) before this turn ends. notes.md: AI vocabulary 5 (delve, tapestry). Vale reports 6 alert(s) in 1 file(s) (Terms 3, Significance 2, Signposts 1); first at line 5: In conclusion.
+```
+
+It speaks only when Vale reports at least `Vale minimum alerts` warnings, three by default, and only when a binary resolves. An alert below that threshold, a missing binary, or a report that fails to parse leaves the nudge exactly as the engine wrote it. Vale runs on the files the engine already accepted by word count, at most six of them.
+
+The engine and the pack catch the same generic families, so the line Vale adds is position and a per-rule breakdown rather than new words. Profile-specific lists belong to the engine, which is where a person's own vocabulary is enforced without regenerating a style.
 
 ## This edition ships with no personal data
 

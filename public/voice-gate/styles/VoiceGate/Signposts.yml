@@ -1,0 +1,18 @@
+extends: existence
+message: "Conclusion signpost: '%s'. End on the point."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "in conclusion"
+  - "to sum up"
+  - "all in all"
+  - "at the end of the day"
+  - "in summary"
+  - "to wrap up"
+  - "the bottom line is"
+  - "ultimately,"
+  - "overall,"
+  - "in the end,"
+  - "to conclude"

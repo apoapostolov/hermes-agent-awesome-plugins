@@ -135,17 +135,64 @@ def _resolve_path(raw: str) -> Optional[Path]:
         return None
 
 
-def _message(found: List[Tuple[str, List[str]]], mode: str, name: str) -> str:
+def _message(found: List[Tuple[str, List[str]]], mode: str, name: str, note: str = "") -> str:
     listed = "; ".join(f"{file}: {', '.join(calls)}" for file, calls in found)
+    pieces: List[str] = []
+    if listed:
+        if mode == "improve":
+            pieces.append(f"fix {len(found)} file(s) before this turn ends. {listed}.")
+        else:
+            pieces.append(f"tells in {len(found)} changed file(s). {listed}.")
+    if note:
+        pieces.append(note)
     if mode == "improve":
-        return (
-            f"voice-gate improve ({name}): fix {len(found)} file(s) before this turn ends. {listed}. "
-            "Rewrite the passages whose job is explanation, then re-read the file."
-        )
-    return (
-        f"voice-gate ({name}): tells in {len(found)} changed file(s). {listed}. "
-        "Rewrite the passages whose job is explanation, or say why the shape is deliberate."
-    )
+        tail = "Rewrite the passages whose job is explanation, then re-read the file."
+        return f"voice-gate improve ({name}): {' '.join(pieces)} {tail}"
+    tail = "Rewrite the passages whose job is explanation, or say why the shape is deliberate."
+    return f"voice-gate ({name}): {' '.join(pieces)} {tail}"
+
+
+VALE_OFF = {"off", "skip", "no", "false", "0", ""}
+
+
+def _vale_advisory(paths: List[Path]) -> Optional[str]:
+    """A second opinion from Vale, when it is installed and switched on.
+
+    The pack under ``styles/`` is generated from the same families, so Vale
+    contributes positions and a per-rule breakdown rather than different words.
+    Fail-open in every direction: no binary, no report, or fewer alerts than the
+    threshold, and the gate says nothing on its behalf.
+    """
+    mode = str(_setting("vale_mode", "off") or "off").strip().lower()
+    if mode in VALE_OFF or not paths:
+        return None
+    override = _vale_path()
+    if not vale.resolve_binary(override):
+        return None
+    report = vale.run([str(path) for path in paths[:6]], override)
+    if not report.get("ok"):
+        return None
+    alerts: List[Dict[str, Any]] = []
+    for results in (report.get("report") or {}).values():
+        for alert in results or []:
+            if str(alert.get("Severity") or "").lower() in ("error", "warning"):
+                alerts.append(alert)
+    try:
+        floor = int(_setting("vale_min_alerts", 3) or 3)
+    except (TypeError, ValueError):
+        floor = 3
+    if len(alerts) < floor:
+        return None
+    counts: Dict[str, int] = {}
+    for alert in alerts:
+        name = str(alert.get("Check") or "rule").split(".")[-1]
+        counts[name] = counts.get(name, 0) + 1
+    summary = ", ".join(f"{name} {count}" for name, count in
+                        sorted(counts.items(), key=lambda item: -item[1])[:4])
+    first = alerts[0]
+    files = len(report.get("report") or {})
+    return (f"Vale reports {len(alerts)} alert(s) in {files} file(s) ({summary}); "
+            f"first at line {first.get('Line')}: {first.get('Match')}.")
 
 
 def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
@@ -161,6 +208,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
             return None
         floor = _min_words(data)
         found: List[Tuple[str, List[str]]] = []
+        checked: List[Path] = []
         for raw in kwargs.get("changed_paths") or []:
             path = _resolve_path(str(raw))
             if path is None:
@@ -172,12 +220,15 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
             result = rules.lint(text, data)
             if int(result.get("words") or 0) < floor:
                 continue
+            checked.append(path)
             calls = rules.gate_findings(result, data)
             if calls:
                 found.append((path.name, calls))
-        if not found:
+        advisory = _vale_advisory(checked) or ""
+        if not found and not advisory:
             return None
-        return {"action": "continue", "message": _message(found, mode, str(data.get("name") or "base"))}
+        return {"action": "continue",
+                "message": _message(found, mode, str(data.get("name") or "base"), advisory)}
     except Exception:
         log.debug("voice-gate pre_verify failed", exc_info=True)
         return None

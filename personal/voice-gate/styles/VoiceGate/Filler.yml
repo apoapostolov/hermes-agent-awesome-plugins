@@ -1,0 +1,19 @@
+extends: existence
+message: "Wordy construction: '%s'."
+level: suggestion
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "in order to"
+  - "due to the fact that"
+  - "at this point in time"
+  - "it is important to note"
+  - "needless to say"
+  - "the fact that"
+  - "in terms of"
+  - "for the purpose of"
+  - "with regard to"
+  - "in the event that"
+  - "a number of"
+  - "in light of"

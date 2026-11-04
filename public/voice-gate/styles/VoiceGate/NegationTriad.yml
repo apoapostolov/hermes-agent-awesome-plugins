@@ -1,0 +1,7 @@
+extends: existence
+message: "Negation triad: 'not just X, but Y' frame."
+level: warning
+scope: sentence
+nonword: true
+tokens:
+  - '(?i)\bnot (?:just|only)\b[^.!?]{0,90}\bbut\b'

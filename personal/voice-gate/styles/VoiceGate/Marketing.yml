@@ -1,0 +1,27 @@
+extends: existence
+message: "Promotional adjective: '%s'. Say what it does."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "robust"
+  - "cutting-edge"
+  - "world-class"
+  - "best-in-class"
+  - "revolutionary"
+  - "stunning"
+  - "groundbreaking"
+  - "renowned"
+  - "powerful"
+  - "vibrant"
+  - "thriving"
+  - "unmatched"
+  - "unparalleled"
+  - "effortless"
+  - "premium"
+  - "next-generation"
+  - "state-of-the-art"
+  - "future-proof"
+  - "game changing"
+  - "top-tier"

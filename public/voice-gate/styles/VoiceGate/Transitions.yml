@@ -1,0 +1,16 @@
+extends: existence
+message: "Transition that announces structure: '%s'."
+level: suggestion
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "moreover"
+  - "furthermore"
+  - "additionally"
+  - "in addition"
+  - "that said,"
+  - "with that in mind"
+  - "on the other hand,"
+  - "having said that"
+  - "to that end"

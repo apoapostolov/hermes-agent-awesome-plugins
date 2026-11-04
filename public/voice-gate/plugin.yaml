@@ -13,6 +13,15 @@ tags:
   - hooks
 requires_hermes: ">=0.22.0"
 config_schema:
+  vale_mode:
+    type: str
+    label: Vale second opinion
+    description: "off, or advisory to add Vale's own alerts to the nudge when it is installed."
+    choices: ["off", "advisory"]
+  vale_min_alerts:
+    type: number
+    label: Vale minimum alerts
+    description: "Speak on Vale's behalf only when it reports at least this many warnings."
   vale_path:
     type: str
     label: Vale binary

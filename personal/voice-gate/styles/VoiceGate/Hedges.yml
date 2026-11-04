@@ -1,0 +1,20 @@
+extends: existence
+message: "Hedge: '%s'. Only hedge when the evidence is thin."
+level: suggestion
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "perhaps"
+  - "arguably"
+  - "somewhat"
+  - "in some ways"
+  - "to an extent"
+  - "it could be argued"
+  - "may well"
+  - "presumably"
+  - "ostensibly"
+  - "seemingly"
+  - "it seems"
+  - "more or less"
+  - "fairly"

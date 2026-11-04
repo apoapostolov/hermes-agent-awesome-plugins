@@ -1,0 +1,20 @@
+extends: existence
+message: "Clich\u00e9 opener: '%s'. Start with the subject."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "in today's"
+  - "in the ever-evolving"
+  - "let's dive in"
+  - "let's unpack"
+  - "it's worth noting"
+  - "in the fast-paced"
+  - "we live in a world"
+  - "in an era of"
+  - "in recent years"
+  - "in the realm of"
+  - "when it comes to"
+  - "as we all know"
+  - "it goes without saying"

@@ -1,0 +1,26 @@
+extends: existence
+message: "Inflated significance: '%s'. State what happened."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "plays a crucial role"
+  - "plays a pivotal role"
+  - "plays a vital role"
+  - "plays a key role"
+  - "pivotal moment"
+  - "turning point"
+  - "speaks volumes"
+  - "leaves a lasting"
+  - "a reminder that"
+  - "stands as a"
+  - "serves as a"
+  - "functions as a"
+  - "represents a"
+  - "is more than just"
+  - "marks a significant"
+  - "cements its"
+  - "solidifies its"
+  - "ushering in"
+  - "paving the way"

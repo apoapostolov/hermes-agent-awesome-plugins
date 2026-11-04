@@ -186,6 +186,18 @@ def install(override: str = "") -> Dict[str, Any]:
     return {"ok": True, "already": False, "binary": str(binary), "version": version, "steps": steps}
 
 
+def config_path() -> Path:
+    """The pack the plugin ships, or a generated fallback in the data directory."""
+    shipped = Path(__file__).resolve().parent / ".vale.ini"
+    if shipped.is_file():
+        return shipped
+    fallback = data_dir() / ".vale.ini"
+    if not fallback.is_file():
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+        fallback.write_text(VALE_INI, encoding="utf-8")
+    return fallback
+
+
 def run(paths: List[str], override: str = "", timeout: float = 120.0) -> Dict[str, Any]:
     """Run Vale over files and return its JSON report, or a clear failure."""
     binary = resolve_binary(override)
@@ -194,10 +206,7 @@ def run(paths: List[str], override: str = "", timeout: float = 120.0) -> Dict[st
     files = [str(Path(p).resolve()) for p in paths if Path(p).is_file()]
     if not files:
         return {"ok": False, "error": "no readable files to check"}
-    ini = data_dir() / ".vale.ini"
-    if not ini.is_file():
-        data_dir().mkdir(parents=True, exist_ok=True)
-        ini.write_text(VALE_INI, encoding="utf-8")
+    ini = config_path()
     command = [binary, f"--config={ini}", "--output=JSON", *files]
     try:
         proc = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
@@ -210,7 +219,9 @@ def run(paths: List[str], override: str = "", timeout: float = 120.0) -> Dict[st
                 "stderr": (proc.stderr or "")[:800], "command": command}
     counts: Dict[str, int] = {}
     for result in report.values() if isinstance(report, dict) else []:
-        for alert in (result or {}).get("Alerts") or []:
+        # Vale returns a list of alerts per path; older reports nest them under "Alerts".
+        alerts = result.get("Alerts") if isinstance(result, dict) else result
+        for alert in alerts or []:
             severity = str(alert.get("Severity") or "unknown")
             counts[severity] = counts.get(severity, 0) + 1
     return {"ok": True, "binary": binary, "files": len(files), "counts": counts, "report": report}

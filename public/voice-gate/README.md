@@ -38,6 +38,8 @@ Settings → Plugins → Voice Gate.
 | Mode | `warn`, `improve`, `skip` | `warn` asks once per turn. `improve` keeps asking until the tells are gone or the host's nudge budget for the turn runs out. `skip` turns the gate off. |
 | Minimum words | number, default 200 | Documents shorter than this are ignored, so a stub note does not trigger a review. |
 | Vale binary | path | Path to a Vale binary. Empty uses the plugin's own copy under `HERMES_HOME/plugin-data`, then `PATH`. |
+| Vale second opinion | `off`, `advisory` | `advisory` runs Vale over the same changed files and appends one line when it reports at least the minimum number of alerts. |
+| Vale minimum alerts | number, default 3 | The threshold Vale has to reach before the gate mentions it. |
 
 ## What it checks
 
@@ -78,6 +80,30 @@ voice_gate_vale(action="check", paths=["docs/release-notes.md"])
 ```
 
 Status resolves an existing binary from the `Vale binary` setting, then the plugin's own copy, then `PATH`, so a Vale you already installed is used as-is. Checks return Vale's own report and a count per severity.
+
+### The style pack
+
+`styles/VoiceGate/` holds the rules Vale runs. Every file in it is generated from `rules.py` by `scripts/gen_style_pack.py`, so the pack cannot describe a different list than the engine; `scripts/check_style_pack.py` exits nonzero when the two drift, which makes it usable in CI.
+
+```text
+python scripts/check_style_pack.py
+```
+
+Nine rules: `Terms`, `Marketing`, `Significance`, `Signposts`, `Openers`, `Hedges`, `Filler`, `Transitions` and `NegationTriad`. The first five alert at `warning` and the rest at `suggestion`, and `.vale.ini` sets `MinAlertLevel = warning`, so the nudge is driven by the rules that matter.
+
+The pack is portable. Copy `.vale.ini` and `styles/` into a repository and Vale, the VS Code extension and any pre-commit hook judge the same prose by the same list.
+
+### A second opinion in the turn
+
+`Vale second opinion` has two states. `off`, the default, leaves Vale out of the turn entirely. `advisory` runs it over the same changed Markdown the engine read and appends one line to the nudge:
+
+```text
+voice-gate improve: fix 1 file(s) before this turn ends. notes.md: AI vocabulary 5 (delve, tapestry). Vale reports 6 alert(s) in 1 file(s) (Terms 3, Significance 2, Signposts 1); first at line 5: In conclusion.
+```
+
+It speaks only when Vale reports at least `Vale minimum alerts` warnings, three by default, and only when a binary resolves. An alert below that threshold, a missing binary, or a report that fails to parse leaves the nudge exactly as the engine wrote it. Vale runs on the files the engine already accepted by word count, at most six of them.
+
+The engine and the pack catch the same generic families, so the line Vale adds is position and a per-rule breakdown rather than new words. Profile-specific lists belong to the engine, which is where a person's own vocabulary is enforced without regenerating a style.
 
 ## Limits
 
