@@ -263,6 +263,19 @@ def _vale_advisory(paths: List[Path]) -> Optional[str]:
             f"first at line {first.get('Line')}: {first.get('Match')}.")
 
 
+def _exceptions_block() -> Dict[str, Any]:
+    """The exceptions as a profile carries them, read from the plugin's settings.
+
+    ``exceptions|em_dash: README.md, *.md`` silences one family for a kind of
+    file. An entry is ``tell: glob, glob``; the tell may be any family name,
+    and a stray name is ignored rather than guessed at.
+    """
+    raw = str(_setting("exceptions", "") or "").strip()
+    if not raw:
+        return {}
+    return {"exceptions": rules.exceptions(raw)}
+
+
 def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
     try:
         mode = _mode()
@@ -275,6 +288,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
         if not _bots_allow():
             return None
         min_words = _min_words()
+        block = _exceptions_block()
         found: List[Tuple[str, List[str]]] = []
         checked: List[Path] = []
         for raw in kwargs.get("changed_paths") or []:
@@ -289,7 +303,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
             if int(result.get("words") or 0) < min_words:
                 continue
             checked.append(path)
-            calls = rules.gate_findings(result)
+            calls = rules.gate_findings(result, block, str(path))
             if calls:
                 found.append((path.name, calls))
         advisory = _vale_advisory(checked) or ""
@@ -311,6 +325,9 @@ CHECK_SCHEMA = {
         "type": "object",
         "properties": {
             "text": {"type": "string", "description": "Prose to check directly."},
+            "path": {"type": "string",
+                     "description": "Optional file name for text, so exceptions written for that "
+                                    "kind of file apply."},
             "paths": {"type": "array", "items": {"type": "string"},
                       "description": "Markdown files to check."},
         },
@@ -319,27 +336,30 @@ CHECK_SCHEMA = {
 
 
 def _tool_check(args: Dict[str, Any]) -> Dict[str, Any]:
-    chunks: List[Tuple[str, str]] = []
+    declared = str(args.get("path") or "").strip()
+    chunks: List[Tuple[str, str, str]] = []
     text = str(args.get("text") or "")
     if text.strip():
-        chunks.append(("text", text))
+        chunks.append(("text", text, declared))
     for raw_path in args.get("paths") or []:
         path = _resolve(str(raw_path))
         if path is None:
             continue
         try:
-            chunks.append((path.name, (extract.read(path) or "")))
+            chunks.append((path.name, (extract.read(path) or ""), str(path)))
         except OSError:
             continue
     if not chunks:
         return {"ok": False, "error": "nothing to check: pass text or readable Markdown paths"}
+    block = _exceptions_block()
     checks = []
-    for source, body in chunks:
+    for source, body, target in chunks:
         result = rules.lint(body)
         checks.append({
             "source": source,
             "words": result.get("words", 0),
-            "findings": rules.gate_findings(result),
+            "findings": rules.gate_findings(result, block, target),
+            "exceptions": rules.suppressed(block, target),
             "tells": result.get("tells", {}),
         })
     return {"ok": True, "checks": checks}

@@ -62,6 +62,10 @@ config_schema:
     type: number
     label: Minimum words
     description: "Documents shorter than this are ignored. Default 200."
+  exceptions:
+    type: str
+    label: Exceptions
+    description: "One entry per line, as tell: glob, glob. It silences that family for files that match, without weakening it anywhere else. Empty means the rules apply everywhere."
 provides_hooks:
   - pre_verify
   - pre_tool_call

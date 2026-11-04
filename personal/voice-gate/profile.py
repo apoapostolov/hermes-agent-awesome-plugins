@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 PROFILE_SUFFIXES = (".yaml", ".yml", ".json")
-TOP_LEVEL_KEYS = {"name", "description", "applies_to", "rules", "thresholds", "preferences"}
+TOP_LEVEL_KEYS = {"name", "description", "applies_to", "rules", "thresholds", "preferences",
+                  "exceptions"}
 RULE_KEYS = {"verdict_openers", "closing_offers", "cliche_openers", "conclusion_signposts",
              "buzzwords", "banned_words", "marketing_adjectives"}
 
@@ -112,7 +113,35 @@ def validate(profile: Dict[str, Any]) -> List[str]:
     thresholds = profile.get("thresholds")
     if thresholds is not None and not isinstance(thresholds, dict):
         issues.append("thresholds must be a mapping")
+    if profile.get("exceptions") is not None:
+        raw = profile["exceptions"]
+        if not isinstance(raw, (dict, list, tuple, str)):
+            issues.append("exceptions must be a mapping, a list of lines, or one line per entry")
+        else:
+            table = _rules().exceptions(raw)
+            for entry in _exception_names(raw):
+                if not _rules().canonical_tell(entry):
+                    issues.append(f"unknown exception tell {entry!r}")
+            if not table:
+                issues.append("exceptions has no usable entry")
     return issues
+
+
+def _rules():
+    from . import rules as module
+
+    return module
+
+
+def _exception_names(raw: Any) -> List[str]:
+    if isinstance(raw, dict):
+        return [str(key) for key in raw]
+    items: List[str] = []
+    if isinstance(raw, str):
+        items = [line for line in raw.splitlines() if line.strip()]
+    elif isinstance(raw, (list, tuple)):
+        items = [str(item) for item in raw]
+    return [item.partition(":")[0] for item in items]
 
 
 def stats(samples: List[str]) -> Dict[str, Any]:

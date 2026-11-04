@@ -5,6 +5,10 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ## [Unreleased]
 
+### Added
+
+- **voice-gate:** an `exceptions` block, unreleased. A family can be silenced for the files a glob matches and stay in force everywhere else, so a generated reference page or a template that repeats the same construction can be exempted without weakening the rule for ordinary documents. The block accepts a mapping, a list of `tell: glob, glob` lines, or the plugin's own Exceptions setting, and every source merges. One limit worth naming: a check on bare text carries no path, so an exception never applies to it.
+
 ### Changed
 
 - **vercel-agent-desktop-support:** renamed from `hermes-agent-desktop`, at the same version `1.0.2` because no behaviour changed. In the plugin catalog the old name read as Nous's own Hermes Desktop app, so it is named for the upstream `agent-desktop` binary it wraps instead. The directory, `plugin.yaml` name, README, install commands, root screenshot and pack pin follow. The plugin id changed, so an existing install is reinstalled rather than renamed in place, and settings saved under the old id are not read; the nine tools, the `pre_tool_call` hook and the config keys are unchanged.

@@ -87,6 +87,20 @@ Settings → Plugins → Voice Gate.
 
 Markdown only: `.md`, `.markdown`, `.mdx`. Paths under `.git`, `node_modules`, `.venv`, `venv`, `dist`, `build` and `__pycache__` are skipped. The tell list, the thresholds and the wording of the objection all come from the active profile, so two people running this plugin get two different gates.
 
+## Exceptions
+
+A family can be wrong for a kind of file. A generated reference page repeats the same sentence on every page, and a template that leads every bullet with a bold label is doing its job. An exception silences one family for the files a glob matches and leaves the rule in force everywhere else.
+
+```yaml
+exceptions:
+  signposting: docs/reference/**
+  bold_lead_bullets: CHANGELOG.md, docs/api/*.md
+```
+
+The tell is any family name from the table above, in any spelling its aliases accept, or `all` to silence every family for those files. A glob is matched against the file name and against the whole path, so `README.md` matches in every directory and `docs/**` matches one tree. Write the block in the profile or in the plugin's Exceptions setting; both merge, and the profile is never modified by the setting.
+
+An exception needs a path to test. Text passed to `voice_gate_check` without a `path` has none, so it is judged with the plain rules.
+
 ## Vale
 
 `voice_gate_vale` installs and runs [Vale](https://vale.sh), the prose linter, on Markdown you name. The release is pinned, the sha256 is checked against the digest in `vale.py` before anything is unpacked, and the copy lives under `HERMES_HOME/plugin-data/voice-gate/`. The install call goes to the approval prompt, because it downloads and runs a binary.

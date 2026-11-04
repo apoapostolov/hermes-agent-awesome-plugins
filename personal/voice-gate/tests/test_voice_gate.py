@@ -165,6 +165,43 @@ def main() -> int:
     check("an unticked bot gets no nudge",
           ctx.hooks["pre_verify"](attempt=0, changed_paths=[str(probe)]) is None)
 
+    # ---- exceptions
+    dash = "The row loads and the value stays where it was. " * 20 + "One dash — here."
+    exc = {"preferences": {"no_em_dash": True}, "exceptions": {"em_dash": ["*.md"]}}
+    check("an exception silences its family in the file it names",
+          not rules.gate_findings(rules.lint(dash), exc, "README.md"))
+    check("the same family still fires in another format",
+          bool(rules.gate_findings(rules.lint(dash), exc, "notes.txt")))
+    check("an exception without a path applies to nothing",
+          bool(rules.gate_findings(rules.lint(dash), exc)))
+    shapes = (
+        {"em_dash": ["*.md"]},
+        {"em_dash": "*.md"},
+        ["em dash: *.md"],
+        "em_dash: README.md, *.md",
+        {"em_dash": {"globs": ["*.md"]}},
+    )
+    check("every accepted shape parses",
+          all(rules.suppressed({"exceptions": shape}, "docs/README.md") for shape in shapes))
+    check("a basename glob matches in any directory",
+          rules.suppressed({"exceptions": {"em_dash": ["readme.md"]}}, "deep/docs/README.md"))
+    check("a wildcard tell silences every family",
+          rules.suppressed({"exceptions": {"all": ["*.md"]}}, "x.md") == list(rules.TELL_KEYS))
+    check("an unknown tell is ignored", rules.normalise_exceptions({"nonsense": ["*.md"]}) == {})
+    check("a semicolon separates globs",
+          rules.normalise_exceptions("em_dash: *.md; *.txt")["em_dashes"] == ["*.md", "*.txt"])
+
+    # profile rows and settings rows merge
+    profile_rows = {"exceptions": {"em_dash": ["*.md"]}}
+    ctx.config["exceptions"] = "bold_lead_bullets: docs/**"
+    merged = module._exceptions_block(profile_rows)
+    check("profile and settings exceptions merge",
+          set(module.rules.normalise_exceptions(merged.get("exceptions"))) == {"em_dashes", "bold_lead_bullets"},
+          str(merged.get("exceptions")))
+    check("the profile itself is not mutated", "exceptions" in profile_rows and
+          module.rules.normalise_exceptions(profile_rows["exceptions"]) == {"em_dashes": ["*.md"]})
+    ctx.config["exceptions"] = ""
+
     print()
     if FAILURES:
         print(f"{len(FAILURES)} check(s) failed: {', '.join(FAILURES)}")

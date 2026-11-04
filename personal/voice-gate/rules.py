@@ -13,6 +13,7 @@ profile replaces any list it wants with the words its owner actually avoids.
 from __future__ import annotations
 
 import re
+from fnmatch import fnmatchcase
 from typing import Any, Dict, Iterable, List, Optional
 
 _MD_EMPHASIS = re.compile(r"[*_`]+")
@@ -266,17 +267,173 @@ def lint(text: str, profile: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     return {"words": words, "profile": merged["name"], "tells": tells}
 
 
-def gate_findings(result: Dict[str, Any], profile: Optional[Dict[str, Any]] = None) -> List[str]:
+TELL_KEYS = (
+    "closing_offers",
+    "significance_inflation",
+    "hedges",
+    "signposting",
+    "filler",
+    "transitions",
+    "trailing_qualifiers",
+    "gerund_openings",
+    "negation_positive",
+    "verdict_openers",
+    "cliche_openers",
+    "conclusion_signposts",
+    "negation_triads",
+    "bold_pseudo_headings",
+    "bold_lead_bullets",
+    "buzzwords",
+    "marketing_adjectives",
+    "banned_words",
+    "em_dashes",
+)
+
+TELL_ALIASES = {
+    "em_dash": "em_dashes",
+    "emdash": "em_dashes",
+    "em_dashes_in_documents": "em_dashes",
+    "bold_lead": "bold_lead_bullets",
+    "bold_lead_in": "bold_lead_bullets",
+    "bold_lead_ins": "bold_lead_bullets",
+    "bold_pseudo_heading": "bold_pseudo_headings",
+    "bold_heading": "bold_pseudo_headings",
+    "buzzword": "buzzwords",
+    "ai_vocabulary": "buzzwords",
+    "marketing_adjective": "marketing_adjectives",
+    "promotional_adjective": "marketing_adjectives",
+    "banned_word": "banned_words",
+    "closing_offer": "closing_offers",
+    "verdict_opener": "verdict_openers",
+    "cliche_opener": "cliche_openers",
+    "conclusion_signpost": "conclusion_signposts",
+    "negation_triad": "negation_triads",
+    "negation": "negation_positive",
+    "significance": "significance_inflation",
+    "hedge": "hedges",
+    "transition": "transitions",
+    "trailing_qualifier": "trailing_qualifiers",
+    "gerund_opening": "gerund_openings",
+}
+
+_WILDCARD_TELLS = ("*", "all", "any", "everything")
+
+
+def canonical_tell(name: Any) -> str:
+    """A tell name in the spelling the counters use, or '' when unknown."""
+    key = str(name or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if key in _WILDCARD_TELLS:
+        return "*"
+    if key in TELL_KEYS:
+        return key
+    if key in TELL_ALIASES:
+        return TELL_ALIASES[key]
+    if key + "s" in TELL_KEYS:
+        return key + "s"
+    if key.endswith("s") and key[:-1] in TELL_KEYS:
+        return key[:-1]
+    return ""
+
+
+def normalise_exceptions(value: Any) -> Dict[str, List[str]]:
+    """Exceptions in any accepted shape, as tell name to file globs.
+
+    An exception belongs to the writer, not to the rules, so it arrives from a
+    profile or from the plugin's own settings and can look like a mapping, a
+    list of ``tell: glob, glob`` lines, or one such string::
+
+        exceptions:
+          em_dash: ["README.md", "*.md"]
+          bold_lead_bullets: docs/**
+
+        exceptions: ["signposting: *.generated.md"]
+    """
+    entries: List[Any] = []
+    if isinstance(value, dict):
+        entries = list(value.items())
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            if isinstance(item, dict):
+                entries.extend(item.items())
+            else:
+                entries.append(str(item))
+    elif isinstance(value, str):
+        entries = [line for line in value.splitlines() if line.strip()]
+    out: Dict[str, List[str]] = {}
+    for entry in entries:
+        if isinstance(entry, tuple):
+            tell, globs = entry
+        else:
+            tell, _, globs = str(entry).partition(":")
+        if isinstance(globs, dict):
+            globs = globs.get("globs") or globs.get("paths") or globs.get("files") or []
+        if isinstance(globs, str):
+            globs = globs.replace(";", ",").split(",")
+        key = canonical_tell(tell)
+        if not key:
+            continue
+        cleaned = [str(glob).strip().lower() for glob in (globs or []) if str(glob).strip()]
+        if cleaned:
+            out.setdefault(key, []).extend(cleaned)
+    return out
+
+
+def exceptions(*values: Any) -> Dict[str, List[str]]:
+    """Every source merged, so settings and a profile can both add rows."""
+    merged: Dict[str, List[str]] = {}
+    for value in values:
+        for tell, globs in normalise_exceptions(value).items():
+            merged.setdefault(tell, []).extend(globs)
+    return merged
+
+
+def suppressed(profile: Optional[Dict[str, Any]], path: Any) -> List[str]:
+    """The tell names the exceptions cover for this file.
+
+    A glob is matched against the basename and the whole path, so ``README.md``
+    matches anywhere and ``docs/**`` matches one tree. An exception with no path
+    to test against applies to nothing: a check on bare text cannot know which
+    file it is and must not quietly drop findings.
+    """
+    if not path:
+        return []
+    table = normalise_exceptions((profile or {}).get("exceptions"))
+    if not table:
+        return []
+    posix = str(path).replace("\\", "/").lower()
+    base = posix.rsplit("/", 1)[-1]
+    hit: List[str] = []
+    for tell, globs in table.items():
+        for glob in globs:
+            if glob in ("*", "**") or fnmatchcase(base, glob) or fnmatchcase(posix, glob):
+                hit.append(tell)
+                break
+    if "*" in hit:
+        return list(TELL_KEYS)
+    return hit
+
+
+def gate_findings(
+    result: Dict[str, Any],
+    profile: Optional[Dict[str, Any]] = None,
+    path: Any = None,
+) -> List[str]:
     """The tells worth asking for another pass over.
 
     A single hit is ordinary writing. Each family fires at the density where a
-    reader starts to notice the pattern rather than the words.
+    reader starts to notice the pattern rather than the words. ``path`` lets a
+    profile exempt a family for a kind of file without weakening it everywhere.
     """
     merged = merge(profile)
     thresholds = merged["thresholds"]
     tells = result.get("tells") or {}
     words = int(result.get("words") or 0)
     found: List[str] = []
+    skip = set(suppressed(profile, path))
+
+    def emit(key: str, text: str) -> None:
+        if key not in skip:
+            found.append(text)
 
     def count(key: str) -> int:
         return int((tells.get(key) or {}).get("count") or 0)
@@ -298,35 +455,36 @@ def gate_findings(result: Dict[str, Any], profile: Optional[Dict[str, Any]] = No
     for key, label, floor in simple:
         if count(key) >= max(floor, 1):
             tail = f" ({samples(key)})" if samples(key) else ""
-            found.append(f"{label} {count(key)}{tail}")
+            emit(key, f"{label} {count(key)}{tail}")
 
     if count("verdict_openers"):
-        found.append(f"verdict opener {count('verdict_openers')}")
+        emit("verdict_openers", f"verdict opener {count('verdict_openers')}")
     if count("cliche_openers"):
-        found.append(f"cliche opener {count('cliche_openers')}")
+        emit("cliche_openers", f"cliche opener {count('cliche_openers')}")
     if count("conclusion_signposts") >= int(thresholds["conclusion_signposts"]):
-        found.append(f"conclusion signpost {count('conclusion_signposts')}")
+        emit("conclusion_signposts", f"conclusion signpost {count('conclusion_signposts')}")
     if count("negation_triads") >= int(thresholds["negation_triads"]):
-        found.append(f"negation triad {count('negation_triads')}")
+        emit("negation_triads", f"negation triad {count('negation_triads')}")
     if count("bold_pseudo_headings") >= int(thresholds["bold_pseudo_headings"]):
-        found.append(f"bold pseudo-heading {count('bold_pseudo_headings')}")
+        emit("bold_pseudo_headings", f"bold pseudo-heading {count('bold_pseudo_headings')}")
 
     bold = tells.get("bold_lead_bullets") or {}
     if int(bold.get("count") or 0) >= int(thresholds["bold_lead_bullets"]) and \
             float(bold.get("ratio") or 0) >= float(thresholds["bold_lead_ratio"]):
-        found.append(f"bold lead-in bullets {bold.get('count')}")
+        emit("bold_lead_bullets", f"bold lead-in bullets {bold.get('count')}")
 
     buzz_threshold = max(int(thresholds["buzzwords_floor"]),
                          int(words / 150 * float(thresholds["buzzwords_per_150_words"])))
     if count("buzzwords") >= buzz_threshold:
-        found.append(f"AI vocabulary {count('buzzwords')} ({samples('buzzwords')})")
+        emit("buzzwords", f"AI vocabulary {count('buzzwords')} ({samples('buzzwords')})")
     if count("marketing_adjectives") >= max(3, int(words / 400)):
-        found.append(f"promotional adjective {count('marketing_adjectives')} ({samples('marketing_adjectives')})")
+        emit("marketing_adjectives",
+             f"promotional adjective {count('marketing_adjectives')} ({samples('marketing_adjectives')})")
     if count("banned_words"):
-        found.append(f"banned word {count('banned_words')} ({samples('banned_words')})")
+        emit("banned_words", f"banned word {count('banned_words')} ({samples('banned_words')})")
     if merged["preferences"].get("no_em_dash") and count("em_dashes"):
-        found.append(f"em dash {count('em_dashes')}")
+        emit("em_dashes", f"em dash {count('em_dashes')}")
     elif count("em_dashes") >= int(thresholds["em_dashes"]):
-        found.append(f"em dash cluster {count('em_dashes')}")
+        emit("em_dashes", f"em dash cluster {count('em_dashes')}")
 
     return found

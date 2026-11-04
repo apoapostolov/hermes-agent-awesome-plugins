@@ -299,6 +299,20 @@ def _vale_advisory(paths: List[Path]) -> Optional[str]:
             f"first at line {first.get('Line')}: {first.get('Match')}.")
 
 
+def _exceptions_block(data: Dict[str, Any]) -> Dict[str, Any]:
+    """The profile's exceptions with the settings' own rows laid over them.
+
+    A profile carries exceptions because a preference about typography belongs
+    to the person writing. The settings copy exists for a public install with no
+    profile, and both merge, so a row added in one place never cancels the other.
+    """
+    rows = rules.exceptions(data.get("exceptions"), str(_setting("exceptions", "") or ""))
+    block = dict(data)
+    if rows:
+        block["exceptions"] = rows
+    return block
+
+
 def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
     try:
         mode = _mode()
@@ -310,6 +324,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
         data, _path, _issues = _active()
         if not _applies_here(data):
             return None
+        block = _exceptions_block(data)
         floor = _min_words(data)
         found: List[Tuple[str, List[str]]] = []
         checked: List[Path] = []
@@ -325,7 +340,7 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
             if int(result.get("words") or 0) < floor:
                 continue
             checked.append(path)
-            calls = rules.gate_findings(result, data)
+            calls = rules.gate_findings(result, block, str(path))
             if calls:
                 found.append((path.name, calls))
         advisory = _vale_advisory(checked) or ""
@@ -377,26 +392,29 @@ def _collect(paths: List[str], text: str) -> List[str]:
 def _tool_check(args: Dict[str, Any]) -> Dict[str, Any]:
     target = str(args.get("profile") or "").strip()
     data, path, issues = _loaded(target) if target else _active()
-    texts: List[Tuple[str, str]] = []
+    block = _exceptions_block(data)
+    declared = str(args.get("path") or "").strip()
+    texts: List[Tuple[str, str, str]] = []
     if args.get("text"):
-        texts.append(("text", str(args["text"])))
+        texts.append(("text", str(args["text"]), declared))
     for raw in args.get("paths") or []:
         resolved = _resolve_path(str(raw))
         if resolved is None:
             continue
         try:
-            texts.append((resolved.name, (extract.read(resolved) or "")))
+            texts.append((resolved.name, (extract.read(resolved) or ""), str(resolved)))
         except OSError:
             continue
     if not texts:
         return {"ok": False, "error": "nothing to check: pass text or paths"}
     reports = []
-    for label, body in texts:
+    for label, body, where in texts:
         result = rules.lint(body, data)
         reports.append({
             "source": label,
             "words": result["words"],
-            "findings": rules.gate_findings(result, data),
+            "findings": rules.gate_findings(result, block, where),
+            "exceptions": rules.suppressed(block, where),
             "tells": result["tells"],
         })
     return {
@@ -529,6 +547,9 @@ CHECK_SCHEMA = {
         "type": "object",
         "properties": {
             "text": {"type": "string", "description": "Prose to check."},
+            "path": {"type": "string",
+                     "description": "Optional file name for text, so exceptions written for that "
+                                    "kind of file apply."},
             "paths": {"type": "array", "items": {"type": "string"},
                       "description": "Markdown files to check instead of text."},
             "profile": {"type": "string",

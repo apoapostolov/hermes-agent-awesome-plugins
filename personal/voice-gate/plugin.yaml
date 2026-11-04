@@ -67,6 +67,10 @@ config_schema:
     type: number
     label: Minimum words overrides
     description: "Smallest document to check. 0 uses the profile's own floor, default 200."
+  exceptions:
+    type: str
+    label: Exceptions
+    description: "One entry per line, as tell: glob, glob. It silences that family for files that match, on top of the profile's own exceptions. Empty means the profile decides alone."
 provides_hooks:
   - pre_verify
   - pre_tool_call
