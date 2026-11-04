@@ -5,6 +5,11 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ## [Unreleased]
 
+### Changed
+
+- **vercel-agent-desktop-support:** renamed from `hermes-agent-desktop`, at the same version `1.0.2` because no behaviour changed. In the plugin catalog the old name read as Nous's own Hermes Desktop app, so it is named for the upstream `agent-desktop` binary it wraps instead. The directory, `plugin.yaml` name, README, install commands, root screenshot and pack pin follow. The plugin id changed, so an existing install is reinstalled rather than renamed in place, and settings saved under the old id are not read; the nine tools, the `pre_tool_call` hook and the config keys are unchanged.
+
+
 ### Added
 
 - **better-capabilities:** version `1.1.0`. Replaces the 1.0.0 design that painted delete and package controls into the Capabilities page. The plugin now owns a page under Settings ▸ Plugins with an overview, **Skills** and **Presets**: filter skills, flip them on or off, read the other markdown files in a skill folder, package a folder as a zip, reveal it, delete it to the Recycle Bin (or to a moved-aside folder when the bin is unavailable), and save, apply, overwrite, rename, reorder or delete on/off presets for skills, toolsets and agent plugins, per profile. Presets are snapshotted and applied through `host.skills`, `host.toolsets` and the `plugins.manage` RPC instead of core modules. The personal edition also carries two glyphs on the Capabilities nav row — this profile's Skills editor, and a picker that splits profiles by Skills and by Plugins — plus the `/preset` chat command. The listed edition now exists at `public/better-capabilities` and drops both of those: the command needs core capability-state modules, and the glyphs inject app markup. `LIMITATIONS.md` records each cut and why.

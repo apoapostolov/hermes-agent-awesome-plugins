@@ -29,7 +29,7 @@ from . import agentdesktop_config as settings
 
 RELEASE_BASE = "https://github.com/vercel-labs/agent-desktop/releases/download/v{version}/{name}"
 DEFAULT_VERSION = "1.0.2"
-USER_AGENT = "hermes-agent-desktop/1.0 (+https://github.com/apoapostolov/hermes-agent-awesome-plugins)"
+USER_AGENT = "vercel-agent-desktop-support/1.0 (+https://github.com/apoapostolov/hermes-agent-awesome-plugins)"
 PLUGIN_DIR = Path(__file__).resolve().parent
 ARCHIVE_ENTRY = "agent-desktop.exe"
 MAX_ARCHIVE_BYTES = 64 * 1024 * 1024

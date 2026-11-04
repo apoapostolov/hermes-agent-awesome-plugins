@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
-  <h1>Hermes Agent Desktop</h1>
+  <h1>Vercel Agent Desktop Support</h1>
   <strong>Hands on Windows apps without taking over the screen.</strong>
   <p>Read any app's real UI and act on it by ref: click, fill, select, toggle, scroll, key combos, windows, clipboard.</p>
   <p>
@@ -9,12 +9,12 @@
   </p>
 </div>
 <div align="center">
-  <img src="docs/hero.png" width="100%" alt="Hermes Agent Desktop" />
+  <img src="docs/hero.png" width="100%" alt="Vercel Agent Desktop Support" />
 </div>
 
 
 <div align="center">
-  <img src="docs/screenshot-settings.png" width="520" alt="Hermes Agent Desktop settings in Hermes Desktop" />
+  <img src="docs/screenshot-settings.png" width="520" alt="Vercel Agent Desktop Support settings in Hermes Desktop" />
 </div>
 
 ## What You Can Do
@@ -61,13 +61,13 @@ If you prefer npm, `npm install -g agent-desktop --allow-scripts=agent-desktop` 
 ## Install
 
 ```powershell
-hermes plugins install hermes-agent-desktop
+hermes plugins install vercel-agent-desktop-support
 ```
 
 Or from this repository:
 
 ```powershell
-hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/hermes-agent-desktop
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/vercel-agent-desktop-support
 ```
 
 New tools land on the next session; the gateway rebuilds the tool registry rather than hot-loading it.

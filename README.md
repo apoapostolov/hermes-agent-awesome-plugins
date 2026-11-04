@@ -43,7 +43,7 @@ Each plugin that has a settings page shows it under Settings, Plugins in Hermes 
   <a href="personal/better-capabilities"><img src="docs/screenshots/better-capabilities-settings.png" width="240" alt="Better Capabilities settings" /></a>
   <a href="personal/better-session-appearance"><img src="docs/screenshots/better-session-appearance-settings.png" width="240" alt="Better Session Appearance settings" /></a>
   <a href="personal/hermes-jev-routing"><img src="docs/screenshots/hermes-jev-routing-settings.png" width="240" alt="Jev Routing settings" /></a>
-  <a href="personal/hermes-agent-desktop"><img src="docs/screenshots/hermes-agent-desktop-settings.png" width="240" alt="Agent Desktop settings" /></a>
+  <a href="personal/vercel-agent-desktop-support"><img src="docs/screenshots/vercel-agent-desktop-support-settings.png" width="240" alt="Agent Desktop settings" /></a>
 </div>
 
 ## Personal and public
@@ -82,7 +82,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reaso
 | Plugin | What you get |
 | --- | --- |
 | [intelligent-tool-break](personal/intelligent-tool-break/README.md) · [public](public/intelligent-tool-break/README.md) | `/break`, `/break {msg}`, and `/again`. Desktop strip. Turn stays alive. |
-| [hermes-agent-desktop](personal/hermes-agent-desktop/README.md) · [public](public/hermes-agent-desktop/README.md) | Operate Windows apps through the accessibility tree: click, fill, select, toggle, scroll, key combos, windows, clipboard. Headless by default, so it never takes focus or the cursor. **Windows only.** |
+| [vercel-agent-desktop-support](personal/vercel-agent-desktop-support/README.md) · [public](public/vercel-agent-desktop-support/README.md) | Operate Windows apps through the accessibility tree: click, fill, select, toggle, scroll, key combos, windows, clipboard. Headless by default, so it never takes focus or the cursor. **Windows only.** |
 | [memory-review](personal/memory-review/README.md) · [public](public/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
 | [cdp-manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar, with a profile per port and one port a backend supervisor keeps alive. The `cdp` tool does the same from chat and repairs a Chrome profile-picker launch. |
 | [hermes-jev-routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. The listed edition rewrites the model and the reasoning level on the request the turn is already bound to, and reports a pick on another provider rather than sending it; the personal edition moves the live session and also reads the provider catalogue, Codex quota and private pricing. **Not in the pack; enable separately.** |

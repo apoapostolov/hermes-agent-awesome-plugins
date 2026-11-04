@@ -10,11 +10,11 @@ import tarfile
 
 import pytest
 
-from hermes_agent_desktop import agentdesktop_cli as cli
-from hermes_agent_desktop import agentdesktop_config as settings
-from hermes_agent_desktop import agentdesktop_install as installer
-from hermes_agent_desktop import agentdesktop_schemas as schemas
-from hermes_agent_desktop import agentdesktop_tools as tools
+from vercel_agent_desktop_support import agentdesktop_cli as cli
+from vercel_agent_desktop_support import agentdesktop_config as settings
+from vercel_agent_desktop_support import agentdesktop_install as installer
+from vercel_agent_desktop_support import agentdesktop_schemas as schemas
+from vercel_agent_desktop_support import agentdesktop_tools as tools
 
 FAKE_BINARY = b"MZ" + b"\x00" * 64
 

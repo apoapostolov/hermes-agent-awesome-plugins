@@ -1,7 +1,7 @@
 """Load the plugin directory as an importable package for the tests.
 
-The plugin directory is named ``hermes-agent-desktop``, which is not a legal
-Python module name, so the tests register it under ``hermes_agent_desktop``
+The plugin directory is named ``vercel-agent-desktop-support``, which is not a legal
+Python module name, so the tests register it under ``vercel_agent_desktop_support``
 before importing anything from it.
 """
 
@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGE = "hermes_agent_desktop"
+PACKAGE = "vercel_agent_desktop_support"
 
 if PACKAGE not in sys.modules:
     spec = importlib.util.spec_from_file_location(
