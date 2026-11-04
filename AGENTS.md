@@ -38,6 +38,14 @@ Do not raise a version unless Apo asks or the change needs a bump. A public-only
 
 Do not lower personal to match a public cut. Never ship personal behind public.
 
+## Latest plugin update
+
+`README.md` carries exactly one "Latest plugin update" block, and it names the most recent tagged plugin release.
+
+Rewrite it in the same commit that creates the tag. The block opens with the plugin and its version, says what the release adds for someone who already has the plugin, and ends with the restart or reinstall it needs. It names a version that exists as a tag, and it names the newest one.
+
+A tag that does not move this block leaves the front page advertising the previous plugin, and a block naming a version with no tag promises something nobody can install. Both are release defects, not copy edits.
+
 ## Catalog work
 
 Do not gut personal to get a listing. Do not restore public reach-in just to keep the two trees identical.

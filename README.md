@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Reddit 1.0.1 reads without a login. With only a Reddit app saved, the plugin asks for an app-only token and reads public subreddits, search, threads and user history; logging in adds private subreddits, saved items, moderation queues, the inbox and every write. Thread reads keep each comment's reply depth and fetch the comments Reddit hides behind "more", `reddit_user` reads one user's posts and comments, and a rate-limited call waits out Reddit's window instead of failing. The settings page under Settings, Plugins still saves and verifies the app, runs the login, checks the account and reports the scopes.
+Voice Gate 1.3.1 reads the prose a turn changed and reports the AI tells before the turn finishes. Markdown is no longer the only input: plain text, reStructuredText, AsciiDoc, Org, LaTeX and HTML documents go through the same seventeen rule families, and a PDF is decoded with the standard library rather than a package. The commit gate reads the same formats, and an optional Vale pass adds a second opinion when you ask for it.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
