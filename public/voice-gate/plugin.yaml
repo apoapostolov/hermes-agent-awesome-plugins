@@ -1,0 +1,29 @@
+name: voice-gate
+label: Voice Gate
+version: 1.0.0
+description: "Checks the Markdown a turn changed for the tells that make writing read as machine made, then asks for one more pass before the turn finishes. The rules ship with the plugin, so nothing is fetched and no other package is required."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/public/voice-gate
+tags:
+  - writing
+  - markdown
+  - hooks
+requires_hermes: ">=0.22.0"
+config_schema:
+  mode:
+    type: str
+    label: Mode
+    description: "Warn asks once, improve keeps asking until the tells are gone, skip turns the gate off."
+    choices:
+      - "warn"
+      - "improve"
+      - "skip"
+  min_words:
+    type: number
+    label: Minimum words
+    description: "Documents shorter than this are ignored. Default 200."
+provides_hooks:
+  - pre_verify
