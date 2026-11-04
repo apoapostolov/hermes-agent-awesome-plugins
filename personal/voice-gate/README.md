@@ -1,11 +1,15 @@
 <div align="center">
   <h1>Voice Gate, personal edition</h1>
-  <strong>A prose gate that learns how one person writes.</strong>
+  <strong>Finds the AI tells in Markdown, measured against your own writing.</strong>
   <p>Same checks as the public build, driven by a profile document instead of one fixed rule set.</p>
   <p>
     <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
+</div>
+
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Voice Gate, personal edition" />
 </div>
 
 ## What the edition adds

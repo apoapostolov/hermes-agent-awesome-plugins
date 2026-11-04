@@ -30,6 +30,18 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - hermes-jev-routing. Every model carries a reasoning flag from the host's capability table, so a row asking for a thinking level on a model without one is visible rather than silently clamped.
 
+## [voice-gate 1.0.0] - 2026-11-04
+
+First release. Voice Gate reads the Markdown a turn changed and reports the AI tells that make writing sound machine made, then asks for one more pass before the turn finishes. Two editions ship in one release: the public build carries one rule set and needs nothing else installed, and the personal build loads a writing profile so the same checks are measured against one person's habits.
+
+### Added
+
+- **voice-gate (public).** A `pre_verify` hook that lints changed `.md`, `.markdown` and `.mdx` files against eight families of tell: verdict openers, closing offers, cliché openers, conclusion signposts, negation triads, bold pseudo-headings, bold lead-in bullets, and a vocabulary list. Thresholds sit where a pattern starts, so one bold heading is not a finding. Modes are `warn` (ask once), `improve` (keep asking inside the host's nudge budget) and `skip`. `min_words` ignores short documents. Every path is fail-open: a missing file or a broken rule returns nothing and never blocks a turn.
+- **voice-gate (personal).** The same engine, parameterised by a profile document in `HERMES_HOME/voice-profiles` (YAML or JSON). A profile replaces any rule list, adjusts thresholds, sets `applies_to` for named Hermes profiles, and can flag em dashes. With no profile it behaves exactly like the public build.
+- Three tools in the personal edition: `voice_gate_check` reports findings on text or files, `voice_gate_profile` shows, lists or validates profiles, and `voice_gate_learn` builds a draft profile from a corpus of chat exports, mail or documents, with measured habits and candidate openings and closings.
+- A bundled `voice-profile-builder` skill covering what to collect, how to read the measurements, and how to check a finished profile against writing the person is happy with.
+- Both editions share one `rules.py`, byte-identical, and code fences and inline spans are stripped before counting, so documentation about a banned phrase never trips that phrase.
+
 ## [hermes-agent-desktop 1.0.2] - 2026-11-02
 
 ### Fixed

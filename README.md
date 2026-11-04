@@ -52,7 +52,7 @@ This repository keeps two trees.
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
-**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All eighteen active plugins have one.
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All nineteen active plugins have one.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
@@ -104,6 +104,12 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reaso
 | [opaque-composer](personal/opaque-composer/README.md) · [public](public/opaque-composer/README.md) | Solid composer while the transcript scrolls behind it. |
 | [prompt-enhance](personal/prompt-enhance/README.md) · [public](public/prompt-enhance/README.md) | Rewrite a composer draft from a saved prompt library and put the finished prompt back in the field. **Not in the pack; enable separately.** |
 
+### Writing
+
+| Plugin | What you get |
+| --- | --- |
+| [voice-gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reads the Markdown a turn changed and reports the AI tells: verdict openers, closing offers, cliché openers, bold pseudo-headings, buzzword runs. Modes `warn`, `improve` or `skip`, with a word floor. The personal edition loads a writing profile and ships three tools to check, inspect and build one. **Not in the pack; install separately.** |
+
 ### Reading and posting
 
 | Plugin | What you get |
@@ -111,7 +117,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reaso
 | [rss-reader](personal/rss-reader/README.md) · [public](public/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
 | [reddit](personal/reddit/README.md) · [public](public/reddit/README.md) | Your own Reddit app and account: OAuth login, reads of public subreddits, search, user history and threads that keep their reply tree before any login, then private subreddits, saved items, the inbox, posts, comments, votes and subscriptions as the account, plus `reddit_api` for any other endpoint. |
 
-Three plugins in this repo are not in the pack and are installed separately: **reasoning-switch** (Status Bar table), **prompt-enhance** (Composer table), and **hermes-jev-routing** (Tools and Memory table). Every other plugin above is pinned by the pack.
+Four plugins in this repo are not in the pack and are installed separately: **reasoning-switch** (Status Bar table), **prompt-enhance** (Composer table), **hermes-jev-routing** (Tools and Memory table), and **voice-gate** (Writing table). Every other plugin above is pinned by the pack.
 
 Retired and on-hold plugins live in [RETIRED.md](RETIRED.md).
 

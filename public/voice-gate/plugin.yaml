@@ -1,7 +1,7 @@
 name: voice-gate
 label: Voice Gate
 version: 1.0.0
-description: "Checks the Markdown a turn changed for the tells that make writing read as machine made, then asks for one more pass before the turn finishes. The rules ship with the plugin, so nothing is fetched and no other package is required."
+description: "Checks the Markdown a turn changed for the AI tells that make writing sound machine made, and reports them before the turn finishes. The rules ship with the plugin, so nothing is fetched and no other package is required."
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2

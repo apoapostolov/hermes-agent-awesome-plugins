@@ -1,16 +1,20 @@
 <div align="center">
   <h1>Voice Gate</h1>
-  <strong>Lints the Markdown a turn wrote before that turn can finish.</strong>
-  <p>Names the tells in the prose an agent just changed, and asks for one more pass.</p>
+  <strong>Finds the AI tells in Markdown.</strong>
+  <p>Names them, file by file, before the turn ends.</p>
   <p>
     <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.0.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Voice Gate" />
+</div>
+
 ## What it does
 
-Hermes runs a `pre_verify` hook once per turn when files were edited, and a hook may answer with a message that sends the agent back for another pass. Voice Gate uses that moment to read the Markdown the turn changed and report the shapes that make writing sound machine made: a verdict opener in the first line, a closing offer at the end, a run of bold pseudo-headings, a wall of AI vocabulary.
+Hermes runs a `pre_verify` hook once per turn when files were edited, and a hook may answer with a message that sends the agent back for another pass. Voice Gate uses that moment to read the Markdown the turn changed and report the AI tells it finds: a verdict opener in the first line, a closing offer at the end, a run of bold pseudo-headings, a wall of AI vocabulary.
 
 It reports and asks. It never edits your files, never blocks a turn it cannot explain, and never runs when the file is too short to judge.
 
