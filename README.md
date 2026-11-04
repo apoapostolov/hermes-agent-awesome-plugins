@@ -34,16 +34,23 @@ Restart Hermes Desktop after updating; the Python and desktop halves do not relo
 
 The pack is at 1.24.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
-## Settings pages
+## In the app
 
-Each plugin that has a settings page shows it under Settings, Plugins in Hermes Desktop. The screenshots below are captured from the running app.
+These are captures from the running app of the parts that only make sense in place: the providers dialog, the reader, the memory review queue, skills presets, the session list and the turn meter. Six plugins carry one; the settings for every plugin that has a settings page live under Settings, Plugins, and each plugin README shows its own.
 
 <div align="center">
-  <a href="personal/provider-status"><img src="docs/screenshots/provider-status-settings.png" width="240" alt="Provider Status settings" /></a>
-  <a href="personal/better-capabilities"><img src="docs/screenshots/better-capabilities-settings.png" width="240" alt="Better Capabilities settings" /></a>
-  <a href="personal/better-session-appearance"><img src="docs/screenshots/better-session-appearance-settings.png" width="240" alt="Better Session Appearance settings" /></a>
-  <a href="personal/hermes-jev-routing"><img src="docs/screenshots/hermes-jev-routing-settings.png" width="240" alt="Jev Routing settings" /></a>
-  <a href="personal/vercel-agent-desktop-support"><img src="docs/screenshots/vercel-agent-desktop-support-settings.png" width="240" alt="Agent Desktop settings" /></a>
+<table>
+  <tr>
+    <td align="center" valign="top" width="33%"><a href="personal/provider-status"><img src="personal/provider-status/docs/screenshot.png" width="260" alt="Provider Status providers dialog with quota dots, extra keys and key rotation" /></a><br /><sub><a href="personal/provider-status"><strong>Provider Status</strong></a><br />The providers dialog: quota dots, extra keys, rotation</sub></td>
+    <td align="center" valign="top" width="33%"><a href="personal/rss-reader"><img src="personal/rss-reader/docs/screenshot.png" width="260" alt="RSS Reader three-column layout with folders, article list and reader pane" /></a><br /><sub><a href="personal/rss-reader"><strong>RSS Reader</strong></a><br />Three columns: folders, article list, reader pane</sub></td>
+    <td align="center" valign="top" width="33%"><a href="personal/memory-review"><img src="personal/memory-review/docs/screenshot.png" width="260" alt="Memory Review dialog with staged writes, All selected, Reject and Approve" /></a><br /><sub><a href="personal/memory-review"><strong>Memory Review</strong></a><br />Staged memory writes waiting for Approve or Reject</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="33%"><a href="personal/better-capabilities"><img src="personal/better-capabilities/docs/screenshot-presets.png" width="260" alt="Skills presets dialog listing a saved All On preset above the capabilities list" /></a><br /><sub><a href="personal/better-capabilities"><strong>Better Capabilities</strong></a><br />Skills presets saved from the current on/off set</sub></td>
+    <td align="center" valign="top" width="33%"><a href="personal/better-session-appearance"><img src="personal/better-session-appearance/docs/screenshot.png" width="260" alt="Better Session Appearance color picker, Bold Session, icon grid and Auto Rules" /></a><br /><sub><a href="personal/better-session-appearance"><strong>Better Session Appearance</strong></a><br />Color picker, icon grid and Auto Rules</sub></td>
+    <td align="center" valign="top" width="33%"><a href="personal/iteration-budget-meter"><img src="personal/iteration-budget-meter/docs/iteration-budget-meter.png" width="260" alt="Iteration Budget Meter showing per-turn usage and request statistics" /></a><br /><sub><a href="personal/iteration-budget-meter"><strong>Iteration Budget Meter</strong></a><br />Per-turn usage and request statistics</sub></td>
+  </tr>
+</table>
 </div>
 
 ## Personal and public
