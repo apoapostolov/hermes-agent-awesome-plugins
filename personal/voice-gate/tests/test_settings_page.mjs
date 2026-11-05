@@ -126,7 +126,22 @@ try {
     globalThis.setTimeout = originalSetTimeout
     globalThis.clearTimeout = originalClearTimeout
   }
-  console.log('Settings page: collapsed optional controls, StrictMode deduplication, 120-second bounded requests, failed-load retry, delayed recovery, five-row exceptions and scoped save passed.')
+  const diagnosticKey = 'voice-gate.personal.settings-diagnostics.v1'
+  const history = JSON.parse(window.localStorage.getItem(diagnosticKey))
+  assert.ok(history.some(row => row.event === 'request.error'))
+  assert.ok(history.some(row => row.event === 'request.finish' && row.action === 'save'))
+  assert.ok(!JSON.stringify(history).includes(value), 'Setting values must not enter diagnostic history')
+  for (let i = 0; i < 150; i++) page.settingsDiagnostic('test', { sequence: i })
+  assert.equal(JSON.parse(window.localStorage.getItem(diagnosticKey)).length, 128)
+  for (let i = 0; i < 150; i++) page.settingsDiagnostic('test', { detail: 'x'.repeat(1000) })
+  assert.ok(window.localStorage.getItem(diagnosticKey).length * 2 <= 65536)
+  window.localStorage.setItem(diagnosticKey, '{invalid')
+  page.settingsDiagnostic('recovered')
+  assert.equal(JSON.parse(window.localStorage.getItem(diagnosticKey))[0].event, 'recovered')
+  const originalStore = window.Storage.prototype.setItem
+  window.Storage.prototype.setItem = () => { throw new Error('quota') }
+  try { assert.doesNotThrow(() => page.settingsDiagnostic('unwritable')) } finally { window.Storage.prototype.setItem = originalStore }
+  console.log('Settings page checks and bounded diagnostics, privacy, corrupt-storage recovery and quota failure passed.')
 } finally {
   await act(async () => { root.unmount() })
   dom.window.close()

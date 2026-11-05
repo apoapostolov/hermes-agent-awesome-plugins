@@ -13,14 +13,42 @@ const DELIVERY = new Set(['assistant_residue', 'template_residue', 'tool_fingerp
 const WORDS = new Set(['buzzwords', 'marketing_adjectives', 'banned_words', 'significance_inflation', 'copula_avoidance', 'hedges', 'filler', 'transitions', 'trailing_qualifiers', 'vague_authority', 'real_actual', 'moral_category', 'tier1a', 'tier1b', 'tier2', 'tier3', 'tier3_phrases', 'load_bearing_metaphor', 'significance_adverbs'])
 export const SETTINGS_TIMEOUT_MS = 120_000
 const pendingLoads = new Map()
+const DIAGNOSTICS_KEY = 'voice-gate.personal.settings-diagnostics.v1'
+
+// Keep local settings timing even when the backend cannot answer. Values and
+// error messages can contain private data, so only fixed metadata is retained.
+export function settingsDiagnostic(event, fields = {}) {
+  try {
+    let events
+    try { events = JSON.parse(window.localStorage.getItem(DIAGNOSTICS_KEY) || '[]') } catch { events = [] }
+    if (!Array.isArray(events)) events = []
+    events = events.slice(-127)
+    events.push({ time: new Date().toISOString(), event, ...fields })
+    let serialized = JSON.stringify(events)
+    while (serialized.length > 32768 && events.length > 1) {
+      events.shift()
+      serialized = JSON.stringify(events)
+    }
+    if (serialized.length <= 32768) window.localStorage.setItem(DIAGNOSTICS_KEY, serialized)
+  } catch { /* Logging cannot prevent loading or saving settings. */ }
+}
 
 export async function settingsRequest(route, params) {
   let timer
+  const started = Date.now()
+  const operation = `${started}-${Math.random().toString(36).slice(2, 10)}`
+  const action = params.action === 'settings' ? 'save' : 'load'
+  settingsDiagnostic('request.start', { operation, action, fieldsCount: Object.keys(params.values || {}).length })
   try {
-    return await Promise.race([
+    const result = await Promise.race([
       host.requestProfile(route, 'plugins.manage', { ...params, profile: route.targetProfile }, SETTINGS_TIMEOUT_MS, { spawnPriority: 'foreground' }),
       new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Hermes took too long to respond. Try again when the backend is ready.')), SETTINGS_TIMEOUT_MS) })
     ])
+    settingsDiagnostic('request.finish', { operation, action, elapsedMs: Date.now() - started, ok: result?.ok !== false })
+    return result
+  } catch (error) {
+    settingsDiagnostic('request.error', { operation, action, elapsedMs: Date.now() - started })
+    throw error
   } finally {
     clearTimeout(timer)
   }
@@ -33,6 +61,8 @@ function loadSettings(route) {
       if (pendingLoads.get(key) === request) pendingLoads.delete(key)
     })
     pendingLoads.set(key, request)
+  } else {
+    settingsDiagnostic('load.reused')
   }
   return pendingLoads.get(key)
 }
@@ -103,6 +133,7 @@ function SettingsBody({ ctx, route }) {
     setPluginKey(row.key)
     setFields(row.settings_schema)
     setDraft(Object.fromEntries(row.settings_schema.map(field => [field.key, textValue(field)])))
+    settingsDiagnostic('form.ready', { fieldsCount: row.settings_schema.length })
   }
   useEffect(() => {
     alive.current = true
@@ -110,7 +141,7 @@ function SettingsBody({ ctx, route }) {
     setError('')
     loadSettings(route).then(result => {
       if (current) adopt((result.plugins ?? []).find(row => row.key === 'voice-gate' || row.name === 'Voice Gate'))
-    }).catch(error => { if (current) setError(String(error.message ?? error)) })
+    }).catch(error => { settingsDiagnostic('form.load_error'); if (current) setError(String(error.message ?? error)) })
     return () => { current = false; alive.current = false }
   }, [route, loadAttempt])
 
@@ -128,6 +159,7 @@ function SettingsBody({ ctx, route }) {
       else setFields(current => current.map(field => Object.hasOwn(values, field.key) ? { ...field, value: values[field.key] } : field))
       setSaved(true)
     } catch (error) {
+      settingsDiagnostic('form.save_error')
       if (alive.current) setError(String(error.message ?? error))
     } finally {
       if (alive.current) setBusy(false)

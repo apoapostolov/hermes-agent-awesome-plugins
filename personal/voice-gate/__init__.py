@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -21,6 +22,7 @@ from . import vale
 from . import editorial
 from . import model_review
 from . import coverage
+from . import diagnostics
 
 log = logging.getLogger(__name__)
 
@@ -211,6 +213,8 @@ def _loaded(target: str) -> Tuple[Dict[str, Any], Optional[Path], List[str]]:
         log.warning("voice-gate profile rejected; using base rules: %s", issues)
         data = {}
     _CACHE.update({"target": target, "stamp": stamp, "profile": data, "path": path, "issues": issues})
+    _diagnostic('profile.loaded', profile=diagnostics.identifier(path) if path else None,
+                issues_count=len(issues), fallback=bool(issues))
     return data, path, issues
 
 
@@ -293,11 +297,16 @@ def _vale_advisory(paths: List[Path], active_families: Optional[set] = None) -> 
     """
     mode = str(_setting("vale_mode", "off") or "off").strip().lower()
     if mode in VALE_OFF or not paths:
+        _diagnostic('vale.skip', reason='disabled_or_no_documents')
         return None
     override = _vale_path()
     if not vale.resolve_binary(override):
+        _diagnostic('vale.skip', reason='binary_unavailable')
         return None
+    started = time.perf_counter()
     report = vale.run([str(path) for path in paths[:6]], override)
+    _diagnostic('vale.result', ok=report.get('ok'), documents_count=min(len(paths), 6),
+                elapsed_ms=round((time.perf_counter() - started) * 1000, 2))
     if not report.get("ok"):
         return None
     alerts: List[Dict[str, Any]] = []
@@ -333,11 +342,13 @@ def _vale_advisory(paths: List[Path], active_families: Optional[set] = None) -> 
     except (TypeError, ValueError):
         floor = 3
     if len(alerts) < floor:
+        _diagnostic('vale.below_floor', alerts_count=len(alerts), floor=floor)
         return None
     counts: Dict[str, int] = {}
     for alert in alerts:
         name = str(alert.get("Check") or "rule").split(".")[-1]
         counts[name] = counts.get(name, 0) + 1
+    _diagnostic('vale.findings', alerts_count=len(alerts), floor=floor, rules=counts)
     summary = ", ".join(f"{name} {count}" for name, count in
                         sorted(counts.items(), key=lambda item: -item[1])[:4])
     first = alerts[0]
@@ -373,25 +384,45 @@ def _disabled_families() -> List[str]:
     return [key for key in rules.TELL_KEYS if _family_off(key)]
 
 
+def _diagnostic(event: str, **fields: Any) -> None:
+    try:
+        diagnostics.emit(_home(), event, **fields)
+    except Exception:
+        pass
+
+
+@diagnostics.traced('gate', _home)
 def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
     try:
         mode = _mode()
+        _diagnostic('gate.policy', mode=mode, attempt=kwargs.get('attempt'),
+                    session=diagnostics.identifier(kwargs.get('session_id') or ''),
+                    changed_paths_count=len(kwargs.get('changed_paths') or []),
+                    bot=diagnostics.identifier(_current_profile()))
         if mode == "skip":
+            _diagnostic('gate.skip', reason='mode_off')
             return None
         attempt = int(kwargs.get("attempt") or 0)
         if attempt >= 2:
+            _diagnostic('gate.skip', reason='pass_limit')
             log.info('voice-gate stopped after two review/edit opportunities; report unresolved residuals.')
             return None
         if mode == "warn" and attempt != 0:
+            _diagnostic('gate.skip', reason='warn_already_shown')
             return None
         data, _path, _issues = _active()
         if not _applies_here(data):
+            _diagnostic('gate.skip', reason='profile_excluded')
             return None
         block = _exceptions_block(data)
         floor = _min_words(data)
         found: List[Tuple[str, List[str]]] = []
         checked: List[Path] = []
         disabled = _disabled_families()
+        _diagnostic('gate.configuration', word_floor=floor, disabled=disabled,
+                    profile=diagnostics.identifier(_path) if _path else None,
+                    profile_issue_count=len(_issues),
+                    model_review=_truthy(_setting('model_review', False)))
         families = {}
         model_documents = {}
         model_exclusions = {}
@@ -401,25 +432,38 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
         for raw in kwargs.get("changed_paths") or []:
             path = _resolve_path(str(raw))
             if path is None:
+                _diagnostic('document.skip', file=diagnostics.file_id(str(raw)), reason='unresolved_or_unsupported')
                 continue
             try:
                 text = (extract.read(path) or "")
-            except OSError:
+            except OSError as exc:
+                _diagnostic('document.skip', file=diagnostics.file_id(path), reason='read_error', **diagnostics.error_fields(exc))
                 continue
             if not text.strip():
+                _diagnostic('document.skip', file=diagnostics.file_id(path), reason='empty_or_unextractable')
                 continue
+            started = time.perf_counter()
             result = rules.lint(text, data, path)
+            _diagnostic('document.lint', file=diagnostics.file_id(path), content=editorial.digest(text),
+                        words=result.get('words'), context=result.get('context'),
+                        elapsed_ms=round((time.perf_counter() - started) * 1000, 2),
+                        rules={key: tell.get('count', 0) for key, tell in result['tells'].items() if tell.get('count', 0)})
             strict_dash = (data.get('preferences') or {}).get('no_em_dash') and result['tells']['em_dashes']['count']
             if int(result.get("words") or 0) < floor and not strict_dash:
+                _diagnostic('document.skip', file=diagnostics.file_id(path), reason='below_word_floor')
                 continue
             key = _review_key(path, text, block, disabled)
             if key in _REVIEWED:
+                _diagnostic('document.skip', file=diagnostics.file_id(path), reason='review_record_matches')
                 continue
             checked.append(path)
             model_documents[str(path)] = text
             issues = rules.gate_findings(result, block, str(path), disabled=disabled, structured=True)
             if int(result.get('words') or 0) < floor:
                 issues = [item for item in issues if item['rule'] == 'em_dashes']
+            _diagnostic('document.findings', file=diagnostics.file_id(path),
+                        issues=[{'rule': item['rule'], 'severity': item['severity']} for item in issues],
+                        suppressed=rules.suppressed(block, str(path)))
             skip = set(rules.suppressed(block, str(path))) | set(disabled) | set(rules.relaxed(result['context']))
             families[str(path)] = {key: tell.get('samples', []) for key, tell in result['tells'].items()
                                    if tell.get('count', 0) and key not in skip}
@@ -433,6 +477,9 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
             previous = _TURN_RECORDS.get(turn_key)
             if previous and attempt:
                 integrity = editorial.compare_signatures(previous['signature'], signature)
+                _diagnostic('document.preservation', file=diagnostics.file_id(path),
+                            errors_count=len(integrity['errors']), warnings_count=len(integrity['warnings']),
+                            unchanged=previous['digest'] == editorial.digest(text))
                 if integrity['errors']:
                     calls = ['Repair only protected material changed during revision: ' + ', '.join(integrity['errors'])]
                 notes.extend(integrity['warnings'])
@@ -444,7 +491,9 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
                 found.append((path.name, calls))
         advisory = _vale_advisory(checked, families) or ''
         if _truthy(_setting('model_review', False)) and model_documents:
+            started = time.perf_counter()
             contextual = model_review.analyze(_CTX, model_documents, data, _OWNED_REVIEW_TASK, model_exclusions)
+            _diagnostic('model_review.result', elapsed_ms=round((time.perf_counter() - started) * 1000, 2), **diagnostics.summary(contextual))
             if contextual.get('ok'):
                 for issue in contextual['issues']:
                     found.append((Path(issue['path']).name, [f"{issue['severity']} humanizer {issue['pattern_id']}: {issue['quote']!r}. {issue['explanation']} {issue['repair']}"]))
@@ -453,13 +502,17 @@ def _on_pre_verify(**kwargs: Any) -> Optional[Dict[str, Any]]:
                 if found:
                     notes.append('The model review was unavailable; complete the contextual review explicitly.')
         if not found and not advisory and not _issues:
+            _diagnostic('gate.decision', decision='allow', checked_count=len(checked))
             return None
         notes.append(f"Read {editorial.SOURCE / 'SKILL.md'} and the relevant catalog references. Check meaning, reader priority, supported voice, evidence, narrative when applicable, delivery residue, and over-correction. Preserve code, quotations, tables, URLs, paths, headings, and technical terms. Record the reviewed paths and assessment with voice_gate_review(action='record'). Use at most two passes including preservation repairs; then report residuals. These are editorial signals, never authorship proof.")
         if advisory:
             notes.append(advisory)
+        _diagnostic('gate.decision', decision='request_review', checked_count=len(checked),
+                    flagged_count=len(found), vale_advisory=bool(advisory), notes_count=len(notes))
         return {"action": "continue",
                 "message": _message(found, mode, str(data.get("name") or "base"), ' '.join(dict.fromkeys(notes)))}
-    except Exception:
+    except Exception as exc:
+        _diagnostic('gate.failure', **diagnostics.error_fields(exc))
         log.exception("voice-gate pre_verify failed; gate did not verify this turn")
         return None
 
@@ -722,6 +775,8 @@ def _on_pre_tool_call(tool_name: str = "", args: Any = None, **_kwargs: Any) -> 
     if tool_name != VALE_SCHEMA["name"] or not isinstance(args, dict):
         return None
     action = str(args.get('action') or '').strip().lower()
+    _diagnostic('vale.approval_check', action=action if action in {'status', 'check', 'install'} else 'unknown',
+                paths_count=len(args.get('paths') or []))
     if action in {'status', 'check'}:
         binary = vale.resolve_binary(str(args.get('path') or '').strip() or _vale_path())
         if not binary:
@@ -813,11 +868,18 @@ REVIEW_SCHEMA = {
 
 
 def _as_handler(fn, name: str):
+    @diagnostics.traced('tool.' + name, _home)
     def handler(args: Optional[dict] = None, **_kwargs) -> str:
         try:
+            _diagnostic('tool.input', tool=name, action=(args or {}).get('action') if (args or {}).get('action') in {'status', 'check', 'install', 'show', 'list', 'validate', 'plan', 'analyze', 'record'} else None,
+                        paths_count=len((args or {}).get('paths') or []),
+                        text_chars=len(str((args or {}).get('text') or '')),
+                        assessment_chars=len(str((args or {}).get('assessment') or '')))
             payload = fn(dict(args or {}))
+            _diagnostic('tool.result', tool=name, **diagnostics.summary(payload))
             return _dump(payload)
         except Exception as exc:
+            _diagnostic('tool.failure', tool=name, **diagnostics.error_fields(exc))
             log.exception("voice-gate tool %s failed", name)
             return _dump({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
 
@@ -827,6 +889,8 @@ def _as_handler(fn, name: str):
 def register(ctx: Any) -> None:
     global _CTX, _OWNED_REVIEW_TASK
     _CTX = ctx
+    _diagnostic('plugin.register', edition='personal', max_log_bytes=diagnostics.MAX_BYTES,
+                backups=diagnostics.BACKUPS, bot=diagnostics.identifier(_current_profile()))
     _OWNED_REVIEW_TASK = False
     register_task = getattr(ctx, 'register_auxiliary_task', None)
     if callable(register_task):
