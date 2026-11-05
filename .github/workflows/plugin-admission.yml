@@ -1,0 +1,93 @@
+name: plugin admission
+
+# The mechanical half of the catalog review bar, run on every edition that
+# changes. The rule classes come from the reviews in NousResearch/hermes-agent
+# (hermes-plugin-desk-ops skill, references/catalog-review-bar.md). A FAIL is
+# one of the findings a catalog reviewer would raise: desktop reach-ins, core
+# rebinds, credential reads, unapproved process launches, a version URL nobody
+# pinned.
+#
+# Untrusted input: only SHAs are interpolated, and they are hex from GitHub.
+# The edition list is written to a file and read line by line, never echoed
+# into a shell, because a pull request chooses the directory names in it.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  changed-editions:
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: List the editions that changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          list="$RUNNER_TEMP/editions.txt"
+          : > "$list"
+          if [ -n "${BASE_SHA:-}" ] && git rev-parse --verify -q "${BASE_SHA}^{commit}" >/dev/null; then
+            git diff --name-only "$BASE_SHA" HEAD -- public personal \
+              | awk -F/ 'NF>1 {print $1"/"$2}' | sort -u > "$list"
+          fi
+          if [ ! -s "$list" ]; then
+            echo "no edition changed in this push; nothing to check"
+          fi
+          echo "editions under test:"
+          cat "$list"
+
+      - name: Run the review bar on each changed edition
+        shell: bash
+        run: |
+          set -uo pipefail
+          fail=0
+          while IFS= read -r dir; do
+            [ -n "$dir" ] || continue
+            case "$dir" in
+              public/*|personal/*) ;;
+              *) echo "::error::unexpected path $dir"; fail=1; continue ;;
+            esac
+            if [ ! -f "$dir/plugin.yaml" ]; then
+              echo "::error file=$dir::no plugin.yaml in $dir"
+              fail=1
+              continue
+            fi
+            echo "::group::$dir"
+            if ! python3 scripts/admission_check.py "$dir"; then
+              fail=1
+            fi
+            echo "::endgroup::"
+          done < "$RUNNER_TEMP/editions.txt"
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::the catalog review bar has a FAIL above; a listed pin would be held"
+          fi
+          exit "$fail"
+
+  fleet-report:
+    # Full-tree sweep for a human to read. Never blocks a merge: a finding can
+    # be an adjudicated exception (a pattern the reviewer accepted for one
+    # plugin), and that call belongs to a person, not to this job.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sweep every edition
+        shell: bash
+        run: |
+          find public personal -maxdepth 1 -mindepth 1 -type d | sort > "$RUNNER_TEMP/editions.txt"
+          while IFS= read -r dir; do
+            [ -f "$dir/plugin.yaml" ] || continue
+            python3 scripts/admission_check.py "$dir" || true
+            echo
+          done < "$RUNNER_TEMP/editions.txt"
