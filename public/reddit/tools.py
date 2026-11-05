@@ -325,6 +325,12 @@ def _err(exc: Exception) -> str:
 def reddit_setup(args: dict, **kwargs) -> str:
     """Show or save the user's own Reddit app credentials."""
     try:
+        credential_keys = ("client_id", "client_secret", "redirect_uri", "user_agent", "contact_username")
+        if not any(key in args for key in credential_keys) and any(key in args for key in ("background_refresh", "protect_secrets")):
+            if "background_refresh" in args:
+                client.save_config({"background_refresh": bool(args["background_refresh"])})
+            protection = client.protect_credentials(bool(args["protect_secrets"])) if "protect_secrets" in args else None
+            return _ok({"settings_saved": True, "secret_protection": protection})
         if args.get("reset_auth"):
             if not args.get("client_id") or not args.get("client_secret"):
                 raise client.RedditError("Credential recovery requires replacement client_id and client_secret")

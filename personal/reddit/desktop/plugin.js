@@ -163,7 +163,7 @@ function RedditLibrary({ ctx, account }) {
     ] }),
     jsxs('div', { style: S.row, children: [
       jsx(Btn, { busy, onClick: sync, children: cursor ? 'Sync next page' : 'Sync saves' }),
-      jsx(Btn, { busy, onClick: () => run('Refreshing', async () => { await action({ action: 'refresh' }); await load(offset) }), children: 'Refresh oldest 100' }),
+      jsx(Btn, { busy, onClick: () => run('Refreshing', async () => { await action({ action: 'refresh' }); setSelected(null); await load(offset) }), children: 'Refresh oldest 100' }),
       jsx(Btn, { busy, onClick: () => run('Cleaning', async () => { await action({ action: 'purge' }); await load(offset) }), children: 'Purge expired content' }),
       jsx(Btn, { busy, onClick: () => run('Loading', () => load(0)), children: 'Reload' })
     ] }),

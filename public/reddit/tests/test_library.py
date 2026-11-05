@@ -197,11 +197,13 @@ def test_reject_ambiguous_urls(url):
 
 def test_save_can_succeed_when_local_snapshot_fails(monkeypatch):
     session = Session()
-    session.save = lambda *args: {}
+    calls = []
+    session.save = lambda *args: calls.append(args) or {}
     monkeypatch.setattr(client, "session", lambda: session)
     result = json.loads(tools.reddit_manage({"action": "save", "target": "t3_abc"}))
     assert result["ok"] and result["result"]["remote_saved"]
     assert "local_error" in result["result"]
+    assert calls == [("t3_abc", True)]
 
 
 def test_subscribe_uses_the_correct_name_field(monkeypatch):

@@ -294,7 +294,7 @@ def handle(args) -> int:
             file=sys.stderr,
         )
         return 2
-    except (client.RedditError, OSError) as exc:
+    except (client.RedditError, OSError, ValueError) as exc:
         print(redaction.safe(f"✗ {exc}"), file=sys.stderr)
         return 1
 

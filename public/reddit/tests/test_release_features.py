@@ -328,3 +328,31 @@ def test_credential_patterns_in_errors_are_redacted():
     from reddit import redaction
     assert "secret-canary" not in redaction.safe("Basic secret-canary")
     assert "secret-canary" not in redaction.safe("access_token=secret-canary")
+
+
+def test_settings_only_tool_call_works_offline_without_credentials(monkeypatch):
+    monkeypatch.setattr(client, "validate_app", lambda *a: pytest.fail("settings requested network access"))
+    assert json.loads(tools.reddit_setup({"background_refresh": True}))["ok"]
+    assert client.load_config()["background_refresh"]
+
+
+def test_maintenance_keeps_attempt_and_result_while_disabled(home):
+    client.save_config({"background_refresh": True})
+    initial = maintenance.run_once(home)
+    assert initial["last_refresh_result"] == "login_required"
+    client.save_config({"background_refresh": False})
+    assert maintenance.run_once(home)["last_refresh_attempt"] == initial["last_refresh_attempt"]
+    client.save_config({"background_refresh": True})
+    state = maintenance.run_once(home)
+    assert state["refresh"] == "not_due" and state["last_refresh_result"] == "login_required"
+
+
+def test_literal_backslash_search_and_missing_rate_headers():
+    store = library.Library("owner")
+    store.upsert(source(text=r"A path C:\Users\foo"))
+    assert store.search(r"C:\Users\foo")["total"] == 1
+    session = client.Reddit(creds={"client_id": "x"}, token={})
+    session.last_rate = {"X-Ratelimit-Remaining": "0", "X-Ratelimit-Reset": "120"}
+    session._blocked_until = 0
+    session._capture_rate({})
+    assert session._blocked_until == 0

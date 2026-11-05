@@ -13,20 +13,24 @@ def run_once(home=None):
     root = home / "plugin-data/reddit"
     with coordination.file_lock(root / "maintenance.lock"):
         store = library.Library(home=home)
-        state = {"checked_at": int(time.time()), "purge": "complete", "refresh": "disabled"}
+        previous = coordination.read_state(root / "maintenance.json")
+        state = {key: previous[key] for key in ("last_refresh_attempt", "last_refresh_result", "last_refresh_error") if key in previous}
+        state.update(checked_at=int(time.time()), purge="complete", refresh="disabled")
         if client.load_config(home).get("background_refresh"):
-            previous = coordination.read_state(root / "maintenance.json")
             if time.time() - previous.get("last_refresh_attempt", 0) >= 1800:
                 state["last_refresh_attempt"] = time.time()
-                session = client.Reddit(home=home)
-                if session.has_refresh_token:
-                    try:
+                try:
+                    session = client.Reddit(home=home)
+                    if session.has_refresh_token:
                         store = library.Library(session.require_account(), home=home)
                         state["refresh"] = library.refresh(session, store, store.names(100))
-                    except Exception as exc:
-                        state.update(refresh="failed", error=str(exc)[:500])
-                else:
-                    state["refresh"] = "login_required"
+                    else:
+                        state["refresh"] = "login_required"
+                    state["last_refresh_error"] = ""
+                except Exception as exc:
+                    state.update(refresh="failed", error=type(exc).__name__)
+                    state["last_refresh_error"] = type(exc).__name__
+                state["last_refresh_result"] = state["refresh"]
             else:
                 state.update(last_refresh_attempt=previous.get("last_refresh_attempt", 0), refresh="not_due")
         client._atomic_write(root / "maintenance.json", json.dumps(state))

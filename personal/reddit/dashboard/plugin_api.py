@@ -85,6 +85,15 @@ def status() -> dict:
 def save_config(payload: ConfigPayload) -> dict:
     """Save app credentials, verifying them first unless asked not to."""
     client, _login = _mods()
+    if not any(getattr(payload, key) is not None for key in ("client_id", "client_secret", "redirect_uri", "user_agent")):
+        try:
+            if payload.background_refresh is not None:
+                client.save_config({"background_refresh": payload.background_refresh})
+            if payload.protect_secrets is not None:
+                client.protect_credentials(payload.protect_secrets)
+        except Exception as exc:
+            raise _reddit_error(exc) from exc
+        return {"settings_saved": True}
     creds = client.load_credentials()
     client_id = (payload.client_id or "").strip() or creds["client_id"]
     secret = (payload.client_secret or "").strip() or creds["client_secret"]

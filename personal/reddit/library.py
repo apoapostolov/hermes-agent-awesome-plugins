@@ -37,6 +37,7 @@ def _terms(query):
         lexer.whitespace_split = True
         lexer.commenters = ""
         lexer.quotes = '"'
+        lexer.escape = ""
         terms = list(lexer)
     except ValueError as exc:
         raise client.RedditError("Close quoted phrases in the search query") from exc

@@ -774,8 +774,8 @@ class Reddit:
             if value is not None:
                 self.last_rate[key] = value
         try:
-            if float(self.last_rate.get("X-Ratelimit-Remaining", 1)) <= 0:
-                self._blocked_until = time.time() + float(self.last_rate.get("X-Ratelimit-Reset", 0)) + 1
+            if float(headers.get("X-Ratelimit-Remaining", 1)) <= 0:
+                self._blocked_until = time.time() + float(headers.get("X-Ratelimit-Reset", 0)) + 1
         except (TypeError, ValueError):
             pass
 

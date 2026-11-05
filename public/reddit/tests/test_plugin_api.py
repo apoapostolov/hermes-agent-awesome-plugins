@@ -55,6 +55,13 @@ def test_status_reports_unconfigured(isolated_home):
     assert "client_secret" not in payload
 
 
+def test_settings_only_save_needs_no_credentials_or_network(monkeypatch):
+    monkeypatch.setattr(client, "validate_app", lambda *a: pytest.fail("settings made a network call"))
+    response = api.post("/api/plugins/reddit/config", json={"background_refresh": True})
+    assert response.status_code == 200
+    assert client.load_config()["background_refresh"]
+
+
 def test_config_saves_and_never_echoes_the_secret(monkeypatch, isolated_home):
     monkeypatch.setattr(
         client, "validate_app", lambda *a: {"app_token": "ok", "scopes": "*"}
