@@ -46,8 +46,12 @@ def _cipher(home=None, rotate=False):
                 text = path.read_text(encoding="utf-8")
             except OSError:
                 raise RuntimeError("Reddit storage key is unreadable right now; retry shortly") from None
+            except UnicodeDecodeError:
+                text = ""  # damaged key: replaceable by a write, never by a read
             try:
-                record = __import__("json").loads(text)
+                record = __import__("json").loads(text) if text else None
+                if record is None:
+                    raise ValueError("damaged key file")
                 key = _crypt(base64.b64decode(record["dpapi"]), True) if "dpapi" in record else record["private_file"].encode("ascii")
                 return Fernet(key)
             except (ValueError, KeyError, TypeError, RuntimeError):
@@ -68,11 +72,13 @@ def _cipher(home=None, rotate=False):
 
 def encode(record, enabled=False, home=None):
     result = dict(record)
+    pending = [key for key in FIELDS if isinstance(result.get(key), str) and result[key]]
+    if not pending:
+        # A settings-only save must not depend on the key store being reachable.
+        return result
     cipher = _cipher(home, rotate=True)
-    for key in FIELDS:
-        value = result.get(key)
-        if isinstance(value, str) and value:
-            result[key] = {"$fernet": cipher.encrypt(value.encode()).decode("ascii")}
+    for key in pending:
+        result[key] = {"$fernet": cipher.encrypt(result[key].encode()).decode("ascii")}
     return result
 
 

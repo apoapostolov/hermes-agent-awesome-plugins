@@ -200,14 +200,39 @@ def test_reading_never_replaces_the_storage_key(home):
 
 def test_authorization_values_are_redacted_whatever_they_look_like():
     assert redaction.safe("Authorization: Basic YWJjOmRlZg==") == "Authorization: Basic [redacted]"
-    assert "tutorial" in redaction.safe("a post about basic tutorial writing")
+    assert redaction.safe("Authorization: Digest abc123def456") == "Authorization: Digest [redacted]"
+    assert redaction.safe("a post about basic tutorial writing") == "a post about basic tutorial writing"
 
 
 def test_reservation_refuses_when_pacing_state_cannot_be_written(monkeypatch):
-    def unwritable(path, values, strict=False):
-        if strict:
-            raise RuntimeError("Shared Reddit pacing state is not writable; refuse to send")
+    def unwritable(*args, **kwargs):
+        raise OSError("disk full")
 
-    monkeypatch.setattr(coordination, "_write_state", unwritable)
+    monkeypatch.setattr(coordination.os, "replace", unwritable)
     with pytest.raises(RuntimeError, match="not writable"):
         coordination.reserve_slot("client")
+
+
+def test_corrupt_pacing_state_refuses_to_send(monkeypatch):
+    path = coordination._slot_path("client")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{bad json", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="unreadable"):
+        coordination.reserve_slot("client")
+
+
+def test_undecodable_key_file_is_replaced_by_a_write(home):
+    root = home / "plugin-data/reddit"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "storage-key.json").write_bytes(bytes([0xFF, 0xFE]) + b" not utf8")
+    client.save_config({"client_id": "id", "client_secret": "secret"})
+    assert client.load_config()["client_secret"] == "secret"
+
+
+def test_settings_only_save_does_not_need_the_key_store(monkeypatch):
+    def no_cipher(*args, **kwargs):
+        raise AssertionError("the key store must not be touched for a settings-only save")
+
+    monkeypatch.setattr(client.secrets_store, "_cipher", no_cipher)
+    client.save_config({"background_refresh": True})
+    assert client.load_config()["background_refresh"] is True

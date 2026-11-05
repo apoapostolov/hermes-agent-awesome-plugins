@@ -123,7 +123,13 @@ def save_config(values: dict, home=None) -> pathlib.Path:
     """Merge values into the plugin config file and return its path."""
     path = config_path(home)
     with _WRITE_LOCK, coordination.file_lock(path.with_suffix(".lock")):
-        merged = load_config(home)
+        # Merge over the raw file: a field that cannot be decrypted right now
+        # must keep its ciphertext instead of vanishing from a partial save.
+        try:
+            current = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            current = {}
+        merged = dict(current) if isinstance(current, dict) else {}
         for key, value in values.items():
             if value is None:
                 continue
