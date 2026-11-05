@@ -214,13 +214,17 @@ def test_credentials_are_encrypted_by_default_and_output_is_redacted(capsys):
     assert redaction.safe("Bearer unknown-token") == "Bearer [redacted]"
 
 
-def test_tampered_ciphertext_cannot_be_decrypted():
+def test_tampered_ciphertext_is_treated_as_absent_and_recoverable():
     client.save_config({"client_id": "id", "client_secret": "client-secret-canary"})
     payload = json.loads(client.config_path().read_text())
     payload["client_secret"]["$fernet"] = "invalid"
     client.config_path().write_text(json.dumps(payload))
-    with pytest.raises(RuntimeError, match="decryption failed"):
-        client.load_config()
+    # An unreadable protected file must read as absent rather than raise: a
+    # credential file carried to another user or machine would otherwise block
+    # recovery until it was moved aside by hand.
+    assert client.load_config() == {}
+    client.save_config({"client_id": "id", "client_secret": "replacement-secret"})
+    assert client.load_config()["client_secret"] == "replacement-secret"
 
 
 def test_lost_access_does_not_remove_another_account_copy():

@@ -24,6 +24,10 @@ def safe(value):
                 result = result.replace(secret, "[redacted]")
             elif result == secret:
                 result = "[redacted]"
-        result = re.sub(r"(?i)((?:bearer|basic)\s+)[A-Za-z0-9._~+/-]+", r"\1[redacted]", result)
+        result = re.sub(
+            r"(?i)((?:bearer|basic)\s+)(?=[A-Za-z0-9._~+/-]{8,})(?=[A-Za-z0-9._~+/-]*[0-9._~+/-])[A-Za-z0-9._~+/-]+",
+            r"\1[redacted]",
+            result,
+        )
         return re.sub(r"(?i)((?:access_token|refresh_token|client_secret)[=:]\s*)[^\s&]+", r"\1[redacted]", result)
     return clean(value)

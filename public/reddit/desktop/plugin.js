@@ -12,7 +12,7 @@
  */
 
 import { Badge, Button, Input, host, PALETTE_AREA } from '@hermes/plugin-sdk'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
 const PLUGIN_ID = 'reddit'
@@ -123,18 +123,22 @@ function RedditLibrary({ ctx, account }) {
     const timer = setTimeout(() => setSelected(null), Math.min(remaining, 2147483647))
     return () => clearTimeout(timer)
   }, [selected])
+  const requestRef = useRef(0)
   const load = async (nextOffset = 0) => {
     const params = new URLSearchParams({ query, tag, account, limit: '15', offset: String(nextOffset) })
     if (queue) params.set('summary_source', 'extractive')
     if (unread) params.set('read', 'false')
+    const token = ++requestRef.current
     const next = await ctx.rest(`library?${params}`)
+    if (token !== requestRef.current) return
     setData(next)
     setOffset(nextOffset)
   }
   useEffect(() => {
-    let active = true
-    ctx.rest('library?account=' + encodeURIComponent(account) + '&limit=15').then(next => { if (active) setData(next) }).catch(err => { if (active) setError(readError(err)) })
-    return () => { active = false }
+    const token = ++requestRef.current
+    ctx.rest('library?account=' + encodeURIComponent(account) + '&limit=15').then(next => {
+      if (token === requestRef.current) setData(next)
+    }).catch(err => { if (token === requestRef.current) setError(readError(err)) })
   }, [ctx, account])
   const run = async (label, task) => {
     setBusy(label)
@@ -221,6 +225,7 @@ function RedditSettingsPage({ ctx }) {
   const [identity, setIdentity] = useState(null)
   const [copied, setCopied] = useState(false)
   const [libraryAccount, setLibraryAccount] = useState('')
+  const [accountDraft, setAccountDraft] = useState('')
   useEffect(() => {
     if (status?.logged_in && status.username) setLibraryAccount(status.username)
   }, [status?.logged_in, status?.username])
@@ -592,7 +597,8 @@ function RedditSettingsPage({ ctx }) {
         ]
       }),
 
-      jsx(Field, { label: 'Local library account', value: libraryAccount, onChange: setLibraryAccount, placeholder: 'local', hint: 'Select a local namespace, including after logout. Network actions require the connected account.' }),
+      jsx(Field, { label: 'Local library account', value: accountDraft, onChange: setAccountDraft, placeholder: 'local', hint: 'Type a namespace, then press Use account. Network actions require the connected account.' }),
+      jsx(Btn, { onClick: () => setLibraryAccount(accountDraft.trim()), children: 'Use account' }),
       jsx(RedditLibrary, { ctx, account: libraryAccount || 'local' }, libraryAccount || 'local'),
       jsx('p', {
         style: S.note,
