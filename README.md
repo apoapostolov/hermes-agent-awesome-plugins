@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Voice Gate 1.4.2 removes the extra generated Agent settings page on Hermes 0.22.8 and newer, leaving one page for Voice Gate settings. Older Hermes builds still show the generated form alongside it.
+Voice Gate 1.4.3 adds local diagnostics to the personal edition so review decisions, skipped files, rule counts, failures, and settings delays can be studied. Backend logs rotate within 10 MiB per Hermes home; settings timing keeps at most 128 events within 64 KiB. The public edition receives matching version metadata only.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
@@ -115,7 +115,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **bette
 
 | Plugin | What you get |
 | --- | --- |
-| [Voice Gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reviews changed prose with 75 mechanical families and optional model review against all 110 humanizer patterns. Protects source material, limits revision requests to two opportunities, and supports Vale, file exceptions, writing contexts, and a grouped settings page. Personal also loads approved writing profiles and drafts profiles from curated samples. **Not in the pack; install separately.** |
+| [Voice Gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reviews changed prose with 75 mechanical families and optional model review against all 110 humanizer patterns. Protects source material, limits revision requests to two opportunities, and supports Vale, file exceptions, writing contexts, and a grouped settings page. Personal also loads approved writing profiles, drafts profiles from curated samples, and records bounded local diagnostics. **Not in the pack; install separately.** |
 
 ### Reading and posting
 

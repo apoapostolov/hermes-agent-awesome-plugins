@@ -28,6 +28,15 @@ the component that changed; a plugin patch does not imply a new pack release.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
 
+## [voice-gate 1.4.3] - 2026-11-05
+
+### Added
+
+- The personal edition records correlated gate and tool events, document skip reasons, rule counts, profile reloads, preservation results, Vale and model review outcomes, errors, and timings. Backend JSON Lines logs rotate at 2 MiB with four backups, capped at 10 MiB per Hermes home. A shared file lock protects rotation across bot processes. Settings timing is stored separately in Desktop local storage, capped at 128 events and 64 KiB. Records exclude prose, assessments, setting values, full document paths, and exception messages; logging failures do not interrupt the plugin.
+- Regression checks cover rotation under competing processes, record size limits, failure isolation, tool correlation and privacy, and bounded settings history with corrupt or unavailable storage.
+
+The public edition receives version metadata only. This release updates the community index to the personal edition; the upstream catalog remains pinned to public 1.4.2. Restart Hermes Desktop to load the new backend and renderer.
+
 ## [voice-gate 1.4.2] - 2026-11-05
 
 ### Fixed

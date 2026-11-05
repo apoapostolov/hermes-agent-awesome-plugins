@@ -1,6 +1,6 @@
 # Voice Gate
 
-![Version](https://img.shields.io/badge/version-1.4.2-blue)
+![Version](https://img.shields.io/badge/version-1.4.3-blue)
 
 Voice Gate reviews prose files Hermes changes before a turn finishes. It finds wording and structural patterns that deserve another read, then asks for a source-faithful revision or an explanation for keeping the passage. A match is an editorial signal, not evidence of AI authorship.
 
