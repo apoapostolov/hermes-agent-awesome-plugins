@@ -1,5 +1,5 @@
 name: "Voice Gate"
-version: "1.4.0"
+version: "1.4.1"
 description: "Checks changed prose against your writing profile and the complete humanizer editorial contract. Reports contextual signals, protects source material, and allows at most two review and revision passes. Includes Vale checks and a settings page."
 author: Apostol Apostolov
 license: MIT

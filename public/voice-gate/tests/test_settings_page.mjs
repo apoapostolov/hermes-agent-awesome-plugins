@@ -18,6 +18,7 @@ const React = require('react')
 const { createRoot } = require('react-dom/client')
 const { act } = React
 const requests = [], opened = []
+let listBehavior = 'ok', finishList
 const fields = [
   { key: 'mode', type: 'string', value: 'improve', label: 'Mode', description: 'Review mode.' },
   { key: 'vale_mode', type: 'string', value: 'advisory', label: 'Vale second opinion', description: 'Vale mode.' },
@@ -28,12 +29,18 @@ const fields = [
 const row = { key: 'voice-gate', name: 'Voice Gate', settings_schema: fields }
 globalThis.__vgHost = {
   state: { profile: { get: () => 'default' }, connectionId: { get: () => 'local' } },
-  async requestProfile(route, method, params) {
+  async requestProfile(route, method, params, timeoutMs, options) {
     assert.equal(route.targetProfile, 'default')
     assert.equal(route.connectionId, 'local')
     assert.equal(method, 'plugins.manage')
+    assert.equal(timeoutMs, 120_000)
+    assert.equal(options.spawnPriority, 'foreground')
     requests.push(params)
-    if (params.action === 'list') return { plugins: [row] }
+    if (params.action === 'list') {
+      if (listBehavior === 'fail') throw new Error('Backend unavailable')
+      if (listBehavior === 'pending') return new Promise(resolve => { finishList = resolve })
+      return { plugins: [row] }
+    }
     for (const [key, value] of Object.entries(params.values)) fields.find(field => field.key === key).value = value
     return { ok: true, plugin: row }
   }
@@ -63,7 +70,11 @@ const ctx = { registerSettingsPage: value => { contribution = value }, os: { ope
 page.default.register(ctx)
 const root = createRoot(document.getElementById('root'))
 try {
-  await act(async () => { root.render(contribution.render()) })
+  await act(async () => { root.render(React.createElement(React.StrictMode, null, contribution.render())) })
+  assert.equal(requests.filter(request => request.action === 'list').length, 1, 'StrictMode shares its in-flight inventory load')
+  const disclosures = [...document.querySelectorAll('form > details')]
+  assert.deepEqual(disclosures.map(node => node.querySelector('summary').textContent), ['Vale checks', 'Bots', 'Advanced rules'])
+  assert.ok(disclosures.every(node => !node.open), 'Optional controls start collapsed')
   const input = document.querySelector('textarea')
   assert.equal(input.rows, 5)
   assert.equal(input.style.width, '100%')
@@ -90,7 +101,31 @@ try {
   assert.equal(save.disabled, true)
   assert.equal(document.querySelector('[role="status"]').textContent, 'Changes saved.')
   assert.throws(() => page.changedValues([{ key: 'count', type: 'number', value: 3, label: 'Count' }], { count: 'NaN' }))
-  console.log('Settings page: five-row full-width input, placeholder, two-line Vale intro, install link, scoped multiline save and validation passed.')
+  listBehavior = 'fail'
+  await act(async () => { root.render(React.createElement(React.Fragment, { key: 'failed-load' }, contribution.render())) })
+  assert.match(document.querySelector('[role="alert"]').textContent, /Could not load Voice Gate settings.*Backend unavailable/)
+  const retry = [...document.querySelectorAll('button')].find(node => node.textContent === 'Try again')
+  assert.ok(retry)
+  listBehavior = 'pending'
+  await act(async () => { retry.dispatchEvent(new window.MouseEvent('click', { bubbles: true })) })
+  assert.match(document.querySelector('[role="status"]').textContent, /may take a minute/)
+  await act(async () => { finishList({ plugins: [row] }) })
+  assert.equal(document.querySelector('textarea').rows, 5, 'A delayed retry can still render the settings')
+
+  const originalSetTimeout = globalThis.setTimeout, originalClearTimeout = globalThis.clearTimeout
+  let deadline, cleared = false
+  globalThis.setTimeout = (callback, milliseconds) => { assert.equal(milliseconds, 120_000); deadline = callback; return 123 }
+  globalThis.clearTimeout = timer => { assert.equal(timer, 123); cleared = true }
+  try {
+    const timedOut = assert.rejects(page.settingsRequest({ connectionId: 'local', profile: 'default', targetProfile: 'default' }, { action: 'list' }), /took too long/)
+    deadline()
+    await timedOut
+    assert.ok(cleared, 'The outer deadline also bounds a stalled SDK dial')
+  } finally {
+    globalThis.setTimeout = originalSetTimeout
+    globalThis.clearTimeout = originalClearTimeout
+  }
+  console.log('Settings page: collapsed optional controls, StrictMode deduplication, 120-second bounded requests, failed-load retry, delayed recovery, five-row exceptions and scoped save passed.')
 } finally {
   await act(async () => { root.unmount() })
   dom.window.close()

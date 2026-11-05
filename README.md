@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Voice Gate 1.4.0 adds a clearer settings page, 75 mechanical rule families, and optional contextual review against the complete humanizer skill and its references. Exceptions have a full-width five-line editor, Vale has installation guidance, and prose em dashes are distinguished from list separators and empty table values. Revision requests stop after two opportunities and check that protected material was preserved.
+Voice Gate 1.4.1 fixes the settings request timing out before a large plugin inventory finishes loading. The page now allows up to two minutes and offers Try again after a failed load. Everyday settings and file exceptions stay visible; Vale, bots, and individual rules start collapsed.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 

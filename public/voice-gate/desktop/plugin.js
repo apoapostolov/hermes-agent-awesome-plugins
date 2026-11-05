@@ -11,6 +11,31 @@ const CHOICE_LABELS = { warn: 'Ask once', improve: 'Review and revise', skip: 'O
 const FORMATTING = new Set(['em_dashes', 'bold_pseudo_headings', 'bold_lead_bullets', 'hashtag_stuffing', 'title_case_headings', 'decorative_headers', 'label_periods', 'unnecessary_hyphenation'])
 const DELIVERY = new Set(['assistant_residue', 'template_residue', 'tool_fingerprints', 'citation_residue', 'reasoning_residue', 'closing_offers'])
 const WORDS = new Set(['buzzwords', 'marketing_adjectives', 'banned_words', 'significance_inflation', 'copula_avoidance', 'hedges', 'filler', 'transitions', 'trailing_qualifiers', 'vague_authority', 'real_actual', 'moral_category', 'tier1a', 'tier1b', 'tier2', 'tier3', 'tier3_phrases', 'load_bearing_metaphor', 'significance_adverbs'])
+export const SETTINGS_TIMEOUT_MS = 120_000
+const pendingLoads = new Map()
+
+export async function settingsRequest(route, params) {
+  let timer
+  try {
+    return await Promise.race([
+      host.requestProfile(route, 'plugins.manage', { ...params, profile: route.targetProfile }, SETTINGS_TIMEOUT_MS, { spawnPriority: 'foreground' }),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Hermes took too long to respond. Try again when the backend is ready.')), SETTINGS_TIMEOUT_MS) })
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function loadSettings(route) {
+  const key = JSON.stringify([route.connectionId, route.profile, route.targetProfile])
+  if (!pendingLoads.has(key)) {
+    const request = settingsRequest(route, { action: 'list' }).finally(() => {
+      if (pendingLoads.get(key) === request) pendingLoads.delete(key)
+    })
+    pendingLoads.set(key, request)
+  }
+  return pendingLoads.get(key)
+}
 
 function textValue(field) {
   if (field.type === 'enum') return String(field.value ?? field.default ?? field.choices?.[0] ?? '')
@@ -70,8 +95,9 @@ function SettingsBody({ ctx, route }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const alive = useRef(true)
-  const request = (params) => host.requestProfile(route, 'plugins.manage', { ...params, profile: route.profile })
+  const request = params => settingsRequest(route, params)
   const adopt = row => {
     if (!row?.key || !row.settings_schema?.length) throw new Error('Voice Gate is not available in this profile. Enable it in Capabilities, then reopen this page.')
     setPluginKey(row.key)
@@ -80,11 +106,13 @@ function SettingsBody({ ctx, route }) {
   }
   useEffect(() => {
     alive.current = true
-    request({ action: 'list' }).then(result => {
-      if (alive.current) adopt((result.plugins ?? []).find(row => row.key === 'voice-gate' || row.name === 'Voice Gate'))
-    }).catch(error => { if (alive.current) setError(String(error.message ?? error)) })
-    return () => { alive.current = false }
-  }, [route])
+    let current = true
+    setError('')
+    loadSettings(route).then(result => {
+      if (current) adopt((result.plugins ?? []).find(row => row.key === 'voice-gate' || row.name === 'Voice Gate'))
+    }).catch(error => { if (current) setError(String(error.message ?? error)) })
+    return () => { current = false; alive.current = false }
+  }, [route, loadAttempt])
 
   const save = async event => {
     event.preventDefault()
@@ -105,34 +133,41 @@ function SettingsBody({ ctx, route }) {
       if (alive.current) setBusy(false)
     }
   }
-  if (!fields) return h('div', null, error ? h('p', { role: 'alert', style: hint }, error) : h('p', { role: 'status', style: hint }, 'Loading Voice Gate settings…'))
+  if (!fields) return h('div', { style: { display: 'grid', justifyItems: 'start', gap: 12 } },
+    error ? h('p', { role: 'alert', style: hint }, `Could not load Voice Gate settings. ${error}`)
+      : h('p', { role: 'status', style: hint }, 'Loading Voice Gate settings… Hermes may take a minute to read installed plugins.'),
+    error ? h(Button, { type: 'button', variant: 'outline', size: 'sm', onClick: () => setLoadAttempt(value => value + 1) }, 'Try again') : null)
   const props = { draft, setDraft: update => { setSaved(false); setDraft(update) }, disabled: busy, prefix: `voice-gate-${route.profile}` }
   const controls = items => items.map(field => h(Setting, { ...props, key: field.key, field }))
   const section = (title, items, intro) => items.length ? h('section', { 'aria-label': title, style: { display: 'grid', gap: 12 } },
     h('h3', { style: { margin: 0, fontSize: 13, fontWeight: 500 } }, title), intro,
     h('div', { style: grid }, ...controls(items))) : null
+  const disclosure = (title, ...children) => h('details', { style: { borderTop: '1px solid var(--ui-border)', paddingTop: 16 } },
+    h('summary', { style: { cursor: 'pointer', fontSize: 13, fontWeight: 500 } }, title),
+    h('div', { style: { display: 'grid', gap: 20, paddingTop: 16 } }, ...children))
   const dirty = fields.some(field => (draft[field.key] ?? '') !== textValue(field))
   const checks = fields.filter(field => field.key.startsWith('tell_'))
   const inGroup = names => checks.filter(field => names.has(field.key.slice(5)))
   return h('form', { onSubmit: save, style: { display: 'grid', gap: 24, width: '100%' } },
     h('p', { style: hint }, `Settings for ${route.profile === 'default' ? 'Hermes' : route.profile}.`),
     section('When to review', fields.filter(field => !/^(apply_|tell_|vale_)/.test(field.key) && field.key !== 'exceptions')),
-    section('Bots', fields.filter(field => field.key.startsWith('apply_'))),
-    section('Vale checks', fields.filter(field => field.key.startsWith('vale_')),
+    disclosure('Vale checks', section('Vale checks', fields.filter(field => field.key.startsWith('vale_')),
       h('p', { style: hint },
         h('span', { style: { display: 'block' } }, 'Vale checks your writing against a set of style rules, entirely on your computer.'),
         h('span', { style: { display: 'block' } }, 'To install it, follow the ',
           h('a', { href: VALE_URL, style: { color: 'var(--ui-accent)', textDecoration: 'underline' }, onClick: event => {
             event.preventDefault()
             void ctx.os.openExternal(VALE_URL).then(ok => { if (!ok && alive.current) setError(`Open ${VALE_URL} in your browser for installation instructions.`) })
-          } }, 'Vale installation guide on GitHub'), '. Leave the executable path blank to use an installed copy.'))),
+          } }, 'Vale installation guide on GitHub'), '. Leave the executable path blank to use an installed copy.')))),
     h('section', { 'aria-label': 'Exceptions', style: { display: 'grid', gap: 8, width: '100%' } },
       ...controls(fields.filter(field => field.key === 'exceptions'))),
-    h('p', { style: hint }, 'Choose which patterns to report. A match is a reason to read the passage again, and may be deliberate.'),
-    section('Words and claims', inGroup(WORDS)),
-    section('Sentence and paragraph patterns', checks.filter(field => !WORDS.has(field.key.slice(5)) && !FORMATTING.has(field.key.slice(5)) && !DELIVERY.has(field.key.slice(5)))),
-    section('Formatting', inGroup(FORMATTING)),
-    section('Leftover draft and assistant text', inGroup(DELIVERY)),
+    disclosure('Bots', section('Bots', fields.filter(field => field.key.startsWith('apply_')))),
+    disclosure('Advanced rules',
+      h('p', { style: hint }, 'The built-in checks are on by default. Open a group to adjust individual rules. A match may be deliberate; read the passage before changing it.'),
+      disclosure('Words and claims', section('Words and claims', inGroup(WORDS))),
+      disclosure('Sentence and paragraph patterns', section('Sentence and paragraph patterns', checks.filter(field => !WORDS.has(field.key.slice(5)) && !FORMATTING.has(field.key.slice(5)) && !DELIVERY.has(field.key.slice(5))))),
+      disclosure('Formatting', section('Formatting', inGroup(FORMATTING))),
+      disclosure('Leftover draft and assistant text', section('Leftover draft and assistant text', inGroup(DELIVERY)))),
     error ? h('p', { role: 'alert', style: { ...hint, color: 'var(--ui-red)' } }, error) : null,
     h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 } },
       saved ? h('span', { role: 'status', style: hint }, 'Changes saved.') : null,

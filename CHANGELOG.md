@@ -27,6 +27,14 @@ the component that changed; a plugin patch does not imply a new pack release.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
 
+## [voice-gate 1.4.1] - 2026-11-05
+
+### Fixed
+
+- The new settings page used the SDK's default 30-second deadline for the complete installed-plugin inventory. On a large installation the request could time out before controls appeared. Loading and saving now allow up to two minutes, with an outer deadline covering a stalled dial, and failed loads offer Try again. Repeated mounts share a pending inventory request instead of adding another one.
+- Everyday review settings and the exceptions editor remain visible. Vale, bot switches, and the individual checks now start collapsed, with the checks grouped inside Advanced rules.
+- The settings test covers the request deadline, repeated mounts, a rejected load, retry, delayed recovery, collapsed controls, and scoped saving. The user confirmed the updated page loads. Inventory loading itself can still be slow.
+
 ## [voice-gate 1.4.0] - 2026-11-05
 
 Voice Gate now gives a passage a bounded editorial review, with clearer settings and a complete comparison against the humanizer skill and all nine references.
