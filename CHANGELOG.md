@@ -120,7 +120,7 @@ Version `1.3.0` shipped the work 1.1.0 and 1.2.0 had carried, so those numbers n
 
 ### Added
 
-- **voice-gate:** The manifest name is `Voice Gate`, so Settings ▸ Plugins and the plugin list show the product name instead of the slug; the catalog entry, the index entry and the install commands keep `voice-gate` as the key, which the catalog matches through its install sidecar, and existing settings moved to the new `plugins.entries` key in every profile. The generic rule set grew from eight families to seventeen: significance inflation, copula avoidance, promotional adjectives, hedge stacking, signposting, wordy constructions, chained transitions, trailing qualifiers, gerund openings and the negation-then-positive frame, alongside the existing verdict openers, closing offers, cliché openers, conclusion signposts, AI vocabulary, bold pseudo-headings and bold lead-in bullets. Thresholds sit at the density where a pattern starts rather than where a single word lands; four real documents, including an 8,390-word changelog, report nothing at the new settings.
+- **voice-gate.** The manifest name is `Voice Gate`, so Settings ▸ Plugins and the plugin list show the product name instead of the slug; the catalog entry, the index entry and the install commands keep `voice-gate` as the key, which the catalog matches through its install sidecar, and existing settings moved to the new `plugins.entries` key in every profile. The generic rule set grew from eight families to seventeen: significance inflation, copula avoidance, promotional adjectives, hedge stacking, signposting, wordy constructions, chained transitions, trailing qualifiers, gerund openings and the negation-then-positive frame, alongside the existing verdict openers, closing offers, cliché openers, conclusion signposts, AI vocabulary, bold pseudo-headings and bold lead-in bullets. Thresholds sit at the density where a pattern starts rather than where a single word lands; four real documents, including an 8,390-word changelog, report nothing at the new settings.
 - **voice-gate:** The five per-bot switches are back in Settings, one checkbox per bot, read from the default profile's config because a page opened on the Herald scope writes Herald's own file; untick one and that profile stops being gated, and a fresh install ticks all five. The public edition gained `voice_gate_check`, so a turn can ask what the rules see without waiting for the nudge. An explicit `min_words: 0` now turns the word floor off instead of silently becoming 200, and both editions answer the check tool with the same `checks` payload. Vale reports are cached by file stamp and config stamp, so a second pass over an untouched file does not spawn the binary again. Each edition ships `tests/test_voice_gate.py`: twenty-one checks over the rule families, the code-span exemption, the bot switches, the floor, the tool registrations and the turn path, runnable with no dependencies because the host has neither PyYAML nor pytest for plugin code.
 - **voice-gate:** Vale is now part of the turn. New tool `voice_gate_vale` installs Vale 3.26.0 from a pinned release whose sha256 is checked before anything is unpacked, keeps the copy under `HERMES_HOME/plugin-data/voice-gate/`, and routes the download through the `pre_tool_call` approval prompt; an existing binary from the setting or from `PATH` is used as-is. The plugin ships a style pack in `styles/VoiceGate` generated from `rules.py` by `scripts/gen_style_pack.py`, with `scripts/check_style_pack.py` failing when the two drift. The new `Vale second opinion` setting adds one line to the nudge with a per-rule breakdown and the first position, and speaks only above `Vale minimum alerts`, three by default. A missing binary, an unreachable release or fewer alerts than the threshold leave the nudge as the engine wrote it.
 
@@ -425,7 +425,7 @@ The status bar has a native Memory chip. The chrome-menu row sits next to New ch
 
 ### Fixed
 
-- Personal edition: the chrome-menu row was appended after the menu was sized, so it sat below the box and React could wipe it. It now inserts next to New chat.
+- Personal edition. The chrome-menu row was appended after the menu was sized, so it sat below the box and React could wipe it. It now inserts next to New chat.
 
 ### Changed
 
@@ -437,7 +437,7 @@ The review dialog and palette follow the app language. The chrome-menu row no lo
 
 ### Added
 
-- Both editions: dialog, palette, and status copy ship an `es` bundle through `ctx.i18n.register`. English is unchanged.
+- Both editions. Dialog, palette, and status copy ship an `es` bundle through `ctx.i18n.register`. English is unchanged.
 
 ### Fixed
 
@@ -546,7 +546,7 @@ The public edition keeps its settings in `ctx.storage` instead of `window.localS
 
 ### Changed
 
-- Public edition: color grades and the hidden-tools list read and write through `ctx.storage`, captured in `register(ctx)` and released in `ctx.onDispose`.
+- Public edition. Color grades and the hidden-tools list read and write through `ctx.storage`, captured in `register(ctx)` and released in `ctx.onDispose`.
 - Public edition: the settings dialog subscribes to a store version counter, so a change made in one surface re-renders the others. `better-session-appearance` already used this pattern.
 - Personal edition is unchanged and keeps its `localStorage` behavior.
 
@@ -574,7 +574,7 @@ The listed edition reads and writes the composer through the draft API, so enhan
 
 ### Changed
 
-- Public edition: enhance, undo, and replace use the composer draft API.
+- Public edition. Enhance, undo, and replace use the composer draft API.
 - Public edition: Add on a saved prompt appends to the draft. Personal Add still inserts at the caret.
 
 ## [prompt-enhance 1.1.0] - 2026-09-22
@@ -632,7 +632,7 @@ RSS Reader moves browser frames and ticker events onto the desktop SDK, restores
 
 ### Changed
 
-- **rss-reader:** Use the desktop plugin event bridge instead of a commands-file poll, and the sandboxed frame API for the browser and YouTube player.
+- **rss-reader.** Use the desktop plugin event bridge instead of a commands-file poll, and the sandboxed frame API for the browser and YouTube player.
 
 ### Fixed
 
@@ -653,7 +653,7 @@ DeepSeek's pricing period and GLM's peak/off-peak schedule now appear beside the
 
 ### Changed
 
-- **provider-status:** Personal, public, and pack overview documentation now lists all 17 registered providers.
+- **provider-status.** Personal, public, and pack overview documentation now lists all 17 registered providers.
 
 ## [rss-reader 1.0.9] - 2026-09-23
 
