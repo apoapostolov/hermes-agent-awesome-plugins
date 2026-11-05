@@ -45,7 +45,7 @@
   ],
   "vale_mode": [
     "Include Vale checks",
-    "Add Vale findings when a document is reviewed."
+    "Add Vale findings when a document is reviewed, using the executable you approved with the Vale tool."
   ],
   "vale_min_alerts": [
     "Minimum Vale findings",

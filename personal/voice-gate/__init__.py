@@ -45,12 +45,17 @@ _OWNED_REVIEW_TASK = False
 
 
 def _home() -> Path:
-    """The Hermes home, resolved even when this process inherits no HERMES_HOME.
+    """The Hermes home of the profile this turn belongs to.
 
-    The desktop backend starts without the variable, so a plugin that reads it
-    alone silently falls back to ``~/.hermes`` and loses the settings and the
-    profiles written under the Windows install.
+    The host resolves it: a context-local override, then ``HERMES_HOME``, then the
+    platform default. Reading the variable here instead lands the turn in the
+    launch profile's tree whenever one process serves several profiles, which
+    puts the settings and the voice profiles under the wrong profile. The probe
+    below stays for a host where core cannot be imported.
     """
+    served = profiles.served_home()
+    if served is not None:
+        return served
     candidates: List[Path] = []
     raw = os.environ.get("HERMES_HOME")
     if raw:
@@ -304,7 +309,7 @@ def _vale_advisory(paths: List[Path], active_families: Optional[set] = None) -> 
         _diagnostic('vale.skip', reason='binary_unavailable')
         return None
     started = time.perf_counter()
-    report = vale.run([str(path) for path in paths[:6]], override)
+    report = vale.run([str(path) for path in paths[:6]], override, approved_only=True)
     _diagnostic('vale.result', ok=report.get('ok'), documents_count=min(len(paths), 6),
                 elapsed_ms=round((time.perf_counter() - started) * 1000, 2))
     if not report.get("ok"):
@@ -762,12 +767,20 @@ def _tool_vale(args: Dict[str, Any]) -> Dict[str, Any]:
     action = str(args.get("action") or "status").strip().lower()
     override = str(args.get("path") or "").strip() or _vale_path()
     if action == "status":
-        return vale.status(override)
-    if action == "install":
-        return vale.install(override)
-    if action == "check":
-        return vale.run([str(p) for p in (args.get("paths") or [])], override)
-    return {"ok": False, "error": f"unknown action {action!r}"}
+        result = vale.status(override)
+    elif action == "install":
+        result = vale.install(override)
+    elif action == "check":
+        result = vale.run([str(p) for p in (args.get("paths") or [])], override)
+    else:
+        return {"ok": False, "error": f"unknown action {action!r}"}
+    # Reaching here means the pre_tool_call gate let the call through, so the
+    # binary this call named is the one a person approved. Turn-time findings
+    # accept only that binary, and only while its digest still matches.
+    binary = str(result.get("binary") or "") or vale.resolve_binary(override)
+    if binary and (action != "install" or result.get("ok")):
+        vale.record_approval(binary)
+    return result
 
 
 def _on_pre_tool_call(tool_name: str = "", args: Any = None, **_kwargs: Any) -> Optional[Dict[str, Any]]:

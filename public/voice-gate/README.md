@@ -1,6 +1,6 @@
 # Voice Gate
 
-![Version](https://img.shields.io/badge/version-1.4.3-blue)
+![Version](https://img.shields.io/badge/version-1.4.4-blue)
 
 Voice Gate reviews prose files Hermes changes before a turn finishes. It finds wording and structural patterns that deserve another read, then asks for a source-faithful revision or an explanation for keeping the passage. A match is an editorial signal, not evidence of AI authorship.
 
@@ -22,7 +22,7 @@ Markdown, plain text, reStructuredText, AsciiDoc, Org, LaTeX, HTML, and simple t
 
 Personal edition shown. The public edition omits the Writing profile field.
 
-Open Settings, Plugins, Voice Gate. Everyday review settings and file exceptions stay visible. Vale, bots, and individual checks sit in collapsed sections; Advanced rules groups the checks by purpose. Settings are saved for the profile named on the page. The installed-plugin inventory can take more than 30 seconds on a large installation. Loading and saving allow up to two minutes, and a failed load offers Try again. Repeated mounts share the same pending load. Hermes 0.22.8 and newer show this page on its own; older builds still show the generated Agent settings page alongside it.
+Open Settings, Plugins, Voice Gate. Everyday review settings and file exceptions stay visible. Vale, bots, and individual checks sit in collapsed sections; Advanced rules groups the checks by purpose. Settings are saved for the profile named on the page. The installed-plugin inventory can take more than 30 seconds on a large installation. Loading and saving allow up to two minutes, and a failed load offers Try again. Repeated mounts share the same pending load.
 
 Prose em dashes are flagged by default. A bullet label separator such as `- Status — Ready` and a table cell containing only `—` are formatting and remain allowed. A prose sentence in a bullet or table still follows the prose policy. Code, quotes, and literal examples remain protected.
 
@@ -48,7 +48,7 @@ Use the family name without `tell_`, a catalog key from `pattern_1` through `pat
 
 [Vale](https://github.com/vale-cli/vale#install) is a local prose style checker. It is an independent project; the Microsoft writing style can be installed as a Vale style package. The settings page explains Vale above its controls and links to its GitHub installation guide.
 
-Leave **Vale executable** blank to search the plugin-managed copy and PATH. The bundled style pack needs no download. Optional installation verifies the archive against a digest pinned in the plugin before extracting it. Status, checking, and installation request approval before starting a program. Approval directives need Hermes v2026.7.7 (semver 0.18.1); this plugin requires Hermes 0.22.0 or newer.
+Leave **Vale executable** blank to search the plugin-managed copy and PATH. The bundled style pack needs no download. Optional installation verifies the archive against a digest pinned in the plugin before extracting it. Status, checking, and installation request approval before starting a program; turn-time findings run only the executable you approved through `voice_gate_vale`, and an approval is stored by digest, so a replaced binary asks again. Approval directives need Hermes v2026.7.7 (semver 0.18.1); this plugin requires Hermes 0.22.0 or newer.
 
 Vale is off by default. Its turn-time findings respect family switches and file exceptions; standalone Vale uses the generic pack and does not reproduce a personal profile. The Python checker works without Vale or model review.
 

@@ -37,24 +37,40 @@ def plugin_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
+def served_home() -> Optional[Path]:
+    """The home of the profile this turn belongs to, as the host resolves it.
+
+    ``HERMES_HOME`` alone answers for the launch profile, so a process that serves
+    several profiles would put plugin data and voice-profile lookups in another
+    profile's tree. Core already orders the sources: a context-local override,
+    then the variable, then the platform default.
+    """
+    try:
+        import hermes_constants
+
+        home = Path(hermes_constants.get_hermes_home())
+    except Exception:
+        return None
+    return home if str(home) else None
+
+
 def home_candidates() -> List[Path]:
     """Every place a Hermes home can live on this machine, best first.
 
-    ``HERMES_HOME`` is unset in some hosts (the desktop backend runs without it),
-    so a profile written under the Windows install must still be found when the
-    process inherits no environment at all.
+    The served profile's home leads, so a lookup never prefers another profile's
+    prose. The rest covers a host where core cannot be imported, an older install
+    under ``~/.hermes``, and addresses written before the home moved.
     """
     seen: set = set()
     out: List[Path] = []
-    for raw in (
-        os.environ.get("HERMES_HOME"),
-        str(Path(os.environ["LOCALAPPDATA"]) / "hermes") if os.environ.get("LOCALAPPDATA") else "",
-        str(Path.home() / ".hermes"),
+    local = os.environ.get("LOCALAPPDATA")
+    for candidate in (
+        served_home(),
+        Path(os.environ["HERMES_HOME"]) if os.environ.get("HERMES_HOME") else None,
+        Path(local) / "hermes" if local else None,
+        Path.home() / ".hermes",
     ):
-        if not raw:
-            continue
-        candidate = Path(raw)
-        if candidate in seen:
+        if candidate is None or candidate in seen:
             continue
         seen.add(candidate)
         out.append(candidate)
@@ -62,7 +78,10 @@ def home_candidates() -> List[Path]:
 
 
 def hermes_home() -> Path:
-    """The home that actually holds profiles, falling back to the first candidate."""
+    """The home this profile's own plugin data belongs to."""
+    served = served_home()
+    if served is not None:
+        return served
     for candidate in home_candidates():
         if (candidate / "voice-profiles").is_dir():
             return candidate

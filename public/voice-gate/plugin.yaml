@@ -1,5 +1,5 @@
 name: "voice-gate"
-version: "1.4.3"
+version: "1.4.4"
 description: "Checks changed prose for wording and structural patterns, with optional contextual review through your Hermes model. Protects source material and allows at most two review and revision passes. Includes Vale checks and a settings page."
 author: Apostol Apostolov
 license: MIT
@@ -40,7 +40,7 @@ config_schema:
   vale_mode:
     type: str
     label: "Include Vale checks"
-    description: "Add Vale findings when a document is reviewed."
+    description: "Add Vale findings when a document is reviewed, using the executable you approved with the Vale tool."
     choices: ["off", "advisory"]
   vale_min_alerts:
     type: number

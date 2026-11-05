@@ -5,8 +5,8 @@ release, a digest checked before anything is unpacked, the copy kept under the
 plugin's data directory instead of the system, and every download routed
 through the ``pre_tool_call`` approval prompt so nothing arrives silently.
 
-Nothing here runs on its own. A turn only reaches this module through the
-``voice_gate_vale`` tool.
+A turn reaches this module through the ``voice_gate_vale`` tool, and through
+the gate's advisory pass, which runs only a binary a person approved there.
 """
 
 from __future__ import annotations
@@ -67,10 +67,8 @@ def asset() -> Tuple[str, str, str]:
 
 
 def data_dir() -> Path:
-    from .profile import home_candidates
-    candidates = home_candidates()
-    home = next((candidate for candidate in candidates if (candidate / 'config.yaml').is_file()), candidates[0])
-    return home / "plugin-data" / "voice-gate" / "vale" / VERSION
+    from .profile import hermes_home
+    return hermes_home() / "plugin-data" / "voice-gate" / "vale" / VERSION
 
 
 def binary_name() -> str:
@@ -80,6 +78,98 @@ def binary_name() -> str:
 def installed_binary() -> Optional[Path]:
     candidate = data_dir() / binary_name()
     return candidate if candidate.is_file() else None
+
+
+# Vale reads files and prints a report. It needs no secret and no site
+# configuration, so the child gets locale, temp and executable lookup instead of
+# the host's environment: a downloaded binary must not inherit every provider key
+# the gateway holds.
+_CHILD_ENV_KEYS = (
+    "PATH", "HOME", "USERPROFILE", "LANG", "LC_ALL", "TMPDIR", "TMP", "TEMP",
+    "SYSTEMROOT", "WINDIR", "PATHEXT",
+)
+
+
+def child_env() -> Dict[str, str]:
+    """The environment a Vale child receives."""
+    return {key: os.environ[key] for key in _CHILD_ENV_KEYS if os.environ.get(key)}
+
+
+_APPROVALS = "approved.json"
+_DIGESTS: Dict[Tuple[str, int, int], str] = {}
+
+
+def _sha256_file(path: str) -> Optional[str]:
+    """The file's digest, remembered while its size and modification time hold."""
+    try:
+        info = Path(path).stat()
+    except OSError:
+        return None
+    key = (str(path), info.st_mtime_ns, info.st_size)
+    known = _DIGESTS.get(key)
+    if known:
+        return known
+    digest = hashlib.sha256()
+    try:
+        with open(path, "rb") as handle:
+            for block in iter(lambda: handle.read(1 << 20), b""):
+                digest.update(block)
+    except OSError:
+        return None
+    value = digest.hexdigest()
+    if len(_DIGESTS) >= 32:
+        _DIGESTS.pop(next(iter(_DIGESTS)))
+    _DIGESTS[key] = value
+    return value
+
+
+def _approval_file() -> Path:
+    return data_dir() / _APPROVALS
+
+
+def _approval_key(binary: str) -> str:
+    try:
+        return os.path.normcase(str(Path(binary).resolve()))
+    except OSError:
+        return os.path.normcase(str(binary))
+
+
+def _approvals() -> Dict[str, str]:
+    try:
+        stored = json.loads(_approval_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {str(key): str(value) for key, value in stored.items()} if isinstance(stored, dict) else {}
+
+
+def record_approval(binary: str) -> None:
+    """Remember that a person approved running this binary, by its digest.
+
+    Only the tool handler calls this, and only after the approval gate has let
+    the call through. A replaced binary changes the digest, so the next turn
+    asks again instead of inheriting an older consent.
+    """
+    digest = _sha256_file(binary) if binary else None
+    if not digest:
+        return
+    stored = _approvals()
+    stored[_approval_key(binary)] = digest
+    target = _approval_file()
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_suffix(".tmp")
+        temporary.write_text(json.dumps(stored, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(temporary, target)
+    except OSError:
+        return
+
+
+def approved(binary: str) -> bool:
+    """Whether this exact binary was approved in this data directory."""
+    if not binary:
+        return False
+    stored = _approvals().get(_approval_key(binary))
+    return bool(stored) and stored == _sha256_file(binary)
 
 
 def resolve_binary(override: str = "") -> Optional[str]:
@@ -112,7 +202,7 @@ def status(override: str = "") -> Dict[str, Any]:
 
 def _version_of(binary: str) -> Optional[str]:
     try:
-        out = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=20)
+        out = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=20, env=child_env())
         return (out.stdout or out.stderr).strip().splitlines()[0] if out.returncode == 0 else None
     except Exception:
         return None
@@ -220,11 +310,19 @@ def config_path() -> Path:
     return fallback
 
 
-def run(paths: List[str], override: str = "", timeout: float = 120.0) -> Dict[str, Any]:
-    """Run Vale over files and return its JSON report, or a clear failure."""
+def run(paths: List[str], override: str = "", timeout: float = 120.0,
+        approved_only: bool = False) -> Dict[str, Any]:
+    """Run Vale over files and return its JSON report, or a clear failure.
+
+    ``approved_only`` suits a caller that runs outside the approval gate, such as
+    the gate's own advisory pass: it refuses any binary nobody approved there.
+    """
     binary = resolve_binary(override)
     if not binary:
         return {"ok": False, "error": "Vale is not installed. Run voice_gate_vale with action=install."}
+    if approved_only and not approved(binary):
+        return {"ok": False, "approved": False,
+                "error": "Vale is not approved on this machine. Run voice_gate_vale with action=status to approve it."}
     files = [str(Path(p).resolve()) for p in paths if Path(p).is_file()]
     if not files:
         return {"ok": False, "error": "no readable files to check"}
@@ -236,7 +334,7 @@ def run(paths: List[str], override: str = "", timeout: float = 120.0) -> Dict[st
         return cached
     command = [binary, f"--config={ini}", "--output=JSON", *files]
     try:
-        proc = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=child_env())
     except Exception as exc:
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}", "command": command}
     try:
