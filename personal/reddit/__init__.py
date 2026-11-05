@@ -1,6 +1,6 @@
 """Reddit plugin — OAuth login plus the full Reddit API as tools.
 
-Registers thirteen tools on the ``reddit`` toolset: login/logout, status, a generic
+Registers tools on the ``reddit`` toolset: login/logout, status, a generic
 ``reddit_api`` passthrough and curated read/write helpers for subreddits, search,
 threads, users, posts, comments, votes and the inbox.
 
@@ -13,7 +13,7 @@ Login is the published-app authorization-code flow with a loopback catcher on
 ``$HERMES_HOME/reddit-oauth.json`` and refreshed automatically.
 """
 
-from . import cli, tools as _tools
+from . import cli, tools as _tools, maintenance
 
 _HANDLERS = {
     "reddit_setup": _tools.reddit_setup,
@@ -29,10 +29,23 @@ _HANDLERS = {
     "reddit_vote": _tools.reddit_vote,
     "reddit_manage": _tools.reddit_manage,
     "reddit_inbox": _tools.reddit_inbox,
+    "reddit_library": _tools.reddit_library,
+    "reddit_library_search": _tools.reddit_library_search,
+    "reddit_account": _tools.reddit_account,
+    "reddit_content": _tools.reddit_content,
+    "reddit_community": _tools.reddit_community,
+    "reddit_moderation": _tools.reddit_moderation,
+    "reddit_messages": _tools.reddit_messages,
+    "reddit_wiki": _tools.reddit_wiki,
+    "reddit_multis": _tools.reddit_multis,
 }
 
 
 def register(ctx):
+    cleanup = maintenance.start()
+    on_unload = getattr(ctx, "on_unload", None)
+    if cleanup and callable(on_unload):
+        on_unload(cleanup)
     for schema in _tools.SCHEMAS:
         name = schema["name"]
         ctx.register_tool(

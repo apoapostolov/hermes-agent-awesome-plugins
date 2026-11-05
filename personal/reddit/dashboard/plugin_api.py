@@ -9,6 +9,7 @@ one token store and one OAuth flow.
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 from pathlib import Path
 
@@ -41,6 +42,8 @@ class ConfigPayload(BaseModel):
     redirect_uri: str | None = None
     user_agent: str | None = None
     verify: bool = True
+    background_refresh: bool | None = None
+    protect_secrets: bool | None = None
 
 
 class LoginStartPayload(BaseModel):
@@ -72,6 +75,9 @@ def status() -> dict:
         "username": token.get("username") or None,
         "scopes": token.get("scope") or None,
         "setup_url": "https://www.reddit.com/prefs/apps",
+        "background_refresh": bool(client.load_config().get("background_refresh")),
+        "protect_secrets": bool(client.load_config().get("protect_secrets")),
+        "secret_protection_available": os.name == "nt",
     }
 
 
@@ -106,6 +112,13 @@ def save_config(payload: ConfigPayload) -> dict:
             "user_agent": user_agent,
         }
     )
+    if payload.background_refresh is not None:
+        client.save_config({"background_refresh": payload.background_refresh})
+    if payload.protect_secrets is not None:
+        try:
+            client.protect_credentials(payload.protect_secrets)
+        except Exception as exc:
+            raise _reddit_error(exc) from exc
     return {
         "saved": str(path),
         "client_id": client_id,
@@ -122,7 +135,7 @@ def login_start(payload: LoginStartPayload | None = None) -> dict:
     payload = payload or LoginStartPayload()
     try:
         return login.start(
-            port=int(payload.port or 8080),
+            port=payload.port,
             redirect_uri=(payload.redirect_uri or "").strip(),
             scope=(payload.scope or "").strip(),
         )
@@ -142,7 +155,7 @@ def login_status() -> dict:
 
 @router.post("/login/complete")
 def login_complete(payload: LoginCompletePayload) -> dict:
-    """Finish the flow from a pasted redirect URL or code."""
+    """Finish the flow from a full redirect URL including its state."""
     _client, login = _mods()
     try:
         code, state = login.parse_code(payload.value)
@@ -168,3 +181,41 @@ def identity() -> dict:
         return session.identity()
     except Exception as exc:  # noqa: BLE001
         raise _reddit_error(exc) from exc
+
+
+class LibraryAction(BaseModel):
+    action: str
+    target: str = ""
+    account: str = ""
+    pages: int = 1
+    after: str = ""
+    summary: str | None = None
+    context: str | None = None
+    notes: str | None = None
+    tags: list[str] | None = None
+    bookmarks: dict | None = None
+    source_hash: str | None = None
+
+
+@router.get("/library")
+def library_search(query: str = "", account: str = "", offset: int = 0, limit: int = 25,
+                   tag: str = "", subreddit: str = "", summary_source: str = "", read: bool | None = None):
+    _mods()
+    lib, upkeep = importlib.import_module("reddit.library"), importlib.import_module("reddit.maintenance")
+    try:
+        store = lib.Library(account)
+        return {"results": store.search(query, limit, offset, tag=tag, subreddit=subreddit, summary_source=summary_source, read=read),
+                "stats": store.stats(), "maintenance": upkeep.status()}
+    except Exception as exc:
+        raise _reddit_error(exc) from exc
+
+
+@router.post("/library")
+def library_action(payload: LibraryAction):
+    _mods()
+    import json
+    tools = importlib.import_module("reddit.tools")
+    result = json.loads(tools.reddit_library(payload.model_dump(exclude_none=True)))
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error") or "Library operation failed")
+    return result["result"]

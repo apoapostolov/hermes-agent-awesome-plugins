@@ -8,6 +8,7 @@ then it is exchanged for a permanent refresh token.
 from __future__ import annotations
 
 import http.server
+import html
 import json
 import secrets
 import threading
@@ -24,6 +25,7 @@ PENDING: dict = {
     "started_at": 0.0,
     "result": None,
     "error": "",
+    "home": "",
 }
 _LOCK = threading.Lock()
 _SERVER: http.server.HTTPServer | None = None
@@ -51,7 +53,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             expected = PENDING["state"]
             if error:
                 PENDING["error"] = error
-                status, message = "failed", f"Reddit returned <code>{error}</code>."
+                status, message = "failed", f"Reddit returned <code>{html.escape(error)}</code>."
             elif not code:
                 PENDING["error"] = "no code in callback"
                 status, message = "failed", "No authorization code in the callback."
@@ -84,18 +86,20 @@ def _shutdown() -> None:
         threading.Thread(target=server.shutdown, daemon=True).start()
     if thread is not None and thread.is_alive():
         thread.join(timeout=2)
+    if server is not None:
+        server.server_close()
 
 
-def _expire(deadline: float) -> None:
+def _expire(deadline: float, state: str) -> None:
     while time.time() < deadline:
         time.sleep(1)
-        if PENDING["result"] or PENDING["error"]:
+        if PENDING["state"] != state or PENDING["result"] or PENDING["error"]:
             return
     _shutdown()
 
 
 def start(
-    port: int = 8080,
+    port: int | None = None,
     redirect_uri: str = "",
     scope: str = "",
     host: str = "127.0.0.1",
@@ -106,10 +110,15 @@ def start(
     if not creds["client_id"] or not creds["client_secret"]:
         raise client.RedditError(client.SETUP_HINT)
 
+    profile_home = str(client.hermes_home().resolve())
+    if _SERVER is not None and PENDING.get("home") and PENDING["home"] != profile_home:
+        raise client.RedditError("Another Hermes profile has an active Reddit callback listener; complete it first")
     _shutdown()
     redirect = (redirect_uri or creds["redirect_uri"] or client.DEFAULT_REDIRECT_URI).strip()
     parsed = urllib.parse.urlparse(redirect)
-    bind_port = port or parsed.port or 8080
+    if parsed.scheme != "http" or parsed.hostname not in {"localhost", "127.0.0.1"}:
+        raise client.RedditError("The local callback requires an http localhost or 127.0.0.1 redirect URI")
+    bind_port = (parsed.port or 8080) if port is None else int(port)
 
     try:
         server = http.server.HTTPServer((host, bind_port), _Handler)
@@ -123,6 +132,7 @@ def start(
         ) from exc
 
     state = secrets.token_urlsafe(24)
+    bind_port = server.server_address[1]
     PENDING.update(
         {
             "state": state,
@@ -132,13 +142,17 @@ def start(
             "started_at": time.time(),
             "result": None,
             "error": "",
+            "home": profile_home,
         }
     )
+    client._atomic_write(client.hermes_home() / "reddit-login-pending.json", json.dumps({
+        key: PENDING[key] for key in ("state", "redirect_uri", "scope", "started_at")
+    }))
 
     _SERVER = server
     _THREAD = threading.Thread(target=server.serve_forever, daemon=True)
     _THREAD.start()
-    threading.Thread(target=_expire, args=(time.time() + 900,), daemon=True).start()
+    threading.Thread(target=_expire, args=(time.time() + 900, state), daemon=True).start()
 
     url = client.build_authorize_url(
         creds["client_id"], redirect, state, scope=PENDING["scope"]
@@ -160,11 +174,12 @@ def result() -> dict:
     """Current login state, exchanging the captured code when present."""
     creds = client.load_credentials()
     with _LOCK:
-        captured = dict(PENDING["result"]) if PENDING["result"] else None
-        error = PENDING["error"]
-        redirect = PENDING["redirect_uri"] or creds["redirect_uri"]
-        listening = bool(_SERVER is not None)
-        started_at = PENDING["started_at"]
+        owned = not PENDING.get("home") or PENDING["home"] == str(client.hermes_home().resolve())
+        captured = dict(PENDING["result"]) if owned and PENDING["result"] else None
+        error = PENDING["error"] if owned else ""
+        redirect = (PENDING["redirect_uri"] if owned else "") or creds["redirect_uri"]
+        listening = bool(owned and _SERVER is not None)
+        started_at = PENDING["started_at"] if owned else 0
 
     if captured and not error:
         try:
@@ -218,9 +233,22 @@ def finish(code: str, redirect_uri: str = "", state: str = "") -> dict:
     creds = client.load_credentials()
     redirect = (redirect_uri or creds["redirect_uri"] or client.DEFAULT_REDIRECT_URI).strip()
     with _LOCK:
-        expected = PENDING["state"]
-        pending_redirect = PENDING["redirect_uri"]
-    if expected and state and state != expected:
+        owned = not PENDING.get("home") or PENDING["home"] == str(client.hermes_home().resolve())
+        expected = PENDING["state"] if owned else ""
+        pending_redirect = PENDING["redirect_uri"] if owned else ""
+        started_at = PENDING["started_at"] if owned else 0
+    if expected and time.time() - started_at >= 900:
+        raise client.RedditError("Login expired. Start reddit_login again")
+    if not expected:
+        try:
+            stored = json.loads((client.hermes_home() / "reddit-login-pending.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            stored = {}
+        if time.time() - stored.get("started_at", 0) < 900:
+            expected, pending_redirect = stored.get("state", ""), stored.get("redirect_uri", "")
+    if not expected:
+        raise client.RedditError("No active login. Start reddit_login again and complete within 15 minutes")
+    if not state or not secrets.compare_digest(state, expected):
         raise client.RedditError("state mismatch: refusing to exchange that code")
     if pending_redirect and not redirect_uri:
         redirect = pending_redirect
@@ -248,10 +276,12 @@ def finish(code: str, redirect_uri: str = "", state: str = "") -> dict:
     token["username"] = profile.get("name", "")
     client.save_token(token)
     client.reset_session()
+    (client.hermes_home() / "reddit-login-pending.json").unlink(missing_ok=True)
 
-    with _LOCK:
-        PENDING.update({"state": "", "result": None, "error": "", "started_at": 0.0})
-    _shutdown()
+    if owned:
+        with _LOCK:
+            PENDING.update({"state": "", "result": None, "error": "", "started_at": 0.0, "home": ""})
+        _shutdown()
 
     return {
         "status": "logged_in",
@@ -262,11 +292,15 @@ def finish(code: str, redirect_uri: str = "", state: str = "") -> dict:
 
 
 def logout() -> dict:
-    _shutdown()
+    owned = not PENDING.get("home") or PENDING["home"] == str(client.hermes_home().resolve())
+    if owned:
+        _shutdown()
     removed = client.clear_token()
     client.reset_session()
-    with _LOCK:
-        PENDING.update({"state": "", "result": None, "error": "", "started_at": 0.0})
+    (client.hermes_home() / "reddit-login-pending.json").unlink(missing_ok=True)
+    if owned:
+        with _LOCK:
+            PENDING.update({"state": "", "result": None, "error": "", "started_at": 0.0, "home": ""})
     return {"status": "logged_out", "token_removed": removed}
 
 

@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Voice Gate 1.4.3 adds local diagnostics to the personal edition so review decisions, skipped files, rule counts, failures, and settings delays can be studied. Backend logs rotate within 10 MiB per Hermes home; settings timing keeps at most 128 events within 64 KiB. The public edition receives matching version metadata only.
+Reddit 1.1.0 adds a searchable local saved-content library, a Desktop browser, background cleanup and dedicated account/content management tools. Summaries, context, notes and tags remain tied to source freshness; bookmark transfer excludes source text. Both standalone editions provide 22 tools. Catalog admission is pending the host OAuth capabilities described in the plugin's limitations.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
@@ -122,7 +122,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **bette
 | Plugin | What you get |
 | --- | --- |
 | [RSS Reader](personal/rss-reader/README.md) · [public](public/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
-| [Reddit](personal/reddit/README.md) · [public](public/reddit/README.md) | Your own Reddit app and account: OAuth login, reads of public subreddits, search, user history and threads that keep their reply tree before any login, then private subreddits, saved items, the inbox, posts, comments, votes and subscriptions as the account, plus `reddit_api` for any other endpoint. |
+| [Reddit](personal/reddit/README.md) · [public](public/reddit/README.md) | Account access, a searchable local save library with source summaries and notes, a Desktop browser, background cleanup and 22 reading/management tools. Standalone release; catalog admission is blocked by missing host OAuth transport. |
 
 Five plugins in this repo are not in the pack and are installed separately: **better-capabilities**, **reasoning-switch** (Status Bar table), **prompt-enhance** (Composer table), **hermes-jev-routing** (Tools and Memory table), and **voice-gate** (Writing table). Every other plugin above is pinned by the pack.
 

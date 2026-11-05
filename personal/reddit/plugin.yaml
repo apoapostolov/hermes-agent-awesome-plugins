@@ -1,7 +1,7 @@
 name: "reddit"
-version: 1.0.1
+version: 1.1.0
 manifest_version: 2
-description: "Reddit with a real account behind it: bring your own Reddit app, log in with OAuth and a loopback callback, then use the full API from chat. Reads use the account token, so private subreddits, saved items, mod queues and the inbox work; writes publish under the logged-in account. Without a login the app's own token still reads public subreddits, search, threads and user history. Includes curated list, search, thread, user, submit, comment, vote, save/subscribe and inbox tools plus a generic reddit_api passthrough for moderator, wiki, flair, modmail and preference endpoints. Each user stores their own client id and secret; nothing is shared or hardcoded."
+description: "Read and manage Reddit through your own approved OAuth app. Sync saved posts and comments to a local SQLite library, search their text, summaries, context, notes and tags offline, and revalidate or purge source snapshots. Includes account listings, content editing and deletion, community rules, posting, voting, subscriptions, inbox and a generic API tool. Public reads can use app-only OAuth; personal data and writes require account authorization. Stores credentials per profile. Reddit has announced the end of remaining public Data API access in March 2027; Devvit does not expose personal saved items."
 author: Apostol Apostolov
 kind: general
 license: MIT
@@ -21,6 +21,15 @@ provides_tools:
   - reddit_vote
   - reddit_manage
   - reddit_inbox
+  - reddit_library
+  - reddit_library_search
+  - reddit_account
+  - reddit_content
+  - reddit_community
+  - reddit_moderation
+  - reddit_messages
+  - reddit_wiki
+  - reddit_multis
 provides_hooks: []
 provides_middleware: []
 requires_env: []

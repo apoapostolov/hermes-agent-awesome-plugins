@@ -10,18 +10,21 @@ import base64
 import json
 import os
 import pathlib
+import re
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from contextlib import contextmanager
+from . import coordination, secrets_store
 
 OAUTH_HOST = "https://oauth.reddit.com"
 TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
 AUTHORIZE_URL = "https://www.reddit.com/api/v1/authorize"
 DEFAULT_REDIRECT_URI = "http://localhost:8080"
-DEFAULT_USER_AGENT = "hermes-reddit-plugin/0.3 (by /u/hermes-reddit)"
+DEFAULT_USER_AGENT = "desktop:hermes-reddit:v1.1.0"
 
 ALL_SCOPES = " ".join(
     [
@@ -70,42 +73,42 @@ def hermes_home() -> pathlib.Path:
     return pathlib.Path(raw)
 
 
-def token_path() -> pathlib.Path:
-    override = os.environ.get("REDDIT_TOKEN_FILE")
+def token_path(home=None) -> pathlib.Path:
+    override = os.environ.get("REDDIT_TOKEN_FILE") if home is None else None
     if override:
         return pathlib.Path(override)
-    return hermes_home() / "reddit-oauth.json"
+    return pathlib.Path(home or hermes_home()) / "reddit-oauth.json"
 
 
-def config_path() -> pathlib.Path:
-    override = os.environ.get("REDDIT_CONFIG_FILE")
+def config_path(home=None) -> pathlib.Path:
+    override = os.environ.get("REDDIT_CONFIG_FILE") if home is None else None
     if override:
         return pathlib.Path(override)
-    return hermes_home() / "reddit-config.json"
+    return pathlib.Path(home or hermes_home()) / "reddit-config.json"
 
 
-def load_config() -> dict:
-    path = config_path()
+def load_config(home=None) -> dict:
+    path = config_path(home)
     if not path.exists():
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    return data if isinstance(data, dict) else {}
+    return secrets_store.decode(data)
 
 
-def save_config(values: dict) -> pathlib.Path:
+def save_config(values: dict, home=None) -> pathlib.Path:
     """Merge values into the plugin config file and return its path."""
-    path = config_path()
-    with _WRITE_LOCK:
-        merged = load_config()
+    path = config_path(home)
+    with _WRITE_LOCK, coordination.file_lock(path.with_suffix(".lock")):
+        merged = load_config(home)
         for key, value in values.items():
             if value is None:
                 continue
             merged[key] = value
         merged["updated_at"] = int(time.time())
-        _atomic_write(path, json.dumps(merged, indent=2, sort_keys=True))
+        _atomic_write(path, json.dumps(secrets_store.encode(merged, merged.get("protect_secrets", False)), indent=2, sort_keys=True))
     return path
 
 
@@ -152,7 +155,7 @@ def _atomic_write(path: pathlib.Path, text: str) -> None:
         pass
 
 
-def load_credentials() -> dict[str, str]:
+def load_credentials(home=None) -> dict[str, str]:
     """Resolve client id, secret, user agent and redirect URI.
 
     The plugin's own config file (written by ``hermes reddit setup`` or the
@@ -169,7 +172,7 @@ def load_credentials() -> dict[str, str]:
         "source": "",
     }
 
-    config = load_config()
+    config = load_config(home)
     if config.get("client_id"):
         creds.update(
             client_id=str(config.get("client_id", "")).strip(),
@@ -179,7 +182,7 @@ def load_credentials() -> dict[str, str]:
             source="config",
         )
 
-    stored = load_token()
+    stored = load_token(home)
     if not creds["client_id"] and stored.get("client_id"):
         creds["client_id"] = stored["client_id"]
         creds["client_secret"] = stored.get("client_secret", "")
@@ -247,29 +250,44 @@ def validate_app(client_id: str, client_secret: str, user_agent: str) -> dict:
 
 
 
-def load_token() -> dict:
-    path = token_path()
+def load_token(home=None) -> dict:
+    path = token_path(home)
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return secrets_store.decode(json.loads(path.read_text(encoding="utf-8")))
     except (OSError, ValueError):
         return {}
 
 
-def save_token(token: dict) -> pathlib.Path:
-    path = token_path()
-    with _WRITE_LOCK:
-        _atomic_write(path, json.dumps(token, indent=2, sort_keys=True))
+def save_token(token: dict, home=None) -> pathlib.Path:
+    path = token_path(home)
+    with _WRITE_LOCK, coordination.file_lock(path.with_suffix(".lock")):
+        _atomic_write(path, json.dumps(secrets_store.encode(token, load_config(home).get("protect_secrets", False)), indent=2, sort_keys=True))
     return path
 
 
 def clear_token() -> bool:
     path = token_path()
+    (hermes_home() / "plugin-data/reddit/access-cache.json").unlink(missing_ok=True)
     if path.exists():
         path.unlink()
         return True
     return False
+
+
+def protect_credentials(enabled=True, home=None):
+    if enabled and os.name != "nt":
+        raise RedditError("DPAPI secret protection requires Windows")
+    token = load_token(home)
+    save_config({"protect_secrets": bool(enabled)}, home)
+    if token:
+        save_token(token, home)
+    cache = pathlib.Path(home or hermes_home()) / "plugin-data/reddit/access-cache.json"
+    if cache.exists():
+        value = secrets_store.decode(json.loads(cache.read_text(encoding="utf-8")))
+        _atomic_write(cache, json.dumps(secrets_store.encode(value, enabled)))
+    return {"protected": bool(enabled), "backend": "Windows DPAPI" if enabled else "profile file permissions"}
 
 
 def basic_auth(client_id: str, client_secret: str) -> str:
@@ -351,14 +369,15 @@ def _clip(text: str, size: int) -> str:
 def rate_limit_wait(headers, cap: int = 30) -> int:
     """Seconds to wait before retrying a 429, read from Reddit's own headers."""
     for key in ("retry-after", "x-ratelimit-reset"):
-        value = headers.get(key) if headers else None
+        value = next((v for k, v in (headers.items() if headers else []) if k.lower() == key), None)
         if not value:
             continue
         try:
             seconds = int(float(value)) + 1
         except (TypeError, ValueError):
             continue
-        return max(1, min(seconds, cap))
+        # Never retry before Reddit's window ends. Long waits return to the caller.
+        return max(1, seconds)
     return 5
 
 
@@ -489,9 +508,11 @@ def flatten_comments(
 class Reddit:
     """Authenticated Reddit API session backed by a stored refresh token."""
 
-    def __init__(self, creds: dict | None = None, token: dict | None = None):
-        self.creds = creds or load_credentials()
-        self.token = token if token is not None else load_token()
+    def __init__(self, creds: dict | None = None, token: dict | None = None, home=None):
+        self.home = pathlib.Path(home) if home is not None else None
+        self.creds = creds or load_credentials(home)
+        self.token = token if token is not None else load_token(home)
+        self._auth_lock = threading.RLock()
         self._access = ""
         self._expires_at = 0.0
         # App-only tokens are a different grant; keeping them in their own
@@ -501,6 +522,7 @@ class Reddit:
         self.last_rate: dict[str, str] = {}
         # Which grant served the last call: "account" or "app" (read-only).
         self.last_backend: str = ""
+        self._blocked_until = 0.0
 
     # ---- auth -------------------------------------------------------
     @property
@@ -511,6 +533,23 @@ class Reddit:
         return not self._access or time.time() > self._expires_at - 90
 
     def refresh(self, force: bool = False) -> str:
+        root = pathlib.Path(self.home or hermes_home()) / "plugin-data/reddit"
+        with self._auth_lock, coordination.file_lock(root / "token-refresh.lock"):
+            if not force and not self._needs_refresh():
+                return self._access
+            import hashlib
+            key = hashlib.sha256((self.creds.get("client_id", "") + self.creds.get("client_secret", "") + self.token.get("refresh_token", "")).encode()).hexdigest()
+            cache = root / "access-cache.json"
+            cached = secrets_store.decode(coordination.read_state(cache)) if not force else {}
+            if cached.get("key") == key and cached.get("expires_at", 0) > time.time() + 90:
+                self._access, self._expires_at = cached["access_token"], cached["expires_at"]
+                return self._access
+            access = self._refresh_locked(force)
+            cached = {"key": key, "access_token": access, "expires_at": self._expires_at}
+            _atomic_write(cache, json.dumps(secrets_store.encode(cached, load_config(self.home).get("protect_secrets", False))))
+            return access
+
+    def _refresh_locked(self, force: bool = False) -> str:
         if not self.has_refresh_token:
             raise RedditError(
                 "Not logged in: no Reddit refresh token. Run reddit_login first."
@@ -541,7 +580,7 @@ class Reddit:
         scope = payload.get("scope")
         if scope and scope != self.token.get("scope"):
             self.token["scope"] = scope
-            save_token(self.token)
+            save_token(self.token, self.home)
         return self._access
 
     def app_only_token(self, force: bool = False) -> str:
@@ -572,6 +611,8 @@ class Reddit:
         searches and threads without a login. Writes still need the account.
         """
         if app_only:
+            if method != "GET":
+                raise RedditError("app_only is read-only; account authorization is required for writes")
             return self.app_only_token(), "app"
         if self.has_refresh_token:
             return self.refresh(), "account"
@@ -591,6 +632,22 @@ class Reddit:
         )
 
     # ---- transport --------------------------------------------------
+    @contextmanager
+    def _response(self, request):
+        try:
+            with coordination.request_slot(self.creds.get("client_id", "")) as budget:
+                try:
+                    with urllib.request.urlopen(request, timeout=45) as response:
+                        budget.capture(response.headers)
+                        yield response
+                except urllib.error.HTTPError as exc:
+                    budget.capture(exc.headers, exc.code)
+                    raise
+        except RuntimeError as exc:
+            if isinstance(exc, RedditError):
+                raise
+            raise RedditError(str(exc)) from exc
+
     def request(
         self,
         method: str,
@@ -600,6 +657,11 @@ class Reddit:
         app_only: bool = False,
     ) -> dict:
         method = (method or "GET").upper()
+        remaining_wait = self._blocked_until - time.time()
+        if remaining_wait > 0:
+            raise RedditError(f"Reddit rate budget is exhausted; retry after {int(remaining_wait) + 1} seconds")
+        if method not in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
+            raise RedditError("Unsupported HTTP method")
         raw_path = (path or "").strip()
         if "://" in raw_path or raw_path.lower().startswith("http"):
             raise RedditError(
@@ -613,7 +675,7 @@ class Reddit:
         self.last_backend = backend
         query = dict(params or {})
         body = None
-        if method in ("GET", "DELETE"):
+        if method == "GET":
             query.setdefault("raw_json", "1")
         else:
             body = dict(data or {})
@@ -640,10 +702,14 @@ class Reddit:
                 url, data=payload_bytes, headers=headers, method=method
             )
             try:
-                with urllib.request.urlopen(request, timeout=45) as response:
+                with self._response(request) as response:
                     self._capture_rate(response.headers)
                     raw = response.read().decode("utf-8", "replace")
-                    return json.loads(raw) if raw else {}
+                    payload = json.loads(raw) if raw else {}
+                    errors = (payload.get("json") or {}).get("errors") if isinstance(payload, dict) else None
+                    if errors:
+                        raise RedditError("Reddit rejected the operation: " + json.dumps(errors))
+                    return payload
             except urllib.error.HTTPError as exc:
                 self._capture_rate(exc.headers)
                 detail = exc.read().decode("utf-8", "replace")
@@ -656,6 +722,9 @@ class Reddit:
                     continue
                 if exc.code == 429 and attempt < 2:
                     wait = rate_limit_wait(exc.headers)
+                    self._blocked_until = time.time() + wait
+                    if wait > 30:
+                        raise RedditError(f"Reddit rate limit: retry after {wait} seconds; no early retry was sent") from None
                     if wait:
                         self.last_rate["waited"] = str(wait)
                         time.sleep(wait)
@@ -675,6 +744,9 @@ class Reddit:
                     raise RedditError(
                         f"Reddit API {method} {path} -> {exc.code}: {detail[:500]}"
                     ) from None
+            except (OSError, ValueError) as exc:
+                # Retrying a write after a lost response can create duplicate content.
+                raise RedditError(f"Reddit response failed: {exc}. Writes were not automatically replayed.") from exc
         raise RedditError("Reddit API request failed after retries")
 
     def _capture_rate(self, headers) -> None:
@@ -684,6 +756,11 @@ class Reddit:
             value = headers.get(key)
             if value is not None:
                 self.last_rate[key] = value
+        try:
+            if float(self.last_rate.get("X-Ratelimit-Remaining", 1)) <= 0:
+                self._blocked_until = time.time() + float(self.last_rate.get("X-Ratelimit-Reset", 0)) + 1
+        except (TypeError, ValueError):
+            pass
 
     # ---- convenience ------------------------------------------------
     def me(self) -> dict:
@@ -749,6 +826,7 @@ class Reddit:
         limit: int = 25,
         kind: str = "",
         body_chars: int = 300,
+        after: str = "",
     ) -> dict:
         params = {
             "q": query,
@@ -756,8 +834,12 @@ class Reddit:
             "t": time_filter,
             "limit": max(1, min(int(limit or 25), 100)),
         }
-        if kind in ("link", "comment", "sr"):
+        if kind == "comment":
+            raise RedditError("The documented Data API search does not support comment search. Use reddit_library_search for locally saved comments.")
+        if kind in ("link", "sr", "user"):
             params["type"] = kind
+        if after:
+            params["after"] = after
         path = f"/r/{subreddit}/search" if subreddit else "/search"
         if subreddit:
             params["restrict_sr"] = "1"
@@ -886,6 +968,7 @@ class Reddit:
         sort: str = "new",
         time_filter: str = "all",
         body_chars: int = 300,
+        after: str = "",
     ) -> dict:
         name = (username or "").strip()
         if name.lower().startswith("u/"):
@@ -900,6 +983,7 @@ class Reddit:
                 "limit": max(1, min(int(limit or 25), 100)),
                 "sort": sort,
                 "t": time_filter,
+                **({"after": after} if after else {}),
             },
         )
         listing = compact_listing(payload, body_chars=body_chars, limit=limit)
@@ -951,11 +1035,12 @@ class Reddit:
         )
 
     def subscribe(self, subreddit: str, subscribe: bool = True) -> dict:
+        value = subreddit.strip().removeprefix("r/")
         return self.request(
             "POST",
             "/api/subscribe",
             data={
-                "sr": subreddit if subreddit.startswith("t5_") else subreddit,
+                ("sr" if value.startswith("t5_") else "sr_name"): value,
                 "action": "sub" if subscribe else "unsub",
             },
         )
@@ -967,6 +1052,50 @@ class Reddit:
             params={"limit": max(1, min(int(limit or 25), 100)), "mark": str(mark).lower()},
         )
         return compact_listing(payload, body_chars=500, limit=limit)
+
+    def require_account(self) -> str:
+        if not self.has_refresh_token:
+            raise RedditError("This operation needs reddit_login with an account token")
+        name = self.token.get("username") or self.me().get("name")
+        if not name:
+            raise RedditError("Reddit did not return the account name")
+        return str(name)
+
+    def account_listing(self, where="saved", limit=100, after="", raw=False):
+        name = self.require_account()
+        if where not in {"saved", "hidden", "upvoted", "downvoted", "submitted", "comments", "overview"}:
+            raise RedditError("Unknown account listing")
+        params = {"limit": max(1, min(int(limit), 100))}
+        if after:
+            params["after"] = after
+        payload = self.request("GET", f"/user/{name}/{where}", params=params)
+        return payload if raw else compact_listing(payload, body_chars=2000)
+
+    def info(self, names):
+        names = [normalize_fullname(name) for name in names]
+        if not names or len(names) > 100:
+            raise RedditError("Supply between 1 and 100 post/comment fullnames")
+        return self.request("GET", "/api/info", params={"id": ",".join(names)})
+
+    def content_action(self, action, target, text="", reason=""):
+        name = normalize_fullname(target)
+        self.require_account()
+        if action == "edit":
+            if not text.strip():
+                raise RedditError("Editing requires nonempty Markdown text")
+            return self.request("POST", "/api/editusertext", data={"thing_id": name, "text": text})
+        if action == "delete":
+            return self.request("POST", "/api/del", data={"id": name})
+        if action == "report":
+            if not reason.strip():
+                raise RedditError("Reporting requires a reason")
+            return self.request("POST", "/api/report", data={"thing_id": name, "reason": reason})
+        routes = {"nsfw": "marknsfw", "un-nsfw": "unmarknsfw", "spoiler": "spoiler", "unspoiler": "unspoiler"}
+        if action not in routes:
+            raise RedditError("Unknown content action")
+        if not name.startswith("t3_"):
+            raise RedditError("This action requires a post")
+        return self.request("POST", "/api/" + routes[action], data={"id": name})
 
 
 _SESSION_LOCK = threading.RLock()
@@ -1026,3 +1155,25 @@ def normalize_thread_id(value: str) -> str:
                     return parts[index + 1]
         raw = parts[-1]
     return raw.split("#")[0]
+
+
+def normalize_fullname(value: str) -> str:
+    """Resolve fullnames and canonical Reddit URLs without guessing comment IDs."""
+    raw = (value or "").strip()
+    if re.fullmatch(r"t[13]_[a-z0-9]+", raw):
+        return raw
+    parsed = urllib.parse.urlparse(raw)
+    if parsed.scheme in {"http", "https"} and parsed.hostname in {"reddit.com", "www.reddit.com", "old.reddit.com", "new.reddit.com", "redd.it"}:
+        parts = [part for part in parsed.path.split("/") if part]
+        if parsed.hostname == "redd.it" and len(parts) == 1:
+            result = "t3_" + parts[0]
+        elif "comments" in parts:
+            index = parts.index("comments")
+            if len(parts) <= index + 1:
+                raise RedditError("Invalid Reddit URL")
+            result = ("t1_" + parts[index + 3]) if len(parts) > index + 3 else ("t3_" + parts[index + 1])
+        else:
+            raise RedditError("Use a canonical post/comment URL, not a share link")
+        if re.fullmatch(r"t[13]_[a-z0-9]+", result):
+            return result
+    raise RedditError("Supply a t3_ post fullname, t1_ comment fullname, or canonical Reddit URL")
