@@ -186,6 +186,6 @@ export default {
   id: 'voice-gate', name: 'Voice Gate', description: 'Writing rules, Vale checks, and file exceptions.',
   register(ctx) {
     if (typeof ctx.registerSettingsPage !== 'function' || !host?.requestProfile || !host.state?.profile || !host.state?.connectionId || ![Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Textarea, useValue].every(Boolean)) return
-    ctx.registerSettingsPage({ id: 'settings', title: 'Voice Gate', icon: 'edit', render: () => h(SettingsPage, { ctx }) })
+    ctx.registerSettingsPage({ id: 'settings', title: 'Voice Gate', icon: 'edit', hideAgentSettings: true, render: () => h(SettingsPage, { ctx }) })
   }
 }
