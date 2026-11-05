@@ -261,8 +261,9 @@ class Library:
             # Only fixed allowlisted SQL fragments are assembled; every caller
             # value (including literal search terms) is a bound parameter.
             total = db.execute("SELECT count(*) FROM saves WHERE " + predicate, args).fetchone()[0]  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query
+            # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query
             rows = db.execute("SELECT *, " + ("+".join(rank) or "0") + " AS rank FROM saves WHERE " + predicate +
-                              " ORDER BY rank DESC,first_saved DESC,name LIMIT ? OFFSET ?", rank_args + args + [limit, offset]).fetchall()  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query
+                              " ORDER BY rank DESC,first_saved DESC,name LIMIT ? OFFSET ?", rank_args + args + [limit, offset]).fetchall()
         items = []
         for row in rows:
             record = json.loads(row["payload"])
