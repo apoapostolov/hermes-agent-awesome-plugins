@@ -236,3 +236,26 @@ def test_settings_only_save_does_not_need_the_key_store(monkeypatch):
     monkeypatch.setattr(client.secrets_store, "_cipher", no_cipher)
     client.save_config({"background_refresh": True})
     assert client.load_config()["background_refresh"] is True
+
+
+def test_short_authorization_values_are_redacted():
+    assert redaction.safe("Authorization: Basic YTpi") == "Authorization: Basic [redacted]"
+
+
+def test_a_published_budget_is_not_written_twice(monkeypatch):
+    budget = coordination.reserve_slot("client")
+    budget.capture({"X-Ratelimit-Remaining": "0", "X-Ratelimit-Reset": "60"})
+    writes = []
+    real = coordination._write_state
+    monkeypatch.setattr(coordination, "_write_state", lambda *a, **kw: (writes.append(1), real(*a, **kw))[1])
+    coordination.record_slot("client", budget)
+    coordination.record_slot("client", budget)
+    assert len(writes) == 1
+
+
+def test_a_failed_publish_stays_pending(monkeypatch):
+    budget = coordination.reserve_slot("client")
+    budget.capture({"X-Ratelimit-Remaining": "0"})
+    monkeypatch.setattr(coordination, "_write_state", lambda *a, **kw: False)
+    coordination.record_slot("client", budget)
+    assert budget.unpublished is True

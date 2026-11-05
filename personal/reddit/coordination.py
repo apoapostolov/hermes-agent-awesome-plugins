@@ -131,6 +131,7 @@ def _write_state(path, values, strict=False):
         temporary.write_text(json.dumps(values), encoding="utf-8")
         os.chmod(temporary, 0o600)
         os.replace(temporary, path)
+        return True
     except OSError as exc:
         if strict:
             raise RuntimeError("Shared Reddit pacing state is not writable; refusing to send") from exc
@@ -138,6 +139,7 @@ def _write_state(path, values, strict=False):
         # because optional pacing state could not be persisted.
         import logging
         logging.getLogger(__name__).warning("Reddit pacing state could not be persisted")
+        return False
 
 
 def reserve_slot(client_id):
@@ -184,8 +186,8 @@ def record_slot(client_id, budget, force=False):
             blocked = budget.values.get("blocked_until")
             if blocked:
                 values["blocked_until"] = max(float(values.get("blocked_until") or 0), float(blocked))
-            _write_state(path, values)
-            budget.unpublished = False
+            if _write_state(path, values):
+                budget.unpublished = False
     except (RuntimeError, OSError):
         import logging
         logging.getLogger(__name__).warning("Reddit pacing state could not be recorded")

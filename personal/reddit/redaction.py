@@ -47,7 +47,7 @@ def safe(value):
         # bearer/basic word in prose only when it is credential-shaped.
         result = re.sub(
             r"(?i)(\bauthorization\b[^A-Za-z0-9]{0,5}[A-Za-z][A-Za-z0-9_-]{0,20}\s+)"
-            r"(?=[A-Za-z0-9._~+/=-]{6,})([A-Za-z0-9._~+/=-]+)",
+            r"(?=[A-Za-z0-9._~+/=-]{4,})([A-Za-z0-9._~+/=-]+)",
             r"\1[redacted]",
             result,
         )
