@@ -602,7 +602,7 @@ function RedditSettingsPage({ ctx }) {
         ]
       }),
 
-      jsx(Field, { label: 'Local library account', value: accountDraft, onChange: setAccountDraft, placeholder: 'local', hint: 'Type a namespace, then press Use account. Network actions require the connected account.' }),
+      jsx(Field, { label: 'Local library account', value: accountDraft, onChange: setAccountDraft, placeholder: 'local', hint: `Active: ${libraryAccount || 'local'}. Type a namespace, then press Use account. Network actions require the connected account.` }),
       jsx(Btn, { onClick: () => setLibraryAccount(accountDraft.trim()), children: 'Use account' }),
       jsx(RedditLibrary, { ctx, account: libraryAccount || 'local' }, libraryAccount || 'local'),
       jsx('p', {

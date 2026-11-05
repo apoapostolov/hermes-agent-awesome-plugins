@@ -111,13 +111,15 @@ def _slot_path(client_id):
     return shared_root() / (hashlib.sha256(client_id.encode()).hexdigest() + ".json")
 
 
-def _write_state(path, values):
+def _write_state(path, values, strict=False):
     try:
         temporary = path.with_name(path.name + f".{os.getpid()}.tmp")
         temporary.write_text(json.dumps(values), encoding="utf-8")
         os.chmod(temporary, 0o600)
         os.replace(temporary, path)
-    except OSError:
+    except OSError as exc:
+        if strict:
+            raise RuntimeError("Shared Reddit pacing state is not writable; refusing to send") from exc
         # A successful remote write must not be reported as failed solely
         # because optional pacing state could not be persisted.
         import logging
@@ -142,7 +144,9 @@ def reserve_slot(client_id):
         if delay:
             time.sleep(delay)
         values["next_at"] = time.time() + MIN_INTERVAL
-        _write_state(path, values)
+        # Refuse the call rather than send unpaced: an unrecorded reservation is
+        # invisible to every other process sharing this client id.
+        _write_state(path, values, strict=True)
     return Budget(values)
 
 

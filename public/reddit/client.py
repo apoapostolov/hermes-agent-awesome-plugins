@@ -683,14 +683,19 @@ class Reddit:
     # ---- transport --------------------------------------------------
     @contextmanager
     def _response(self, request):
+        client_id = self.creds.get("client_id", "")
         try:
-            with coordination.request_slot(self.creds.get("client_id", "")) as budget:
+            with coordination.request_slot(client_id) as budget:
                 try:
                     with urllib.request.urlopen(request, timeout=45) as response:
                         budget.capture(response.headers)
+                        # Record before the caller reads the body, or an exhausted
+                        # budget stays invisible to other processes meanwhile.
+                        coordination.record_slot(client_id, budget)
                         yield response
                 except urllib.error.HTTPError as exc:
                     budget.capture(exc.headers, exc.code)
+                    coordination.record_slot(client_id, budget)
                     raise
         except RuntimeError as exc:
             if isinstance(exc, RedditError):

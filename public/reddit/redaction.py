@@ -43,6 +43,13 @@ def safe(value):
                 result = result.replace(secret, "[redacted]")
             elif result == secret:
                 result = "[redacted]"
+        # An authorization value is a credential whatever it looks like; a bare
+        # bearer/basic word in prose only when it is credential-shaped.
+        result = re.sub(
+            r"(?i)(\bauthorization\b[^A-Za-z0-9]{0,3}(?:bearer|basic)\s+)[A-Za-z0-9._~+/=-]+",
+            r"\1[redacted]",
+            result,
+        )
         result = re.sub(
             r"(?i)((?:bearer|basic)\s+)([A-Za-z0-9._~+/-]+)",
             lambda match: match.group(1) + ("[redacted]" if _looks_like_credential(match.group(2)) else match.group(2)),
