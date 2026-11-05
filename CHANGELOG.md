@@ -181,6 +181,12 @@ Reads work before a login now. With only the Reddit app saved, the plugin asks f
 
 - **reddit:** version `1.0.0`. First stable release. Runs on your own Reddit app. Save the client id and secret in the plugin config, and log in with the published-app code flow against a loopback catcher on `http://localhost:8080`; the permanent refresh token is stored per profile and renewed automatically. Twelve tools cover the account: `reddit_setup`, `reddit_login`, `reddit_status`, `reddit_subreddit`, `reddit_search`, `reddit_thread`, `reddit_submit`, `reddit_comment`, `reddit_vote`, `reddit_manage`, `reddit_inbox`, and `reddit_api` for any endpoint the curated set does not wrap (moderation, modmail, wiki, flair, prefs). Writes publish under the logged-in account. Reads use that token too, so private subreddits, saved items and mod queues work. The Desktop settings page saves and verifies credentials, starts and finishes the login, checks the account and logs out, through `/api/plugins/reddit/`. The page takes its fields, buttons and tags from the plugin SDK, so it follows the active theme instead of painting a light-mode form. `hermes reddit setup|login|complete|status|logout|smoke|api` does the same from a terminal. No third-party dependencies; requests share one cached session per process, and config/token writes are atomic and safe under concurrent tool calls.
 
+## [provider-status 1.6.9] - 2026-11-05
+
+### Fixed
+
+- The checkbox theme fix restyled every checkbox in the app, not only the provider rows it belongs to. `[data-slot="checkbox"]` matched the sidebar, dialogs and settings controls while any provider dialog was open. Both rules now sit under `[data-ps-row]`, the marker on this plugin's own provider row, and the select rule stays under `[data-ps-select]`. This was item 1 of the catalog review at `1264a8e1`; the entry shipped at 1.6.8 with the reach-in still in the tree. `scripts/admission_check.py` now reports this plugin clean.
+
 ## [provider-status 1.6.8] - 2026-11-01
 
 The renewal-day and add-provider dropdowns paint outside the setup dialog instead of stopping at its edge.
