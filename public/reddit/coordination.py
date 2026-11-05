@@ -71,6 +71,18 @@ def _os_lock(path, timeout):
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
+def read_state_checked(path):
+    """Return (values, readable). A corrupt file must block sending, not reset pacing."""
+    path = Path(path)
+    if not path.exists():
+        return {}, True
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, False
+    return (value, True) if isinstance(value, dict) else ({}, False)
+
+
 def read_state(path):
     try:
         value = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -94,8 +106,10 @@ def retry_delay(headers):
 class Budget:
     def __init__(self, values):
         self.values = values
+        self.unpublished = False
 
     def capture(self, headers, status=200):
+        self.unpublished = True
         headers = {k.lower(): v for k, v in (headers.items() if headers else [])}
         self.values["observed_at"] = time.time()
         self.values["headers"] = {k: v for k, v in headers.items() if k.startswith("x-ratelimit-")}
@@ -111,17 +125,21 @@ def _slot_path(client_id):
     return shared_root() / (hashlib.sha256(client_id.encode()).hexdigest() + ".json")
 
 
-def _write_state(path, values):
+def _write_state(path, values, strict=False):
     try:
         temporary = path.with_name(path.name + f".{os.getpid()}.tmp")
         temporary.write_text(json.dumps(values), encoding="utf-8")
         os.chmod(temporary, 0o600)
         os.replace(temporary, path)
-    except OSError:
+        return True
+    except OSError as exc:
+        if strict:
+            raise RuntimeError("Shared Reddit pacing state is not writable; refusing to send") from exc
         # A successful remote write must not be reported as failed solely
         # because optional pacing state could not be persisted.
         import logging
         logging.getLogger(__name__).warning("Reddit pacing state could not be persisted")
+        return False
 
 
 def reserve_slot(client_id):
@@ -134,7 +152,9 @@ def reserve_slot(client_id):
         return Budget({})
     path = _slot_path(client_id)
     with file_lock(path.with_suffix(".lock"), timeout=55):
-        values = read_state(path)
+        values, readable = read_state_checked(path)
+        if not readable:
+            raise RuntimeError("Shared Reddit pacing state is unreadable; refusing to send unpaced")
         delay = float(values.get("blocked_until", 0)) - time.time()
         if delay > 0:
             raise RuntimeError(f"Shared Reddit rate budget exhausted; retry after {int(delay) + 1} seconds")
@@ -142,13 +162,17 @@ def reserve_slot(client_id):
         if delay:
             time.sleep(delay)
         values["next_at"] = time.time() + MIN_INTERVAL
-        _write_state(path, values)
+        # Refuse the call rather than send unpaced: an unrecorded reservation is
+        # invisible to every other process sharing this client id.
+        _write_state(path, values, strict=True)
     return Budget(values)
 
 
-def record_slot(client_id, budget):
+def record_slot(client_id, budget, force=False):
     """Fold one response's rate-limit headers back into the shared state."""
     if not client_id or budget is None or not budget.values:
+        return
+    if not force and not getattr(budget, "unpublished", False):
         return
     path = _slot_path(client_id)
     try:
@@ -162,7 +186,8 @@ def record_slot(client_id, budget):
             blocked = budget.values.get("blocked_until")
             if blocked:
                 values["blocked_until"] = max(float(values.get("blocked_until") or 0), float(blocked))
-            _write_state(path, values)
+            if _write_state(path, values):
+                budget.unpublished = False
     except (RuntimeError, OSError):
         import logging
         logging.getLogger(__name__).warning("Reddit pacing state could not be recorded")

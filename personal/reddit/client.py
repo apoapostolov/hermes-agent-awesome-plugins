@@ -123,7 +123,13 @@ def save_config(values: dict, home=None) -> pathlib.Path:
     """Merge values into the plugin config file and return its path."""
     path = config_path(home)
     with _WRITE_LOCK, coordination.file_lock(path.with_suffix(".lock")):
-        merged = load_config(home)
+        # Merge over the raw file: a field that cannot be decrypted right now
+        # must keep its ciphertext instead of vanishing from a partial save.
+        try:
+            current = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            current = {}
+        merged = dict(current) if isinstance(current, dict) else {}
         for key, value in values.items():
             if value is None:
                 continue
@@ -683,14 +689,19 @@ class Reddit:
     # ---- transport --------------------------------------------------
     @contextmanager
     def _response(self, request):
+        client_id = self.creds.get("client_id", "")
         try:
-            with coordination.request_slot(self.creds.get("client_id", "")) as budget:
+            with coordination.request_slot(client_id) as budget:
                 try:
                     with urllib.request.urlopen(request, timeout=45) as response:
                         budget.capture(response.headers)
+                        # Record before the caller reads the body, or an exhausted
+                        # budget stays invisible to other processes meanwhile.
+                        coordination.record_slot(client_id, budget)
                         yield response
                 except urllib.error.HTTPError as exc:
                     budget.capture(exc.headers, exc.code)
+                    coordination.record_slot(client_id, budget)
                     raise
         except RuntimeError as exc:
             if isinstance(exc, RedditError):

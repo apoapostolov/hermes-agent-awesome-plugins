@@ -30,28 +30,37 @@ def _crypt(value, decrypt=False):
         kernel.LocalFree(result.data)
 
 
-def _cipher(home=None):
+def _cipher(home=None, rotate=False):
+    """Return the profile cipher.
+
+    ``rotate`` is for the write path only. Reading must never replace the key:
+    an unreadable key is reported, and the credentials stay recoverable by
+    saving replacements, which re-encrypts through ``rotate=True``.
+    """
     from . import client, coordination
     root = Path(home or client.hermes_home()) / "plugin-data/reddit"
     path = root / "storage-key.json"
     with coordination.file_lock(root / "storage-key.lock"):
-        if not path.exists():
-            key = Fernet.generate_key()
-            if os.name == "nt":
-                record = {"dpapi": base64.b64encode(_crypt(key)).decode("ascii")}
-            else:
-                record = {"private_file": key.decode("ascii")}
-            client._atomic_write(path, __import__("json").dumps(record))
-        try:
-            record = __import__("json").loads(path.read_text(encoding="utf-8"))
-            key = _crypt(base64.b64decode(record["dpapi"]), True) if "dpapi" in record else record["private_file"].encode("ascii")
-            return Fernet(key)
-        except (OSError, ValueError, KeyError, TypeError, RuntimeError):
-            # The key belongs to another Windows user or machine: rotate it so
-            # replacement credentials can be stored. Anything it encrypted is
-            # already unreadable, which is why recovery was blocked.
-            import logging
-            logging.getLogger(__name__).warning("Reddit storage key could not be unlocked; rotating it")
+        if path.exists():
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                raise RuntimeError("Reddit storage key is unreadable right now; retry shortly") from None
+            except UnicodeDecodeError:
+                text = ""  # damaged key: replaceable by a write, never by a read
+            try:
+                record = __import__("json").loads(text) if text else None
+                if record is None:
+                    raise ValueError("damaged key file")
+                key = _crypt(base64.b64decode(record["dpapi"]), True) if "dpapi" in record else record["private_file"].encode("ascii")
+                return Fernet(key)
+            except (ValueError, KeyError, TypeError, RuntimeError):
+                if not rotate:
+                    raise RuntimeError(
+                        "Reddit storage key cannot be unlocked; save replacement credentials to recover"
+                    ) from None
+                import logging
+                logging.getLogger(__name__).warning("Reddit storage key could not be unlocked; rotating it for a rewrite")
         key = Fernet.generate_key()
         if os.name == "nt":
             record = {"dpapi": base64.b64encode(_crypt(key)).decode("ascii")}
@@ -63,10 +72,13 @@ def _cipher(home=None):
 
 def encode(record, enabled=False, home=None):
     result = dict(record)
-    for key in FIELDS:
-        value = result.get(key)
-        if isinstance(value, str) and value:
-            result[key] = {"$fernet": _cipher(home).encrypt(value.encode()).decode("ascii")}
+    pending = [key for key in FIELDS if isinstance(result.get(key), str) and result[key]]
+    if not pending:
+        # A settings-only save must not depend on the key store being reachable.
+        return result
+    cipher = _cipher(home, rotate=True)
+    for key in pending:
+        result[key] = {"$fernet": cipher.encrypt(result[key].encode()).decode("ascii")}
     return result
 
 

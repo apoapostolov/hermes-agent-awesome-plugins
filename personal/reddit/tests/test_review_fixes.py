@@ -110,7 +110,9 @@ def test_capture_keeps_the_cache_when_reddit_returns_no_listing(monkeypatch):
 def test_capture_annotates_with_the_hash_it_stored(monkeypatch):
     store = library.Library("owner")
     store.upsert(source())
-    payload = {"data": {"children": [source()]}}
+    # The fetched source differs from the cached one, so a stale hash would be
+    # rejected: the capture has to annotate with the hash it just stored.
+    payload = {"data": {"children": [source(text="Query planner, changed source")]}}
     monkeypatch.setattr(client, "session", lambda: Offline(payload))
     seen = {}
     original = library.Library.annotate
@@ -122,7 +124,10 @@ def test_capture_annotates_with_the_hash_it_stored(monkeypatch):
     monkeypatch.setattr(library.Library, "annotate", spy)
     result = json.loads(tools.reddit_library({"action": "capture", "target": "t3_abc", "account": "owner", "summary": "kept"}))
     assert result["ok"] is True
-    assert seen.get("expected_hash") and len(seen["expected_hash"]) == 64
+    stored = store.get("t3_abc")
+    assert stored["body"] == "Query planner, changed source"
+    assert seen["expected_hash"] == stored["content_hash"]
+    assert stored["summary"] == "kept"
 
 
 def test_upsert_reports_the_stored_hash():
@@ -178,3 +183,79 @@ def test_unreadable_storage_key_rotates_so_credentials_can_be_saved(home):
     (root / "storage-key.json").write_text(json.dumps({"dpapi": "bm90LWEta2V5"}), encoding="utf-8")
     client.save_config({"client_id": "id", "client_secret": "secret"})
     assert client.load_config()["client_secret"] == "secret"
+
+
+def test_reading_never_replaces_the_storage_key(home):
+    client.save_config({"client_id": "id", "client_secret": "secret"})
+    key_path = home / "plugin-data/reddit/storage-key.json"
+    key_path.write_text("{not json", encoding="utf-8")
+    loaded = client.load_config()
+    assert "client_secret" not in loaded
+    # The read dropped the unreadable field and left the key alone: only a write
+    # may rotate it, so a temporary failure cannot destroy the other credentials.
+    assert key_path.read_text(encoding="utf-8") == "{not json"
+    client.save_config({"client_id": "id", "client_secret": "replacement"})
+    assert client.load_config()["client_secret"] == "replacement"
+
+
+def test_authorization_values_are_redacted_whatever_they_look_like():
+    assert redaction.safe("Authorization: Basic YWJjOmRlZg==") == "Authorization: Basic [redacted]"
+    assert redaction.safe("Authorization: Digest abc123def456") == "Authorization: Digest [redacted]"
+    assert redaction.safe("a post about basic tutorial writing") == "a post about basic tutorial writing"
+
+
+def test_reservation_refuses_when_pacing_state_cannot_be_written(monkeypatch):
+    def unwritable(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(coordination.os, "replace", unwritable)
+    with pytest.raises(RuntimeError, match="not writable"):
+        coordination.reserve_slot("client")
+
+
+def test_corrupt_pacing_state_refuses_to_send(monkeypatch):
+    path = coordination._slot_path("client")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{bad json", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="unreadable"):
+        coordination.reserve_slot("client")
+
+
+def test_undecodable_key_file_is_replaced_by_a_write(home):
+    root = home / "plugin-data/reddit"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "storage-key.json").write_bytes(bytes([0xFF, 0xFE]) + b" not utf8")
+    client.save_config({"client_id": "id", "client_secret": "secret"})
+    assert client.load_config()["client_secret"] == "secret"
+
+
+def test_settings_only_save_does_not_need_the_key_store(monkeypatch):
+    def no_cipher(*args, **kwargs):
+        raise AssertionError("the key store must not be touched for a settings-only save")
+
+    monkeypatch.setattr(client.secrets_store, "_cipher", no_cipher)
+    client.save_config({"background_refresh": True})
+    assert client.load_config()["background_refresh"] is True
+
+
+def test_short_authorization_values_are_redacted():
+    assert redaction.safe("Authorization: Basic YTpi") == "Authorization: Basic [redacted]"
+
+
+def test_a_published_budget_is_not_written_twice(monkeypatch):
+    budget = coordination.reserve_slot("client")
+    budget.capture({"X-Ratelimit-Remaining": "0", "X-Ratelimit-Reset": "60"})
+    writes = []
+    real = coordination._write_state
+    monkeypatch.setattr(coordination, "_write_state", lambda *a, **kw: (writes.append(1), real(*a, **kw))[1])
+    coordination.record_slot("client", budget)
+    coordination.record_slot("client", budget)
+    assert len(writes) == 1
+
+
+def test_a_failed_publish_stays_pending(monkeypatch):
+    budget = coordination.reserve_slot("client")
+    budget.capture({"X-Ratelimit-Remaining": "0"})
+    monkeypatch.setattr(coordination, "_write_state", lambda *a, **kw: False)
+    coordination.record_slot("client", budget)
+    assert budget.unpublished is True
