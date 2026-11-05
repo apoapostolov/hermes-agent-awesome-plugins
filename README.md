@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Voice Gate 1.4.1 fixes the settings request timing out before a large plugin inventory finishes loading. The page now allows up to two minutes and offers Try again after a failed load. Everyday settings and file exceptions stay visible; Vale, bots, and individual rules start collapsed.
+Voice Gate 1.4.2 removes the extra generated Agent settings page on Hermes 0.22.8 and newer, leaving one page for Voice Gate settings. Older Hermes builds still show the generated form alongside it.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
