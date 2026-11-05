@@ -28,6 +28,8 @@
 
 ## Latest plugin update
 
+Provider Status 1.6.9 scopes its checkbox theme fix to the plugin's own provider rows. Until now the rule matched every checkbox in the app while a provider dialog was open, which is the reach-in the catalog review asked to remove. Both editions carry the fix; restart Hermes Desktop to load it.
+
 Voice Gate 1.4.4 starts Vale with a short list of variables instead of the host's environment, so a downloaded binary no longer inherits the provider keys the gateway holds. Plugin data and voice-profile lookup now follow the profile the host is serving, and turn-time Vale findings run only an executable you approved once through the tool, matched by digest. The settings-page note about Hermes Desktop 0.22.8 is gone, because `hideAgentSettings` has no implementation in Hermes yet. Both editions carry the fixes; the personal edition keeps its local diagnostics.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.

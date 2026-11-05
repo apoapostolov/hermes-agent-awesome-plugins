@@ -1488,7 +1488,7 @@ function ProviderRow({ pid, pmeta, pc, st, onSave, probe, probeAge, onCheck, var
     },
     children: [
       // ── header row ──
-      jsxs('div', { className: 'flex items-center gap-2 min-h-[28px]', children: [
+      jsxs('div', { 'data-ps-row': '', className: 'flex items-center gap-2 min-h-[28px]', children: [
         // HTML5 drag handle (only the gripper is draggable so inputs stay usable)
         jsx('span', {
           draggable: true,
@@ -1887,7 +1887,9 @@ export default {
 
   // Theme fixes: native <select> popups ignore inherited colors and render
   // light-on-light in dark mode; the SDK checkbox checked fill (bg-primary) is
-  // near-white in dark mode and reads harsh. Both are scoped to this plugin.
+  // near-white in dark mode and reads harsh. Both rules are scoped to this
+  // plugin's own nodes ([data-ps-select], [data-ps-row]) and never reach the
+  // rest of the app.
   const STYLE_ID = 'provider-status-theme-fix'
   const style = document.createElement('style')
   style.id = STYLE_ID
@@ -1896,8 +1898,8 @@ export default {
       background: var(--ui-bg-elevated, var(--background, inherit));
       color: var(--ui-text-secondary, var(--foreground));
     }
-    [data-slot="checkbox"][data-state="checked"],
-    [data-slot="checkbox"][data-state="indeterminate"] {
+    [data-ps-row] [data-slot="checkbox"][data-state="checked"],
+    [data-ps-row] [data-slot="checkbox"][data-state="indeterminate"] {
       background: color-mix(in srgb, var(--ui-accent, var(--foreground)) 55%, transparent) !important;
       border-color: color-mix(in srgb, var(--ui-accent, var(--foreground)) 70%, transparent) !important;
       color: var(--ui-text-primary, var(--foreground)) !important;
