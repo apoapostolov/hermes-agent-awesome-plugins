@@ -50,11 +50,11 @@ The following map describes the documented Data API, not a guarantee that every 
 | Voting | `/api/vote` | User, `vote` | Vote |
 | Subscriptions | `/api/subscribe`, `/subreddits/mine/subscriber` | User, `subscribe` / `mysubreddits` | Manage/account |
 | Reports/hiding | `/api/report`, `/api/hide`, `/api/unhide` | User, `report` | Content/manage |
-| Messages | `/message/inbox`, `/api/read_message` | User, `privatemessages` | Inbox/raw API |
-| Moderation | `/about/modqueue`, `/api/approve`, `/api/remove` | Moderator, `modposts` | Raw API |
+| Messages | `/message/inbox`, `/api/read_message` | User, `privatemessages` | Inbox/messages |
+| Moderation | `/about/modqueue`, `/api/approve`, `/api/remove` | Moderator, `modposts` | Moderation |
 | Modmail | `/api/mod/conversations` | Moderator, `modmail` | Raw API |
-| Wiki | `/wiki/pages`, `/wiki/page/{page}` | `wikiread`; writes `wikiedit` / `modwiki` | Raw API |
-| Flair/multis | `/api/link_flair_v2`, `/api/multi/mine` | `flair` / `read` and applicable permissions | Community/raw API |
+| Wiki | `/wiki/pages`, `/wiki/page/{page}` | `wikiread`; writes `wikiedit` / `modwiki` | Wiki |
+| Flair/multis | `/api/link_flair_v2`, `/api/multi/mine` | `flair` / `read` and applicable permissions | Community/custom feeds |
 
 The baseline advertised global comment search with `type=comment`, although that result type is absent from the documented search contract. The wrapper now rejects it and directs the caller to local saved-comment search. Search and public-user listings now expose continuation cursors.
 
@@ -78,7 +78,7 @@ Reddit requires deletion of removed source content and author-identifying inform
 
 The implementation expires source snapshots and all annotations after 48 hours without a successful fetch. It leaves content-free bookmark identifiers for later refresh. Revalidation removes inaccessible items only from the current account. Confirmed deleted or removed source text is purged across copies. A malformed response or transport failure does not count as an empty result and does not erase the library. Author redaction is not treated as proof of account deletion. Only the affected source is removed; unrelated saves remain.
 
-Expiry runs on library access and every minute while the plugin is loaded. Optional online revalidation is off by default and checks at most 100 known bookmarks per 30 minutes. Stopped Hermes cannot physically delete expired bytes, so strict wall-clock retention across process downtime needs an external maintenance process. Filesystem backups are outside SQLite's deletion control and should not retain expired Reddit content. This implementation reduces retention risk; it is not a claim that every deployment automatically satisfies every Reddit obligation.
+Expiry runs on library access. Hosts with unload support also run cleanup every minute while the plugin is loaded; older hosts use on-access cleanup. Optional online revalidation is off by default and checks at most 100 known bookmarks per 30 minutes. Stopped Hermes cannot physically delete expired bytes, so strict wall-clock retention across process downtime needs an external maintenance process. Filesystem backups are outside SQLite's deletion control and should not retain expired Reddit content. This implementation reduces retention risk; it is not a claim that every deployment automatically satisfies every Reddit obligation.
 
 The current implementation stores annotation text with the source lifecycle. It does not provide permanent notes that might preserve deleted Reddit content. The content database is not encrypted. New credential files and access-cache tokens use authenticated encryption. Windows protects the key with DPAPI; other platforms store it separately with private file permissions.
 
@@ -106,6 +106,6 @@ Embedding search, full-thread ingestion and linked-article ingestion are not inc
 
 ## Validation
 
-All 115 offline tests pass, compared with 58 before changes. The expanded suite covers source expiry and removal from SQLite bytes, annotations, account/profile separation, Unicode and literal search, concurrent local writes, sync continuation, malformed responses, partial save success, URL validation, OAuth state and port selection, HTTP 200 operation errors, DELETE bodies and long rate windows.
+All 123 offline tests pass, compared with 58 before changes. The expanded suite covers source expiry and removal from SQLite bytes, annotations, account/profile separation, Unicode and literal search, concurrent local writes, sync continuation, malformed responses, partial save success, URL validation, OAuth state and port selection, HTTP 200 operation errors, DELETE bodies and long rate windows.
 
 Live validation verified account and app-only reads, personal saved items, karma, community rules and post requirements. Bounded saved-item sync and offline search were verified. Remote posting, voting, editing and deletion were not performed against the user's account; write transport and error handling were checked offline.

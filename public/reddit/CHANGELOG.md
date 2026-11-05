@@ -7,7 +7,7 @@
 - Local saves store posts and comments with searchable source excerpts, summaries, context, notes and tags. Sync and refresh are bounded, account namespaces are separate, and expired or unavailable sources are removed from the search corpus. Use the new library tools or `hermes reddit library` commands.
 - Account, content and community tools expose personal listings, profile details, editing, deletion, reporting, community rules and posting requirements without constructing raw API requests.
 - A Desktop library browser provides search, source details, annotations, tags and read status. A source-bound summary queue and identifier-only bookmark transfer support organization without retaining deleted content in exports.
-- Background cleanup runs while Hermes is loaded, with optional bounded online revalidation. Processes coordinate rate budgets and token refresh; Windows users can protect stored credentials with DPAPI.
+- Hosts with unload support run background cleanup while Hermes is loaded, with optional bounded online revalidation. Processes coordinate rate budgets and token refresh. Credential writes use authenticated encryption, with DPAPI protecting the key on Windows.
 - Dedicated moderation, message-state, wiki and custom-feed tools cover additional content-management workflows. The plugin now provides 22 tools.
 
 ### Fixed
