@@ -18,6 +18,10 @@ Markdown, plain text, reStructuredText, AsciiDoc, Org, LaTeX, HTML, and simple t
 
 ## Settings
 
+![Voice Gate settings with review controls and a five-row file exceptions editor](docs/settings.png)
+
+Personal edition shown. The public edition omits the Writing profile field.
+
 Open Settings, Plugins, Voice Gate. Everyday review settings and file exceptions stay visible. Vale, bots, and individual checks sit in collapsed sections; Advanced rules groups the checks by purpose. Settings are saved for the profile named on the page. The installed-plugin inventory can take more than 30 seconds on a large installation. Loading and saving allow up to two minutes, and a failed load offers Try again. Repeated mounts share the same pending load. Older Desktop builds without the settings-page SDK keep the generated settings form.
 
 Prose em dashes are flagged by default. A bullet label separator such as `- Status — Ready` and a table cell containing only `—` are formatting and remain allowed. A prose sentence in a bullet or table still follows the prose policy. Code, quotes, and literal examples remain protected.
