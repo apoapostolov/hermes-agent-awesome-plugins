@@ -1,4 +1,4 @@
-name: "Voice Gate"
+name: "voice-gate"
 version: "1.4.3"
 description: "Checks changed prose for wording and structural patterns, with optional contextual review through your Hermes model. Protects source material and allows at most two review and revision passes. Includes Vale checks and a settings page."
 author: Apostol Apostolov

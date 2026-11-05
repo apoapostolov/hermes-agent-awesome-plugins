@@ -1,4 +1,4 @@
-name: "Memory Review"
+name: "memory-review"
 version: 1.2.6
 description: "A dialog to checkbox staged memory writes and approve or reject the selection."
 author: Apostol Apostolov

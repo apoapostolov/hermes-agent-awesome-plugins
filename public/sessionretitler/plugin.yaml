@@ -1,4 +1,4 @@
-name: "Session Retitler"
+name: "sessionretitler"
 version: 1.1.1
 description: "Rename sessions dynamically every N user messages (llm-rank rewrites, user titles untouchable). Disclosure: writes the new title through agent.title_generator and hermes_state.SessionDB because no plugin SDK title-write seam exists yet; those imports are guarded and a failed write is logged, never raised."
 author: Apostol Apostolov

@@ -1,4 +1,4 @@
-name: "Drag to Pin Session"
+name: "drag-to-pin-session"
 version: 1.1.0
 description: "Pin or unpin a session from its row with supported desktop SDK actions."
 author: Apostol Apostolov

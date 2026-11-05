@@ -1,4 +1,4 @@
-name: "CDP Manager"
+name: "cdp-manager"
 version: 1.0.2
 description: "Manage local Chrome CDP debug ports from the status bar and the `cdp` agent tool: probe, launch, stop and recheck each port, keep a profile per port, hold one port alive through a backend supervisor, and detect or repair a Chrome profile-picker launch (wedged/unwedge)."
 author: Apostol Apostolov
