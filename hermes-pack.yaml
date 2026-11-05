@@ -44,4 +44,4 @@ plugins:
     ref: ac71ce3260607481d4ccaf19982afd7ae80b065f
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/reddit
-    ref: 18b40e2e827dbb1ed58a917ab2d8464f61764fe7
+    ref: d9cf2bb17f247d15a5b1d1f03f04515b56fb5cb6
