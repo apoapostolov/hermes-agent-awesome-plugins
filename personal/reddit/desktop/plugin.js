@@ -129,10 +129,14 @@ function RedditLibrary({ ctx, account }) {
     if (queue) params.set('summary_source', 'extractive')
     if (unread) params.set('read', 'false')
     const token = ++requestRef.current
-    const next = await ctx.rest(`library?${params}`)
-    if (token !== requestRef.current) return
-    setData(next)
-    setOffset(nextOffset)
+    try {
+      const next = await ctx.rest(`library?${params}`)
+      if (token !== requestRef.current) return
+      setData(next)
+      setOffset(nextOffset)
+    } catch (err) {
+      if (token === requestRef.current) setError(readError(err))
+    }
   }
   useEffect(() => {
     const token = ++requestRef.current
@@ -226,6 +230,7 @@ function RedditSettingsPage({ ctx }) {
   const [copied, setCopied] = useState(false)
   const [libraryAccount, setLibraryAccount] = useState('')
   const [accountDraft, setAccountDraft] = useState('')
+  useEffect(() => { setAccountDraft(libraryAccount) }, [libraryAccount])
   useEffect(() => {
     if (status?.logged_in && status.username) setLibraryAccount(status.username)
   }, [status?.logged_in, status?.username])

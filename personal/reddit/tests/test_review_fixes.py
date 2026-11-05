@@ -130,3 +130,51 @@ def test_upsert_reports_the_stored_hash():
     result = store.upsert(source())
     assert len(result["content_hash"]) == 64
     assert result["content_hash"] == store.get("t3_abc")["content_hash"]
+
+
+def test_redaction_redacts_letter_only_credentials():
+    assert "dXNlcjpwYXNz" not in redaction.safe("Authorization: Basic dXNlcjpwYXNz")
+    assert "[redacted]" in redaction.safe("Authorization: Basic dXNlcjpwYXNz")
+    assert redaction.safe("a body about basic training") == "a body about basic training"
+
+
+def test_capture_keeps_the_cache_when_children_is_null(monkeypatch):
+    store = library.Library("owner")
+    store.upsert(source())
+    monkeypatch.setattr(client, "session", lambda: Offline({"data": {"children": None}}))
+    result = json.loads(tools.reddit_library({"action": "capture", "target": "t3_abc", "account": "owner"}))
+    assert result["ok"] is False
+    assert store.get("t3_abc") is not None
+
+
+def test_an_older_response_does_not_move_the_pacing_deadline_backwards():
+    first = coordination.reserve_slot("client")
+    coordination.reserve_slot("client")
+    path = coordination._slot_path("client")
+    reserved = coordination.read_state(path)["next_at"]
+    coordination.record_slot("client", first)
+    assert coordination.read_state(path)["next_at"] >= reserved
+
+
+def test_unreadable_access_cache_does_not_block_protection(home):
+    root = home / "plugin-data/reddit"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "access-cache.json").write_text("{not json", encoding="utf-8")
+    assert client.protect_credentials(True)["protected"] is True
+    assert not (root / "access-cache.json").exists()
+
+
+def test_one_damaged_field_keeps_the_readable_settings():
+    client.save_config({"client_id": "abc", "client_secret": "shh"})
+    payload = json.loads(client.config_path().read_text())
+    payload["client_secret"]["$fernet"] = "invalid"
+    client.config_path().write_text(json.dumps(payload))
+    assert client.load_config().get("client_id") == "abc"
+
+
+def test_unreadable_storage_key_rotates_so_credentials_can_be_saved(home):
+    root = home / "plugin-data/reddit"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "storage-key.json").write_text(json.dumps({"dpapi": "bm90LWEta2V5"}), encoding="utf-8")
+    client.save_config({"client_id": "id", "client_secret": "secret"})
+    assert client.load_config()["client_secret"] == "secret"

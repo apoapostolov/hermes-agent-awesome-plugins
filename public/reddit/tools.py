@@ -793,10 +793,10 @@ def reddit_library(args: dict, **kwargs) -> str:
             generation = store.generation()
             payload = session.info([name])
             data = payload.get("data") if isinstance(payload, dict) else None
-            if not isinstance(data, dict) or "children" not in data:
-                # An empty or malformed listing is not proof the source is gone.
+            children = data.get("children") if isinstance(data, dict) else None
+            if not isinstance(children, list):
+                # A missing, null or malformed listing is not proof the source is gone.
                 raise client.RedditError("Reddit returned no listing for this item; the cached copy was kept")
-            children = data.get("children") or []
             if not children:
                 store.remove(name, expected_generation=generation)
                 raise client.RedditError("Source is unavailable; any cached copy was removed")

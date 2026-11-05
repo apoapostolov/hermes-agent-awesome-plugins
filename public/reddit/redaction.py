@@ -5,6 +5,25 @@ from . import client
 _FIELDS = {"client_secret", "refresh_token", "access_token", "authorization", "password"}
 
 
+def _looks_like_credential(token: str) -> bool:
+    """A word after bearer/basic is a credential when it looks like one.
+
+    Redacting every word turned "SQLite basic tutorial" into "SQLite basic
+    [redacted]"; requiring a digit or punctuation then left letter-only base64
+    credentials visible. Mixing character classes separates the two: prose is
+    one case, an encoded token is not.
+    """
+    if len(token) < 8:
+        return False
+    classes = sum((
+        any(character.isdigit() for character in token),
+        any(character in "._~+/-=" for character in token),
+        any(character.isupper() for character in token),
+        any(character.islower() for character in token),
+    ))
+    return classes >= 2 and (len(token) >= 12 or classes >= 3)
+
+
 def safe(value):
     try:
         records = (client.load_config(), client.load_token())
@@ -25,8 +44,8 @@ def safe(value):
             elif result == secret:
                 result = "[redacted]"
         result = re.sub(
-            r"(?i)((?:bearer|basic)\s+)(?=[A-Za-z0-9._~+/-]{8,})(?=[A-Za-z0-9._~+/-]*[0-9._~+/-])[A-Za-z0-9._~+/-]+",
-            r"\1[redacted]",
+            r"(?i)((?:bearer|basic)\s+)([A-Za-z0-9._~+/-]+)",
+            lambda match: match.group(1) + ("[redacted]" if _looks_like_credential(match.group(2)) else match.group(2)),
             result,
         )
         return re.sub(r"(?i)((?:access_token|refresh_token|client_secret)[=:]\s*)[^\s&]+", r"\1[redacted]", result)

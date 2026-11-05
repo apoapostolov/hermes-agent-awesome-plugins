@@ -113,8 +113,10 @@ def _slot_path(client_id):
 
 def _write_state(path, values):
     try:
-        path.write_text(json.dumps(values), encoding="utf-8")
-        os.chmod(path, 0o600)
+        temporary = path.with_name(path.name + f".{os.getpid()}.tmp")
+        temporary.write_text(json.dumps(values), encoding="utf-8")
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
     except OSError:
         # A successful remote write must not be reported as failed solely
         # because optional pacing state could not be persisted.
@@ -152,9 +154,16 @@ def record_slot(client_id, budget):
     try:
         with file_lock(path.with_suffix(".lock"), timeout=55):
             values = read_state(path)
-            values.update({key: value for key, value in budget.values.items() if value})
+            # Never write next_at back: an older response landing after a later
+            # reservation would move the shared deadline backwards.
+            for key in ("observed_at", "headers"):
+                if budget.values.get(key):
+                    values[key] = budget.values[key]
+            blocked = budget.values.get("blocked_until")
+            if blocked:
+                values["blocked_until"] = max(float(values.get("blocked_until") or 0), float(blocked))
             _write_state(path, values)
-    except RuntimeError:
+    except (RuntimeError, OSError):
         import logging
         logging.getLogger(__name__).warning("Reddit pacing state could not be recorded")
 

@@ -214,15 +214,15 @@ def test_credentials_are_encrypted_by_default_and_output_is_redacted(capsys):
     assert redaction.safe("Bearer unknown-token") == "Bearer [redacted]"
 
 
-def test_tampered_ciphertext_is_treated_as_absent_and_recoverable():
+def test_tampered_ciphertext_is_dropped_and_replaceable():
     client.save_config({"client_id": "id", "client_secret": "client-secret-canary"})
     payload = json.loads(client.config_path().read_text())
     payload["client_secret"]["$fernet"] = "invalid"
     client.config_path().write_text(json.dumps(payload))
-    # An unreadable protected file must read as absent rather than raise: a
-    # credential file carried to another user or machine would otherwise block
-    # recovery until it was moved aside by hand.
-    assert client.load_config() == {}
+    # An unreadable protected field must not raise or block recovery: it reads
+    # as absent while the rest of the file stays usable.
+    assert "client_secret" not in client.load_config()
+    assert client.load_config()["client_id"] == "id"
     client.save_config({"client_id": "id", "client_secret": "replacement-secret"})
     assert client.load_config()["client_secret"] == "replacement-secret"
 
