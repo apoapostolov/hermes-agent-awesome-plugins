@@ -94,7 +94,7 @@ function Tag({ children }) {
   return jsx(Badge, { variant: 'muted', children })
 }
 
-function RedditLibrary({ ctx }) {
+function RedditLibrary({ ctx, account }) {
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState('')
   const [queue, setQueue] = useState(false)
@@ -108,6 +108,15 @@ function RedditLibrary({ ctx }) {
   const [transfer, setTransfer] = useState('')
   const [offset, setOffset] = useState(0)
   useEffect(() => {
+    const deadlines = (data?.results.items || []).map(item => (item.checked_at + 48 * 60 * 60) * 1000).filter(Number.isFinite)
+    if (!deadlines.length) return undefined
+    const timer = setTimeout(() => {
+      setData(null)
+      setNotice('Cached sources expired. Reload the library to retrieve current results.')
+    }, Math.max(0, Math.min(...deadlines) - Date.now()) + 10)
+    return () => clearTimeout(timer)
+  }, [data])
+  useEffect(() => {
     if (!selected || !selected.expires_at) return undefined
     const remaining = selected.expires_at * 1000 - Date.now()
     if (remaining <= 0) { setSelected(null); return undefined }
@@ -115,7 +124,7 @@ function RedditLibrary({ ctx }) {
     return () => clearTimeout(timer)
   }, [selected])
   const load = async (nextOffset = 0) => {
-    const params = new URLSearchParams({ query, tag, limit: '15', offset: String(nextOffset) })
+    const params = new URLSearchParams({ query, tag, account, limit: '15', offset: String(nextOffset) })
     if (queue) params.set('summary_source', 'extractive')
     if (unread) params.set('read', 'false')
     const next = await ctx.rest(`library?${params}`)
@@ -124,16 +133,16 @@ function RedditLibrary({ ctx }) {
   }
   useEffect(() => {
     let active = true
-    ctx.rest('library?limit=15').then(next => { if (active) setData(next) }).catch(err => { if (active) setError(readError(err)) })
+    ctx.rest('library?account=' + encodeURIComponent(account) + '&limit=15').then(next => { if (active) setData(next) }).catch(err => { if (active) setError(readError(err)) })
     return () => { active = false }
-  }, [ctx])
+  }, [ctx, account])
   const run = async (label, task) => {
     setBusy(label)
     setError('')
     setNotice('')
     try { await task() } catch (err) { setError(readError(err)) } finally { setBusy('') }
   }
-  const action = body => ctx.rest('library', { method: 'POST', timeoutMs: 60000, body })
+  const action = body => ctx.rest('library', { method: 'POST', timeoutMs: 60000, body: { ...body, account } })
   const sync = () => run('Syncing', async () => {
     const result = await action({ action: 'sync', pages: 1, after: cursor })
     setCursor(result.after || '')
@@ -311,7 +320,7 @@ function RedditSettingsPage({ ctx }) {
     setBusy('Starting')
     setMessage(null)
     try {
-      const started = await rest('login/start', { method: 'POST', body: { port: 8080 } })
+      const started = await rest('login/start', { method: 'POST', body: {} })
       setPending(started)
       if (typeof ctx.os?.openExternal === 'function') {
         await ctx.os.openExternal(started.authorize_url)
@@ -481,7 +490,7 @@ function RedditSettingsPage({ ctx }) {
           }),
           jsx('p', { style: S.note, children: `Stored in ${status?.config_file || '$HERMES_HOME/reddit-config.json'}` }),
           jsxs('div', { style: S.row, children: [
-            status?.secret_protection_available ? jsx(Btn, { busy, onClick: () => configureExtras({ protect_secrets: true }), children: status?.protect_secrets ? 'Recheck Windows credential protection' : 'Protect credentials with Windows' }) : null,
+            status?.secret_protection_available ? jsx(Btn, { busy, onClick: () => configureExtras({ protect_secrets: true }), children: status?.protect_secrets ? 'Recheck credential encryption' : 'Encrypt stored credentials' }) : null,
             jsx(Btn, { busy, onClick: () => configureExtras({ background_refresh: !status?.background_refresh }), children: status?.background_refresh ? 'Turn off background revalidation' : 'Enable background revalidation' })
           ] }),
           jsx('p', { style: S.note, children: 'Cleanup runs every minute while the plugin is loaded. Optional online revalidation checks up to 100 known bookmarks per 30 minutes; it does not change Reddit content.' })
@@ -579,7 +588,7 @@ function RedditSettingsPage({ ctx }) {
         ]
       }),
 
-      jsx(RedditLibrary, { ctx }),
+      jsx(RedditLibrary, { ctx, account: connected ? status.username : 'local' }, connected ? status.username : 'local'),
       jsx('p', {
         style: S.note,
         children:

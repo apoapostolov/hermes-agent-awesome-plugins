@@ -5,7 +5,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 ## [reddit 1.1.0] - 2026-11-05
 
-Reddit adds a local library of saved posts and comments, searchable source excerpts, summaries, context, notes and tags, and a Desktop browser with unread filtering and annotation editing. Bounded sync/refresh, source expiry and identifier-only bookmark transfer keep retrieval tied to current source access. A summary queue checks source hashes before attaching annotations. Background cleanup runs while Hermes is loaded; online revalidation is optional. Processes coordinate rate budgets and token refresh, and Windows users can protect credential files with DPAPI.
+Reddit adds a local library of saved posts and comments, searchable source excerpts, summaries, context, notes and tags, and a Desktop browser with unread filtering and annotation editing. Bounded sync/refresh, source expiry and identifier-only bookmark transfer keep retrieval tied to current source access. A summary queue checks source hashes before attaching annotations. Background cleanup runs while Hermes is loaded; online revalidation is optional. Processes coordinate rate budgets and token refresh, and Credential files use authenticated encryption, with DPAPI-protected keys on Windows.
 
 Nine added tools bring the total to 22, including account/content/community workflows, moderator queues and actions, message read state, wiki revisions and custom feeds. Subscription fields, API error reporting, long rate-limit handling and OAuth callback/state handling are corrected. Complete manual login with its full redirect URL and restart Hermes after updating.
 

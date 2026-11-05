@@ -197,3 +197,87 @@ def test_local_queue_and_export_do_not_make_network_client(monkeypatch):
     assert json.loads(tools.reddit_library({"action": "queue"}))["result"]["total"] == 1
     assert json.loads(tools.reddit_library({"action": "read", "target": "t3_abc"}))["result"]["read"]
     assert json.loads(tools.reddit_library({"action": "export"}))["result"]["items"]
+
+
+def test_credentials_are_encrypted_by_default_and_output_is_redacted(capsys):
+    from reddit import cli, redaction
+    client.save_config({"client_id": "id", "client_secret": "client-secret-canary"})
+    client.save_token({"refresh_token": "refresh-secret-canary"})
+    assert "client-secret-canary" not in client.config_path().read_text()
+    assert "refresh-secret-canary" not in client.token_path().read_text()
+    cli._print({"error": "echoed client-secret-canary and refresh-secret-canary", "access_token": "other-secret"})
+    output = capsys.readouterr().out
+    assert "client-secret-canary" not in output
+    assert "refresh-secret-canary" not in output
+    assert "other-secret" not in output
+    assert "[redacted]" in output
+    assert redaction.safe("Bearer unknown-token") == "Bearer [redacted]"
+
+
+def test_tampered_ciphertext_cannot_be_decrypted():
+    client.save_config({"client_id": "id", "client_secret": "client-secret-canary"})
+    payload = json.loads(client.config_path().read_text())
+    payload["client_secret"]["$fernet"] = "invalid"
+    client.config_path().write_text(json.dumps(payload))
+    with pytest.raises(RuntimeError, match="decryption failed"):
+        client.load_config()
+
+
+def test_lost_access_does_not_remove_another_account_copy():
+    first, second = library.Library("first"), library.Library("second")
+    first.upsert(source())
+    second.upsert(source())
+    class Missing:
+        def info(self, names):
+            return {"data": {"children": []}}
+    library.refresh(Missing(), second, ["t3_abc"])
+    assert first.get("t3_abc")["body"]
+    assert second.search()["total"] == 0
+
+
+def test_mod_log_preserves_action_and_target():
+    expected = {"data": {"children": [{"data": {"action": "removecomment", "mod": "moderator", "target_fullname": "t1_abc", "details": "spam"}}]}}
+    class LogSession(Session):
+        def request(self, *args, **kwargs):
+            return expected
+    assert management.moderation(LogSession(), {"action": "log", "subreddit": "test"}) == expected
+
+
+@pytest.mark.parametrize("headers,delay", [({"retry-after": "5.5"}, 7), ({}, 6)])
+def test_shared_and_local_retry_deadlines_match(headers, delay):
+    assert coordination.retry_delay(headers) == client.rate_limit_wait(headers) == delay
+
+
+def test_annotation_race_cannot_restore_an_older_snapshot(monkeypatch):
+    import time
+    store = library.Library("owner")
+    store.upsert(source())
+    old_hash = store.get("t3_abc")["content_hash"]
+    row_read, release = threading.Event(), threading.Event()
+    original = store._row
+    errors = []
+    def paused_row(db, name):
+        result = original(db, name)
+        if threading.current_thread().name == "annotate":
+            row_read.set()
+            assert release.wait(3)
+        return result
+    monkeypatch.setattr(store, "_row", paused_row)
+    def annotate():
+        try:
+            store.annotate("t3_abc", summary="Old summary", expected_hash=old_hash)
+        except Exception as exc:
+            errors.append(exc)
+    first = threading.Thread(target=annotate, name="annotate")
+    first.start()
+    assert row_read.wait(3)
+    second = threading.Thread(target=lambda: store.upsert(source(text="Replacement source")))
+    second.start()
+    time.sleep(.1)
+    release.set()
+    first.join(3)
+    second.join(3)
+    assert not first.is_alive() and not second.is_alive() and not errors
+    result = store.get("t3_abc")
+    assert result["body"] == "Replacement source"
+    assert result["summary"] != "Old summary"

@@ -9,7 +9,7 @@ Reddit tools for Hermes Agent, with account access and a local library of saved 
 Version 1.1.0 provides 22 tools, a Desktop library browser, background cleanup, a summary queue, bookmark transfer and dedicated content-management workflows.
 
 ```bash
-hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/reddit
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/reddit
 ```
 
 Restart Hermes Desktop after updating. This is a standalone release. Both repository editions provide the same tools and plugin-managed OAuth; neither is currently admitted to the Hermes Plugin Catalog. [Catalog limitations](LIMITATIONS.md) explains the missing Hermes OAuth capabilities.
@@ -121,7 +121,7 @@ The documented Data API has no global comment-search result type. Search locally
 
 Plugin-owned files are `reddit-config.json`, `reddit-oauth.json`, temporary `reddit-login-pending.json`, and `plugin-data/reddit/access-cache.json` under Hermes home. The access cache lets processes reuse a short-lived token under a profile lock and is removed on logout.
 
-On Windows, `hermes reddit secure` or the Desktop protection button encrypts stored client secrets, refresh tokens and access-cache tokens with DPAPI for the current Windows user. Protection is opt-in. Moving protected files to another user or machine requires signing in again. Other platforms use private file permissions.
+New credential writes are encrypted with authenticated Fernet encryption. Run `hermes reddit secure` or use the Desktop protection button to migrate existing files. Windows protects the profile encryption key with DPAPI; other platforms keep that key in a separate mode-600 profile file. Keep the storage key private and back it up separately from encrypted credentials. Moving Windows-protected files to another user or machine requires signing in again.
 
 Use a truthful User-Agent such as `desktop:hermes-reddit:v1.1.0 (by /u/your_actual_name)`. `reddit_setup(contact_username="your_actual_name")` sets it without replacing app credentials. It identifies the operator; it does not increase the published OAuth quota.
 
@@ -129,4 +129,4 @@ Eligible free access is 100 requests/minute per OAuth client ID, averaged over t
 
 ## Development
 
-The plugin uses the Python standard library. Run `python -m pytest tests -q` in the plugin directory. Tests require pytest, fastapi and httpx; settings tests skip without the latter two. The release's offline tests cover both editions. Visual Desktop behavior still requires a manual check in the running host.
+Credential encryption requires `cryptography>=50.0.2,<51`; the rest uses the Python standard library. Run `python -m pytest tests -q` in the plugin directory. Tests require pytest, fastapi and httpx; settings tests skip without the latter two. The release's offline tests cover both editions. Visual Desktop behavior still requires a manual check in the running host.

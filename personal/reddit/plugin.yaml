@@ -34,4 +34,4 @@ provides_hooks: []
 provides_middleware: []
 requires_env: []
 requires_hermes: ">=0.21.0,<1.0.0"
-pip_dependencies: []
+pip_dependencies: ["cryptography>=50.0.2,<51"]

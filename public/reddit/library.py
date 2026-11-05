@@ -75,6 +75,7 @@ class Library:
         db.execute("PRAGMA journal_mode=DELETE")
         try:
             with db:
+                db.execute("BEGIN IMMEDIATE")
                 yield db
         finally:
             db.close()
@@ -115,14 +116,9 @@ class Library:
         unavailable = (body.strip() in {"[deleted]", "[removed]"} or data.get("removed_by_category")
                        or data.get("author") in {None, "[deleted]"})
         if unavailable:
-            if data.get("author") in {None, "[deleted]"}:
-                with self.connection() as db:
-                    authors = db.execute("SELECT json_extract(payload,'$.author') FROM saves WHERE name=?", (name,)).fetchall()
-                    for author in authors:
-                        if author[0]:
-                            db.execute("DELETE FROM saves WHERE json_extract(payload,'$.author')=?", (author[0],))
-            self.remove(name, all_accounts=True)
-            return {"name": name, "removed": True, "reason": "source unavailable or author deleted"}
+            confirmed = body.strip() in {"[deleted]", "[removed]"} or bool(data.get("removed_by_category"))
+            self.remove(name, all_accounts=confirmed)
+            return {"name": name, "removed": True, "reason": "source unavailable or author redacted"}
         snapshot = {"name": name, "kind": kind, "title": str(data.get("title") or "")[:1000],
                     "body": str(body)[:MAX_BODY], "body_truncated": len(body) > MAX_BODY,
                     "author": str(data.get("author") or ""), "subreddit": str(data.get("subreddit") or ""),
@@ -340,7 +336,7 @@ def refresh(session, library, names):
     for name in names:
         if name not in found:
             # Unavailable may mean deleted, private, or no longer accessible.
-            library.remove(name, all_accounts=True)
+            library.remove(name)
             removed += 1
         else:
             removed += int(library.upsert(found[name]).get("removed", False))

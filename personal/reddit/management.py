@@ -23,7 +23,8 @@ def moderation(session, args):
         if where not in {"modqueue", "reports", "spam", "unmoderated", "edited"}:
             raise client.RedditError("Unknown moderator queue")
         path = f"/r/{sr}/about/" + ("log" if action == "log" else where)
-        return client.compact_listing(session.request("GET", path, params=paging(args)), body_chars=2000)
+        payload = session.request("GET", path, params=paging(args))
+        return payload if action == "log" else client.compact_listing(payload, body_chars=2000)
     target = client.normalize_fullname(args.get("target") or "")
     routes = {"approve": "approve", "remove": "remove", "lock": "lock", "unlock": "unlock", "distinguish": "distinguish", "undistinguish": "distinguish", "sticky": "set_subreddit_sticky", "unsticky": "set_subreddit_sticky"}
     if action not in routes:

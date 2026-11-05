@@ -95,7 +95,7 @@ def load_config(home=None) -> dict:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    return secrets_store.decode(data)
+    return secrets_store.decode(data, home)
 
 
 def save_config(values: dict, home=None) -> pathlib.Path:
@@ -108,7 +108,7 @@ def save_config(values: dict, home=None) -> pathlib.Path:
                 continue
             merged[key] = value
         merged["updated_at"] = int(time.time())
-        _atomic_write(path, json.dumps(secrets_store.encode(merged, merged.get("protect_secrets", False)), indent=2, sort_keys=True))
+        _atomic_write(path, json.dumps(secrets_store.encode(merged, home=home), indent=2, sort_keys=True))
     return path
 
 
@@ -255,7 +255,7 @@ def load_token(home=None) -> dict:
     if not path.exists():
         return {}
     try:
-        return secrets_store.decode(json.loads(path.read_text(encoding="utf-8")))
+        return secrets_store.decode(json.loads(path.read_text(encoding="utf-8")), home)
     except (OSError, ValueError):
         return {}
 
@@ -263,7 +263,7 @@ def load_token(home=None) -> dict:
 def save_token(token: dict, home=None) -> pathlib.Path:
     path = token_path(home)
     with _WRITE_LOCK, coordination.file_lock(path.with_suffix(".lock")):
-        _atomic_write(path, json.dumps(secrets_store.encode(token, load_config(home).get("protect_secrets", False)), indent=2, sort_keys=True))
+        _atomic_write(path, json.dumps(secrets_store.encode(token, home=home), indent=2, sort_keys=True))
     return path
 
 
@@ -277,17 +277,17 @@ def clear_token() -> bool:
 
 
 def protect_credentials(enabled=True, home=None):
-    if enabled and os.name != "nt":
-        raise RedditError("DPAPI secret protection requires Windows")
+    if not enabled:
+        raise RedditError("At-rest credential encryption cannot be disabled")
     token = load_token(home)
-    save_config({"protect_secrets": bool(enabled)}, home)
+    save_config({"protect_secrets": True}, home)
     if token:
         save_token(token, home)
     cache = pathlib.Path(home or hermes_home()) / "plugin-data/reddit/access-cache.json"
     if cache.exists():
-        value = secrets_store.decode(json.loads(cache.read_text(encoding="utf-8")))
-        _atomic_write(cache, json.dumps(secrets_store.encode(value, enabled)))
-    return {"protected": bool(enabled), "backend": "Windows DPAPI" if enabled else "profile file permissions"}
+        value = secrets_store.decode(json.loads(cache.read_text(encoding="utf-8")), home)
+        _atomic_write(cache, json.dumps(secrets_store.encode(value, home=home)))
+    return {"protected": True, "backend": "Fernet with Windows DPAPI key protection" if os.name == "nt" else "Fernet with a private profile key file"}
 
 
 def basic_auth(client_id: str, client_secret: str) -> str:
@@ -367,18 +367,8 @@ def _clip(text: str, size: int) -> str:
 
 
 def rate_limit_wait(headers, cap: int = 30) -> int:
-    """Seconds to wait before retrying a 429, read from Reddit's own headers."""
-    for key in ("retry-after", "x-ratelimit-reset"):
-        value = next((v for k, v in (headers.items() if headers else []) if k.lower() == key), None)
-        if not value:
-            continue
-        try:
-            seconds = int(float(value)) + 1
-        except (TypeError, ValueError):
-            continue
-        # Never retry before Reddit's window ends. Long waits return to the caller.
-        return max(1, seconds)
-    return 5
+    """Use the same rounded deadline as the shared client budget."""
+    return coordination.retry_delay(headers)
 
 
 def compact_item(item: dict, body_chars: int = 400) -> dict:
@@ -540,13 +530,13 @@ class Reddit:
             import hashlib
             key = hashlib.sha256((self.creds.get("client_id", "") + self.creds.get("client_secret", "") + self.token.get("refresh_token", "")).encode()).hexdigest()
             cache = root / "access-cache.json"
-            cached = secrets_store.decode(coordination.read_state(cache)) if not force else {}
+            cached = secrets_store.decode(coordination.read_state(cache), self.home) if not force else {}
             if cached.get("key") == key and cached.get("expires_at", 0) > time.time() + 90:
                 self._access, self._expires_at = cached["access_token"], cached["expires_at"]
                 return self._access
             access = self._refresh_locked(force)
             cached = {"key": key, "access_token": access, "expires_at": self._expires_at}
-            _atomic_write(cache, json.dumps(secrets_store.encode(cached, load_config(self.home).get("protect_secrets", False))))
+            _atomic_write(cache, json.dumps(secrets_store.encode(cached, home=self.home)))
             return access
 
     def _refresh_locked(self, force: bool = False) -> str:

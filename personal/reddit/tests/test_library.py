@@ -129,12 +129,12 @@ def test_deletion_removes_derived_content_in_every_account():
     assert one.search()["total"] == two.search()["total"] == 0
 
 
-def test_deleted_author_purges_other_cached_attributions():
+def test_redacted_author_does_not_prove_other_sources_are_deleted():
     store = library.Library("owner")
     store.upsert(item("t3_abc"))
     store.upsert(item("t3_def"))
     store.upsert(item("t3_abc", author="[deleted]"))
-    assert store.search()["total"] == 0
+    assert store.search()["total"] == 1
 
 
 class Session:

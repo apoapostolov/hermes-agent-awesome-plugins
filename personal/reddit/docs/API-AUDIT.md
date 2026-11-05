@@ -76,11 +76,11 @@ Remote save and local capture have separate outcomes. A successful Reddit save f
 
 Reddit requires deletion of removed source content and author-identifying information for deleted accounts; its guidance recommends routine deletion within 48 hours. Keeping a derived summary is not an exception to source deletion. [Retention guidance](https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki).
 
-The implementation expires source snapshots and all annotations after 48 hours without a successful fetch. It leaves content-free bookmark identifiers for later refresh. Revalidation removes missing, deleted, removed or inaccessible items conservatively. A malformed response or transport failure does not count as an empty result and does not erase the library. Deleted-author detection also removes other locally known records attributed to the same author.
+The implementation expires source snapshots and all annotations after 48 hours without a successful fetch. It leaves content-free bookmark identifiers for later refresh. Revalidation removes inaccessible items only from the current account. Confirmed deleted or removed source text is purged across copies. A malformed response or transport failure does not count as an empty result and does not erase the library. Author redaction is not treated as proof of account deletion. Only the affected source is removed; unrelated saves remain.
 
 Expiry runs on library access and every minute while the plugin is loaded. Optional online revalidation is off by default and checks at most 100 known bookmarks per 30 minutes. Stopped Hermes cannot physically delete expired bytes, so strict wall-clock retention across process downtime needs an external maintenance process. Filesystem backups are outside SQLite's deletion control and should not retain expired Reddit content. This implementation reduces retention risk; it is not a claim that every deployment automatically satisfies every Reddit obligation.
 
-The current implementation stores annotation text with the source lifecycle. It does not provide permanent notes that might preserve deleted Reddit content. The content database is not encrypted. Windows users can opt into DPAPI protection for plugin-owned credential files and the access cache; other platforms use private file permissions.
+The current implementation stores annotation text with the source lifecycle. It does not provide permanent notes that might preserve deleted Reddit content. The content database is not encrypted. New credential files and access-cache tokens use authenticated encryption. Windows protects the key with DPAPI; other platforms store it separately with private file permissions.
 
 ## Defects fixed in this audit
 
@@ -98,7 +98,7 @@ The current implementation stores annotation text with the source lifecycle. It 
 
 ## Follow-up implementation and remaining dependencies
 
-The release adds a profile-bound maintenance worker, opt-in bounded revalidation, shared client-ID rate coordination, locked token refresh/access caching, a source-hash checked summary queue, read status, identifier-only bookmark transfer and a Desktop library browser. Dedicated moderation, message-state, wiki and custom-feed tools cover the management recommendations. Windows DPAPI protection is optional.
+The release adds a profile-bound maintenance worker, opt-in bounded revalidation, shared client-ID rate coordination, locked token refresh/access caching, a source-hash checked summary queue, read status, identifier-only bookmark transfer and a Desktop library browser. Dedicated moderation, message-state, wiki and custom-feed tools cover the management recommendations. New credential writes use authenticated Fernet encryption; Windows protects the key with DPAPI. Existing files can be migrated with the secure command.
 
 Two external dependencies remain. Reddit must provide a supported route for the personal data excluded from Devvit; a local implementation cannot create that permission. Separately, Hermes catalog rule 11 requires host-managed OAuth, but its current plugin route lacks Reddit's client-secret Basic authentication, fixed callback declaration and form-body request transport. Existing [issue #142687](https://github.com/NousResearch/hermes-agent/issues/142687) tracks the authentication/redirect gap. See [LIMITATIONS.md](../LIMITATIONS.md) for the listing prerequisites. This release remains standalone and unlisted.
 
@@ -106,6 +106,6 @@ Embedding search, full-thread ingestion and linked-article ingestion are not inc
 
 ## Validation
 
-All 108 offline tests pass, compared with 58 before changes. The expanded suite covers source expiry and removal from SQLite bytes, annotations, account/profile separation, Unicode and literal search, concurrent local writes, sync continuation, malformed responses, partial save success, URL validation, OAuth state and port selection, HTTP 200 operation errors, DELETE bodies and long rate windows.
+All 115 offline tests pass, compared with 58 before changes. The expanded suite covers source expiry and removal from SQLite bytes, annotations, account/profile separation, Unicode and literal search, concurrent local writes, sync continuation, malformed responses, partial save success, URL validation, OAuth state and port selection, HTTP 200 operation errors, DELETE bodies and long rate windows.
 
 Live validation verified account and app-only reads, personal saved items, karma, community rules and post requirements. Bounded saved-item sync and offline search were verified. Remote posting, voting, editing and deletion were not performed against the user's account; write transport and error handling were checked offline.

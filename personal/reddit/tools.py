@@ -772,6 +772,8 @@ def reddit_library(args: dict, **kwargs) -> str:
         if action == "annotate":
             return _ok(store.annotate(target, expected_hash=args.get("source_hash"), **annotations))
         session = client.session()
+        if session.has_refresh_token and library.account_key(session.require_account()) != store.account:
+            raise client.RedditError("Online library actions must match the authorized Reddit account")
         if action == "sync":
             return _ok(library.sync_saved(session, store, args.get("pages") or 1, args.get("after") or ""))
         if action == "capture":
@@ -779,7 +781,7 @@ def reddit_library(args: dict, **kwargs) -> str:
             payload = session.info([name])
             children = (payload.get("data") or {}).get("children") or []
             if not children:
-                store.remove(name, all_accounts=True)
+                store.remove(name)
                 raise client.RedditError("Source is unavailable; any cached copy was removed")
             result = store.upsert(children[0])
             if annotations and result.get("stored"):
@@ -872,7 +874,7 @@ LIBRARY["description"] += " queue lists sources needing an agent summary; read/u
 LIBRARY_SEARCH["parameters"]["properties"].update({"summary_source": _string("Summary queue filter.", ["extractive", "agent_or_user"]), "read": {"type": "boolean"}})
 SETUP["parameters"]["properties"].update({
     "background_refresh": {"type": "boolean", "description": "Opt in to revalidate at most 100 known bookmarks per 30 minutes while Hermes runs. No remote writes."},
-    "protect_secrets": {"type": "boolean", "description": "Protect credentials with Windows DPAPI; false explicitly returns to permission-protected files."}
+    "protect_secrets": {"type": "boolean", "description": "True migrates existing credentials to encrypted storage. Encryption cannot be disabled."}
 })
 
 

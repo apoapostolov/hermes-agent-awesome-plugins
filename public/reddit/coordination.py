@@ -1,6 +1,7 @@
 """Cross-process file locks and a shared OAuth-client request budget."""
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import threading
@@ -60,6 +61,18 @@ def read_state(path):
         return {}
 
 
+def retry_delay(headers):
+    headers = {k.lower(): v for k, v in (headers.items() if headers else [])}
+    for key in ("retry-after", "x-ratelimit-reset"):
+        try:
+            value = float(headers[key])
+            if math.isfinite(value):
+                return max(1, math.ceil(value) + 1)
+        except (KeyError, TypeError, ValueError):
+            pass
+    return 6
+
+
 class Budget:
     def __init__(self, values):
         self.values = values
@@ -70,7 +83,7 @@ class Budget:
         self.values["headers"] = {k: v for k, v in headers.items() if k.startswith("x-ratelimit-")}
         try:
             if status == 429 or float(headers.get("x-ratelimit-remaining", 1)) <= 0:
-                self.values["blocked_until"] = time.time() + max(1, float(headers.get("retry-after") or headers.get("x-ratelimit-reset") or 5)) + 1
+                self.values["blocked_until"] = time.time() + retry_delay(headers)
         except (TypeError, ValueError):
             if status == 429:
                 self.values["blocked_until"] = time.time() + 60

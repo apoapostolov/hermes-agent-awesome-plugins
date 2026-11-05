@@ -11,7 +11,7 @@ import json
 import sys
 import time
 
-from . import client, login
+from . import client, login, redaction
 
 
 def setup_parser(parser) -> None:
@@ -96,8 +96,7 @@ def setup_parser(parser) -> None:
     lib.add_argument("--kind", choices=["t1", "t3"], default="")
     lib.add_argument("--summary-source", choices=["extractive", "agent_or_user"], default="")
     lib.add_argument("--read", action="store_true", default=None)
-    secure = sub.add_parser("secure", help="Protect existing credential files with Windows DPAPI")
-    secure.add_argument("--disable", action="store_true", help="Return to permission-protected plaintext files.")
+    sub.add_parser("secure", help="Encrypt existing Reddit credential files")
     upkeep = sub.add_parser("maintenance", help="Run cleanup and configure bounded background revalidation")
     upkeep.add_argument("--background-refresh", choices=["on", "off"], default=None)
 
@@ -115,7 +114,7 @@ def _pairs(items: list[str]) -> dict:
 
 
 def _print(payload) -> None:
-    print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
+    print(json.dumps(redaction.safe(payload), indent=2, ensure_ascii=False, default=str))
 
 
 def _setup(args) -> int:
@@ -200,7 +199,7 @@ def handle(args) -> int:
     command = getattr(args, "reddit_command", None)
     try:
         if command == "secure":
-            _print(client.protect_credentials(not args.disable))
+            _print(client.protect_credentials())
             return 0
         if command == "maintenance":
             from . import maintenance
@@ -286,7 +285,7 @@ def handle(args) -> int:
         )
         return 2
     except (client.RedditError, OSError) as exc:
-        print(f"✗ {exc}", file=sys.stderr)
+        print(redaction.safe(f"✗ {exc}"), file=sys.stderr)
         return 1
 
 
@@ -308,12 +307,8 @@ def _login(args) -> int:
             _print(state)
             return 0
         if state["status"] == "failed":
-            print(f"✗ login failed: {state.get('error')}", file=sys.stderr)
+            print(redaction.safe(f"✗ login failed: {state.get('error')}"), file=sys.stderr)
             return 1
         time.sleep(1)
-    print(
-        "✗ timed out waiting for the callback. If the app's redirect URI differs from "
-        f"{started['redirect_uri']}, finish with `hermes reddit complete <url>`.",
-        file=sys.stderr,
-    )
+    print("✗ OAuth callback timed out. Check the configured redirect URI and finish with the full redirect URL.", file=sys.stderr)
     return 1
