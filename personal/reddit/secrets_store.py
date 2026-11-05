@@ -42,8 +42,22 @@ def _cipher(home=None):
             else:
                 record = {"private_file": key.decode("ascii")}
             client._atomic_write(path, __import__("json").dumps(record))
-        record = __import__("json").loads(path.read_text(encoding="utf-8"))
-        key = _crypt(base64.b64decode(record["dpapi"]), True) if "dpapi" in record else record["private_file"].encode("ascii")
+        try:
+            record = __import__("json").loads(path.read_text(encoding="utf-8"))
+            key = _crypt(base64.b64decode(record["dpapi"]), True) if "dpapi" in record else record["private_file"].encode("ascii")
+            return Fernet(key)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+            # The key belongs to another Windows user or machine: rotate it so
+            # replacement credentials can be stored. Anything it encrypted is
+            # already unreadable, which is why recovery was blocked.
+            import logging
+            logging.getLogger(__name__).warning("Reddit storage key could not be unlocked; rotating it")
+        key = Fernet.generate_key()
+        if os.name == "nt":
+            record = {"dpapi": base64.b64encode(_crypt(key)).decode("ascii")}
+        else:
+            record = {"private_file": key.decode("ascii")}
+        client._atomic_write(path, __import__("json").dumps(record))
     return Fernet(key)
 
 

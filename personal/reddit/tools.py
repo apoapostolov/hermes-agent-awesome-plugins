@@ -792,13 +792,17 @@ def reddit_library(args: dict, **kwargs) -> str:
             name = client.normalize_fullname(target)
             generation = store.generation()
             payload = session.info([name])
-            children = (payload.get("data") or {}).get("children") or []
+            data = payload.get("data") if isinstance(payload, dict) else None
+            children = data.get("children") if isinstance(data, dict) else None
+            if not isinstance(children, list):
+                # A missing, null or malformed listing is not proof the source is gone.
+                raise client.RedditError("Reddit returned no listing for this item; the cached copy was kept")
             if not children:
                 store.remove(name, expected_generation=generation)
                 raise client.RedditError("Source is unavailable; any cached copy was removed")
             result = store.upsert(children[0], expected_generation=generation)
             if annotations and result.get("stored"):
-                store.annotate(name, **annotations)
+                store.annotate(name, expected_hash=result.get("content_hash"), **annotations)
             return _ok(result)
         if action == "refresh":
             names = [client.normalize_fullname(target)] if target else store.names(args.get("limit") or 100)

@@ -162,7 +162,7 @@ class Library:
                     record[key] = old.get(key, record[key])
             self._write(db, record, now, row["first_saved"] if row else now)
             generation = self._version(db)
-        return {"name": name, "stored": True, "generation": generation, "summary_source": record["summary_source"], "source_changed": bool(old and not same)}
+        return {"name": name, "stored": True, "content_hash": content_hash, "generation": generation, "summary_source": record["summary_source"], "source_changed": bool(old and not same)}
 
     def get(self, target):
         name = client.normalize_fullname(target)

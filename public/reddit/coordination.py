@@ -107,12 +107,32 @@ class Budget:
                 self.values["blocked_until"] = time.time() + 60
 
 
-@contextmanager
-def request_slot(client_id):
+def _slot_path(client_id):
+    return shared_root() / (hashlib.sha256(client_id.encode()).hexdigest() + ".json")
+
+
+def _write_state(path, values):
+    try:
+        temporary = path.with_name(path.name + f".{os.getpid()}.tmp")
+        temporary.write_text(json.dumps(values), encoding="utf-8")
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    except OSError:
+        # A successful remote write must not be reported as failed solely
+        # because optional pacing state could not be persisted.
+        import logging
+        logging.getLogger(__name__).warning("Reddit pacing state could not be persisted")
+
+
+def reserve_slot(client_id):
+    """Take the shared slot, persist pacing, and release before the caller's network call.
+
+    Holding the file lock across ``urlopen`` made a second process wait out
+    ``file_lock`` and fail as busy on a request that was only slow.
+    """
     if not client_id:
-        yield Budget({})
-        return
-    path = shared_root() / (hashlib.sha256(client_id.encode()).hexdigest() + ".json")
+        return Budget({})
+    path = _slot_path(client_id)
     with file_lock(path.with_suffix(".lock"), timeout=55):
         values = read_state(path)
         delay = float(values.get("blocked_until", 0)) - time.time()
@@ -121,15 +141,37 @@ def request_slot(client_id):
         delay = min(MIN_INTERVAL, max(0, float(values.get("next_at", 0)) - time.time()))
         if delay:
             time.sleep(delay)
-        try:
-            yield Budget(values)
-        finally:
-            values["next_at"] = time.time() + MIN_INTERVAL
-            try:
-                path.write_text(json.dumps(values), encoding="utf-8")
-                os.chmod(path, 0o600)
-            except OSError:
-                # A successful remote write must not be reported as failed
-                # solely because optional pacing state could not be persisted.
-                import logging
-                logging.getLogger(__name__).warning("Reddit pacing state could not be persisted")
+        values["next_at"] = time.time() + MIN_INTERVAL
+        _write_state(path, values)
+    return Budget(values)
+
+
+def record_slot(client_id, budget):
+    """Fold one response's rate-limit headers back into the shared state."""
+    if not client_id or budget is None or not budget.values:
+        return
+    path = _slot_path(client_id)
+    try:
+        with file_lock(path.with_suffix(".lock"), timeout=55):
+            values = read_state(path)
+            # Never write next_at back: an older response landing after a later
+            # reservation would move the shared deadline backwards.
+            for key in ("observed_at", "headers"):
+                if budget.values.get(key):
+                    values[key] = budget.values[key]
+            blocked = budget.values.get("blocked_until")
+            if blocked:
+                values["blocked_until"] = max(float(values.get("blocked_until") or 0), float(blocked))
+            _write_state(path, values)
+    except (RuntimeError, OSError):
+        import logging
+        logging.getLogger(__name__).warning("Reddit pacing state could not be recorded")
+
+
+@contextmanager
+def request_slot(client_id):
+    budget = reserve_slot(client_id)
+    try:
+        yield budget
+    finally:
+        record_slot(client_id, budget)

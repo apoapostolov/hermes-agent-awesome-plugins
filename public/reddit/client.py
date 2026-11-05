@@ -88,6 +88,26 @@ def config_path(home=None) -> pathlib.Path:
     return pathlib.Path(home or hermes_home()) / "reddit-config.json"
 
 
+def _decode_credentials(data, home=None) -> dict:
+    """Decode a credential file, treating an unreadable one as absent.
+
+    A protected file carried to another Windows user or machine cannot be
+    decrypted, and raising from here blocked recovery: setup could not store
+    replacement credentials until the file was moved aside by hand.
+    """
+    try:
+        return secrets_store.decode(data, home)
+    except (RuntimeError, ValueError, TypeError):
+        pass
+    recovered = {}
+    for key, value in data.items():
+        try:
+            recovered.update(secrets_store.decode({key: value}, home))
+        except (RuntimeError, ValueError, TypeError):
+            continue
+    return recovered
+
+
 def load_config(home=None) -> dict:
     path = config_path(home)
     if not path.exists():
@@ -96,7 +116,7 @@ def load_config(home=None) -> dict:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    return secrets_store.decode(data, home)
+    return _decode_credentials(data, home)
 
 
 def save_config(values: dict, home=None) -> pathlib.Path:
@@ -261,9 +281,10 @@ def load_token(home=None) -> dict:
     if not path.exists():
         return {}
     try:
-        return secrets_store.decode(json.loads(path.read_text(encoding="utf-8")), home)
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+    return _decode_credentials(data, home)
 
 
 def save_token(token: dict, home=None) -> pathlib.Path:
@@ -301,13 +322,24 @@ def reset_credentials():
 def protect_credentials(enabled=True, home=None):
     if not enabled:
         raise RedditError("At-rest credential encryption cannot be disabled")
-    token = load_token(home)
-    if token:
-        save_token(token, home)
-    cache = pathlib.Path(home or hermes_home()) / "plugin-data/reddit/access-cache.json"
-    if cache.exists():
-        value = secrets_store.decode(json.loads(cache.read_text(encoding="utf-8")), home)
-        _atomic_write(cache, json.dumps(secrets_store.encode(value, home=home)))
+    root = pathlib.Path(home or hermes_home()) / "plugin-data/reddit"
+    # One lock across the token read, the rewrite and the cache migration: a
+    # logout that lands between them used to be undone by the token write, and a
+    # concurrent refresh could rewrite the cache in plaintext after the rewrite.
+    with coordination.file_lock(root / "token-refresh.lock"):
+        cache = root / "access-cache.json"
+        if cache.exists():
+            try:
+                value = secrets_store.decode(json.loads(cache.read_text(encoding="utf-8")), home)
+            except (OSError, ValueError, RuntimeError):
+                value = {}
+            if value:
+                _atomic_write(cache, json.dumps(secrets_store.encode(value, home=home)))
+            else:
+                cache.unlink(missing_ok=True)
+        token = load_token(home)
+        if token:
+            save_token(token, home)
     save_config({"protect_secrets": True}, home)
     return {"protected": True, "backend": "Fernet with Windows DPAPI key protection" if os.name == "nt" else "Fernet with a private profile key file"}
 
