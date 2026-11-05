@@ -220,6 +220,10 @@ function RedditSettingsPage({ ctx }) {
   const [paste, setPaste] = useState('')
   const [identity, setIdentity] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [libraryAccount, setLibraryAccount] = useState('')
+  useEffect(() => {
+    if (status?.logged_in && status.username) setLibraryAccount(status.username)
+  }, [status?.logged_in, status?.username])
 
   const rest = useCallback(
     (path, options) => ctx.rest(path, { timeoutMs: 60000, ...(options || {}) }),
@@ -588,7 +592,8 @@ function RedditSettingsPage({ ctx }) {
         ]
       }),
 
-      jsx(RedditLibrary, { ctx, account: connected ? status.username : 'local' }, connected ? status.username : 'local'),
+      jsx(Field, { label: 'Local library account', value: libraryAccount, onChange: setLibraryAccount, placeholder: 'local', hint: 'Select a local namespace, including after logout. Network actions require the connected account.' }),
+      jsx(RedditLibrary, { ctx, account: libraryAccount || 'local' }, libraryAccount || 'local'),
       jsx('p', {
         style: S.note,
         children:

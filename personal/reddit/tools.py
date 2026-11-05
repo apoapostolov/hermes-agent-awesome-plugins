@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from . import client, login, library, maintenance, management
+from . import client, login, library, maintenance, management, coordination, redaction
 
 # ---------------------------------------------------------------- schemas
 
@@ -314,7 +314,7 @@ def _ok(payload) -> str:
 
 
 def _err(exc: Exception) -> str:
-    message = str(exc) or exc.__class__.__name__
+    message = redaction.safe(str(exc) or exc.__class__.__name__)
     if isinstance(exc, client.RedditError):
         return json.dumps({"ok": False, "error": message}, ensure_ascii=False)
     return json.dumps(
@@ -325,6 +325,10 @@ def _err(exc: Exception) -> str:
 def reddit_setup(args: dict, **kwargs) -> str:
     """Show or save the user's own Reddit app credentials."""
     try:
+        if args.get("reset_auth"):
+            if not args.get("client_id") or not args.get("client_secret"):
+                raise client.RedditError("Credential recovery requires replacement client_id and client_secret")
+            client.reset_credentials()
         creds = client.load_credentials()
         client_id = (args.get("client_id") or "").strip()
         secret = (args.get("client_secret") or "").strip()
@@ -632,18 +636,18 @@ def reddit_manage(args: dict, **kwargs) -> str:
             result = {"action": action, "target": target, "remote_saved": action == "save", "raw": payload}
             try:
                 store = library.Library(session.require_account())
+                store.mark_saved(target, action == "save")
                 if action == "save" and args.get("local_copy") is not False:
+                    generation = store.generation()
                     info = session.info([target])
                     children = (info.get("data") or {}).get("children") or []
                     if not children:
                         raise client.RedditError("Saved remotely, but Reddit returned no content to cache")
-                    result["local"] = store.upsert(children[0], remote_saved=True)
+                    result["local"] = store.upsert(children[0], remote_saved=True, expected_generation=generation)
                     if result["local"].get("stored"):
                         annotations = {key: args[key] for key in ANNOTATIONS if key in args}
                         if annotations:
                             store.annotate(target, **annotations)
-                else:
-                    store.mark_saved(target, action == "save")
             except Exception as exc:
                 # A failed cache read must not make a successful remote save look failed.
                 result["local_error"] = str(exc)
@@ -770,6 +774,8 @@ def reddit_library(args: dict, **kwargs) -> str:
             return _ok(store.remove(target))
         annotations = {k: args[k] for k in ANNOTATIONS if k in args}
         if action == "annotate":
+            if "summary" in args and not args.get("source_hash"):
+                raise client.RedditError("Summary annotation requires source_hash from the current item's content_hash; get the source first")
             return _ok(store.annotate(target, expected_hash=args.get("source_hash"), **annotations))
         session = client.session()
         if session.has_refresh_token and library.account_key(session.require_account()) != store.account:
@@ -778,12 +784,13 @@ def reddit_library(args: dict, **kwargs) -> str:
             return _ok(library.sync_saved(session, store, args.get("pages") or 1, args.get("after") or ""))
         if action == "capture":
             name = client.normalize_fullname(target)
+            generation = store.generation()
             payload = session.info([name])
             children = (payload.get("data") or {}).get("children") or []
             if not children:
-                store.remove(name)
+                store.remove(name, expected_generation=generation)
                 raise client.RedditError("Source is unavailable; any cached copy was removed")
-            result = store.upsert(children[0])
+            result = store.upsert(children[0], expected_generation=generation)
             if annotations and result.get("stored"):
                 store.annotate(name, **annotations)
             return _ok(result)
@@ -873,6 +880,7 @@ LIBRARY["parameters"]["properties"].update({
 LIBRARY["description"] += " queue lists sources needing an agent summary; read/unread track reading; export/import transfer identifiers only; maintain runs cleanup and configured refresh."
 LIBRARY_SEARCH["parameters"]["properties"].update({"summary_source": _string("Summary queue filter.", ["extractive", "agent_or_user"]), "read": {"type": "boolean"}})
 SETUP["parameters"]["properties"].update({
+    "reset_auth": {"type": "boolean", "description": "Explicitly reset unreadable local credentials before saving replacement client_id and client_secret. Preserves the saved library."},
     "background_refresh": {"type": "boolean", "description": "Opt in to revalidate at most 100 known bookmarks per 30 minutes while Hermes runs. No remote writes."},
     "protect_secrets": {"type": "boolean", "description": "True migrates existing credentials to encrypted storage. Encryption cannot be disabled."}
 })
@@ -899,3 +907,19 @@ def reddit_wiki(args, **kwargs):
 
 def reddit_multis(args, **kwargs):
     return _management_call(management.multis, args)
+
+
+def _serialize_mutation(handler):
+    def call(args, **kwargs):
+        if handler.__name__ == "reddit_content" and args.get("action") == "info":
+            return handler(args, **kwargs)
+        try:
+            with coordination.file_lock(client.hermes_home() / "plugin-data/reddit/mutations.lock", timeout=55):
+                return handler(args, **kwargs)
+        except Exception as exc:
+            return _err(exc)
+    return call
+
+
+reddit_manage = _serialize_mutation(reddit_manage)
+reddit_content = _serialize_mutation(reddit_content)

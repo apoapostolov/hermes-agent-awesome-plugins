@@ -10,6 +10,7 @@ from contextlib import contextmanager
 
 MIN_INTERVAL = 0.6
 _LOCKS, _GUARD = {}, threading.Lock()
+_HELD = threading.local()
 
 
 def shared_root():
@@ -22,7 +23,24 @@ def file_lock(path, timeout=20):
     path.parent.mkdir(parents=True, exist_ok=True)
     with _GUARD:
         lock = _LOCKS.setdefault(str(path.resolve()), threading.RLock())
-    with lock, path.open("a+b") as handle:
+    with lock:
+        held = getattr(_HELD, "paths", set())
+        key = str(path.resolve())
+        if key in held:
+            yield
+            return
+        with _os_lock(path, timeout) as handle:
+            held.add(key)
+            _HELD.paths = held
+            try:
+                yield
+            finally:
+                held.remove(key)
+
+
+@contextmanager
+def _os_lock(path, timeout):
+    with path.open("a+b") as handle:
         if handle.seek(0, 2) == 0:
             handle.write(b"0")
             handle.flush()
@@ -95,7 +113,7 @@ def request_slot(client_id):
         yield Budget({})
         return
     path = shared_root() / (hashlib.sha256(client_id.encode()).hexdigest() + ".json")
-    with file_lock(path.with_suffix(".lock")):
+    with file_lock(path.with_suffix(".lock"), timeout=55):
         values = read_state(path)
         delay = float(values.get("blocked_until", 0)) - time.time()
         if delay > 0:
@@ -107,8 +125,11 @@ def request_slot(client_id):
             yield Budget(values)
         finally:
             values["next_at"] = time.time() + MIN_INTERVAL
-            path.write_text(json.dumps(values), encoding="utf-8")
             try:
+                path.write_text(json.dumps(values), encoding="utf-8")
                 os.chmod(path, 0o600)
             except OSError:
-                pass
+                # A successful remote write must not be reported as failed
+                # solely because optional pacing state could not be persisted.
+                import logging
+                logging.getLogger(__name__).warning("Reddit pacing state could not be persisted")

@@ -15,7 +15,7 @@ import threading
 import time
 import urllib.parse
 
-from . import client
+from . import client, coordination
 
 PENDING: dict = {
     "state": "",
@@ -28,6 +28,7 @@ PENDING: dict = {
     "home": "",
 }
 _LOCK = threading.Lock()
+_FLOW_LOCK = threading.RLock()
 _SERVER: http.server.HTTPServer | None = None
 _THREAD: threading.Thread | None = None
 
@@ -95,7 +96,9 @@ def _expire(deadline: float, state: str) -> None:
         time.sleep(1)
         if PENDING["state"] != state or PENDING["result"] or PENDING["error"]:
             return
-    _shutdown()
+    with _FLOW_LOCK:
+        if PENDING["state"] == state:
+            _shutdown()
 
 
 def start(
@@ -306,3 +309,16 @@ def logout() -> dict:
 
 def dump_status() -> str:
     return json.dumps(result(), indent=2)
+
+
+def _serial_flow(handler):
+    def call(*args, **kwargs):
+        with _FLOW_LOCK, coordination.file_lock(client.hermes_home() / "plugin-data/reddit/oauth-flow.lock", timeout=55):
+            return handler(*args, **kwargs)
+    return call
+
+
+start = _serial_flow(start)
+result = _serial_flow(result)
+finish = _serial_flow(finish)
+logout = _serial_flow(logout)

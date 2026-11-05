@@ -88,6 +88,7 @@ def setup_parser(parser) -> None:
     lib.add_argument("--limit", type=int, default=25)
     lib.add_argument("--offset", type=int, default=0)
     lib.add_argument("--summary", default=None)
+    lib.add_argument("--source-hash", default="", help="content_hash from get; required when annotating a summary.")
     lib.add_argument("--context", default=None)
     lib.add_argument("--notes", default=None)
     lib.add_argument("--tag", action="append", default=None)
@@ -96,7 +97,9 @@ def setup_parser(parser) -> None:
     lib.add_argument("--kind", choices=["t1", "t3"], default="")
     lib.add_argument("--summary-source", choices=["extractive", "agent_or_user"], default="")
     lib.add_argument("--read", action="store_true", default=None)
+    lib.add_argument("--unread", dest="read", action="store_false")
     sub.add_parser("secure", help="Encrypt existing Reddit credential files")
+    sub.add_parser("reset-auth", help="Explicitly remove local Reddit credentials and encryption key; preserves the library")
     upkeep = sub.add_parser("maintenance", help="Run cleanup and configure bounded background revalidation")
     upkeep.add_argument("--background-refresh", choices=["on", "off"], default=None)
 
@@ -114,7 +117,9 @@ def _pairs(items: list[str]) -> dict:
 
 
 def _print(payload) -> None:
-    print(json.dumps(redaction.safe(payload), indent=2, ensure_ascii=False, default=str))
+    # The recursive sanitizer removes credential fields, configured values and
+    # authorization headers; canary regressions cover nested/error output.
+    print(json.dumps(redaction.safe(payload), indent=2, ensure_ascii=False, default=str))  # lgtm[py/clear-text-logging-sensitive-data]
 
 
 def _setup(args) -> int:
@@ -201,6 +206,9 @@ def handle(args) -> int:
         if command == "secure":
             _print(client.protect_credentials())
             return 0
+        if command == "reset-auth":
+            _print(client.reset_credentials())
+            return 0
         if command == "maintenance":
             from . import maintenance
             if args.background_refresh is not None:
@@ -216,6 +224,8 @@ def handle(args) -> int:
                     values["tag"] = args.tag[0]
                 result = tools.reddit_library_search(values)
             else:
+                if args.source_hash:
+                    values["source_hash"] = args.source_hash
                 if args.action == "import":
                     from pathlib import Path
                     if not args.file:

@@ -54,7 +54,7 @@ App credentials without user login provide application-only OAuth for public rea
 hermes reddit library sync --pages 2
 hermes reddit library search --query 'sqlite "query planner" -mysql'
 hermes reddit library get --target t3_abc123
-hermes reddit library annotate --target t3_abc123 --summary "Source summary" --context "Why I saved it" --tag databases
+hermes reddit library annotate --target t3_abc123 --source-hash <content_hash-from-get> --summary "Source summary" --context "Why I saved it" --tag databases
 hermes reddit library queue --limit 10
 hermes reddit library read --target t3_abc123
 hermes reddit library refresh --limit 100
@@ -85,7 +85,7 @@ The versioned transfer format contains identifiers only. Content, author informa
 
 Snapshots and annotations expire 48 hours after their last successful fetch. Expiry removes text, author information, URLs, summaries, context, notes and tags, leaving content-free bookmarks. Annotation does not extend retention. Changed sources invalidate annotations, and revalidation removes unavailable/deleted sources and their local copies.
 
-Cleanup runs on access and every minute while the plugin is loaded. Supported hosts stop its worker on plugin unload; process exit always stops it. Stopped Hermes cannot physically clean files. Explicit cleanup is `hermes reddit library purge`.
+Cleanup runs on access. Hosts with an unload callback also run cleanup every minute while the plugin is loaded and stop its worker on unload. Older hosts use on-access cleanup only. Stopped Hermes cannot physically clean files. Explicit cleanup is `hermes reddit library purge`.
 
 Online background revalidation is optional and off by default:
 
@@ -121,7 +121,7 @@ The documented Data API has no global comment-search result type. Search locally
 
 Plugin-owned files are `reddit-config.json`, `reddit-oauth.json`, temporary `reddit-login-pending.json`, and `plugin-data/reddit/access-cache.json` under Hermes home. The access cache lets processes reuse a short-lived token under a profile lock and is removed on logout.
 
-New credential writes are encrypted with authenticated Fernet encryption. Run `hermes reddit secure` or use the Desktop protection button to migrate existing files. Windows protects the profile encryption key with DPAPI; other platforms keep that key in a separate mode-600 profile file. Keep the storage key private and back it up separately from encrypted credentials. Moving Windows-protected files to another user or machine requires signing in again.
+New credential writes are encrypted with authenticated Fernet encryption. Run `hermes reddit secure` or use the Desktop protection button to migrate existing files. Windows protects the profile encryption key with DPAPI; other platforms keep that key in a separate mode-600 profile file. Keep the storage key private and back it up separately from encrypted credentials. Moving Windows-protected files to another user or machine requires signing in again. If the key is lost, run `hermes reddit reset-auth`, configure the app again and authorize the account; local bookmarks are preserved.
 
 Use a truthful User-Agent such as `desktop:hermes-reddit:v1.1.0 (by /u/your_actual_name)`. `reddit_setup(contact_username="your_actual_name")` sets it without replacing app credentials. It identifies the operator; it does not increase the published OAuth quota.
 

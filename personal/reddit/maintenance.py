@@ -58,8 +58,13 @@ def start(home=None):
             while not stopping.is_set():
                 try:
                     run_once(home)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).warning("Reddit maintenance failed (%s)", type(exc).__name__)
+                    try:
+                        client._atomic_write(home / "plugin-data/reddit/maintenance.json", json.dumps({"checked_at": int(time.time()), "purge": "failed", "error": type(exc).__name__}))
+                    except OSError:
+                        pass
                 stopping.wait(60)
         thread = threading.Thread(target=worker, name="reddit-maintenance", daemon=True)
         _RUNNERS[key], _STOPS[key] = thread, stopping

@@ -59,6 +59,8 @@ class Library:
                 first_saved REAL NOT NULL, stale INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (account, name))""")
             db.execute("CREATE INDEX IF NOT EXISTS saves_checked ON saves(checked)")
+            db.execute("CREATE TABLE IF NOT EXISTS revision (singleton INTEGER PRIMARY KEY CHECK(singleton=1), value INTEGER NOT NULL)")
+            db.execute("INSERT OR IGNORE INTO revision VALUES (1,0)")
             self._expire(db)
         try:
             os.chmod(self.path, 0o600)
@@ -88,7 +90,20 @@ class Library:
                          "remote_saved": old.get("remote_saved"), "needs_refresh": True, "read": bool(old.get("read"))}
             db.execute("UPDATE saves SET payload=?,search_text='',title_text='',context_text='',stale=1 WHERE account=? AND name=?",
                        (_json(tombstone), row["account"], row["name"]))
+        if rows:
+            self._bump(db)
         return len(rows)
+
+    def _version(self, db):
+        return db.execute("SELECT value FROM revision WHERE singleton=1").fetchone()[0]
+
+    def _bump(self, db):
+        db.execute("UPDATE revision SET value=value+1 WHERE singleton=1")
+        return self._version(db)
+
+    def generation(self):
+        with self.connection() as db:
+            return self._version(db)
 
     def _row(self, db, name):
         return db.execute("SELECT * FROM saves WHERE account=? AND name=?", (self.account, name)).fetchone()
@@ -105,8 +120,9 @@ class Library:
              record.get("title", "").casefold(),
              (record.get("summary", "") + "\n" + record.get("context", "")).casefold(),
              checked, first_saved))
+        self._bump(db)
 
-    def upsert(self, child, remote_saved=None):
+    def upsert(self, child, remote_saved=None, expected_generation=None):
         data = child.get("data") or {}
         name = client.normalize_fullname(data.get("name") or "")
         kind = child.get("kind")
@@ -117,8 +133,8 @@ class Library:
                        or data.get("author") in {None, "[deleted]"})
         if unavailable:
             confirmed = body.strip() in {"[deleted]", "[removed]"} or bool(data.get("removed_by_category"))
-            self.remove(name, all_accounts=confirmed)
-            return {"name": name, "removed": True, "reason": "source unavailable or author redacted"}
+            result = self.remove(name, all_accounts=confirmed, expected_generation=expected_generation)
+            return dict(result, reason="source unavailable or author redacted")
         snapshot = {"name": name, "kind": kind, "title": str(data.get("title") or "")[:1000],
                     "body": str(body)[:MAX_BODY], "body_truncated": len(body) > MAX_BODY,
                     "author": str(data.get("author") or ""), "subreddit": str(data.get("subreddit") or ""),
@@ -129,6 +145,8 @@ class Library:
         content_hash = hashlib.sha256(_json({k: v for k, v in snapshot.items() if k != "score"}).encode()).hexdigest()
         now = time.time()
         with self.connection() as db:
+            if expected_generation is not None and self._version(db) != expected_generation:
+                return {"name": name, "skipped": True, "reason": "Library changed while the source was being fetched"}
             self._expire(db)
             row = self._row(db, name)
             old = json.loads(row["payload"]) if row else {}
@@ -142,7 +160,8 @@ class Library:
                 for key in ("summary", "summary_source", "context", "tags", "notes"):
                     record[key] = old.get(key, record[key])
             self._write(db, record, now, row["first_saved"] if row else now)
-        return {"name": name, "stored": True, "summary_source": record["summary_source"], "source_changed": bool(old and not same)}
+            generation = self._version(db)
+        return {"name": name, "stored": True, "generation": generation, "summary_source": record["summary_source"], "source_changed": bool(old and not same)}
 
     def get(self, target):
         name = client.normalize_fullname(target)
@@ -180,15 +199,18 @@ class Library:
             self._write(db, record, row["checked"], row["first_saved"])
         return {"name": name, "annotated": True, "expires_at": row["checked"] + TTL}
 
-    def remove(self, target, all_accounts=False):
+    def remove(self, target, all_accounts=False, expected_generation=None):
         name = client.normalize_fullname(target)
         with self.connection() as db:
+            if expected_generation is not None and self._version(db) != expected_generation:
+                return {"name": name, "skipped": True, "reason": "Library changed while the source was being fetched"}
             sql, values = "DELETE FROM saves WHERE name=?", [name]
             if not all_accounts:
                 sql += " AND account=?"
                 values.append(self.account)
             removed = db.execute(sql, values).rowcount
-        return {"name": name, "removed": removed}
+            generation = self._bump(db)
+        return {"name": name, "removed": removed, "generation": generation}
 
     def mark_saved(self, target, saved):
         name = client.normalize_fullname(target)
@@ -200,6 +222,7 @@ class Library:
                 record["remote_saved"] = bool(saved)
                 # JSON-only update also works for expired bookmark tombstones.
                 db.execute("UPDATE saves SET payload=? WHERE account=? AND name=?", (_json(record), self.account, name))
+            self._bump(db)
 
     def search(self, query="", limit=25, offset=0, subreddit="", author="", tag="", kind="", include_stale=False, summary_source="", read=None):
         terms = _terms(query)
@@ -234,9 +257,11 @@ class Library:
         predicate = " AND ".join(where)
         with self.connection() as db:
             self._expire(db)
-            total = db.execute("SELECT count(*) FROM saves WHERE " + predicate, args).fetchone()[0]
+            # Only fixed allowlisted SQL fragments are assembled; every caller
+            # value (including literal search terms) is a bound parameter.
+            total = db.execute("SELECT count(*) FROM saves WHERE " + predicate, args).fetchone()[0]  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query
             rows = db.execute("SELECT *, " + ("+".join(rank) or "0") + " AS rank FROM saves WHERE " + predicate +
-                              " ORDER BY rank DESC,first_saved DESC,name LIMIT ? OFFSET ?", rank_args + args + [limit, offset]).fetchall()
+                              " ORDER BY rank DESC,first_saved DESC,name LIMIT ? OFFSET ?", rank_args + args + [limit, offset]).fetchall()  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query
         items = []
         for row in rows:
             record = json.loads(row["payload"])
@@ -266,6 +291,7 @@ class Library:
             record = json.loads(row["payload"])
             record["read"] = bool(read)
             db.execute("UPDATE saves SET payload=? WHERE account=? AND name=?", (_json(record), self.account, name))
+            self._bump(db)
         return {"name": name, "read": bool(read)}
 
     def export_bookmarks(self):
@@ -288,6 +314,8 @@ class Library:
             for name in dict.fromkeys(names):
                 record = {"name": name, "kind": name[:2], "stale": True, "needs_refresh": True}
                 added += db.execute("INSERT OR IGNORE INTO saves VALUES (?,?,?,'','','',?,?,1)", (self.account, name, _json(record), 0, time.time())).rowcount
+            if added:
+                self._bump(db)
         return {"imported": added, "supplied": len(names), "requires_refresh": True}
 
     def names(self, limit=100, offset=0):
@@ -304,13 +332,18 @@ def sync_saved(session, library, pages=1, after=""):
         raise client.RedditError("Sync account must match the logged-in Reddit account")
     cursor, stored, removed, seen = after, 0, 0, set()
     for _ in range(max(1, min(int(pages), 10))):
+        generation = library.generation()
         payload = session.account_listing("saved", limit=100, after=cursor, raw=True)
         data = payload.get("data")
         if not isinstance(data, dict) or not isinstance(data.get("children"), list):
             raise client.RedditError("Unexpected saved-list response; existing local records were preserved")
         for child in data["children"]:
             if child.get("kind") in {"t1", "t3"}:
-                result = library.upsert(child, remote_saved=True)
+                result = library.upsert(child, remote_saved=True, expected_generation=generation)
+                if result.get("skipped"):
+                    return {"stored": stored, "removed": removed, "after": cursor or None, "has_more": True,
+                            "retry": True, "reason": result["reason"]}
+                generation = result["generation"]
                 stored += int(result.get("stored", False))
                 removed += int(result.get("removed", False))
         next_cursor = data.get("after") or ""
@@ -327,17 +360,21 @@ def sync_saved(session, library, pages=1, after=""):
 def refresh(session, library, names):
     if not names:
         return {"checked": 0, "removed": 0}
+    generation = library.generation()
     payload = session.info(names)
     data = payload.get("data")
     if not isinstance(data, dict) or not isinstance(data.get("children"), list):
         raise client.RedditError("Unexpected info response; no local items were removed")
     found = {c.get("data", {}).get("name"): c for c in data["children"]}
-    removed = 0
+    removed, skipped = 0, 0
     for name in names:
         if name not in found:
             # Unavailable may mean deleted, private, or no longer accessible.
-            library.remove(name)
-            removed += 1
+            result = library.remove(name, expected_generation=generation)
+            removed += int(bool(result.get("removed")))
         else:
-            removed += int(library.upsert(found[name]).get("removed", False))
-    return {"checked": len(names), "removed": removed}
+            result = library.upsert(found[name], expected_generation=generation)
+            removed += int(bool(result.get("removed")))
+        skipped += int(result.get("skipped", False))
+        generation = result.get("generation", generation)
+    return {"checked": len(names), "removed": removed, "skipped": skipped}

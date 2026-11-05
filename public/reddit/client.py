@@ -12,6 +12,7 @@ import os
 import pathlib
 import re
 import threading
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -130,9 +131,14 @@ def _atomic_write(path: pathlib.Path, text: str) -> None:
     or hand the reader a half-written token file.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    descriptor, temporary = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+    tmp = pathlib.Path(temporary)
     try:
-        tmp.write_text(text, encoding="utf-8")
+        # Credential fields are authenticated ciphertext before this sink.
+        # Other callers write metadata, bookmark IDs or temporary OAuth state.
+        # mkstemp creates a mode-600 file before any bytes are written.
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(text)  # lgtm[py/clear-text-storage-sensitive-data]
         last: OSError | None = None
         for attempt in range(4):
             try:
@@ -262,12 +268,19 @@ def load_token(home=None) -> dict:
 
 def save_token(token: dict, home=None) -> pathlib.Path:
     path = token_path(home)
-    with _WRITE_LOCK, coordination.file_lock(path.with_suffix(".lock")):
+    auth_lock = pathlib.Path(home or hermes_home()) / "plugin-data/reddit/token-refresh.lock"
+    with coordination.file_lock(auth_lock), _WRITE_LOCK, coordination.file_lock(path.with_suffix(".lock")):
         _atomic_write(path, json.dumps(secrets_store.encode(token, home=home), indent=2, sort_keys=True))
     return path
 
 
 def clear_token() -> bool:
+    root = hermes_home() / "plugin-data/reddit"
+    with coordination.file_lock(root / "token-refresh.lock"):
+        return _clear_token_locked()
+
+
+def _clear_token_locked() -> bool:
     path = token_path()
     (hermes_home() / "plugin-data/reddit/access-cache.json").unlink(missing_ok=True)
     if path.exists():
@@ -276,17 +289,26 @@ def clear_token() -> bool:
     return False
 
 
+def reset_credentials():
+    root = hermes_home() / "plugin-data/reddit"
+    with coordination.file_lock(root / "token-refresh.lock"):
+        for path in (config_path(), token_path(), root / "access-cache.json", hermes_home() / "reddit-login-pending.json", root / "storage-key.json"):
+            path.unlink(missing_ok=True)
+    reset_session()
+    return {"reset": True, "library_preserved": True}
+
+
 def protect_credentials(enabled=True, home=None):
     if not enabled:
         raise RedditError("At-rest credential encryption cannot be disabled")
     token = load_token(home)
-    save_config({"protect_secrets": True}, home)
     if token:
         save_token(token, home)
     cache = pathlib.Path(home or hermes_home()) / "plugin-data/reddit/access-cache.json"
     if cache.exists():
         value = secrets_store.decode(json.loads(cache.read_text(encoding="utf-8")), home)
         _atomic_write(cache, json.dumps(secrets_store.encode(value, home=home)))
+    save_config({"protect_secrets": True}, home)
     return {"protected": True, "backend": "Fernet with Windows DPAPI key protection" if os.name == "nt" else "Fernet with a private profile key file"}
 
 
@@ -502,6 +524,7 @@ class Reddit:
         self.home = pathlib.Path(home) if home is not None else None
         self.creds = creds or load_credentials(home)
         self.token = token if token is not None else load_token(home)
+        self._managed_token = token is None
         self._auth_lock = threading.RLock()
         self._access = ""
         self._expires_at = 0.0
@@ -525,6 +548,10 @@ class Reddit:
     def refresh(self, force: bool = False) -> str:
         root = pathlib.Path(self.home or hermes_home()) / "plugin-data/reddit"
         with self._auth_lock, coordination.file_lock(root / "token-refresh.lock"):
+            if self._managed_token and load_token(self.home).get("refresh_token") != self.token.get("refresh_token"):
+                self._access = ""
+                self.token = {}
+                raise RedditError("Reddit account changed or logged out in another process; sign in again")
             if not force and not self._needs_refresh():
                 return self._access
             import hashlib

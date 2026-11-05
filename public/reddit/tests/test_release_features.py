@@ -281,3 +281,50 @@ def test_annotation_race_cannot_restore_an_older_snapshot(monkeypatch):
     result = store.get("t3_abc")
     assert result["body"] == "Replacement source"
     assert result["summary"] != "Old summary"
+
+
+def test_inflight_refresh_cannot_restore_removed_or_edited_content():
+    store = library.Library("owner")
+    store.upsert(source())
+    class Delayed:
+        def info(self, names):
+            store.remove("t3_abc")
+            return {"data": {"children": [source()]}}
+    assert library.refresh(Delayed(), store, ["t3_abc"])["skipped"] == 1
+    assert store.search()["total"] == 0
+    store.upsert(source())
+    class Edited:
+        def info(self, names):
+            store.annotate("t3_abc", notes="new note")
+            return {"data": {"children": [source(text="older response")]}}
+    assert library.refresh(Edited(), store, ["t3_abc"])["skipped"] == 1
+    assert store.get("t3_abc")["notes"] == "new note"
+
+
+def test_logged_out_session_cannot_reuse_its_memory_token(monkeypatch):
+    import time
+    client.save_config({"client_id": "client", "client_secret": "secret"})
+    client.save_token({"refresh_token": "refresh"})
+    session = client.Reddit()
+    session._access, session._expires_at = "old-access", time.time() + 3600
+    client.clear_token()
+    monkeypatch.setattr(client, "_post_form", lambda *a, **k: pytest.fail("logged-out session refreshed"))
+    with pytest.raises(client.RedditError, match="logged out"):
+        session.refresh()
+
+
+def test_reset_auth_recovers_a_lost_key_and_preserves_bookmarks(home):
+    client.save_config({"client_id": "client", "client_secret": "secret"})
+    client.save_token({"refresh_token": "refresh"})
+    library.Library("owner").upsert(source())
+    (home / "plugin-data/reddit/storage-key.json").write_text("broken")
+    assert client.reset_credentials()["library_preserved"]
+    client.save_config({"client_id": "new", "client_secret": "new-secret"})
+    assert client.load_config()["client_secret"] == "new-secret"
+    assert library.Library("owner").search()["total"] == 1
+
+
+def test_credential_patterns_in_errors_are_redacted():
+    from reddit import redaction
+    assert "secret-canary" not in redaction.safe("Basic secret-canary")
+    assert "secret-canary" not in redaction.safe("access_token=secret-canary")

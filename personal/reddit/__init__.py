@@ -42,10 +42,11 @@ _HANDLERS = {
 
 
 def register(ctx):
-    cleanup = maintenance.start()
     on_unload = getattr(ctx, "on_unload", None)
-    if cleanup and callable(on_unload):
-        on_unload(cleanup)
+    if callable(on_unload):
+        cleanup = maintenance.start()
+        if cleanup:
+            on_unload(cleanup)
     for schema in _tools.SCHEMAS:
         name = schema["name"]
         ctx.register_tool(
