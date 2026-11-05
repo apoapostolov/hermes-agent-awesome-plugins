@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 DEFAULTS: Dict[str, Any] = {
     "bin_path": "",
     "install_dir": "",
-    "version": "1.0.2",
+    "version": "1.2.0",
     "auto_install": False,
 }
 

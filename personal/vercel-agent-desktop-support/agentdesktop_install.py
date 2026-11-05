@@ -28,7 +28,7 @@ from typing import Any, Dict, Optional, Tuple
 from . import agentdesktop_config as settings
 
 RELEASE_BASE = "https://github.com/vercel-labs/agent-desktop/releases/download/v{version}/{name}"
-DEFAULT_VERSION = "1.0.2"
+DEFAULT_VERSION = "1.2.0"
 USER_AGENT = "vercel-agent-desktop-support/1.0 (+https://github.com/apoapostolov/hermes-agent-awesome-plugins)"
 PLUGIN_DIR = Path(__file__).resolve().parent
 ARCHIVE_ENTRY = "agent-desktop.exe"
@@ -46,6 +46,10 @@ PINS: Dict[str, Dict[str, str]] = {
     "1.0.2": {
         "win32-x64": "2186c76e7df197c0e67365e45d36d869f74714c56bb8a73817e2a66f3e18e222",
         "win32-arm64": "a0ecd6e17e60a0bcfbb45533a72f2d3a7a73508769588273ef08b0477d2b9687",
+    },
+    "1.2.0": {
+        "win32-x64": "a4199f741a441cedd349bf56c5eba01783b1261258b498efeb7ec9945220c3e8",
+        "win32-arm64": "d6d8643310c2c13eace2261444d9e4c0d16ca09581f38500983104903604caa6",
     },
 }
 

@@ -1,5 +1,5 @@
 name: "Vercel Agent Desktop Support"
-version: 1.0.2
+version: 1.2.0
 description: "Vercel Agent Desktop Support: operate Windows apps through the accessibility tree instead of the screen. Read a window's real UI, then click, fill a field, select an option, toggle a checkbox, scroll, send a key combo, and manage windows and the clipboard. Actions are semantic and headless by default, so they do not take focus, move the cursor or synthesize keystrokes, and they fail closed rather than guess. Backed by the Vercel Labs agent-desktop binary: the plugin wraps it, and its desktop_install tool downloads the official release, verifies the checksum and proves the install. Windows only."
 author: Apostol Apostolov
 license: MIT
@@ -40,9 +40,9 @@ config_schema:
     description: "Where desktop_install writes the binary. Empty uses this plugin's bin/ folder."
   version:
     type: str
-    default: "1.0.2"
+    default: "1.2.0"
     label: "Release to install"
-    description: "Upstream agent-desktop release that desktop_install fetches. Must be a release whose digest is pinned in the plugin (1.0.2); any other version is refused."
+    description: "Upstream agent-desktop release that desktop_install fetches. Must be a release whose digest is pinned in the plugin (1.0.2, 1.2.0); any other version is refused."
   auto_install:
     type: bool
     default: false

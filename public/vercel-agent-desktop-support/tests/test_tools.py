@@ -82,7 +82,7 @@ def test_timeout_returns_a_safe_retry_envelope(monkeypatch):
 def test_oversized_tree_is_pruned_not_dropped(monkeypatch):
     monkeypatch.setattr(cli, "resolve_binary", lambda: "agent-desktop")
     big = {
-        "version": "2.5",
+        "version": "2.6",
         "ok": True,
         "command": "snapshot",
         "data": {

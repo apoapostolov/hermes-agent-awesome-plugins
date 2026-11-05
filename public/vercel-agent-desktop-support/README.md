@@ -4,7 +4,7 @@
   <strong>Hands on Windows apps without taking over the screen.</strong>
   <p>Read any app's real UI and act on it by ref: click, fill, select, toggle, scroll, key combos, windows, clipboard.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.2-2ea44f" alt="Version 1.0.2" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.0-2ea44f" alt="Version 1.2.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -53,7 +53,7 @@ Re-running is safe: a working install reports `already_installed`, and `force: t
 | --- | --- |
 | `bin_path` | Use this executable instead of the installed copy |
 | `install_dir` | Where to write the binary; empty uses the plugin's `bin/` |
-| `version` | Which upstream release to install (default `1.0.2`) |
+| `version` | Which upstream release to install (default `1.2.0`) |
 | `auto_install` | Install automatically when the binary is missing (default off) |
 
 If you prefer npm, `npm install -g agent-desktop --allow-scripts=agent-desktop` still works, and so does the package's own postinstall when npm blocks that script.

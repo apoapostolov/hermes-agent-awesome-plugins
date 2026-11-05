@@ -30,10 +30,14 @@ def make_archive(entries: dict[str, bytes]) -> bytes:
 
 
 def test_pins_cover_both_windows_targets():
-    pins = installer.PINS["1.0.2"]
+    pins = installer.PINS[installer.DEFAULT_VERSION]
     assert set(pins) == {"win32-x64", "win32-arm64"}
     for digest in pins.values():
         assert len(digest) == 64 and int(digest, 16) >= 0
+
+
+def test_default_version_has_a_pinned_digest():
+    assert installer.DEFAULT_VERSION in installer.PINS
 
 
 def test_platform_key_maps_windows_targets(monkeypatch):
@@ -76,7 +80,7 @@ def test_checksum_mismatch_fails_closed(monkeypatch, tmp_path):
     monkeypatch.setattr(installer.platform, "machine", lambda: "AMD64")
     monkeypatch.setattr(settings, "_settings", {**settings.DEFAULTS, "install_dir": str(tmp_path)})
     monkeypatch.setattr(installer, "_download", lambda url, timeout=120.0: make_archive({"agent-desktop.exe": FAKE_BINARY}))
-    monkeypatch.setitem(installer.PINS, "1.0.2", {"win32-x64": "0" * 64, "win32-arm64": "0" * 64})
+    monkeypatch.setitem(installer.PINS, installer.DEFAULT_VERSION, {"win32-x64": "0" * 64, "win32-arm64": "0" * 64})
 
     outcome = installer.install()
     assert outcome["ok"] is False
@@ -91,14 +95,14 @@ def test_install_writes_the_binary_and_proves_it(monkeypatch, tmp_path):
     monkeypatch.setattr(installer.platform, "machine", lambda: "AMD64")
     monkeypatch.setattr(settings, "_settings", {**settings.DEFAULTS, "install_dir": str(tmp_path)})
     monkeypatch.setattr(installer, "_download", lambda url, timeout=120.0: archive)
-    monkeypatch.setitem(installer.PINS, "1.0.2", {"win32-x64": digest, "win32-arm64": "0" * 64})
+    monkeypatch.setitem(installer.PINS, installer.DEFAULT_VERSION, {"win32-x64": digest, "win32-arm64": "0" * 64})
     monkeypatch.setattr(
         installer,
         "_probe",
         lambda binary, command, timeout=20.0: {
             "ok": True,
             "command": command,
-            "data": {"version": "1.0.2", "platform": "windows"} if command == "version" else {"platform": "windows"},
+            "data": {"version": installer.DEFAULT_VERSION, "platform": "windows"} if command == "version" else {"platform": "windows"},
         },
     )
 
@@ -186,7 +190,7 @@ def test_install_verify_probes_the_binary_the_tools_use(monkeypatch, tmp_path):
 
     def fake_probe(target, command, timeout=20.0):
         probed["path"] = str(target)
-        return {"ok": True, "command": command, "data": {"version": "1.0.2"}}
+        return {"ok": True, "command": command, "data": {"version": installer.DEFAULT_VERSION}}
 
     monkeypatch.setattr(installer, "_probe", fake_probe)
     monkeypatch.setattr(cli, "resolve_binary", lambda: str(binary))
@@ -261,4 +265,4 @@ def test_install_status_reports_the_binary_in_use(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "resolve_binary", lambda: str(tmp_path / "x.exe"))
     payload = json.loads(tools.desktop_install({"action": "status"}))
     assert payload["resolved_binary"] == str(tmp_path / "x.exe")
-    assert payload["pinned_versions"] == ["1.0.2"]
+    assert payload["pinned_versions"] == sorted(installer.PINS)
