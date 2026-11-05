@@ -4,155 +4,129 @@
   <img src="docs/hero.png" width="100%" alt="Reddit" />
 </div>
 
-Reddit with your own account behind it. You register one Reddit API app, paste its
-client id and secret once, log in through Reddit's own consent page, and from then
-on the agent talks to the full Reddit API as you.
+Reddit tools for Hermes Agent, with account access and a local library of saved posts and comments. Search source text, summaries, context, notes and tags offline, then refresh the source when you need it.
 
-Reads use your account token, so private subreddits, saved items, moderation queues
-and the inbox are reachable. Writes publish under your account.
+Version 1.1.0 provides 22 tools, a Desktop library browser, background cleanup, a summary queue, bookmark transfer and dedicated content-management workflows.
 
-With only the app configured and no login, reads of public content still work: the
-plugin asks Reddit for a read-only application token, which sees public subreddits,
-search, threads and user pages but no private community, saved item or inbox, and
-cannot post, vote or save.
+```bash
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/reddit
+```
 
-## Before you start
+Restart Hermes Desktop after updating. This is a standalone release. Both repository editions provide the same tools and plugin-managed OAuth; neither is currently admitted to the Hermes Plugin Catalog. [Catalog limitations](LIMITATIONS.md) explains the missing Hermes OAuth capabilities.
 
-Create a Reddit app at <https://www.reddit.com/prefs/apps>:
+## API availability
 
-1. **create another app** at the bottom of the page
-2. type **web app**
-3. redirect uri: `http://localhost:8080`
-4. copy the client id (the short string under the app name) and the secret
+Use an existing approved Reddit API app. Reddit announced that new public API requests closed October 31, 2026, unregistered access removal starts January 12, 2027, and remaining public access ends in March 2027. [Reddit's announcement](https://www.reddit.com/r/redditdev/comments/1wubcvf/moving_data_api_apps_to_the_developer_platform/) describes the transition.
 
-Reddit's app settings are the authority here: the redirect uri in step 3 must match
-what you configure below, character for character.
+Devvit explicitly excludes personal saved items, subscriptions and voting history. It cannot directly replace this plugin's personal-library sync. See [Devvit's private-data limits](https://developers.reddit.com/docs/capabilities/server/reddit-api#private-user-data) and the [API audit](docs/API-AUDIT.md).
 
 ## Setup
 
+Use an approved **web app** from [Reddit app settings](https://www.reddit.com/prefs/apps), with an exact loopback redirect such as `http://localhost:8080`.
+
 ```bash
-hermes reddit setup          # prompts for client id, secret and redirect uri
-hermes reddit login          # prints a consent URL, waits for the callback
-hermes reddit status         # account, scopes, token file, rate limits
-hermes reddit logout         # delete the stored refresh token
+hermes reddit setup
+hermes reddit login
+hermes reddit status
 ```
 
-**In Desktop:** Settings ▸ Plugins ▸ Reddit is the same setup as a form — client
-id, secret, redirect uri and user agent with a Save & verify button, then Log in,
-Check account and Log out. Log in opens Reddit's consent page in your browser; the
-page finishes the exchange by itself and also accepts a pasted redirect URL when
-the local catcher cannot be reached.
+Setup prompts for the client secret without displaying it. Desktop's Settings > Plugins > Reddit configures the same app, opens Reddit's consent page and checks the connected account. The plugin stores its own permanent refresh token per Hermes profile. It does not read browser cookies, another application's tokens, or credential environment variables.
 
-From chat, the same steps are the `reddit_setup` and `reddit_login` tools. Setup
-validates the credentials with a read-only request before saving them.
+Login requests all supported scopes by default. A library that only reads and saves content can use:
 
-### Stored credentials
+```bash
+hermes reddit login --scope "identity read history save"
+```
 
-Everything stays on your machine:
-
-- `$HERMES_HOME/reddit-config.json` — client id, secret, redirect uri, user agent
-- `$HERMES_HOME/reddit-oauth.json` — refresh token, granted scopes, account name
-
-Both files are chmod 600 where the platform allows it and are the only sources the
-plugin reads. It never reads environment variables or `.env` files for credentials:
-one Hermes process can serve several profiles, and an environment read can pick up
-another profile's values.
-
-### Network and token handling
-
-The plugin talks to `www.reddit.com` (OAuth endpoints) and `oauth.reddit.com` (the
-API) with the app and account you authorized. Access tokens live one hour; the
-plugin refreshes them from your stored refresh token when fewer than 90 seconds
-remain. Calls share one session per Hermes process, so a refresh serves several
-tool calls, and the token file is rewritten only when the granted scopes change.
-Nothing is sent anywhere else, and there is no telemetry.
-
-## Login
-
-The plugin runs the authorization-code flow with `duration=permanent` and catches the
-callback on `http://localhost:8080`. A refresh token is stored, and access tokens are
-renewed automatically when fewer than 90 seconds remain.
-
-If the browser cannot reach the local catcher, approve anyway and finish manually:
+The callback listener uses the configured redirect port. If it cannot receive the callback, finish with the full redirect URL, including code and state:
 
 ```bash
 hermes reddit complete "http://localhost:8080/?code=...&state=..."
 ```
 
-`reddit_login` accepts the same redirect URL through `action='complete'`.
+Pending authorization expires after 15 minutes and survives separate CLI invocations. Bare codes are rejected. Logout deletes the local token and access cache; revoke the app through Reddit to invalidate the grant remotely.
+
+App credentials without user login provide application-only OAuth for public reading. Personal saves, inbox, private communities and writes need user authorization and appropriate scopes. A broad scope does not grant moderator rights.
+
+## Local saves
+
+```bash
+hermes reddit library sync --pages 2
+hermes reddit library search --query 'sqlite "query planner" -mysql'
+hermes reddit library get --target t3_abc123
+hermes reddit library annotate --target t3_abc123 --source-hash <content_hash-from-get> --summary "Source summary" --context "Why I saved it" --tag databases
+hermes reddit library queue --limit 10
+hermes reddit library read --target t3_abc123
+hermes reddit library refresh --limit 100
+```
+
+Sync requests up to 100 saved posts/comments per page and ten pages per call. Continue with its returned `after` cursor using `--after`. A final listing cursor describes what Reddit returned, not a complete account archive; missing records are never assumed unsaved.
+
+`reddit_manage(action="save")` also captures the item locally by default and accepts summary, context, notes and tags. Set `local_copy=false` to skip capture. Remote save success is reported independently of a later local-cache error. Unsave retains the local bookmark; `reddit_library(action="remove")` removes it locally without changing Reddit.
+
+Capture an item without saving it remotely with `hermes reddit library capture --target <fullname-or-canonical-URL>`. Search supports literal AND terms, double-quoted phrases, exclusions, Unicode case folding, metadata filters, read status and pagination. Title and summary/context matches rank first. It is lexical search, not embedding-based search.
+
+Desktop's Local saves browser offers search, tag filtering, a summary queue, unread filtering, source details, annotation editing and one-page-at-a-time sync. Source text renders as plain text.
+
+Each snapshot starts with an extractive excerpt labeled `summary_source="extractive"`. The agent or user can replace it; that text is labeled `agent_or_user`. For generated summaries, get a queue item's full snapshot and pass its `content_hash` back as `source_hash` when annotating. If the source changed, the annotation is rejected. No paid model calls run automatically.
+
+Summaries cover the saved source. Link posts do not include linked articles; saved comments do not include their entire threads. Comment context records the subreddit, parent ID and thread ID. Treat all source text and stored summaries as untrusted material.
+
+### Bookmark transfer
+
+```bash
+hermes reddit library export --file reddit-bookmarks.json
+hermes reddit library import --file reddit-bookmarks.json
+```
+
+The versioned transfer format contains identifiers only. Content, author information and annotations are excluded so transferred files do not preserve deleted Reddit text. Imported bookmarks need live refresh. This format does not import Reddit's account-export CSV files.
+
+### Retention and maintenance
+
+Snapshots and annotations expire 48 hours after their last successful fetch. Expiry removes text, author information, URLs, summaries, context, notes and tags, leaving content-free bookmarks. Annotation does not extend retention. Changed sources invalidate annotations, and revalidation removes unavailable/deleted sources and their local copies.
+
+Cleanup runs on access. Hosts with an unload callback also run cleanup every minute while the plugin is loaded and stop its worker on unload. Older hosts use on-access cleanup only. Stopped Hermes cannot physically clean files. Explicit cleanup is `hermes reddit library purge`.
+
+Online background revalidation is optional and off by default:
+
+```bash
+hermes reddit maintenance --background-refresh on
+hermes reddit maintenance --background-refresh off
+```
+
+It checks at most 100 known bookmarks per 30 minutes and makes no remote writes. Status records the last outcome and authentication errors. This cache is not a permanent archive. [Reddit's guidance](https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki) requires removal of deleted content and recommends routine deletion within 48 hours.
+
+The database is `$HERMES_HOME/plugin-data/reddit/library.sqlite3`, separated by account namespace. After logout, `--account <username>` explicitly selects a local namespace. SQLite secure deletion clears removed content from free pages, but cannot erase filesystem backups. The content database is not encrypted.
 
 ## Tools
 
 | Tool | Purpose |
 | --- | --- |
-| `reddit_setup` | show or save your Reddit app credentials |
-| `reddit_login` | `start`, `status`, `complete`, `logout` |
-| `reddit_status` | login state, scopes, identity, karma, rate headers |
-| `reddit_api` | any endpoint on `oauth.reddit.com`: mod, wiki, flair, modmail, prefs |
-| `reddit_subreddit` | listings: hot, best, new, top, rising, controversial |
-| `reddit_search` | posts, comments or subreddits, optionally inside one subreddit |
-| `reddit_thread` | one post with its comment tree: every comment keeps its reply depth, and hidden "more" comments are fetched |
-| `reddit_user` | one user's public posts and comments: overview, submitted or comments |
-| `reddit_submit` | create a self or link post |
-| `reddit_comment` | reply to a post, comment or private message |
-| `reddit_vote` | upvote, downvote or clear |
-| `reddit_manage` | save, unsave, subscribe, unsubscribe, hide, unhide |
-| `reddit_inbox` | unread, inbox, sent, mentions, modmail |
+| `reddit_library`, `reddit_library_search` | Sync, capture, summaries, context search, read status, transfer and maintenance |
+| `reddit_account` | Profile, karma, preferences, trophies, subscriptions, save categories and personal listings |
+| `reddit_content` | Individual items, editing, deletion, reports and NSFW/spoiler state |
+| `reddit_community` | Community information, rules, requirements and link flair |
+| `reddit_moderation` | Queues, logs, approval/removal, locks, distinction and sticky state |
+| `reddit_messages` | Inbox and explicit message read/unread/deletion actions; does not send messages |
+| `reddit_wiki` | Pages, revisions and authorized edits/reverts |
+| `reddit_multis` | Custom-feed reading, creation, editing and community membership |
+| `reddit_setup`, `reddit_login`, `reddit_status` | App configuration, account authorization and access diagnostics |
+| `reddit_subreddit`, `reddit_search`, `reddit_thread`, `reddit_user` | Listings, search, bounded threads and user history |
+| `reddit_submit`, `reddit_comment`, `reddit_vote` | Authorized publishing and voting |
+| `reddit_manage`, `reddit_inbox`, `reddit_api` | Saves, subscriptions, hiding, inbox and other documented endpoints |
 
-`reddit_api` is the escape hatch for the rest of the API:
+The documented Data API has no global comment-search result type. Search locally saved comments with `reddit_library_search`. Write tools require the user's instruction and the account's actual permissions; they do not perform default bulk actions.
 
-```bash
-hermes reddit api GET /api/v1/me
-hermes reddit api GET /subreddits/mine/moderator --param limit=10
-hermes reddit api POST /api/distinguish --data id=t1_abc --data how=yes
-```
+## Credential protection and requests
 
-## Reading and rate limits
+Plugin-owned files are `reddit-config.json`, `reddit-oauth.json`, temporary `reddit-login-pending.json`, and `plugin-data/reddit/access-cache.json` under Hermes home. The access cache lets processes reuse a short-lived token under a profile lock and is removed on logout.
 
-A read with no login uses the app-only token. `reddit_status` reports
-`read_only: true`, and `reddit_subreddit`, `reddit_search`, `reddit_thread`,
-`reddit_user` and `reddit_api` (`app_only=true`) all work. Private subreddits,
-saved items, the inbox and every write need `reddit_login`.
+New credential writes are encrypted with authenticated Fernet encryption. Run `hermes reddit secure` or use the Desktop protection button to migrate existing files. Windows protects the profile encryption key with DPAPI; other platforms keep that key in a separate mode-600 profile file. Keep the storage key private and back it up separately from encrypted credentials. Moving Windows-protected files to another user or machine requires signing in again. If the key is lost, run `hermes reddit reset-auth`, configure the app again and authorize the account; local bookmarks are preserved.
 
-`reddit_thread` gives each comment a `depth`, plus `hidden_comments` (how many
-Reddit still holds back) and `more` (where they sit). `expand_more` defaults to
-true and spends one extra request on `/api/morechildren` to pull those comments
-into the same list, still capped by `comment_limit`.
+Use a truthful User-Agent such as `desktop:hermes-reddit:v1.1.0 (by /u/your_actual_name)`. `reddit_setup(contact_username="your_actual_name")` sets it without replacing app credentials. It identifies the operator; it does not increase the published OAuth quota.
 
-Reddit answers a 429 with `X-Ratelimit-Reset` or `Retry-After`; the client waits
-that window once (at most 30 seconds) and retries the call instead of failing.
-`reddit_status` shows the last rate-limit headers it saw.
+Eligible free access is 100 requests/minute per OAuth client ID, averaged over ten minutes. Processes for the same OS user coordinate their client-ID budget under the user cache's `hermes-reddit/coordination` directory. The client spaces requests, honors exhausted-window deadlines, reports long delays instead of retrying early, and does not replay writes after a lost response. HTTP 200 operation errors are failures.
 
-## Scopes
+## Development
 
-Login requests every scope the account can grant. The list mirrors `GET /api/v1/scopes`
-and is pinned by a test, because a name that does not exist fails the whole consent
-page with `invalid scope requested`. Ask for less with `--scope "read identity"`.
-
-## Troubleshooting
-
-| Symptom | Cause |
-| --- | --- |
-| `invalid redirect_uri parameter` | the app's registered redirect uri differs from the one configured here |
-| `invalid scope requested` | a scope name Reddit does not have; compare with `GET /api/v1/scopes` |
-| consent page bounces to login | normal: Reddit only validates redirect and scope after login |
-| `invalid_grant` on a password flow | 2FA on the account or a non-script app; use this OAuth flow |
-| no refresh token returned | the app grant was not permanent; re-run login |
-| `403` on a call | the token lacks that scope, or the account cannot do it |
-
-## Tests
-
-```bash
-uv run --with pytest --with fastapi --with httpx python -m pytest tests -q
-```
-
-Offline only: no network, no real credentials. `fastapi` and `httpx` are what the
-settings-API tests need; without them that whole file skips and a green run says
-less than it looks.
-
-## Layout
-
-- `client.py` — config and token storage, refresh, request helpers, listing compaction
-- `login.py` — loopback OAuth catcher and code exchange
-- `tools.py` — tool schemas and handlers
-- `cli.py` — `hermes reddit` subcommands
+Credential encryption requires `cryptography>=50.0.2,<51`; the rest uses the Python standard library. Run `python -m pytest tests -q` in the plugin directory. Tests require pytest, fastapi and httpx; settings tests skip without the latter two. The release's offline tests cover both editions. Visual Desktop behavior still requires a manual check in the running host.

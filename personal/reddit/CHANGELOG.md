@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.1.0 - 2026-11-05
+
+### Added
+
+- Local saves store posts and comments with searchable source excerpts, summaries, context, notes and tags. Sync and refresh are bounded, account namespaces are separate, and expired or unavailable sources are removed from the search corpus. Use the new library tools or `hermes reddit library` commands.
+- Account, content and community tools expose personal listings, profile details, editing, deletion, reporting, community rules and posting requirements without constructing raw API requests.
+- A Desktop library browser provides search, source details, annotations, tags and read status. A source-bound summary queue and identifier-only bookmark transfer support organization without retaining deleted content in exports.
+- Hosts with unload support run background cleanup while Hermes is loaded, with optional bounded online revalidation. Processes coordinate rate budgets and token refresh. Credential writes use authenticated encryption, with DPAPI protecting the key on Windows.
+- Dedicated moderation, message-state, wiki and custom-feed tools cover additional content-management workflows. The plugin now provides 22 tools.
+
+### Fixed
+
+- Subscriptions use the correct field for subreddit names. API operation errors returned inside HTTP 200 responses are reported as failures, DELETE calls retain form data, and long rate-limit windows no longer trigger early retries.
+- OAuth uses the configured callback port and verifies manual completion against persisted, expiring authorization state. Complete a manual login with its full redirect URL; bare codes are no longer accepted.
+- Post and user searches support pagination. Unsupported global comment search is rejected with guidance to search saved comments locally.
+
+### Notes
+
+- Reddit has announced the end of remaining public Data API access in March 2027. Devvit excludes personal saved items, subscriptions and voting history. The API audit documents this migration gap and the local cache's retention limits.
+- This is a standalone release. Catalog admission remains blocked by missing Hermes-managed OAuth transport capabilities documented in LIMITATIONS.md.
+
 ## [reddit 1.0.1] - 2026-11-02
 
 ### Added

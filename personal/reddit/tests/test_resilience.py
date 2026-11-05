@@ -131,14 +131,14 @@ def test_concurrent_token_saves_never_collide(isolated_home):
         thread.join()
 
     assert errors == []
-    assert json.loads(client.token_path().read_text(encoding="utf-8"))["refresh_token"] == "refresh-token"
+    assert client.load_token()["refresh_token"] == "refresh-token"
     assert [p.name for p in client.token_path().parent.glob("*.tmp")] == []
 
 
 def test_save_config_keeps_the_whole_merged_record(isolated_home):
     client.save_config({"user_agent": "ua/1"})
     client.save_config({"redirect_uri": "http://localhost:9999"})
-    stored = json.loads(client.config_path().read_text(encoding="utf-8"))
+    stored = client.load_config()
     assert stored["client_id"] == "test-client"
     assert stored["user_agent"] == "ua/1"
     assert stored["redirect_uri"] == "http://localhost:9999"
@@ -235,7 +235,7 @@ def test_refresh_persists_a_new_scope(isolated_home, monkeypatch):
         lambda *a, **k: (200, {"access_token": "USER-TOKEN", "expires_in": 3600, "scope": "identity read submit"}),
     )
     client.Reddit().refresh()
-    stored = json.loads(client.token_path().read_text(encoding="utf-8"))
+    stored = client.load_token()
     assert stored["scope"] == "identity read submit"
 
 

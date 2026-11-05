@@ -91,7 +91,12 @@ def transport(monkeypatch):
     transport = Transport()
     monkeypatch.setattr(client, "_post_form", transport.post)
     monkeypatch.setattr(urllib.request, "urlopen", transport.open)
-    monkeypatch.setattr(client.time, "sleep", lambda seconds: transport.sleeps.append(seconds))
+    now, elapsed = client.time.time, [0]
+    monkeypatch.setattr(client.time, "time", lambda: now() + elapsed[0])
+    def advance(seconds):
+        transport.sleeps.append(seconds)
+        elapsed[0] += seconds
+    monkeypatch.setattr(client.time, "sleep", advance)
     return transport
 
 

@@ -55,6 +55,13 @@ def test_status_reports_unconfigured(isolated_home):
     assert "client_secret" not in payload
 
 
+def test_settings_only_save_needs_no_credentials_or_network(monkeypatch):
+    monkeypatch.setattr(client, "validate_app", lambda *a: pytest.fail("settings made a network call"))
+    response = api.post("/api/plugins/reddit/config", json={"background_refresh": True})
+    assert response.status_code == 200
+    assert client.load_config()["background_refresh"]
+
+
 def test_config_saves_and_never_echoes_the_secret(monkeypatch, isolated_home):
     monkeypatch.setattr(
         client, "validate_app", lambda *a: {"app_token": "ok", "scopes": "*"}
@@ -146,3 +153,25 @@ def test_desktop_plugin_is_valid_esm(tmp_path):
     result = subprocess.run([node, "--check", str(target)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert "registerSettingsPage" in target.read_text(encoding="utf-8")
+
+
+def test_library_desktop_roundtrip(isolated_home):
+    from reddit import library
+    store = library.Library()
+    store.upsert({"kind": "t3", "data": {"name": "t3_abc", "title": "SQLite", "selftext": "Query planner", "author": "writer", "subreddit": "test"}})
+    assert api.get("/api/plugins/reddit/library", params={"query": "sqlite"}).json()["results"]["total"] == 1
+    selected = api.post("/api/plugins/reddit/library", json={"action": "get", "target": "t3_abc"}).json()
+    result = api.post("/api/plugins/reddit/library", json={"action": "annotate", "target": "t3_abc", "source_hash": selected["content_hash"], "summary": "Database guide", "tags": ["backend"]})
+    assert result.status_code == 200
+    assert api.get("/api/plugins/reddit/library", params={"tag": "backend", "query": "guide"}).json()["results"]["total"] == 1
+    assert api.post("/api/plugins/reddit/library", json={"action": "read", "target": "t3_abc"}).status_code == 200
+    assert api.get("/api/plugins/reddit/library", params={"read": "false"}).json()["results"]["total"] == 0
+    assert api.post("/api/plugins/reddit/library", json={"action": "export"}).json()["items"] == [{"name": "t3_abc"}]
+    assert api.post("/api/plugins/reddit/library", json={"action": "remove", "target": "t3_abc"}).status_code == 200
+    assert api.post("/api/plugins/reddit/library", json={"action": "get", "target": "t3_abc"}).status_code == 400
+
+
+def test_invalid_library_import_does_not_change_records(isolated_home):
+    response = api.post("/api/plugins/reddit/library", json={"action": "import", "bookmarks": {"format": "unknown"}})
+    assert response.status_code == 400
+    assert api.get("/api/plugins/reddit/library").json()["results"]["total"] == 0

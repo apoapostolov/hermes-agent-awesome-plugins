@@ -11,7 +11,7 @@ import json
 import sys
 import time
 
-from . import client, login
+from . import client, login, redaction
 
 
 def setup_parser(parser) -> None:
@@ -49,7 +49,7 @@ def setup_parser(parser) -> None:
         description="Start the OAuth consent flow, catch the callback on "
         "http://localhost:8080, and store a permanent refresh token.",
     )
-    do_login.add_argument("--port", type=int, default=8080, help="Callback port (default 8080).")
+    do_login.add_argument("--port", type=int, default=None, help="Callback port (default: configured redirect URI port).")
     do_login.add_argument("--redirect-uri", default="", help="Override the registered redirect URI.")
     do_login.add_argument("--scope", default="", help="Space-separated scopes (default: all).")
     do_login.add_argument(
@@ -60,9 +60,9 @@ def setup_parser(parser) -> None:
     do_login.add_argument("--timeout", type=int, default=600, help="Seconds to wait for the callback.")
 
     do_complete = sub.add_parser(
-        "complete", help="Finish login from a pasted redirect URL or code"
+        "complete", help="Finish login from the full redirect URL with code and state"
     )
-    do_complete.add_argument("value", help="Full redirect URL (recommended) or bare code.")
+    do_complete.add_argument("value", help="Full redirect URL including code and state.")
 
     sub.add_parser("status", help="Show login state, scopes and account identity")
     sub.add_parser("logout", help="Delete the stored refresh token")
@@ -76,6 +76,32 @@ def setup_parser(parser) -> None:
     do_api.add_argument("--param", action="append", default=[], metavar="K=V", help="Query parameter.")
     do_api.add_argument("--data", action="append", default=[], metavar="K=V", help="Form field for writes.")
     do_api.add_argument("--app-only", action="store_true", help="Use a read-only application token.")
+
+    lib = sub.add_parser("library", help="Sync, search and manage local Reddit saves")
+    lib.add_argument("action", choices=["sync", "capture", "get", "annotate", "remove", "refresh", "stats", "purge", "search", "queue", "read", "unread", "export", "import", "maintain"])
+    lib.add_argument("--file", default="", help="Identifier-only bookmark JSON for import/export.")
+    lib.add_argument("--target", default="", help="Post/comment fullname or canonical Reddit URL.")
+    lib.add_argument("--account", default="", help="Local account namespace; defaults to the stored account.")
+    lib.add_argument("--query", default="", help="Literal terms, quoted phrases, -exclusions.")
+    lib.add_argument("--pages", type=int, default=1)
+    lib.add_argument("--after", default="")
+    lib.add_argument("--limit", type=int, default=25)
+    lib.add_argument("--offset", type=int, default=0)
+    lib.add_argument("--summary", default=None)
+    lib.add_argument("--source-hash", default="", help="content_hash from get; required when annotating a summary.")
+    lib.add_argument("--context", default=None)
+    lib.add_argument("--notes", default=None)
+    lib.add_argument("--tag", action="append", default=None)
+    lib.add_argument("--subreddit", default="")
+    lib.add_argument("--author", default="")
+    lib.add_argument("--kind", choices=["t1", "t3"], default="")
+    lib.add_argument("--summary-source", choices=["extractive", "agent_or_user"], default="")
+    lib.add_argument("--read", action="store_true", default=None)
+    lib.add_argument("--unread", dest="read", action="store_false")
+    sub.add_parser("secure", help="Encrypt existing Reddit credential files")
+    sub.add_parser("reset-auth", help="Explicitly remove local Reddit credentials and encryption key; preserves the library")
+    upkeep = sub.add_parser("maintenance", help="Run cleanup and configure bounded background revalidation")
+    upkeep.add_argument("--background-refresh", choices=["on", "off"], default=None)
 
     parser.set_defaults(func=handle)
 
@@ -91,7 +117,9 @@ def _pairs(items: list[str]) -> dict:
 
 
 def _print(payload) -> None:
-    print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
+    # The recursive sanitizer removes credential fields, configured values and
+    # authorization headers; canary regressions cover nested/error output.
+    print(json.dumps(redaction.safe(payload), indent=2, ensure_ascii=False, default=str))  # lgtm[py/clear-text-logging-sensitive-data]
 
 
 def _setup(args) -> int:
@@ -175,6 +203,51 @@ def _setup(args) -> int:
 def handle(args) -> int:
     command = getattr(args, "reddit_command", None)
     try:
+        if command == "secure":
+            _print(client.protect_credentials())
+            return 0
+        if command == "reset-auth":
+            _print(client.reset_credentials())
+            return 0
+        if command == "maintenance":
+            from . import maintenance
+            if args.background_refresh is not None:
+                client.save_config({"background_refresh": args.background_refresh == "on"})
+            _print(maintenance.run_once())
+            return 0
+        if command == "library":
+            from . import tools
+            values = {key: getattr(args, key) for key in ("action", "target", "account", "query", "pages", "after", "limit", "offset", "subreddit", "author", "kind")}
+            if args.action == "search":
+                values.update(summary_source=args.summary_source, read=args.read)
+                if args.tag:
+                    values["tag"] = args.tag[0]
+                result = tools.reddit_library_search(values)
+            else:
+                if args.source_hash:
+                    values["source_hash"] = args.source_hash
+                if args.action == "import":
+                    from pathlib import Path
+                    if not args.file:
+                        raise client.RedditError("Supply --file with a bookmark export")
+                    path = Path(args.file)
+                    if path.stat().st_size > 2000000:
+                        raise client.RedditError("Bookmark import exceeds 2 MB")
+                    values["bookmarks"] = json.loads(path.read_text(encoding="utf-8"))
+                for key in ("summary", "context", "notes"):
+                    if getattr(args, key) is not None:
+                        values[key] = getattr(args, key)
+                if args.tag is not None:
+                    values["tags"] = args.tag
+                result = tools.reddit_library(values)
+            payload = json.loads(result)
+            if args.action == "export" and args.file and payload.get("ok"):
+                from pathlib import Path
+                client._atomic_write(Path(args.file), json.dumps(payload["result"], indent=2))
+                _print({"exported": len(payload["result"]["items"]), "file": str(Path(args.file).resolve())})
+                return 0
+            _print(payload)
+            return 0 if payload.get("ok") else 1
         if command == "setup":
             return _setup(args)
         if command == "login":
@@ -221,8 +294,8 @@ def handle(args) -> int:
             file=sys.stderr,
         )
         return 2
-    except (client.RedditError, OSError) as exc:
-        print(f"✗ {exc}", file=sys.stderr)
+    except (client.RedditError, OSError, ValueError) as exc:
+        print(redaction.safe(f"✗ {exc}"), file=sys.stderr)
         return 1
 
 
@@ -244,12 +317,8 @@ def _login(args) -> int:
             _print(state)
             return 0
         if state["status"] == "failed":
-            print(f"✗ login failed: {state.get('error')}", file=sys.stderr)
+            print(redaction.safe(f"✗ login failed: {state.get('error')}"), file=sys.stderr)
             return 1
         time.sleep(1)
-    print(
-        "✗ timed out waiting for the callback. If the app's redirect URI differs from "
-        f"{started['redirect_uri']}, finish with `hermes reddit complete <url>`.",
-        file=sys.stderr,
-    )
+    print("✗ OAuth callback timed out. Check the configured redirect URI and finish with the full redirect URL.", file=sys.stderr)
     return 1

@@ -28,9 +28,7 @@
 
 ## Latest plugin update
 
-Provider Status 1.6.9 scopes its checkbox theme fix to the plugin's own provider rows. Until now the rule matched every checkbox in the app while a provider dialog was open, which is the reach-in the catalog review asked to remove. Both editions carry the fix; restart Hermes Desktop to load it.
-
-Voice Gate 1.4.4 starts Vale with a short list of variables instead of the host's environment, so a downloaded binary no longer inherits the provider keys the gateway holds. Plugin data and voice-profile lookup now follow the profile the host is serving, and turn-time Vale findings run only an executable you approved once through the tool, matched by digest. The settings-page note about Hermes Desktop 0.22.8 is gone, because `hideAgentSettings` has no implementation in Hermes yet. Both editions carry the fixes; the personal edition keeps its local diagnostics.
+Reddit 1.1.0 adds a searchable local saved-content library, a Desktop browser, background cleanup and dedicated account/content management tools. Summaries, context, notes and tags remain tied to source freshness; bookmark transfer excludes source text. Both standalone editions provide 22 tools. Catalog admission is pending the host OAuth capabilities described in the plugin's limitations.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
@@ -124,7 +122,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **bette
 | Plugin | What you get |
 | --- | --- |
 | [RSS Reader](personal/rss-reader/README.md) · [public](public/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
-| [Reddit](personal/reddit/README.md) · [public](public/reddit/README.md) | Your own Reddit app and account: OAuth login, reads of public subreddits, search, user history and threads that keep their reply tree before any login, then private subreddits, saved items, the inbox, posts, comments, votes and subscriptions as the account, plus `reddit_api` for any other endpoint. |
+| [Reddit](personal/reddit/README.md) · [public](public/reddit/README.md) | Account access, a searchable local save library with source summaries and notes, a Desktop browser, background cleanup and 22 reading/management tools. Standalone release; catalog admission is blocked by missing host OAuth transport. |
 
 Five plugins in this repo are not in the pack and are installed separately: **better-capabilities**, **reasoning-switch** (Status Bar table), **prompt-enhance** (Composer table), **hermes-jev-routing** (Tools and Memory table), and **voice-gate** (Writing table). Every other plugin above is pinned by the pack.
 

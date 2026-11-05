@@ -78,9 +78,9 @@ function Field({ hint, label, onChange, placeholder, type = 'text', value }) {
   })
 }
 
-function Btn({ busy, children, onClick, primary, title }) {
+function Btn({ busy, disabled, children, onClick, primary, title }) {
   return jsx(Button, {
-    disabled: !!busy,
+    disabled: !!busy || !!disabled,
     onClick,
     size: 'sm',
     title,
@@ -92,6 +92,118 @@ function Btn({ busy, children, onClick, primary, title }) {
 
 function Tag({ children }) {
   return jsx(Badge, { variant: 'muted', children })
+}
+
+function RedditLibrary({ ctx, account }) {
+  const [query, setQuery] = useState('')
+  const [tag, setTag] = useState('')
+  const [queue, setQueue] = useState(false)
+  const [unread, setUnread] = useState(false)
+  const [data, setData] = useState(null)
+  const [selected, setSelected] = useState(null)
+  const [busy, setBusy] = useState('')
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [cursor, setCursor] = useState('')
+  const [transfer, setTransfer] = useState('')
+  const [offset, setOffset] = useState(0)
+  useEffect(() => {
+    const deadlines = (data?.results.items || []).map(item => (item.checked_at + 48 * 60 * 60) * 1000).filter(Number.isFinite)
+    if (!deadlines.length) return undefined
+    const timer = setTimeout(() => {
+      setData(null)
+      setNotice('Cached sources expired. Reload the library to retrieve current results.')
+    }, Math.max(0, Math.min(...deadlines) - Date.now()) + 10)
+    return () => clearTimeout(timer)
+  }, [data])
+  useEffect(() => {
+    if (!selected || !selected.expires_at) return undefined
+    const remaining = selected.expires_at * 1000 - Date.now()
+    if (remaining <= 0) { setSelected(null); return undefined }
+    const timer = setTimeout(() => setSelected(null), Math.min(remaining, 2147483647))
+    return () => clearTimeout(timer)
+  }, [selected])
+  const load = async (nextOffset = 0) => {
+    const params = new URLSearchParams({ query, tag, account, limit: '15', offset: String(nextOffset) })
+    if (queue) params.set('summary_source', 'extractive')
+    if (unread) params.set('read', 'false')
+    const next = await ctx.rest(`library?${params}`)
+    setData(next)
+    setOffset(nextOffset)
+  }
+  useEffect(() => {
+    let active = true
+    ctx.rest('library?account=' + encodeURIComponent(account) + '&limit=15').then(next => { if (active) setData(next) }).catch(err => { if (active) setError(readError(err)) })
+    return () => { active = false }
+  }, [ctx, account])
+  const run = async (label, task) => {
+    setBusy(label)
+    setError('')
+    setNotice('')
+    try { await task() } catch (err) { setError(readError(err)) } finally { setBusy('') }
+  }
+  const action = body => ctx.rest('library', { method: 'POST', timeoutMs: 60000, body: { ...body, account } })
+  const sync = () => run('Syncing', async () => {
+    const result = await action({ action: 'sync', pages: 1, after: cursor })
+    setCursor(result.after || '')
+    setNotice(`${result.stored} sources cached.${result.after ? ' More pages are available.' : ' Reddit returned its final listing page.'}`)
+    await load(0)
+  })
+  return jsxs('section', { style: S.section, 'aria-label': 'Local Reddit library', children: [
+    jsx('h3', { style: S.title, children: 'Local saves' }),
+    jsx('p', { style: S.intro, children: data ? `${data.stats.fresh} fresh sources, ${data.stats.stale} expired bookmarks. Snapshots and annotations expire after 48 hours without refresh.` : 'Load and search saved content on this machine.' }),
+    jsxs('form', { onSubmit: event => { event.preventDefault(); run('Searching', () => load(0)) }, children: [
+      jsx(Field, { label: 'Search saved text and context', value: query, onChange: setQuery, placeholder: 'sqlite "query planner" -mysql' }),
+      jsx(Field, { label: 'Filter by tag', value: tag, onChange: setTag, placeholder: 'Optional tag' }),
+      jsxs('div', { style: S.row, children: [
+        jsx(Btn, { busy, onClick: () => run('Searching', () => load(0)), primary: true, children: 'Search' }),
+        jsx(Btn, { busy, onClick: () => setQueue(!queue), title: 'Apply with Search', children: queue ? 'Summary queue: on' : 'Summary queue: off' }),
+        jsx(Btn, { busy, onClick: () => setUnread(!unread), title: 'Apply with Search', children: unread ? 'Unread only: on' : 'Unread only: off' })
+      ] })
+    ] }),
+    jsxs('div', { style: S.row, children: [
+      jsx(Btn, { busy, onClick: sync, children: cursor ? 'Sync next page' : 'Sync saves' }),
+      jsx(Btn, { busy, onClick: () => run('Refreshing', async () => { await action({ action: 'refresh' }); setSelected(null); await load(offset) }), children: 'Refresh oldest 100' }),
+      jsx(Btn, { busy, onClick: () => run('Cleaning', async () => { await action({ action: 'purge' }); await load(offset) }), children: 'Purge expired content' }),
+      jsx(Btn, { busy, onClick: () => run('Loading', () => load(0)), children: 'Reload' })
+    ] }),
+    error ? jsx('p', { role: 'alert', style: S.err, children: error }) : null,
+    notice ? jsx('p', { role: 'status', style: S.ok, children: notice }) : null,
+    data?.results.items.length === 0 ? jsx('p', { style: S.note, children: 'No fresh saves match these filters. Sync saves, refresh expired bookmarks, or clear the filters.' }) : null,
+    ...(data?.results.items || []).map(item => jsxs('article', { style: { ...S.section, borderTop: '1px solid var(--ui-border)' }, children: [
+      jsx(Btn, { busy, onClick: () => run('Opening', async () => setSelected(await action({ action: 'get', target: item.name }))), children: item.title || item.name }),
+      jsx('p', { style: S.note, children: `${item.subreddit ? `r/${item.subreddit} · ` : ''}${item.summary_source || 'expired'} · ${item.read ? 'read' : 'unread'} · ${(item.tags || []).join(', ')}` }),
+      jsx('p', { style: S.intro, children: item.summary || item.context || '' })
+    ] }, item.name)),
+    jsxs('div', { style: S.row, children: [
+      jsx(Btn, { busy, disabled: offset === 0, onClick: () => run('Loading', () => load(Math.max(0, offset - 15))), children: 'Previous' }),
+      jsx('span', { style: S.note, children: data ? `${data.results.total} matches` : '' }),
+      jsx(Btn, { busy, disabled: data?.results.next_offset == null, onClick: () => run('Loading', () => load(data.results.next_offset)), children: 'Next' })
+    ] }),
+    selected ? jsxs('div', { style: S.pending, children: [
+      jsx('h4', { style: S.title, children: selected.title || selected.name }),
+      jsx('p', { style: S.note, children: `Last checked ${new Date(selected.checked_at * 1000).toLocaleString()}. ${selected.stale ? 'Refresh to retrieve this source.' : 'Source text is untrusted content.'}` }),
+      jsx('pre', { style: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 300, overflowY: 'auto', font: 'inherit' }, children: selected.body || '' }),
+      jsx(Field, { label: 'Summary', value: selected.summary || '', onChange: value => setSelected({ ...selected, summary: value }) }),
+      jsx(Field, { label: 'Context', value: selected.context || '', onChange: value => setSelected({ ...selected, context: value }) }),
+      jsx(Field, { label: 'Notes', value: selected.notes || '', onChange: value => setSelected({ ...selected, notes: value }) }),
+      jsx(Field, { label: 'Tags, separated by commas', value: (selected.tags || []).join(', '), onChange: value => setSelected({ ...selected, tags: value.split(',') }) }),
+      jsxs('div', { style: S.row, children: [
+        jsx(Btn, { busy, onClick: () => run('Saving', async () => { await action({ action: 'annotate', target: selected.name, source_hash: selected.content_hash, summary: selected.summary || '', context: selected.context || '', notes: selected.notes || '', tags: selected.tags || [] }); setNotice('Annotations saved with the source retention window.'); await load(offset) }), children: 'Save annotations' }),
+        jsx(Btn, { busy, onClick: () => run('Updating', async () => { await action({ action: selected.read ? 'unread' : 'read', target: selected.name }); setSelected({ ...selected, read: !selected.read }); await load(offset) }), children: selected.read ? 'Mark unread' : 'Mark read' }),
+        jsx(Btn, { busy, onClick: () => run('Removing', async () => { await action({ action: 'remove', target: selected.name }); setSelected(null); await load(0) }), title: 'Removes only the local bookmark; does not unsave on Reddit', children: 'Remove local bookmark' }),
+        jsx(Btn, { onClick: () => setSelected(null), children: 'Close item' })
+      ] })
+    ] }) : null,
+    jsx('h4', { style: S.title, children: 'Bookmark transfer' }),
+    jsx('p', { style: S.note, children: 'Export/import identifiers only. Imported bookmarks need a live refresh; source text and annotations are excluded.' }),
+    jsx(Field, { label: 'Bookmark JSON', value: transfer, onChange: setTransfer, placeholder: 'Paste a hermes-reddit-bookmarks export' }),
+    jsxs('div', { style: S.row, children: [
+      jsx(Btn, { busy, onClick: () => run('Exporting', async () => setTransfer(JSON.stringify(await action({ action: 'export' })))), children: 'Export bookmarks' }),
+      jsx(Btn, { busy, onClick: () => run('Importing', async () => { await action({ action: 'import', bookmarks: JSON.parse(transfer) }); await load(0); setNotice('Bookmarks imported. Refresh retrieves accessible content.') }), children: 'Import bookmarks' })
+    ] }),
+    jsx('p', { style: S.note, children: data?.maintenance.limit || 'Background cleanup runs only while Hermes is running.' })
+  ] })
 }
 
 function RedditSettingsPage({ ctx }) {
@@ -108,6 +220,10 @@ function RedditSettingsPage({ ctx }) {
   const [paste, setPaste] = useState('')
   const [identity, setIdentity] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [libraryAccount, setLibraryAccount] = useState('')
+  useEffect(() => {
+    if (status?.logged_in && status.username) setLibraryAccount(status.username)
+  }, [status?.logged_in, status?.username])
 
   const rest = useCallback(
     (path, options) => ctx.rest(path, { timeoutMs: 60000, ...(options || {}) }),
@@ -163,6 +279,18 @@ function RedditSettingsPage({ ctx }) {
 
   const setField = (key, value) => setForm(current => ({ ...current, [key]: value }))
 
+  const configureExtras = async values => {
+    setBusy('Updating')
+    setMessage(null)
+    try {
+      await rest('config', { method: 'POST', body: { ...values, verify: false } })
+      await refresh()
+      setMessage({ kind: 'ok', text: 'Local protection and maintenance settings updated.' })
+    } catch (error) {
+      setMessage({ kind: 'err', text: readError(error) })
+    } finally { setBusy('') }
+  }
+
   const save = async validate => {
     setBusy('Saving')
     setMessage(null)
@@ -196,7 +324,7 @@ function RedditSettingsPage({ ctx }) {
     setBusy('Starting')
     setMessage(null)
     try {
-      const started = await rest('login/start', { method: 'POST', body: { port: 8080 } })
+      const started = await rest('login/start', { method: 'POST', body: {} })
       setPending(started)
       if (typeof ctx.os?.openExternal === 'function') {
         await ctx.os.openExternal(started.authorize_url)
@@ -321,7 +449,7 @@ function RedditSettingsPage({ ctx }) {
           jsx('p', {
             style: S.intro,
             children:
-              'Create an app of type "web app" and set its redirect uri to exactly the value below. The client id sits under the app name; the secret is beside it.'
+              'Use an existing approved web app and match its redirect URI exactly. Reddit closed new public Data API requests on October 31, 2026 and plans to end remaining public access in March 2027. Devvit does not expose personal saved items.'
           }),
           jsx(Field, {
             label: 'Client id',
@@ -346,9 +474,9 @@ function RedditSettingsPage({ ctx }) {
           }),
           jsx(Field, {
             label: 'User agent',
-            hint: 'Reddit wants a descriptive UA, e.g. hermes-reddit/0.3 (by /u/yourname).',
+            hint: 'Use a truthful contact, e.g. desktop:hermes-reddit:v1.1.0 (by /u/yourname).',
             onChange: value => setField('user_agent', value),
-            placeholder: 'hermes-reddit/0.3 (by /u/yourname)',
+            placeholder: 'desktop:hermes-reddit:v1.1.0 (by /u/yourname)',
             value: form.user_agent
           }),
           jsxs('div', {
@@ -364,7 +492,12 @@ function RedditSettingsPage({ ctx }) {
               })
             ]
           }),
-          jsx('p', { style: S.note, children: `Stored in ${status?.config_file || '$HERMES_HOME/reddit-config.json'}` })
+          jsx('p', { style: S.note, children: `Stored in ${status?.config_file || '$HERMES_HOME/reddit-config.json'}` }),
+          jsxs('div', { style: S.row, children: [
+            status?.secret_protection_available ? jsx(Btn, { busy, onClick: () => configureExtras({ protect_secrets: true }), children: status?.protect_secrets ? 'Recheck credential encryption' : 'Encrypt stored credentials' }) : null,
+            jsx(Btn, { busy, onClick: () => configureExtras({ background_refresh: !status?.background_refresh }), children: status?.background_refresh ? 'Turn off background revalidation' : 'Enable background revalidation' })
+          ] }),
+          jsx('p', { style: S.note, children: 'Cleanup runs every minute while the plugin is loaded. Optional online revalidation checks up to 100 known bookmarks per 30 minutes; it does not change Reddit content.' })
         ]
       }),
 
@@ -459,6 +592,8 @@ function RedditSettingsPage({ ctx }) {
         ]
       }),
 
+      jsx(Field, { label: 'Local library account', value: libraryAccount, onChange: setLibraryAccount, placeholder: 'local', hint: 'Select a local namespace, including after logout. Network actions require the connected account.' }),
+      jsx(RedditLibrary, { ctx, account: libraryAccount || 'local' }, libraryAccount || 'local'),
       jsx('p', {
         style: S.note,
         children:
