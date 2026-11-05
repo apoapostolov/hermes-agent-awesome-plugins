@@ -24,7 +24,7 @@ the component that changed; a plugin patch does not imply a new pack release.
 - hermes-jev-routing. `/jev-routing on|off|mode` wrote one process-wide `_LAST`, so an override in one chat changed routing for every session and its "for this session" wording was false. Overrides now live per session and survive the config read that reset the mode on every turn; `why` and `status` read that session's own prompt and decision, and `on_session_delete` drops a deleted session's state.
 - better-capabilities. Zipping or deleting a skill resolved the name through a private `tools.skill_manager_tool._find_skill` plus a directory walk of its own. It uses the public `tools.skills_tool` helpers now, so a name resolves with the host's tier precedence and an ambiguous name is refused instead of guessed, while the result stays inside the user skills tree this panel may change.
 - hermes-jev-routing. The cache guard had no prices to work with, so its penalty was always zero and the "would miss the cache" holds could never fire. Every configured model is now priced from the host rate card, and the context size comes from the anchored usage anchor rather than a guess at attribute names.
-- The three cache-guard branches were a boolean arrangement whose fast path only worked by accident. They are written explicitly now: a same-tier swap needs an affordable miss, a move inside the current band always holds, and a move out of the band holds unless it is a big upgrade or cheap.
+- The three cache-guard branches were a boolean arrangement whose fast path only worked by accident. They are written explicitly now. A same-tier swap needs an affordable miss, a move inside the current band always holds, and a move out of the band holds unless it is a big upgrade or cheap.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
 
@@ -144,13 +144,13 @@ First release. Voice Gate reads the Markdown a turn changed and reports the AI t
 
 ## [reddit 1.0.1] - 2026-11-02
 
-Reads work before a login now: with only the Reddit app saved, the plugin asks for an app-only `client_credentials` token and reads public subreddits, search, threads and user history. Writes and private data still require the account login. `reddit_thread` keeps each comment's reply depth, reports how many comments Reddit still holds back and where, and fetches them from `/api/morechildren` when `expand_more` is on. New `reddit_user` tool reads a user's overview, submitted posts or comments. A `429` waits out `Retry-After` / `X-Ratelimit-Reset` once instead of failing the call, and a thread with more replies than the first page no longer returns an empty `more` stub with no count and no ids.
+Reads work before a login now. With only the Reddit app saved, the plugin asks for an app-only `client_credentials` token and reads public subreddits, search, threads and user history. Writes and private data still require the account login. `reddit_thread` keeps each comment's reply depth, reports how many comments Reddit still holds back and where, and fetches them from `/api/morechildren` when `expand_more` is on. New `reddit_user` tool reads a user's overview, submitted posts or comments. A `429` waits out `Retry-After` / `X-Ratelimit-Reset` once instead of failing the call, and a thread with more replies than the first page no longer returns an empty `more` stub with no count and no ids.
 
 ## [reddit 1.0.0] - 2026-10-31
 
 ### Added
 
-- **reddit:** version `1.0.0`. First stable release. Runs on your own Reddit app: save the client id and secret in the plugin config, log in with the published-app code flow against a loopback catcher on `http://localhost:8080`, and the permanent refresh token is stored per profile and renewed automatically. Twelve tools cover the account: `reddit_setup`, `reddit_login`, `reddit_status`, `reddit_subreddit`, `reddit_search`, `reddit_thread`, `reddit_submit`, `reddit_comment`, `reddit_vote`, `reddit_manage`, `reddit_inbox`, and `reddit_api` for any endpoint the curated set does not wrap (moderation, modmail, wiki, flair, prefs). Writes publish under the logged-in account. Reads use that token too, so private subreddits, saved items and mod queues work. The Desktop settings page saves and verifies credentials, starts and finishes the login, checks the account and logs out, through `/api/plugins/reddit/`. The page takes its fields, buttons and tags from the plugin SDK, so it follows the active theme instead of painting a light-mode form. `hermes reddit setup|login|complete|status|logout|smoke|api` does the same from a terminal. No third-party dependencies; requests share one cached session per process, and config/token writes are atomic and safe under concurrent tool calls.
+- **reddit:** version `1.0.0`. First stable release. Runs on your own Reddit app. Save the client id and secret in the plugin config, and log in with the published-app code flow against a loopback catcher on `http://localhost:8080`; the permanent refresh token is stored per profile and renewed automatically. Twelve tools cover the account: `reddit_setup`, `reddit_login`, `reddit_status`, `reddit_subreddit`, `reddit_search`, `reddit_thread`, `reddit_submit`, `reddit_comment`, `reddit_vote`, `reddit_manage`, `reddit_inbox`, and `reddit_api` for any endpoint the curated set does not wrap (moderation, modmail, wiki, flair, prefs). Writes publish under the logged-in account. Reads use that token too, so private subreddits, saved items and mod queues work. The Desktop settings page saves and verifies credentials, starts and finishes the login, checks the account and logs out, through `/api/plugins/reddit/`. The page takes its fields, buttons and tags from the plugin SDK, so it follows the active theme instead of painting a light-mode form. `hermes reddit setup|login|complete|status|logout|smoke|api` does the same from a terminal. No third-party dependencies; requests share one cached session per process, and config/token writes are atomic and safe under concurrent tool calls.
 
 ## [provider-status 1.6.8] - 2026-11-01
 
@@ -177,7 +177,7 @@ The renewal-day and add-provider dropdowns paint outside the setup dialog instea
 
 ### Changed
 
-- hermes-jev-routing 1.1.1. The listed edition routed by reaching into the running agent: it walked the caller stack and the `gc` objects to find the cached agent, called `switch_model` mid-turn, rebound `_interruptible_api_call` to hold a send, and priced rows from private usage modules. Catalog review at `ef98501c` rejected that, so the listed edition now routes only through the middleware it already registers. It rewrites the model and the reasoning effort on the provider the turn is already bound to, reports a cross-provider pick as `blocked: cross-provider` instead of sending it, prices rows from a `pricing` block written into the routing JSON, estimates context as characters over four, and reads the Jev key through the host secret scope with `TYPESAFE_API_KEY` declared in `requires_env`. The confirm row no longer holds a send, because a plugin cannot stop one: it offers the pick, the turn answers on its current model, and approving moves the session for the following sends. Personal keeps every reach-in. `LIMITATIONS.md`, identical in both editions, records each blocker and the core hook it needs.
+- hermes-jev-routing 1.1.1. The listed edition routed by reaching into the running agent: it walked the caller stack and the `gc` objects to find the cached agent, called `switch_model` mid-turn, rebound `_interruptible_api_call` to hold a send, and priced rows from private usage modules. Catalog review at `ef98501c` rejected that, so the listed edition now routes only through the middleware it already registers. It rewrites the model and the reasoning effort on the provider the turn is already bound to, reports a cross-provider pick as `blocked: cross-provider` instead of sending it, prices rows from a `pricing` block written into the routing JSON, estimates context as characters over four, and reads the Jev key through the host secret scope with `TYPESAFE_API_KEY` declared in `requires_env`. The confirm row no longer holds a send, because a plugin cannot stop one. It offers the pick, the turn answers on its current model, and approving moves the session for the following sends. Personal keeps every reach-in. `LIMITATIONS.md`, identical in both editions, records each blocker and the core hook it needs.
 
 ### Fixed
 
@@ -218,7 +218,7 @@ Every status dot can carry its own icon, not only the idle one.
 
 ### Added
 
-- **Status Dots** in the Appearance panel. Working, needs input, stalled, background, unread and draft each take a Codicon, picked from the same searchable grid as the idle icon: the link opens its own panel beside the Appearance menu, one state is selected at a time, and the grid below edits that state. The icon rides on the state's own colour rather than replacing it, so amber still reads as a prompt waiting for you. **Suggest** fills the six with a starting set, **Clear** returns them to plain dots. The panel takes the Appearance popup's width, so its grid lands on the same columns as the icon grid next to it.
+- **Status Dots** in the Appearance panel. Working, needs input, stalled, background, unread and draft each take a Codicon, picked from the same searchable grid as the idle icon. The link opens its own panel beside the Appearance menu, one state is selected at a time, and the grid below edits that state. The icon rides on the state's own colour rather than replacing it, so amber still reads as a prompt waiting for you. **Suggest** fills the six with a starting set, **Clear** returns them to plain dots. The panel takes the Appearance popup's width, so its grid lands on the same columns as the icon grid next to it.
 - Background and draft dots take the session's own colour when the session has one, instead of the app's grey.
 
 ### Fixed
@@ -476,7 +476,7 @@ Per-turn model routing from TypeSafe Jev. The full feature set ships here; there
 ### Added
 
 - Jev reads the current message, a short history excerpt, the cwd, the live context size, and the spend snapshot, then answers four typed questions: task kind, complexity, capability deserved, and deep reasoning.
-- The demand score picks a tier: `0.55·complexity + 0.45·capability` plus a reasoning nudge, floored per task kind, then clamped by a confidence guard, a budget guard, and a cache-penalty hold. `xpremium` only fires when the demand already rounds to premium and the kind confidence clears the threshold.
+- The demand score picks a tier: `0.55·complexity + 0.45·capability` plus a reasoning nudge, floored per task kind, then clamped by a confidence guard, a budget guard, and a cache-penalty hold. `xpremium` only fires when the demand already rounds to `premium` and the kind confidence clears the threshold.
 - Five tiers with candidate chains, ten kind specialists with `minTier` and `priority`, and a zero-cost free pool that can be tried before the chains or only after them.
 - Codex quota gates the Sol family on remaining account quota. The stricter of the provider floor and the row floor wins, equality passes, and a missing, stale, or reset reading follows `onUnknown`.
 - The live session moves onto the pick before the provider client is built, and the row's thinking level lands with it.
@@ -550,7 +550,7 @@ The public edition keeps its settings in `ctx.storage` instead of `window.localS
 - Public edition: the settings dialog subscribes to a store version counter, so a change made in one surface re-renders the others. `better-session-appearance` already used this pattern.
 - Personal edition is unchanged and keeps its `localStorage` behavior.
 
-Stored values are treated as untrusted: a wrong type, a null, an out-of-range number, or a storage backend that throws all fall back to the defaults instead of breaking the strip. When `ctx.storage` is unavailable the change stays session-local.
+Stored values are treated as untrusted: a wrong type, a null, an out-of-range number, or a storage backend that throws all fall back to the defaults instead of breaking the strip. If `ctx.storage` is unavailable, the change stays session-local.
 
 Verified against the migrated helpers with a fake storage backend: defaults with no backend, round-trips for both keys, values stored as objects rather than JSON strings, five corrupt-input cases, the 3600-second clamp, a throwing backend, and the React subscriber notification. 18 checks, all passing.
 
@@ -619,7 +619,7 @@ next status poll no longer restores it from the local credential files.
   carriers. A fingerprint prevents a stale file from importing it again,
   without storing the raw key in the removal record.
 - The active key and numbered slots stay valid after a deletion, including
-  when a middle key is removed.
+  after a middle key is removed.
 - Public edition: the per-key delete control is gone because this build cannot
   update the personal credential files. Removing a whole provider row remains
   available.

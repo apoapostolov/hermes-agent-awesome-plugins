@@ -24,7 +24,7 @@
 - Verify instead of hoping. Every action reports whether it was delivered and verified, and whether a retry is safe.
 - Read what an app actually shows, as text with roles and refs, instead of a screenshot.
 - Run several steps in one call, and reach anything without a dedicated tool through `desktop_batch`.
-- Install the binary it drives from the plugin itself: `desktop_install` downloads the upstream release, verifies its checksum, and proves it works.
+- Install the binary it drives from the plugin itself. `desktop_install` downloads the upstream release, verifies its checksum, and proves it works.
 
 ## Requirements
 
@@ -114,7 +114,7 @@ desktop_snapshot   {"app": "Discord.exe", "interactive_only": true, "compact": t
 - No telemetry, no credentials, and no file writes outside the plugin's own `bin/` folder and what the binary itself keeps in `~/.agent-desktop`.
 - `desktop_install` is the one tool that uses the network: it fetches the release archive from the upstream GitHub release. The archive is verified against a sha256 pinned in this plugin before anything is written.
 - Actions change the apps they target. `desktop_act`, `desktop_window` and `desktop_clipboard` are the tools that write.
-- Starting or stopping a program asks first: `desktop_window` launch/close, a `desktop_batch` containing `launch` or `close-app`, and `desktop_install` install go through Hermes's approval prompt (a `pre_tool_call` hook), so the model cannot run an executable without you. So does the first tool call made with `auto_install` on while no binary is installed, because that call downloads and runs one. The prompt needs Hermes Agent v2026.7.7 (0.18.1) or newer, the first release that turns an `approve` hook return into its approval gate; an older host ignores the return and runs the call.
+- Starting or stopping a program asks first. `desktop_window` launch/close, a `desktop_batch` containing `launch` or `close-app`, and `desktop_install` install all go through Hermes's approval prompt (a `pre_tool_call` hook), so the model cannot run an executable without you. So does the first tool call made with `auto_install` on while no binary is installed, because that call downloads and runs one. The prompt needs Hermes Agent v2026.7.7 (0.18.1) or newer, the first release that turns an `approve` hook return into its approval gate; an older host ignores the return and runs the call.
 
 ## Verification
 
