@@ -17,7 +17,7 @@ HERE = Path(__file__).resolve().parent.parent
 
 
 def _load(path: Path, name: str):
-    spec = importlib.util.spec_from_file_location(name, path)
+    spec = importlib.util.spec_from_file_location(name, path, submodule_search_locations=[str(HERE)] if path.name == '__init__.py' else None)
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     spec.loader.exec_module(module)
@@ -26,7 +26,7 @@ def _load(path: Path, name: str):
 
 def main() -> int:
     generator = _load(HERE / "scripts" / "gen_style_pack.py", "vg_gen")
-    rules = _load(HERE / "rules.py", "vg_rules")
+    rules = _load(HERE / "__init__.py", "vg_package").rules
     stale = []
     for path, text in generator.build(rules).items():
         target = HERE / path

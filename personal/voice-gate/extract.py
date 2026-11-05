@@ -33,9 +33,9 @@ MAX_BYTES = 8_000_000
 
 _RST_DIRECTIVE = re.compile(r"(?m)^[ \t]*\.\.[ \t]+\S.*$")
 _RST_INLINE = re.compile(r"``([^`]+)``|:[a-z:+-]+:`([^`]+)`")
-_ADOC_FENCE = re.compile(r"(?ms)^(/[-=.*_+]{4,})\s*$.*?^\1\s*$")
+_ADOC_FENCE = re.compile(r"(?ms)^([-./=*+_]{4,})[ \t]*$.*?^\1[ \t]*$")
 _ADOC_INLINE = re.compile(r"\+([^+\n]+)\+")
-_ORG_BLOCK = re.compile(r"(?ms)^[ \t]*#\+(begin_src|begin_example|begin_export)\b.*?^[ \t]*#\+end_\1[ \t]*$")
+_ORG_BLOCK = re.compile(r"(?ims)^[ \t]*#\+begin_(src|example|export)\b.*?^[ \t]*#\+end_\1[ \t]*$")
 _TEX_BLOCK = re.compile(r"(?ms)^[ \t]*\\begin\{(verbatim|lstlisting|minted|equation\*?)\}.*?^[ \t]*\\end\{\1\}")
 _TEX_COMMAND = re.compile(r"\\[a-zA-Z@]+\*?(?:\[[^\]]*\])?")
 _HTML_DROP = re.compile(r"(?is)<(script|style|pre|code|svg)\b.*?</\1\s*>")
@@ -68,7 +68,10 @@ def read(path: Path) -> Optional[str]:
         raw = path.read_bytes()
     except Exception:
         return None
-    return prose_lines(to_prose(_decode(raw), suffix))
+    decoded = to_prose(_decode(raw), suffix)
+    if suffix in {'.md', '.markdown', '.mdx'}:
+        return decoded
+    return prose_lines(decoded)
 
 
 def _decode(raw: bytes) -> str:
@@ -124,15 +127,23 @@ def prose_lines(text: str) -> str:
     phrases it refuses must not be flagged for listing them.
     """
     kept: list[str] = []
-    fenced = False
+    fenced = None
     for raw in text.splitlines():
         head = raw.lstrip()
         if not head:
-            continue
-        if head.startswith(("```", "~~~")):
-            fenced = not fenced
+            if not fenced:
+                kept.append("")
             continue
         if fenced:
+            if re.match(r'^' + re.escape(fenced[0]) + '{' + str(len(fenced)) + r',}\s*$', head):
+                fenced = None
+            continue
+        fence = re.match(r'^(`{3,}|~{3,})', head)
+        if fence:
+            fenced = fence[1]
+            continue
+        if head.startswith("|") and "|" in head[1:]:
+            kept.append(head)
             continue
         indent = len(raw) - len(head)
         is_item = head.startswith(("- ", "* ", "+ ", "> ")) or head[:2].strip().isdigit()
@@ -147,7 +158,7 @@ def prose_lines(text: str) -> str:
         density = sum(char in CODE_CHARS for char in head) / len(head)
         if density > 0.12:
             continue
-        if len(head.split()) <= 3 and not head.endswith((".", "!", "?", ":", ";", ",")):
+        if not is_item and len(head.split()) <= 3 and not head.endswith((".", "!", "?", ":", ";", ",")):
             continue  # a heading or a label, not a sentence
         kept.append(head)
     return "\n".join(kept)
@@ -178,14 +189,20 @@ def pdf_text(path: Path) -> str:
     returns "", which the caller treats as nothing to judge.
     """
     try:
+        if path.stat().st_size > MAX_BYTES:
+            return ''
         raw = path.read_bytes()
     except Exception:
         return ""
     if b"%PDF" not in raw[:1024]:
         return ""
     pieces: list[str] = []
+    total = 0
     for block in _PDF_OBJECT.findall(raw):
         for stream in _inflate(block):
+            total += len(stream)
+            if total > MAX_BYTES:
+                return ''
             pieces.extend(_content_strings(stream))
     return " ".join(piece for piece in pieces if piece).strip()
 
@@ -193,10 +210,13 @@ def pdf_text(path: Path) -> str:
 def _inflate(block: bytes) -> list[bytes]:
     out = [block]
     try:
-        out.append(zlib.decompress(block))
+        decoder = zlib.decompressobj()
+        inflated = decoder.decompress(block, MAX_BYTES + 1)
+        if len(inflated) <= MAX_BYTES and not decoder.unconsumed_tail:
+            out.append(inflated)
     except Exception:
         try:
-            out.append(zlib.decompressobj().decompress(block))
+            pass
         except Exception:
             pass
     return out

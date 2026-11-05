@@ -1,0 +1,8 @@
+extends: existence
+message: "Keep factual constraint inventories; inspect a rhetorical negation drumroll."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\bno fluff,?\\s+no filler,?\\s+(?:and )?no jargon\\b"

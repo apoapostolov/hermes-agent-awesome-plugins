@@ -67,7 +67,9 @@ def asset() -> Tuple[str, str, str]:
 
 
 def data_dir() -> Path:
-    home = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+    from .profile import home_candidates
+    candidates = home_candidates()
+    home = next((candidate for candidate in candidates if (candidate / 'config.yaml').is_file()), candidates[0])
     return home / "plugin-data" / "voice-gate" / "vale" / VERSION
 
 
@@ -128,14 +130,14 @@ def _safe_extract(archive: Path, destination: Path, kind: str) -> None:
         with zipfile.ZipFile(archive) as bundle:
             for member in bundle.infolist():
                 target = (destination / member.filename).resolve()
-                if not str(target).startswith(str(destination.resolve())):
+                if not target.is_relative_to(destination.resolve()) or stat.S_ISLNK(member.external_attr >> 16):
                     raise RuntimeError(f"refusing to extract outside {destination}: {member.filename}")
             bundle.extractall(destination)
         return
     with tarfile.open(archive) as bundle:
         for member in bundle.getmembers():
             target = (destination / member.name).resolve()
-            if not str(target).startswith(str(destination.resolve())):
+            if not target.is_relative_to(destination.resolve()) or member.issym() or member.islnk():
                 raise RuntimeError(f"refusing to extract outside {destination}: {member.name}")
         bundle.extractall(destination)
 
@@ -201,7 +203,9 @@ def _cache_key(binary: str, ini: Path, files: List[str]) -> Any:
         config_stamp = ini.stat().st_mtime_ns
     except OSError:
         config_stamp = 0
-    return (binary, str(ini), config_stamp, tuple(stamps))
+    style_stamps = tuple((str(path), path.stat().st_mtime_ns, path.stat().st_size)
+                         for path in sorted((ini.parent / 'styles').rglob('*.yml')))
+    return (binary, str(ini), config_stamp, style_stamps, tuple(stamps))
 
 
 def config_path() -> Path:
@@ -240,6 +244,8 @@ def run(paths: List[str], override: str = "", timeout: float = 120.0) -> Dict[st
     except json.JSONDecodeError:
         return {"ok": False, "error": "Vale returned no JSON report",
                 "stderr": (proc.stderr or "")[:800], "command": command}
+    if proc.returncode not in (0, 1) or not isinstance(report, dict) or (proc.returncode and not report and proc.stderr):
+        return {'ok': False, 'error': 'Vale failed to lint the files.', 'stderr': (proc.stderr or '')[:800], 'exit_code': proc.returncode}
     counts: Dict[str, int] = {}
     for result in report.values() if isinstance(report, dict) else []:
         # Vale returns a list of alerts per path; older reports nest them under "Alerts".

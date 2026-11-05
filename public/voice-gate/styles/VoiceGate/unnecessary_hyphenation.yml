@@ -1,0 +1,8 @@
+extends: existence
+message: "Use the established spelling; retain correct attributive technical compounds."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\b(?:code-base|data-set|web-site)s?\\b|\\bin real-time\\b"

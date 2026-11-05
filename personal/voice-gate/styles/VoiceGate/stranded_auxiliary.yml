@@ -1,0 +1,8 @@
+extends: existence
+message: "Keep deliberate contrast; review a repeated clipped auxiliary rhythm."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "[,;]\\s+(?:the [\\w-]+|it|they|we|you)\\s+(?:didn.t|doesn.t|wasn.t|isn.t|can.t|won.t)\\s*[.!?]"

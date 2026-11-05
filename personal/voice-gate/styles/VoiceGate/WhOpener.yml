@@ -4,4 +4,4 @@ level: warning
 scope: sentence
 nonword: true
 tokens:
-  - "(?i)(?:^|[.!?]\\s+)\\s*(?:what|why|how)\\b[^.!?\\n]{0,60}\\b(?:is|was|are)\\b"
+  - "(?im)(?:^|[.!?]\\s+)\\s*(?:what|when|where|which|who|why|how)\\s+(?!(?:is|was|are)\\b)[^.!?\\n]{1,60}\\b(?:is|was|are)\\b"

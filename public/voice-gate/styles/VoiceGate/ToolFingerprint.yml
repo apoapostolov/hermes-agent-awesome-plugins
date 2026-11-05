@@ -4,4 +4,4 @@ level: warning
 scope: sentence
 nonword: true
 tokens:
-  - "(?i)(?:[?&]utm_source=(?:chatgpt|openai|claude|perplexity|gemini|copilot)|[?&]referrer=(?:gpt|claude|ai|chatgpt))"
+  - "(?:[?&]utm_source=(?:chatgpt|openai|claude|perplexity|gemini|copilot)|[?&]referrer=(?:gpt|claude|ai|chatgpt)|[?&]utm_medium=ai)\\b"

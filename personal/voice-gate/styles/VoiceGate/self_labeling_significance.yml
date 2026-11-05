@@ -1,0 +1,8 @@
+extends: existence
+message: "Let the supported consequence carry importance instead of labeling it."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\bthat last (?:move|point|step) is (?:the )?(?:contrarian|clever|real story)\\b"

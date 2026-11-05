@@ -1,0 +1,8 @@
+extends: existence
+message: "Name the concrete property rather than a moral quality."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\b(?:honest (?:shape|architecture|abstraction|interface)|flagged honestly)\\b"

@@ -1,0 +1,8 @@
+extends: existence
+message: "Keep real alternatives; remove rejected drafting options that add no information."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\b(?:a tempting approach would be|one might be tempted to|an obvious approach would be|it would be easy to just|some would suggest)\\b"

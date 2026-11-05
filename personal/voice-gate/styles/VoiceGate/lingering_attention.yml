@@ -1,0 +1,8 @@
+extends: existence
+message: "Keep the claim only if its reason and speaker perspective are supported."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\b(?:the line i keep coming back to|can.t stop thinking about this|i keep returning to)\\b"

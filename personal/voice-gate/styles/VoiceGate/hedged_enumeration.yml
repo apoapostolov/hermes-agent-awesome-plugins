@@ -1,0 +1,8 @@
+extends: existence
+message: "Answer first; keep actual scope and alternatives."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\b(?:there are several ways to|a few things to consider|it is generally a good idea to)\\b"

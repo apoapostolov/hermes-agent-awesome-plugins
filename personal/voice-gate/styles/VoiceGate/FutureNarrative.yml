@@ -4,4 +4,4 @@ level: warning
 scope: sentence
 nonword: true
 tokens:
-  - "(?i)\\b(?:will|would|could)\\s+(?:become|be)\\s+(?:one of\\s+)?the (?:most|next|defining)\\s+(?:important|significant|influential|transformative)\\b"
+  - "\\b(?:will|would|could|is set to|are set to)\\s+(?:become|be|remain)\\s+(?:one of\\s+)?the (?:most|next|defining)\\s+(?:important|significant|influential|defining|transformative|critical)\\b"

@@ -1,0 +1,8 @@
+extends: existence
+message: "Replace internal tokens with a verifiable reference; do not invent a citation."
+level: error
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "(?:cite|filecite|filenav|i)[^\\n]*?|\\b(?:cite)?turn\\d+(?:search|view|file)\\d+\\b|\\b(?:oaicite|contentReference)\\[[^\\]\\n]+\\]|【\\d+†[^】\\n]+】"

@@ -1,0 +1,29 @@
+extends: existence
+message: "tier3: inspect meaning and context of %s."
+level: suggestion
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "significant"
+  - "significantly"
+  - "innovative"
+  - "innovation"
+  - "effective"
+  - "effectively"
+  - "dynamic"
+  - "dynamics"
+  - "scalable"
+  - "scalability"
+  - "compelling"
+  - "unprecedented"
+  - "exceptional"
+  - "exceptionally"
+  - "remarkable"
+  - "remarkably"
+  - "sophisticated"
+  - "instrumental"
+  - "world-class"
+  - "state-of-the-art"
+  - "best-in-class"
+  - "verbatim"

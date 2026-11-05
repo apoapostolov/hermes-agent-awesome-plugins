@@ -1,0 +1,8 @@
+extends: existence
+message: "Show the supplied difficulty or consequence; do not invent evidence."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\b(?:this is genuinely hard|this is what [^.!?\\n]{1,45} actually looks like|actually matters)\\b"

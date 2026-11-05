@@ -1,0 +1,552 @@
+[
+  {
+    "id": 1,
+    "title": "Significance inflation",
+    "guidance": "**Tell:** Ordinary details are called pivotal, profound, timeless, legendary,\ntransformative, or representative of a broader shift.\n\n**Repair:** Name the concrete change and its consequence.\n\n**Boundary:** Bare *in the evolution of* is ordinary English. The inflation\nshape needs an inflating word immediately before it (*chapter*, *milestone*,\n*role*, *turning point*); neutral scientific and historical uses stay clean.\n(Adapted from avoid-ai-writing v3.37.0 post-release tip, MIT.)"
+  },
+  {
+    "id": 2,
+    "title": "Genre-register drift",
+    "guidance": "**Tell:** Stock genre language replaces the vocabulary of the actual world,\nprofession, publication, or speaker.\n\n**Repair:** Use named practices, materials, institutions, tools, and stakes."
+  },
+  {
+    "id": 3,
+    "title": "Corporate and motivational register",
+    "guidance": "**Tell:** Words such as *impactful*, *empower*, *leverage*, *optimize*,\n*meaningful*, *deeply*, or *genuinely* replace a specific action or result.\n\n**Repair:** State who did what and what changed."
+  },
+  {
+    "id": 4,
+    "title": "Imported psychological vocabulary",
+    "guidance": "**Tell:** A narrator or character uses therapeutic or diagnostic language that\ndoes not fit the speaker, period, genre, or evidence.\n\n**Repair:** Render observed behavior, sensation, memory, and choice. Keep exact\nclinical terms when the context requires them."
+  },
+  {
+    "id": 5,
+    "title": "Promotional language",
+    "guidance": "**Tell:** Neutral prose sounds like a brochure through words such as *vibrant*,\n*renowned*, *stunning*, *groundbreaking*, *thriving*, or *world-class*.\n\n**Repair:** Replace praise with a fact the reader can evaluate."
+  },
+  {
+    "id": 6,
+    "title": "Abstract noun preference",
+    "guidance": "**Tell:** *Community*, *resilience*, *innovation*, *culture*, *hope*,\n*transformation*, or *impact* carries the sentence without a visible act or object.\n\n**Repair:** Show the exchange, decision, object, or outcome that supports the\nabstraction."
+  },
+  {
+    "id": 7,
+    "title": "Em-dash cluster",
+    "guidance": "**Tell:** Dashes manufacture drama, rhythm, or parenthetical depth several times\nin one passage.\n\n**Repair:** Keep a dash for a real interruption or turn. Use a period, comma,\ncolon, or reordered sentence elsewhere. Dash frequency is a style judgment,\nnever an authorship signal: upstream scores it at zero weight for the same\nreason the house rule already states below."
+  },
+  {
+    "id": 8,
+    "title": "Rule-of-three padding",
+    "guidance": "**Tell:** Claims, adjectives, or examples arrive in polished triads because three\nsounds complete.\n\n**Repair:** Keep the number of points the content earns. One precise detail often\nbeats three generic ones."
+  },
+  {
+    "id": 9,
+    "title": "Negative-then-positive clarification",
+    "guidance": "**Tell:** Repeated *It is not X. It is Y.* and *X rather than Y* constructions\nmanufacture emphasis or sophistication without sharpening the distinction. The\nsame move hides at larger scales: a split-sentence contrast (*This does not\nmean every choice is equal. It means no system confirms which is right.*), a\nmulti-negation countdown stacking several rejections before the reveal (*It is\nnot the price. It is not the features. It is the trust.*), and a clipped\nnegative tail tacked onto a sentence (*The options come from the selected\nitem, no guessing.*).\n\n**Repair:** State the claim directly or make the contrast factual. Cut a\ncountdown straight to the positive claim. Write a clipped tail as a real\nclause (*without forcing the user to guess*) or cut it.\n\n**Carve-outs:** Keep a contrast when the negative half corrects a belief the\nreader actually holds, when it carries the argument, or when both halves carry\ninformation. When the positive claim is not supplied, report the empty contrast\ninstead of inventing a differentiator; repetition alone does not authorize\nremoving a contrast with content. Negations\nenumerating spec constraints in a list (*no dependencies, no telemetry*) are\nlist content, not a reveal. (Split-sentence, countdown, and tail forms adapted\nfrom avoid-ai-writing v3.33.0 and blader/humanizer v3.0.0, MIT. Contrast\ncarve-out extended from the avoid-ai-writing post-v3.38.0 tip, MIT.)"
+  },
+  {
+    "id": 10,
+    "title": "Copula avoidance",
+    "guidance": "**Tell:** *Serves as*, *stands as*, *functions as*, *represents*, *boasts*, or\n*offers* replaces *is* or *has*.\n\n**Repair:** Prefer the plain verb unless the substitute adds meaning.\n\n**Boundary:** *Features* is a copula substitute only as a verb (\"the app\nfeatures a dashboard\", \"This Windows 11 app features support for dark mode\").\nThe plural noun is ordinary product writing, so \"three new features\", a\n*Features* heading, \"we ship features\", counted subjects (\"The two platform\nfeatures\"), and partitives (\"All of the system features\") stay clean. A year\nor version in the product name does not make the subject plural.\n(Adapted from avoid-ai-writing v3.37.0 post-release tip, MIT.)"
+  },
+  {
+    "id": 11,
+    "title": "Elegant variation and repeated openings",
+    "guidance": "**Tell:** Synonyms rotate to avoid repeating the correct name, technical term, or\nrole. Related: several consecutive sentences open on the same subject, often\n*she* or *he*, because each sentence restarts from zero instead of joining the\none before it.\n\n**Repair:** Repeat the right word; consistency is clearer than decorative\nvariation. For repeated openings, merge the sentences, change the subject when\nthat helps, or open on the action. Fix the repeated sentence pattern, not the\nword: the repaired sentence may still start with *She*. Keep deliberate\nrepetition that builds rhythm or pressure, as in *She came. She saw. She\nconquered.* (Extension adapted from blader/humanizer, MIT.)"
+  },
+  {
+    "id": 12,
+    "title": "Hedging stack",
+    "guidance": "**Tell:** *Perhaps*, *possibly*, *arguably*, *somewhat*, *in some ways*, and *to\nan extent* accumulate until the sentence makes no usable claim.\n\n**Repair:** Keep only uncertainty supported by the evidence."
+  },
+  {
+    "id": 13,
+    "title": "Gerund opening",
+    "guidance": "**Tell:** Paragraphs start with static retrospective phrases such as *Having\nworked on...*, *Knowing that...*, or *Feeling the weight...*.\n\n**Repair:** Open on the action, observation, or claim that moves the passage."
+  },
+  {
+    "id": 14,
+    "title": "Balanced compound conclusion",
+    "guidance": "**Tell:** A paragraph ends on a polished balance such as challenge and\nopportunity, fear and hope, or old and new.\n\n**Repair:** Land on the fact, consequence, image, or next decision."
+  },
+  {
+    "id": 15,
+    "title": "Trailing qualifier",
+    "guidance": "**Tell:** A sentence gives final emphasis to *for the most part*, *as best they\ncould*, *to a degree*, or *where possible*.\n\n**Repair:** Move necessary qualification earlier or end on the hard fact."
+  },
+  {
+    "id": 16,
+    "title": "Not-just-X-but-Y construction",
+    "guidance": "**Tell:** *Not just X, but Y* repeatedly signals nuance or escalation without\nadding evidence.\n\n**Repair:** State the stronger claim directly and support it.\n\n**Carve-outs:** Keep a contrast that carries the argument or corrects a real\nmisconception, and retain both supplied propositions when simplifying a frame,\nincluding a stated value judgment. Repetition alone does not authorize removal.\nNever invent a differentiator to fill an empty second half. (Adapted from the\navoid-ai-writing post-v3.38.0 tip, MIT.)"
+  },
+  {
+    "id": 17,
+    "title": "Topic-sentence paragraph",
+    "guidance": "**Tell:** Every paragraph announces its subject, supplies examples, and closes\nwith a summary.\n\n**Repair:** Start where the thought becomes useful and stop when it has done its\nwork."
+  },
+  {
+    "id": 18,
+    "title": "Continuity bridge sentence",
+    "guidance": "**Tell:** *Furthermore*, *building on this*, *against this backdrop*, or *with\nthat in mind* exists only to connect neighboring paragraphs.\n\n**Repair:** Cut the bridge. Reorder the paragraphs if the connection remains\nunclear."
+  },
+  {
+    "id": 19,
+    "title": "Thematic restatement ending",
+    "guidance": "**Tell:** The final sentence explains what the preceding scene or passage meant.\n\n**Repair:** End on the evidence and trust the reader to infer the theme."
+  },
+  {
+    "id": 20,
+    "title": "Even-rhythm paragraph",
+    "guidance": "**Tell:** Sentences share the same length, cadence, and grammatical shape.\n\n**Repair:** Let sentence length follow thought. Use short sentences for hard\nturns and longer ones for connected reasoning."
+  },
+  {
+    "id": 21,
+    "title": "Signposting sentence",
+    "guidance": "**Tell:** *It is important to note*, *the key point is*, *here is what matters*,\nor *let's dive in* announces emphasis before delivering content. The casual\nregister counts too: *heads up*, *quick note*, *before I forget*, or *one thing\nthat bit me, so pay attention to this part* announces the point instead of\nmaking it. Remove the announcement, not just its formal tone.\n\n**Repair:** Begin with the important content."
+  },
+  {
+    "id": 22,
+    "title": "Backstory dump on first mention",
+    "guidance": "**Tell:** A person, place, product, or institution arrives with a complete\nhistory before the present action can continue.\n\n**Repair:** Introduce what matters now. Reveal history when it changes the\nreader's understanding or a character's choice."
+  },
+  {
+    "id": 23,
+    "title": "Emotion announcement",
+    "guidance": "**Tell:** The narrator names emotion instead of rendering what a person notices,\ndoes, or cannot do.\n\n**Repair:** Use bodily response, attention, gesture, and choice when useful. Keep\na direct emotion word when blunt self-naming suits the voice."
+  },
+  {
+    "id": 24,
+    "title": "Sympathetic narrator insert",
+    "guidance": "**Tell:** *Little did she know*, *fate had other plans*, or *things were about to\nchange* reassures, foreshadows, or explains from outside the scene.\n\n**Repair:** Remove the intrusion or foreshadow through a concrete detail."
+  },
+  {
+    "id": 25,
+    "title": "Over-explained motivation",
+    "guidance": "**Tell:** The narrator supplies a full reason for each action rather than letting\nbehavior, context, or prior events carry it.\n\n**Repair:** Show the choice and enough evidence for the reader to infer why."
+  },
+  {
+    "id": 26,
+    "title": "Analytical self-awareness",
+    "guidance": "**Tell:** A first-person narrator perfectly diagnoses their own defenses,\nprojections, motives, and emotional substitutions.\n\n**Repair:** Match the speaker's plausible self-knowledge. Let gaps and\ncontradictions remain when they belong to the voice."
+  },
+  {
+    "id": 27,
+    "title": "Explanatory memory flashback",
+    "guidance": "**Tell:** A memory arrives exactly when needed to explain the present emotion or\ndeliver backstory.\n\n**Repair:** Keep memory fragmentary and triggered by a specific sensation,\nobject, phrase, or action."
+  },
+  {
+    "id": 28,
+    "title": "Expressive dialogue tag",
+    "guidance": "**Tell:** A tag adds a clause such as *her voice heavy with sorrow* or *his words\ncarrying authority*.\n\n**Repair:** Use *said*, *asked*, no tag, or an action beat. Put emotion in the line\nand situation."
+  },
+  {
+    "id": 29,
+    "title": "Dialogue that explains shared backstory",
+    "guidance": "**Tell:** Characters tell each other facts they both know so the reader can catch\nup.\n\n**Repair:** Give the question to someone who lacks the information, or reveal it\nthrough disagreement, action, or consequence."
+  },
+  {
+    "id": 30,
+    "title": "Perfect grammar in all speech",
+    "guidance": "**Tell:** Every speaker uses complete, polished sentences and the same register.\n\n**Repair:** Distinguish speakers through cadence, vocabulary, omission, and what\neach assumes. Avoid cartoon dialect and random errors."
+  },
+  {
+    "id": 31,
+    "title": "Dialogue tags used for emotion",
+    "guidance": "**Tell:** Characters constantly hiss, bark, scoff, groan, exclaim, or stammer.\n\n**Repair:** Use a marked tag only when the sound or act matters. Otherwise use\n*said* or an action beat."
+  },
+  {
+    "id": 32,
+    "title": "Character who summarizes for the reader",
+    "guidance": "**Tell:** A character recaps the plot, argument, or problem in a polished list.\n\n**Repair:** Let the reader assemble the situation. If a recap is necessary, make\nit serve a real action."
+  },
+  {
+    "id": 33,
+    "title": "Generic atmospheric opener",
+    "guidance": "**Tell:** A scene starts with free-floating weather, darkness, silence, or mood.\n\n**Repair:** Anchor atmosphere to a body, tool, task, or decision."
+  },
+  {
+    "id": 34,
+    "title": "Over-complete information",
+    "guidance": "**Tell:** The draft answers every likely question and inventories every aspect of\na place, system, or person at first mention.\n\n**Repair:** Select what matters now. Add the rest when it changes a decision."
+  },
+  {
+    "id": 35,
+    "title": "Culture or belief as flavor",
+    "guidance": "**Tell:** Religion, ritual, identity, or custom appears as decoration without\nobligation, authority, practice, disagreement, or cost.\n\n**Repair:** Show what people do, who expects it, who pays, and what happens when\nsomeone refuses."
+  },
+  {
+    "id": 36,
+    "title": "Monster as obstacle",
+    "guidance": "**Tell:** Genre fiction or game writing treats a creature only as content to\ndefeat.\n\n**Repair:** Give it an ecology, appetite, bargain, history, limit, or competing\ninterest when the world needs that depth."
+  },
+  {
+    "id": 37,
+    "title": "Setting as protagonist service",
+    "guidance": "**Tell:** A place or community exists mainly to offer clues, opportunities, or\nvalidation to the protagonist.\n\n**Repair:** Give the setting pressures and routines that continue without the\nprotagonist."
+  },
+  {
+    "id": 38,
+    "title": "Problem framed as content invitation",
+    "guidance": "**Tell:** *This presents an opportunity*, *the party may investigate*, or *the\nreader can explore* turns a concrete problem into a packaged activity.\n\n**Repair:** Present the situation, actors, stakes, and worsening pressure. Let the\nreader or character choose whether to engage."
+  },
+  {
+    "id": 39,
+    "title": "Sentimental resolution",
+    "guidance": "**Tell:** A difficult passage ends with an unearned warm gesture, reassurance, or\nclaim that everyone will endure.\n\n**Repair:** Let the consequence remain. Use warmth only when a specific action\nearned it."
+  },
+  {
+    "id": 40,
+    "title": "Editorial narrative close",
+    "guidance": "**Tell:** *And so began...*, *history would remember...*, *the night kept its\nsecrets*, or *an uncertain future awaited* steps outside the passage to close it.\n\n**Repair:** End on the last action, fact, image, or decision."
+  },
+  {
+    "id": 41,
+    "title": "Repeated weather openings",
+    "guidance": "**Tell:** Every scene begins with rain, cold, dawn, darkness, or a lowering sky.\n\n**Repair:** Vary openings among action, dialogue, sound, object, interruption,\nclaim, and physically experienced weather."
+  },
+  {
+    "id": 42,
+    "title": "Parallel opening-and-ending echo",
+    "guidance": "**Tell:** A scene opens and closes on the same image or phrase to create automatic\nsymmetry.\n\n**Repair:** Let the ending follow what changed. Keep an echo when transformation\nof that image is the scene's real structure."
+  },
+  {
+    "id": 43,
+    "title": "Lesson stated directly",
+    "guidance": "**Tell:** The close says what the character learned or what the audience should\nunderstand.\n\n**Repair:** Cut the lesson. Strengthen the preceding evidence if the meaning\ndisappears without it."
+  },
+  {
+    "id": 44,
+    "title": "Flat comma chain",
+    "guidance": "**Tell:** Four or more equal-looking units create the appearance of detail without\nrank, sequence, or pressure.\n\n**Repair:** Choose the decisive detail, build a sequence, or use a scannable list\nwhen every member matters."
+  },
+  {
+    "id": 45,
+    "title": "Adjective barrage",
+    "guidance": "**Tell:** Several labels precede one noun while none identifies a useful material,\ncondition, scale, ownership, or function.\n\n**Repair:** Keep modifiers that change the reader's image or decision. Put\natmosphere in what the thing does."
+  },
+  {
+    "id": 46,
+    "title": "Pseudo-inventory",
+    "guidance": "**Tell:** A room, product, setting, or plan lists plausible components merely to\nprove completeness.\n\n**Repair:** Name an item when its condition, owner, use, cost, or absence matters.\nUse a real list for a real inventory."
+  },
+  {
+    "id": 47,
+    "title": "Category drift",
+    "guidance": "**Tell:** One series treats people, objects, abstractions, causes, and outcomes as\nequivalent members.\n\n**Repair:** Separate conceptual kinds. State the material event, then its social\nor conceptual consequence."
+  },
+  {
+    "id": 48,
+    "title": "Unordered causal pile",
+    "guidance": "**Tell:** Causes or results appear without order, weight, dependency, or a point\nwhere someone can intervene.\n\n**Repair:** Build the chain: cause, response, consequence, current pressure."
+  },
+  {
+    "id": 49,
+    "title": "Example dump",
+    "guidance": "**Tell:** A long run of examples substitutes for a rule or representative case.\n\n**Repair:** State the principle and use one revealing example. Group necessary\nexamples by function."
+  },
+  {
+    "id": 50,
+    "title": "Headless modifier train",
+    "guidance": "**Tell:** Multiple qualifications arrive before the reader reaches the noun or\nmain action.\n\n**Repair:** Put the noun and verb early. Move history, source, and exceptions into\nlater clauses or sentences."
+  },
+  {
+    "id": 51,
+    "title": "Serial verb chain",
+    "guidance": "**Tell:** A character watches, listens, considers, remembers, realizes, and\ndecides while no visible action changes the scene.\n\n**Repair:** Show the clue and the resulting action. Keep a fast chain when speed\nis the point and the last verb changes the situation."
+  },
+  {
+    "id": 52,
+    "title": "Decorative and-chain",
+    "guidance": "**Tell:** Repeated *and* lengthens a list without creating labor, panic, ritual,\nbreath, or speaker-specific rhythm.\n\n**Repair:** Break the sequence into stages and end on failure or decision. Keep\nthe chain only when its breath pattern does useful work."
+  },
+  {
+    "id": 53,
+    "title": "Parenthetical list inflation",
+    "guidance": "**Tell:** A parenthesis, bracket, or dash hides a second catalog after the main\nsentence has made its point.\n\n**Repair:** Keep a short necessary example or exception. Give larger sets their\nown sentence, list, or table."
+  },
+  {
+    "id": 54,
+    "title": "List as paragraph substitute",
+    "guidance": "**Tell:** One sentence or bullet contains several independent procedures,\nconditions, outcomes, and exceptions.\n\n**Repair:** Separate trigger, action, result, and exception. Use numbered steps\nfor real sequences."
+  },
+  {
+    "id": 55,
+    "title": "False completeness",
+    "guidance": "**Tell:** *All*, *every*, *comprehensive*, *many aspects*, or an open-ended list\nclaims mastery the passage does not provide.\n\n**Repair:** State the actual scope. Use *all* only for a closed, defined set."
+  },
+  {
+    "id": 56,
+    "title": "Hedge-stacked prediction",
+    "guidance": "**Tell:** A modal stacks with a hedge adverb: *could potentially*, *may\neventually*, *might ultimately*.\n\n**Repair:** Keep one hedge. Make a usable claim. A qualifier that carries a\ndistinct condition, a different timing, or the writer's confidence stays; a\nrequested blunt voice is not authority to upgrade a hypothesis to a result."
+  },
+  {
+    "id": 57,
+    "title": "Real or actual adjective inflation",
+    "guidance": "**Tell:** *Real*, *actual*, *genuine*, or *true* intensifies an abstract noun\nwithout naming the fake contrast (*real utility*, *genuine tokenomics*). The\nword *actually* works the same way as an emphasis-only filler (*this actually\nmakes the process simpler*). The default fix for *actually* is deletion, not\nsubstitution: just state the fact. Keep *actually* when it marks a specific\ncorrection or expectation gap the sentence names (*we expected a cache hit; it\nwas actually a miss*), though a direct contrast may still be clearer.\n\n**Repair:** Drop the intensifier and add the specific claim, or name the contrast\nexplicitly when it is honest."
+  },
+  {
+    "id": 58,
+    "title": "Moral-adjective category error",
+    "guidance": "**Tell:** Moral adjectives or adverbs modify non-agent technical nouns (*honest\nshape*, *flagged honestly*). Related: assumptions that *stop being true*, or\nunverifiable *every* / *all* scope.\n\n**Repair:** Name the concrete property. Prefer *no longer holds*. State real\nscope."
+  },
+  {
+    "id": 59,
+    "title": "Invented contrast-pair mirror",
+    "guidance": "**Tell:** One half of a pair is a real term of art; the other is a phantom\nopposite for symmetry (*false precision rather than genuine accuracy*).\n\n**Repair:** Use a real opposite or state the positive claim alone."
+  },
+  {
+    "id": 60,
+    "title": "Generic future-narrative closer",
+    "guidance": "**Tell:** Modal + *become* + *one of the most important narratives / trends /\nchapters* with no falsifiable content.\n\n**Repair:** State a checkable prediction or cut the closer."
+  },
+  {
+    "id": 61,
+    "title": "Lingering-attention claim",
+    "guidance": "**Tell:** The opener claims duration of attention (*the line I keep coming back\nto*, *can't stop thinking about this*) without saying why the thing matters.\n\n**Repair:** Open on the thing itself, or attach the reason."
+  },
+  {
+    "id": 62,
+    "title": "Hashtag stuffing",
+    "guidance": "**Tell:** A short post ends with a long block of broad category hashtags\n(roughly six or more). The block often mixes one specific tag with empty\ncategory tags (`#AI` `#Innovation` `#FutureTech`).\n\n**Not this tell:** Issue or PR numbers (`#88`), six- or eight-digit hex colours\nthat include a digit (`#1a2b3c`), C preprocessor lines (`#include`), Markdown\nheadings, URL fragments, `owner/repo#88`, and anything inside a fence or inline\ncode span. Short hex-shaped words and channel-style tokens (`#decade`,\n`#general`) can still be real tags.\n\n**Repair:** Keep two or three specific tags, or none."
+  },
+  {
+    "id": 63,
+    "title": "Bare noun-phrase bullet list",
+    "guidance": "**Tell:** Five or more short adjective-noun bullets with no verbs and no\ncheckable claim, all the same shape.\n\n**Repair:** Convert to prose or full claims. Leave real inventories, parameters,\nchangelogs, and todos."
+  },
+  {
+    "id": 64,
+    "title": "Vague third-party validation",
+    "guidance": "**Tell:** Unnamed external authority plus superlative (*independent testing\nconfirms*, *analysts agree we lead*).\n\n**Repair:** Name source, test, and result, or cut the claim."
+  },
+  {
+    "id": 65,
+    "title": "Self-labeling significance",
+    "guidance": "**Tell:** After listing items, the prose points back and labels one as\n*contrarian*, *clever*, or *the real story*.\n\n**Repair:** Cut the label. Lead with or expand the item that should carry weight."
+  },
+  {
+    "id": 66,
+    "title": "Parenthetical hedge aside",
+    "guidance": "**Tell:** Parentheses manufacture nuance without commitment (*(and, increasingly,\nZ)*).\n\n**Repair:** Give the aside its own sentence or cut it."
+  },
+  {
+    "id": 67,
+    "title": "Numbered-list inflation",
+    "guidance": "**Tell:** *Three key takeaways* or *five things to know* pads content to a round\ncount.\n\n**Repair:** Keep only discrete parallel items the content earns."
+  },
+  {
+    "id": 68,
+    "title": "Title-case subhead habit",
+    "guidance": "**Tell:** Section headings use title case when house style and surrounding text\nuse sentence case. Same tell on Markdown `#` / `##` lines as on bare title\nlines. Ordinary short proper titles and headings that open with *The* are not\nthe AI section-header habit; the strong form has a mid-title function word\n(*And*, *Of*, *For*) across four or more content words\n(*Benefits And Strategic Considerations*).\n\n**Repair:** Match house style; default to sentence case for subheads."
+  },
+  {
+    "id": 69,
+    "title": "Historical analogy stack",
+    "guidance": "**Tell:** Rapid-fire past technologies or companies borrow weight without\nanalysis.\n\n**Repair:** Keep one parallel and say what it explains, or cut."
+  },
+  {
+    "id": 70,
+    "title": "Paragraph-reshuffle immunity",
+    "guidance": "**Tell:** Body paragraphs can swap order without the reader noticing missing\ndependency.\n\n**Repair:** Build a through-line, or make the piece an explicit list."
+  },
+  {
+    "id": 71,
+    "title": "Treadmill restatement",
+    "guidance": "**Tell:** A paragraph restates the premise in new words without a new fact,\nclaim, or turn.\n\n**Repair:** Lead with the new unit or cut the paragraph."
+  },
+  {
+    "id": 72,
+    "title": "Load-bearing metaphor",
+    "guidance": "**Tell:** Hyphenated *load-bearing* labels abstract dependencies (*load-bearing\nassumption*) outside structural engineering.\n\n**Repair:** Say essential, critical, or what breaks if removed. Keep literal\nbuilding uses.\n\n**Boundary:** Flag hyphenated *load-bearing* only when it immediately modifies\n*assumption*, *claim*, *invariant*, *premise*, *constraint*, *dependency*,\n*argument*, or *abstraction* (including plurals). Unhyphenated *load bearing*\nis ordinary English. Unlisted nouns, intervening modifiers, mixed\nphysical-or-abstract nouns (*structure*, *element*, *frame*, *foundation*),\nand predicative uses (*the wall is load-bearing*) pass. This deliberately\nmisses some metaphors to avoid flagging ordinary writing. (Adapted from\navoid-ai-writing v3.33.0, MIT.)"
+  },
+  {
+    "id": 73,
+    "title": "Narrated candor",
+    "guidance": "**Tell:** The prose announces its own disclosure instead of disclosing:\n*Two caveats I would rather flag than let you discover later*, *I want to be\nupfront*, *To be fully transparent*, *Rather than bury this, I'll say it\nplainly*, *I could have left this out, but*, *Being honest about the\nlimitations here*. The content is often only *Two caveats:*; the rest advertises\nthe writer's forthrightness. Often arrives as a matched antithesis (*flag*\nrather than *let you discover*).\n\nThis sits with chatbot helpfulness performance and sycophantic reader-flattery:\nthose perform helpfulness or praise; this performs candor about oneself.\n\n**Repair:** Cut the frame. State the caveat, limit, or fact. Deletion test: if\ncutting the frame loses no information, it was never content.\n\n**Carve-outs:** Keep substantive admissions (*I haven't tested this on\nWindows*, *this is a mitigation, not a fix*). Keep conventional conflict-of-\ninterest openings that carry a material fact (*In the interest of full\ndisclosure, I own shares in the company discussed here*). Ordinary comparatives\nabout work are not this pattern (*I'd rather fix it than let you inherit the\nmess*). The empty frame with nothing behind it still counts.\n\nJudgment-only: the same words appear in idiomatic disclosure language. Decide\nwhether the clause carries information or only announces that information is\ncoming."
+  },
+  {
+    "id": 74,
+    "title": "False agency",
+    "guidance": "**Tell:** An inanimate or abstract subject performs a human verb: *the\ncomplaint becomes a fix*, *a bet lives or dies*, *the decision emerges*, *the\nculture shifts*, *the conversation moves toward*, *the data tells us*, *the\nmarket rewards*. AI leans on this because it avoids naming the actor.\n\n**Repair:** Name the human. *The team fixed it that week* beats *the complaint\nbecomes a fix*. If no specific person fits, use *you* to put the reader in the\nseat. (Adapted from hardikpandya/stop-slop, MIT.)\n\nJudgment-only P2: flag an obscured accountable decision-maker, as in *the\ndecision emerged after the offsite* with no decider named. Apply only when a\nspecific person or team exercised judgment and naming them matters to the\npassage. Name the actor only when the source identifies them; otherwise ask\nwho decided instead of inventing a decider. Preserve conventional\npersonification (*the data shows adoption is early*), literal system behavior,\ncollective shorthand (*the market rewards shipping*), emergent change (*the\nculture shifted*), and causal dependence (*a bet lives or dies on\ndistribution*). A consequential choice attributed to an abstraction, with its\nresponsible actor missing, still flags. (P2 extension adapted from\navoid-ai-writing v3.33.0, MIT.)"
+  },
+  {
+    "id": 75,
+    "title": "Wh- opener crutch",
+    "guidance": "**Tell:** Sentences start with *What, When, Where, Which, Who, Why,* or *How*\nas an announcement scaffold: *What makes this hard is...*, *Why this matters\nis...*, *How we fix it is...*. The question word defers the subject.\n\n**Repair:** Lead with the subject or verb. *What makes this hard is the\napproval chain* → *The approval chain is the hard part*. Paragraphs starting\nwith *So* and sentences starting with *Look,* are the same tic. (Adapted from\nhardikpandya/stop-slop, MIT.)"
+  },
+  {
+    "id": 76,
+    "title": "Negative-listing buildup",
+    "guidance": "**Tell:** The writer lists what something is *not* before revealing what it\n*is*: *Not a dashboard... Not a portal... A single page.* Or *It wasn't X. It\nwasn't Y. It was Z.* A rhetorical striptease that delays the point.\n\n**Repair:** State Z directly. The reader does not need the runway. Distinct\nfrom pattern 9 (single negative-then-positive) in that the buildup runs\nmultiple negations. (Adapted from hardikpandya/stop-slop, MIT.)"
+  },
+  {
+    "id": 77,
+    "title": "Staccato fragmentation",
+    "guidance": "**Tell:** Sentence fragments stacked for emphasis: *[Noun]. That's it. That's\nthe [thing].* / *X. And Y. And Z.* / *This unlocks something. [Word].*\nManufactured profundity.\n\n**Repair:** Complete sentences, and trust content over presentation. One\nfragment can carry real emphasis; a run of them is a rhythm tell. (Adapted from\nhardikpandya/stop-slop, MIT.)"
+  },
+  {
+    "id": 78,
+    "title": "Unnecessary hyphenation",
+    "guidance": "**Tell:** Three subtypes. Welded open noun phrases are hyphenated when the\nstandard form is open (*research-impact aggregator* becomes *research impact\naggregator*). Compounds whose established form is closed keep the hyphen by\nmistake (*code-base* becomes *codebase*, *data-set* becomes *dataset*).\nAttributive compounds used adverbially or as nouns keep the hyphen where it\ndoes not belong (*in real-time* becomes *in real time*), while the same compound\nbefore a noun stays hyphenated (*real-time analytics* is correct).\n\n**Repair:** Treat a clear hit as P2 copyediting, not evidence of machine\nauthorship. Preserve established and technical compounds (*high-quality*,\n*third-party*, *family-owned*). Spelling varies by dialect and house style, so\nambiguous pairs are judgment calls. Predicative after the noun stays open\n(*the report is high quality*). Hyphenate attributive-before-noun only."
+  },
+  {
+    "id": 79,
+    "title": "Shadowboxing objections",
+    "guidance": "**Tell:** The text answers an objection nobody raised: *This isn't mainly about\nX*, *I'm not arguing that Y*, *To be clear*, *Don't get me wrong*, *You could\nframe this differently, but*, *Some might say... but*. The named objection\nappears nowhere else and nobody in the text holds it.\n\n**Repair:** Remove the unsupported defense. If it contains a real claim, state\nthat claim directly. Keep an objection when the text names its source or answers\nit in full; a direct claim such as *the API is not thread-safe* is not this\npattern. (Adapted from blader/humanizer, MIT.)"
+  },
+  {
+    "id": 80,
+    "title": "Editorial scar tissue",
+    "guidance": "**Tell:** The draft still records the writer's earlier drafting choices: *A\ntempting approach would be to... but*, *One might be tempted to*, *An obvious\napproach would be*, *You might think... but*, *It would be easy to just*, *Some\nwould suggest*. An option no reader would consider gets introduced and rejected\nin a clause, then never appears again. Several short unrelated rejections in one\npassage are a stronger sign than one.\n\n**Repair:** Remove the fake option and state the real constraint or current\nbehavior directly. Ask what new information each sentence adds; if it only\nrecords an earlier edit, rewrite the paragraph around its main point. Keep real\nalternatives a reader may genuinely weigh in a design doc, tutorial, or\nargument. (Adapted from blader/humanizer, MIT.)"
+  },
+  {
+    "id": 81,
+    "title": "Rhetorical setup",
+    "guidance": "**Tell:** The text announces insight instead of delivering it: *What if [the\nproblem is really X]?*, *Here's what I mean:*, *Think about it:*, *And that's\nokay.* A Socratic question, redundant preview, condescending prompt, or\npermission-granting tagline precedes a point that could stand alone. The\nquestion is answered immediately, every time.\n\n**Repair:** Make the point. Cut the scaffold and let readers draw the\nconclusion. A genuine open question that the piece later answers with evidence\nis not this pattern; the tell is the setup that exists only to stage the\nanswer. (Adapted from hardikpandya/stop-slop, MIT.)"
+  },
+  {
+    "id": 82,
+    "title": "Narrator from a distance",
+    "guidance": "**Tell:** The prose floats above the scene: *Nobody designed this.*, *This\nhappens because...*, *This is why...*, *People tend to...*. A disembodied\nobserver describes behavior in general instead of putting the reader in the\nroom where it happens.\n\n**Repair:** Put the reader in the scene. *You don't sit down one day and decide\nto write sloppy* beats *Nobody designed this*. Where general statement is the\nactual job (a spec, a summary), keep it; the tell is floating voice used where\nspecifics would carry more. (Adapted from hardikpandya/stop-slop, MIT.)"
+  },
+  {
+    "id": 83,
+    "title": "Announced significance",
+    "guidance": "**Tell:** The text asserts its own difficulty or importance instead of showing\nit: *This is genuinely hard*, *This is what leadership actually looks like*,\n*This is what X actually looks like*, *actually matters*. Telling instead of\nshowing, in the register of profundity.\n\n**Repair:** Cut the announcement. Show the hard part or the example. If the\nclaim survives only because the announcement is there, the passage was not\ncarrying it. (Adapted from hardikpandya/stop-slop, MIT.)"
+  },
+  {
+    "id": 84,
+    "title": "Additive hedge escalation",
+    "guidance": "**Tell:** Escalating additive constructions: *not just X but also Y*, *not\nmerely X but Y*, *X isn't only Y, it's Z*. The negation inflates the second\nitem by pretending the first was ever in question.\n\n**Repair:** State Y (or both items) directly. Distinct from pattern 9\n(negative-then-positive contrast): the additive hedge stacks items rather than\ncorrecting a real misconception. Keep genuine two-part scope (*not just the\nclient, the server too*) when both halves are load-bearing facts. (Adapted from hardikpandya/stop-slop, MIT.)"
+  },
+  {
+    "id": 85,
+    "title": "Template narrative arc",
+    "guidance": "**Tell:** Prefab story templates carry the paragraph: *By the time X, I was\nY*, *It started with... It ended with...*, *At first... Then...*. The arc does\nreal narrative work the writer did not do; events slot into a shape that\narrived before them.\n\n**Repair:** Report the events in their own order and let the sequence carry\nthe arc. Keep the template when the events genuinely follow it and the shape\nis not doing the persuading. (Adapted from hardikpandya/stop-slop, MIT.)"
+  },
+  {
+    "id": 86,
+    "title": "Performed insight",
+    "guidance": "**Tell:** Essayist tics that announce profundity instead of delivering it:\n*sit with that for a moment*, *that's not nothing*, *you already know the\nanswer*, *the punchline is*, *worth naming*, *don't take my word for it*,\n*that's the whole point*, *is the entire business model*, *that's the part\nnobody mentions*, *the only metric that matters*, *X is dead; long live X*,\nand sentence-initial *Turns out*. Each stages a reveal; none adds a fact.\n\n**Repair:** State the claim the phrase was gesturing at. *That's not nothing*\nbecomes the actual size of the thing; *the punchline is* becomes the point,\nunannounced.\n\n**Carve-outs:** One hit can be a stylistic choice; several in one piece is the\ntell. Quoted speech and genuinely comedic writing keep literal punchlines.\nStaged-discovery variants such as *it turned out to be the least interesting\npart* and *the real story was that...* use the same reveal frame; revise them\nwhen the phrasing supplies drama without new information. Keep literal outcomes\nsuch as *it turned out to be the most expensive option* and literal reports such\nas *the real story was covered yesterday*. An essay title, a supported contrast,\nor a literal succession announcement in *X is dead; long live Y* form names the\nargument, so judge whether the wording substitutes for one rather than flagging\nthe phrase. (Adapted from avoid-ai-writing v3.28.0, v3.36.0, and v3.38.0, MIT;\nsource: Simon Willison's LLM cliché highlighter.)"
+  },
+  {
+    "id": 87,
+    "title": "Negation chain",
+    "guidance": "**Tell:** A drumroll of negations performing decisiveness: *No fluff, no\nfiller, no jargon*, stacked *didn't ... didn't* clauses (*It didn't ask, it\ndidn't wait*), and the negated-then-repeated verb (*Don't call it a pivot.\nCall it a correction*). Extends pattern 76 (negative-listing buildup); the\nchain form is the rhetorical drumroll even without fragment shaping.\n\n**Repair:** Say what the thing is. One negation earns its place when the reader\nwould otherwise assume the opposite; a chain of them is staging.\n\n**Carve-outs:** Mid-sentence factual inventories (*takes no arguments, no\nheaders, and no body*) and sequential narration with restated subjects (*I did\nnot sleep well. I did not eat breakfast.*) are ordinary prose. (Adapted from\navoid-ai-writing, MIT.)"
+  },
+  {
+    "id": 88,
+    "title": "Dev-blog boilerplate",
+    "guidance": "**Tell:** Stock simplicity slogans from developer marketing: *batteries\nincluded*, *it just works*, *zero config*, *sane defaults*, *small enough to\nfit in your head*. Each substitutes a slogan for a property you could\ndemonstrate.\n\n**Repair:** Name the concrete behavior. *Installs with no config file* beats\n*zero config*; *the whole API is six functions* beats *fits in your head*.\n\n**Carve-outs:** Quoting a product's own tagline or discussing the phrase\nitself. (Adapted from avoid-ai-writing, MIT.)"
+  },
+  {
+    "id": 89,
+    "title": "Stacked rhetorical questions",
+    "guidance": "**Tell:** Two or more questions fired in a row, usually fragments after the\nfirst: *Do I know how it works? Where it breaks? Which corners it cut?* A\nperformance of curiosity, not a real question. Extends pattern 81 (rhetorical\nsetup) to the chain form.\n\n**Repair:** Keep at most one question, answer it, and convert the rest into the\nstatements they were hiding.\n\n**Carve-outs:** Interviews, FAQs, and dialogue stack questions legitimately.\n(Adapted from avoid-ai-writing, MIT.)"
+  },
+  {
+    "id": 90,
+    "title": "Same-opener sentence runs",
+    "guidance": "**Tell:** Three or more consecutive sentences opening on the same word (*Maybe\nnobody needed it. Maybe it solved the wrong problem. Maybe the timing was\noff.*), or consecutive sentences on one repeated skeleton. Deliberate anaphora\nis a rhetorical device; a run that is not doing persuasive work is a tell.\n\n**Repair:** Keep the first, vary or merge the rest.\n\n**Carve-outs:** Whether the repetition is earned is the judgment; pronoun-opener\nruns (*He... He... He...*) are ordinary narration. (Adapted from\navoid-ai-writing, MIT.)"
+  },
+  {
+    "id": 91,
+    "title": "Stranded auxiliary contrast",
+    "guidance": "**Tell:** A reversal landed on a bare auxiliary: *The tool died; the data\ndidn't.* One instance is a fine sentence; as a recurring rhythm it is a\nsignature move, and the clipped contrast poses as earned insight.\n\n**Repair:** Ration it. If the piece already has one, write the next contrast\nout in full.\n\n**Carve-outs:** The single deliberate instance is legitimate style; only\ndensity across a piece distinguishes voice from tic. (Adapted from\navoid-ai-writing, MIT.)"
+  },
+  {
+    "id": 92,
+    "title": "Colon into a triple",
+    "guidance": "**Tell:** A colon opening onto exactly three comma-separated items: *separate\nports, processes, and local state*. The default rhythm LLM prose uses to sound\nconcrete, whether or not the content has three parts.\n\n**Repair:** Audit the list. If there are really two things, or four, write\nthat; if the items are padding, cut to the one that matters.\n\n**Carve-outs:** Three-item lists are often simply true, especially in technical\nwriting. Weigh by genre, not per hit. (Adapted from avoid-ai-writing, MIT.)"
+  },
+  {
+    "id": 93,
+    "title": "Launch-copy dramatic introductions",
+    "guidance": "**Tell:** The default LLM move for product and launch posts: *Enter Flowdesk*,\n*Meet Flowdesk, your new favorite treasury dashboard*, *Say hello to Flowdesk*,\n*Think Notion meets Figma*. The product is introduced like a game-show\ncontestant instead of being described. Sits next to the stale social-ad tells\n(unlock, elevate, link in bio), but no other entry names the introduction move\nitself.\n\n**Repair:** Say what the thing does and for whom. *Meet Flowdesk, your new\nfavorite treasury dashboard* becomes *Flowdesk shows a fund's full treasury\nposition on one screen*.\n\n**Carve-outs:** Bare *Enter X* is how UI and documentation instructions are\nwritten (*Enter Password.*) and how dramatic scripts mark stage entrances, so it\nflags only in launch and announcement copy, by judgment. Bare *Meet X, your new\n[role]* is how humans introduce colleagues, pets, and babies. *Say hello to X*\ncovers ordinary human prose. (Adapted from avoid-ai-writing v3.29.0, MIT.)"
+  },
+  {
+    "id": 94,
+    "title": "Fake-casual register",
+    "guidance": "**Tell:** The register models emit when asked for a lowercase-casual social\nvoice, once the vocabulary tiers are clean: one-word verdict closers as the\nwhole closing line (*wild.*, *insane.*), stage directions (*checks notes*,\n*chef's kiss*, *mic drop*), wink asides *(yes, really)*, label-prefix openers\n(*hot take*, *fun fact*, *pro tip*, *PSA*, *unpopular opinion*), *because of\ncourse it does*, and the self-QA volley (*Is it fast? Yes. Is it cheap? Also\nyes*). The drama is outsourced to the prop instead of carried by the content,\nwhich is why it survives cleanup.\n\n**Repair:** Delete the label and say the thing. Replace the verdict word with\nthe specific surprise. Cut the wink and the stage business.\n\n**Carve-outs:** A writer whose established voice runs on these props keeps\nthem; the register is a tell for imposed casualness, not a ban on playfulness.\nThe deterministic detector covers only the mechanical props (six stage\ndirections, four parentheticals, both closed lists). (Adapted from\navoid-ai-writing v3.29.0, MIT.)"
+  },
+  {
+    "id": 95,
+    "title": "Dramatized contrast against the crowd",
+    "guidance": "**Tell:** A claim propped on an invented lagging crowd, usually stamped with a\ndate: *shipped it in 2022, while everyone else was still debating timelines*,\n*built it in a weekend, while the industry wrote think-pieces*. The crowd is\ninvented, so the contrast costs nothing. Adjacent to significance inflation and\nself-labeling significance, but the surface is its own: the trailing *while\neveryone else...* clause with a dismissive verb.\n\n**Repair:** State the fact and cut the crowd clause, or name the actual\ncompetitor and what they did. If the crowd cannot be named, it was invented.\n\n**Carve-outs:** Literal simultaneity is ordinary narrative and stays\nunflagged: *she read while everyone else watched the movie*. The deterministic\nbranch requires the dismissive verb in its -ing form plus *still*; the other\ntwo branches match their own stereotyped wording (*wrote think-pieces*,\n*played catch-up*). (Adapted from avoid-ai-writing v3.29.0, MIT.)"
+  },
+  {
+    "id": 96,
+    "title": "Transformation crutch",
+    "guidance": "**Tell:** Repeated unexplained relabeling across a passage: *the concern turns\ninto panic*, *a feature turns into a strategy*, *the risk becomes real*. The\npassage asserts a change without the action, threshold, or consequence that\nwould make it one.\n\n**Repair:** Ask what changed and read the surrounding passage before deciding\nthe explanation is missing. Rewrite from supplied facts; never invent a\nmechanism or actor. If the explanation was already present elsewhere, leave\nthe sentence alone.\n\n**Carve-outs:** Literal transformations (*water turns into ice*), supported\nmetaphors, and changes explained anywhere in the passage pass, including\ndeliberate summaries of explained changes. Judgment-only P2, not authorship\nevidence. (Adapted from avoid-ai-writing v3.31.0, MIT.)"
+  },
+  {
+    "id": 97,
+    "title": "Consequence-free restatement",
+    "guidance": "**Tell:** *This matters because* or *here is why that matters* introduces a\nrestatement of importance rather than a reason: *This matters because it is\nimportant.* The frame promises stakes and delivers the premise again. Same\nfamily: a sentence after an example that names what the example showed\n(*This shows the importance of...*, *The message was clear:*, *It was a\nlesson in patience.*).\n\n**Repair:** Cut the empty frame, or replace it with an explanation already\npresent in the source. Never invent stakes. Preserve the frame when a concrete\nconsequence follows (*This matters because retries can charge the customer\ntwice*). Judgment-only P2 clarity check. (Adapted from avoid-ai-writing\nv3.31.0, MIT.)"
+  },
+  {
+    "id": 98,
+    "title": "Repeated empty concessions",
+    "guidance": "**Tell:** Concession pairs staged to sound honest without saying where the\nclaim fails: *Not always. Not perfectly.* repeated across a passage. One\nhonest hedge becomes a rhythm of performed humility.\n\n**Repair:** Fold repeated empty concessions into a limitation already stated\nin the source, or cut them. Keep every supplied assessment and limitation; a\ngeneric-sounding concession is still the writer's claim. Never invent a failure\ncase or drop a stated assessment because its wording is ordinary.\n\n**Carve-outs:** Meaningful concessions (*Not during failover. Not for expired\ntokens*) and an isolated intentional pair pass. Judgment-only P2. (Adapted\nfrom avoid-ai-writing v3.31.0, MIT.)"
+  },
+  {
+    "id": 99,
+    "title": "Repeated setup/reversal punchlines",
+    "guidance": "**Tell:** Two or more paraprosdokian reversals in one piece, especially in\nhooks, closers, or final list items: each sentence sets an expectation in its\nfirst half and flips it in the second, so repeated flips replace concrete\nclaims with generic surprise or deflation. This concerns setup and payoff\nacross sentences; pattern 77 covers runs of same-shape fragments.\n\n**Repair:** Keep at most one reversal and give the rest concrete claims. A\nrepair must not shrink the supplied scope: *We planned for every failure mode.\nExcept the one that happened* becomes *We planned for every failure mode except\nthe one that happened*, not a generic admission that one was missed. Treat as a\nclarity and rhythm edit, not proof of authorship.\n\n**Carve-outs:** Supported reversals, isolated intentional lines, and genuine\ncomedy, fiction, speeches, and quotations pass. Repetition alone is not a\nfinding. Judgment-only P2. (Adapted from avoid-ai-writing v3.30.0, MIT.)"
+  },
+  {
+    "id": 100,
+    "title": "Vague association",
+    "guidance": "**Tell:** *associated with*, *linked to*, *in connection with* with no named\nrelationship.\n\n**Repair:** Use the relationship the source names. If it names none, keep the\nvague wording. Do not invent a CEO, consultant, or role to sound concrete."
+  },
+  {
+    "id": 101,
+    "title": "Empty concession sandwich",
+    "guidance": "**Tell:** *While X is impressive, Y remains a challenge* when both halves are\nvague. A lone pair is ordinary prose. The tell is repetition, and the vague close\nhas to sit in a later clause of the same sentence.\n\n**Repair:** Specify both halves, or keep the supplied assessment and flag the\nscope it leaves unstated; the writer's positive or negative judgment is source\nmeaning, not filler to choose between. Distinct from empty \"Not always. Not\nperfectly.\" (Assessment carve-out from the avoid-ai-writing post-v3.38.0 tip,\nMIT.)"
+  },
+  {
+    "id": 102,
+    "title": "Significance-adverb density",
+    "guidance": "**Tell:** *Notably*, *Interestingly*, *Importantly*, *Significantly* as a\nrun, not a single hit.\n\n**Repair:** Treat as a density tell. One in a long piece can stay. Several in\na short piece go. Replace the survivor with the fact."
+  },
+  {
+    "id": 103,
+    "title": "Parallel reason chains",
+    "guidance": "**Tell:** Three or more consecutive `subject + because/when + reason`.\n\n**Repair:** Break the chain. Vary the join."
+  },
+  {
+    "id": 104,
+    "title": "Intensifier / diminisher opposition",
+    "guidance": "**Tell:** *X obsessively / Y barely at all* as a fake contrast engine.\n\n**Repair:** State the actual difference without the theatrical poles."
+  },
+  {
+    "id": 105,
+    "title": "Participial reframe",
+    "guidance": "**Tell:** *Laid out that way*, *Seen this way*, *Put differently* as a\nthroat-clear before the real sentence.\n\n**Repair:** Start at the claim."
+  },
+  {
+    "id": 106,
+    "title": "Hedged-enumeration openers",
+    "guidance": "**Tell:** *There are several ways to*, *a few things to consider*, *It is\ngenerally a good idea to*.\n\n**Repair:** Answer first. Drop the throat-clear."
+  },
+  {
+    "id": 107,
+    "title": "Re-explaining what the reader knows",
+    "guidance": "**Tell:** In a reply, the answer rebuilds context the reader already has: it\nrestates the problem, walks the diagnosis, lays out the evidence, and reaches\nthe decision in the last line. Each sentence reads fine on its own, which is\nwhy the shape survives sentence-level cleanup. Related: pasting a query,\ncommand, or numbers to prove the plan will work; re-walking background the\nother person wrote or agreed to.\n\n**Repair:** Lead with the decision. Keep only the reasoning that would change\nwhether the reader agrees: usually one fact they lack and any link they need\nto act. The diagnosis and the proof belong in the ticket or document that\nfollows. A reviewer raising a topic is not a request for the full write-up.\n\n**Carve-outs:** Act when the surrounding conversation is visible or the text\nis plainly a reply; when you cannot tell, ask or leave the text alone. A\nstandalone document for readers with no shared context is exempt, and one\nline of framing in a long thread is ordinary. (Adapted from blader/humanizer\nv3.1.0 §26, MIT.)"
+  },
+  {
+    "id": 108,
+    "title": "Mannered prose",
+    "guidance": "**Tell:** Metaphor or flourish where a literal phrase exists. Figurative verbs\n(*rides along*, *stands on*), personified code (*the plan holds it*),\naphoristic fragments (*wire it or delete it*), and stock framing phrases.\n*A dial worth turning* says *a parameter worth varying* with less clarity.\n\n**Repair:** Say what you mean. Check the sentence for a literal equivalent and\nuse it; keep the image when it carries real meaning a plainer phrase would\nlose.\n\n**Carve-outs:** Not the same as pattern 72, which covers only the hyphenated\n*load-bearing* label, and not the secondary-cleanup aphorism formula. Sustained\nmetaphor that organizes a whole passage is a writer's chosen device; flag the\nisolated flourish. (Adapted from cursor/plugins unslop, MIT.)"
+  },
+  {
+    "id": 109,
+    "title": "Over-compression",
+    "guidance": "**Tell:** Dropped articles, verbless fragments, symbol-speak, and unexplained\nabbreviations that make the reader decode instead of read: *Parser rejects bad\ndate → exit 2, no write*.\n\n**Repair:** Write whole sentences with their articles and verbs, and spell out\narrows and abbreviations.\n\n**Carve-outs:** Recognized shorthand in code comments, console transcripts,\nchangelogs, and dense tables can stay when the audience already reads it that\nway; that is a register judgment, not a defect. Related to pattern 77, which\nrepairs the same habit in the opposite direction. (Adapted from\ncursor/plugins unslop, MIT.)"
+  },
+  {
+    "id": 110,
+    "title": "Stock reaction frame",
+    "guidance": "**Tell:** A stock introduction carries the writer's stance instead of a fact:\n*What surprised me most was...*, *The most interesting part...*, *What I love\nabout this is...*. The frame is soft; the judgment inside it is the writer's.\n\n**Repair:** Cut the frame when the supplied fact already carries its whole\nmeaning, and rephrase only while keeping the reaction, preference, or ranking.\nA stated judgment stands as source meaning even when its reason is missing, so\nnever drop it, and never trade a named emotion for theatrical body language to\nsatisfy *show, don't tell*. Add an expectation or a cause only when the source\nsupplies one.\n\n**Carve-outs:** Fiction, deliberate rhetorical openings, and frames whose\npreference is stated elsewhere in the source pass. When the judgment cannot be\nreconstructed safely, keep it and report the gap. (Adapted from the\navoid-ai-writing post-v3.38.0 tip, MIT.)\n\nFor before-and-after demonstrations, load [examples.md](examples.md). For tiered\nword replacements, load [vocabulary-tiers.md](vocabulary-tiers.md). For detect\nor edit modes and severity triage, load [ai-ism-audit.md](ai-ism-audit.md)."
+  }
+]

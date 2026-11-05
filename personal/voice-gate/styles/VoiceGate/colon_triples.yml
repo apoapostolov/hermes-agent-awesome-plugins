@@ -1,0 +1,8 @@
+extends: existence
+message: "Audit whether the three items form a real set; do not alter true technical lists."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - ":\\s+[^,:.!?\\n]+,\\s+[^,:.!?\\n]+,?\\s+and\\s+[^,:.!?\\n]+"

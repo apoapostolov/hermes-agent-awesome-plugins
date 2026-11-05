@@ -10,7 +10,7 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Eighteen plugins. Every one has a public edition.</p>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Nineteen plugins. Every one has a public edition.</p>
 
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Voice Gate 1.3.5 turns the Exceptions setting into a five-line box with a dim example, so a list of entries reads as a list instead of one long line. That needs a field type Hermes did not have, so the same release pairs with a small core change: a `text` field with `rows` and a `placeholder`. On a build without it the field stays a single line and saves as before, which means the two can arrive in either order.
+Voice Gate 1.4.0 adds a clearer settings page, 75 mechanical rule families, and optional contextual review against the complete humanizer skill and its references. Exceptions have a full-width five-line editor, Vale has installation guidance, and prose em dashes are distinguished from list separators and empty table values. Revision requests stop after two opportunities and check that protected material was preserved.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
@@ -59,7 +59,7 @@ This repository keeps two trees.
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
-**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All nineteen active plugins have one.
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All 19 active plugins have one.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
@@ -74,7 +74,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reasoning-switch**, **prompt-enhance**, and **hermes-jev-routing** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all fourteen.
+Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **better-capabilities**, **reasoning-switch**, **prompt-enhance**, **hermes-jev-routing**, and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all fourteen.
 
 ### Status Bar
 
@@ -115,7 +115,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reaso
 
 | Plugin | What you get |
 | --- | --- |
-| [Voice Gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reads the prose a turn changed, in Markdown, plain text, reStructuredText, AsciiDoc, Org, LaTeX, HTML and PDF, and reports the AI tells in 46 families: verdict openers, closing offers, cliché openers, significance inflation, buzzword runs, promotional adjectives, hedge stacks, signposting, wordy constructions, narrated candor, shadowboxed objections, negative listing, stacked hedges, template residue and the sentence and paragraph shapes around them. Exceptions silence a family for the files a glob names. Modes `warn`, `improve` or `skip`, a word floor, a switch per bot and a switch per family. Ships a Vale style pack and an optional second opinion in the turn, and the personal edition loads a writing profile with four tools to check, inspect and build one. **Not in the pack; install separately.** |
+| [Voice Gate](personal/voice-gate/README.md) · [public](public/voice-gate/README.md) | Reviews changed prose with 75 mechanical families and optional model review against all 110 humanizer patterns. Protects source material, limits revision requests to two opportunities, and supports Vale, file exceptions, writing contexts, and a grouped settings page. Personal also loads approved writing profiles and drafts profiles from curated samples. **Not in the pack; install separately.** |
 
 ### Reading and posting
 
@@ -124,7 +124,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **reaso
 | [RSS Reader](personal/rss-reader/README.md) · [public](public/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
 | [Reddit](personal/reddit/README.md) · [public](public/reddit/README.md) | Your own Reddit app and account: OAuth login, reads of public subreddits, search, user history and threads that keep their reply tree before any login, then private subreddits, saved items, the inbox, posts, comments, votes and subscriptions as the account, plus `reddit_api` for any other endpoint. |
 
-Four plugins in this repo are not in the pack and are installed separately: **reasoning-switch** (Status Bar table), **prompt-enhance** (Composer table), **hermes-jev-routing** (Tools and Memory table), and **voice-gate** (Writing table). Every other plugin above is pinned by the pack.
+Five plugins in this repo are not in the pack and are installed separately: **better-capabilities**, **reasoning-switch** (Status Bar table), **prompt-enhance** (Composer table), **hermes-jev-routing** (Tools and Memory table), and **voice-gate** (Writing table). Every other plugin above is pinned by the pack.
 
 Retired and on-hold plugins live in [RETIRED.md](RETIRED.md).
 

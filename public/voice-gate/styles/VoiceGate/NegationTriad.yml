@@ -1,7 +1,8 @@
 extends: existence
-message: "Negation triad: 'not just X, but Y' frame."
+message: "Inspect the not-just/but contrast in context: %s."
 level: warning
 scope: sentence
+ignorecase: true
 nonword: true
 tokens:
-  - '(?i)\bnot (?:just|only)\b[^.!?]{0,90}\bbut\b'
+  - "\\b(?:not|isn't|wasn't) (?:just|only|merely)\\b[^.!?]{0,90}\\bbut\\b"

@@ -1,0 +1,49 @@
+{
+  "skill_version": "1.11.0",
+  "source": "Hermes writing/humanizer",
+  "adaptations": [
+    "Private author binding replaced with a generic approved-profile contract."
+  ],
+  "original_files": [
+    {
+      "path": "SKILL.md",
+      "sha256": "b199d35e3b79dc6c8d1af00e9b9b1eb28bc5e242b796c651ebb84909515de549"
+    },
+    {
+      "path": "references/ai-ism-audit.md",
+      "sha256": "55794109ec3eb808ede01afa7c234c0f3b018f54196b0aca0ccfcd9069ce94d8"
+    },
+    {
+      "path": "references/apo-voice-profile.md",
+      "sha256": "95fdebb4d15bacd1b3046852e52d5a469d83d892557b011daa6e52ffd4e46cef"
+    },
+    {
+      "path": "references/examples.md",
+      "sha256": "edd16db60d94fbd936242c9886e747f445ac9485d5d984f72199a78ed165ee5f"
+    },
+    {
+      "path": "references/humanizing-text.md",
+      "sha256": "411e9a0f4a2d6a05241eeaa9b1e344ce52ee679c08a78764f4d2a6b5167ad3c9"
+    },
+    {
+      "path": "references/long-form-diagnostics.md",
+      "sha256": "3f9254406b2cfca5c4cb201666f7673c313509d6db33b12c5fb41e6610559432"
+    },
+    {
+      "path": "references/pattern-catalog.md",
+      "sha256": "64bea4758103b742181c410eab7056bc7ccaf609c4695b02d34940457785b0e9"
+    },
+    {
+      "path": "references/provenance.md",
+      "sha256": "9341aef2c12d9a330adf38348619d04dc7c7a06924add3dc528fe838c3a878da"
+    },
+    {
+      "path": "references/required-checks.md",
+      "sha256": "6bb36d34533ab4eb07f08cb7c13196f6b909e05b479fe040bb4d1cd96541ddf6"
+    },
+    {
+      "path": "references/vocabulary-tiers.md",
+      "sha256": "5d09600664ea02e6388099342886b86fe8b09fbdc2833ad51fa99f41730a1738"
+    }
+  ]
+}

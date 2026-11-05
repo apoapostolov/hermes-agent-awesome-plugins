@@ -1,0 +1,358 @@
+{
+  "apply_hermes": [
+    "Hermes",
+    "Review changed documents."
+  ],
+  "apply_herald": [
+    "Herald",
+    "Review changed documents."
+  ],
+  "apply_keeper": [
+    "Keeper",
+    "Review changed documents."
+  ],
+  "apply_steward": [
+    "Steward",
+    "Review changed documents."
+  ],
+  "apply_tinker": [
+    "Tinker",
+    "Review changed documents."
+  ],
+  "mode": [
+    "Review mode",
+    "Ask once, allow two passes, or turn reviews off."
+  ],
+  "context": [
+    "Writing context",
+    "Auto uses the file type."
+  ],
+  "no_prose_em_dash": [
+    "Flag every prose em dash",
+    "Allow list separators and empty table values."
+  ],
+  "model_review": [
+    "Review meaning and structure",
+    "Use your Hermes model. Adds a review request per pass."
+  ],
+  "min_words": [
+    "Minimum document length",
+    "Default: 200 words. Use 0 to check shorter text."
+  ],
+  "vale_mode": [
+    "Include Vale checks",
+    "Add Vale findings when a document is reviewed."
+  ],
+  "vale_min_alerts": [
+    "Minimum Vale findings",
+    "Show a summary after this many findings."
+  ],
+  "vale_path": [
+    "Vale executable",
+    "Leave blank to find Vale automatically."
+  ],
+  "exceptions": [
+    "File exceptions",
+    "Write one rule per line as rule_name: file_pattern, file_pattern. For example, signposting: README.md, docs/** skips that check in README files and docs folders. Use * in filename patterns, or all: pattern to skip every check in matching files. Leaving this blank adds no exceptions."
+  ],
+  "tell_closing_offers": [
+    "Offers to do more",
+    "Offers such as ‘Let me know if you need more.’"
+  ],
+  "tell_significance_inflation": [
+    "Inflated importance",
+    "Claims such as ‘a pivotal moment.’"
+  ],
+  "tell_copula_avoidance": [
+    "Indirect verbs",
+    "‘Serves as’ where ‘is’ would do."
+  ],
+  "tell_hedges": [
+    "Repeated hedging",
+    "Several qualifiers without a clear claim."
+  ],
+  "tell_signposting": [
+    "Announcements before the point",
+    "‘Here’s what you need to know’ and similar lead-ins."
+  ],
+  "tell_filler": [
+    "Wordy phrases",
+    "‘Due to the fact that’ instead of ‘because.’"
+  ],
+  "tell_transitions": [
+    "Repeated transition phrases",
+    "Repeated ‘Moreover,’ ‘Furthermore,’ and similar links."
+  ],
+  "tell_trailing_qualifiers": [
+    "Sentence-ending qualifiers",
+    "Endings such as ‘for the most part.’"
+  ],
+  "tell_gerund_openings": [
+    "Reflective openings",
+    "Repeated openings such as ‘Having reviewed…’"
+  ],
+  "tell_negation_positive": [
+    "Staged contrasts",
+    "‘It isn’t about X. It’s about Y.’"
+  ],
+  "tell_negation_triads": [
+    "‘Not just … but’ framing",
+    "Repeated contrasts that introduce a bigger claim."
+  ],
+  "tell_verdict_openers": [
+    "Verdict-first openings",
+    "‘The honest answer’ before the actual answer."
+  ],
+  "tell_cliche_openers": [
+    "Stock openings",
+    "Openings such as ‘In today’s fast-paced world.’"
+  ],
+  "tell_conclusion_signposts": [
+    "Stock conclusions",
+    "Repeated ‘In conclusion’ or ‘To sum up.’"
+  ],
+  "tell_bold_pseudo_headings": [
+    "Bold lines used as headings",
+    "Whole lines of bold text outside normal headings."
+  ],
+  "tell_bold_lead_bullets": [
+    "Repeated bold bullet labels",
+    "Lists where most items begin with a bold label."
+  ],
+  "tell_buzzwords": [
+    "Stock vocabulary",
+    "Dense runs of words such as ‘delve’ and ‘tapestry.’"
+  ],
+  "tell_marketing_adjectives": [
+    "Promotional adjectives",
+    "Repeated praise such as ‘world-class’ or ‘effortless.’"
+  ],
+  "tell_banned_words": [
+    "Words from your avoid list",
+    "Terms you chose to flag in your writing profile."
+  ],
+  "tell_em_dashes": [
+    "Em dashes in prose",
+    "Keep list separators and empty table values."
+  ],
+  "tell_candor_frames": [
+    "Announcements of honesty",
+    "‘To be fully transparent’ before a routine point."
+  ],
+  "tell_objection_frames": [
+    "Unstated objections",
+    "‘Some might say’ without an objection to answer."
+  ],
+  "tell_rhetorical_setup": [
+    "Setup before the point",
+    "‘Think about it’ and similar prompts."
+  ],
+  "tell_emphasis_crutches": [
+    "Empty emphasis",
+    "Statements of importance without a consequence."
+  ],
+  "tell_dev_slogans": [
+    "Developer slogans",
+    "Claims such as ‘It just works’ or ‘sane defaults.’"
+  ],
+  "tell_template_phrases": [
+    "Template phrasing",
+    "Generic introductions and inflated milestones."
+  ],
+  "tell_wh_openers": [
+    "Delayed-subject openings",
+    "Repeated ‘What makes this hard is’ constructions."
+  ],
+  "tell_hedge_stacked": [
+    "Stacked qualifiers",
+    "Pairs such as ‘could potentially.’"
+  ],
+  "tell_parenthetical_hedge": [
+    "Qualifiers in parentheses",
+    "Repeated asides such as ‘(arguably).’"
+  ],
+  "tell_future_narrative": [
+    "Vague predictions",
+    "‘One of the most important’ without a clear outcome."
+  ],
+  "tell_negative_listing": [
+    "Lists of what something is not",
+    "Repeated negatives before the positive claim."
+  ],
+  "tell_number_inflation": [
+    "Numbered-list introductions",
+    "‘Five things to know’ and similar framing."
+  ],
+  "tell_hashtag_stuffing": [
+    "Hashtag blocks",
+    "Six or more tags in one piece of writing."
+  ],
+  "tell_over_compression": [
+    "Compressed prose",
+    "Arrows and symbols used in place of sentences."
+  ],
+  "tell_rule_of_three": [
+    "Repeated three-item lists",
+    "Many short, parallel groups of three."
+  ],
+  "tell_same_openers": [
+    "Repeated sentence openings",
+    "Several sentences starting with the same word."
+  ],
+  "tell_staccato_runs": [
+    "Runs of short sentences",
+    "Three or more very short sentences in a row."
+  ],
+  "tell_question_runs": [
+    "Back-to-back questions",
+    "Repeated questions outside interviews and FAQs."
+  ],
+  "tell_bare_bullet_runs": [
+    "Lists of short labels",
+    "Five or more short bullets without complete claims."
+  ],
+  "tell_vague_authority": [
+    "Unnamed sources",
+    "Claims attributed to ‘experts’ without naming them."
+  ],
+  "tell_real_actual": [
+    "Empty ‘real’ and ‘actual’",
+    "Claims such as ‘real value’ without a named contrast."
+  ],
+  "tell_endorsement_closers": [
+    "Generic recommendations",
+    "‘Worth your time’ without explaining why."
+  ],
+  "tell_launch_copy": [
+    "Launch-style introductions",
+    "‘Say hello to’ and similar product announcements."
+  ],
+  "tell_assistant_residue": [
+    "Assistant chatter",
+    "Pleasantries, stock offers, and capability disclaimers."
+  ],
+  "tell_template_residue": [
+    "Unfilled placeholders",
+    "TBD, sample fields, and bracketed instructions."
+  ],
+  "tell_tool_fingerprints": [
+    "AI tracking in links",
+    "AI-referrer parameters added to a URL."
+  ],
+  "tell_citation_residue": [
+    "Broken citation tokens",
+    "Internal citation codes left in the published text."
+  ],
+  "tell_reasoning_residue": [
+    "Exposed reasoning prompts",
+    "Text such as ‘Let me think step by step.’"
+  ],
+  "tell_load_bearing_metaphor": [
+    "‘Load-bearing’ metaphors",
+    "Abstract uses such as ‘load-bearing assumption.’"
+  ],
+  "tell_unnecessary_hyphenation": [
+    "Unnecessary hyphens",
+    "Spellings such as ‘code-base’ and ‘in real-time.’"
+  ],
+  "tell_fake_casual_props": [
+    "Performed casualness",
+    "Stage directions such as ‘checks notes’ or ‘mic drop.’"
+  ],
+  "tell_crowd_contrast": [
+    "Comparisons with an unnamed crowd",
+    "Claims about what ‘everyone else’ was still doing."
+  ],
+  "tell_participial_reframe": [
+    "Reframing lead-ins",
+    "‘Put differently’ before a repeated point."
+  ],
+  "tell_hedged_enumeration": [
+    "Hesitant list openings",
+    "‘A few things to consider’ before the answer."
+  ],
+  "tell_significance_adverbs": [
+    "Repeated importance words",
+    "Dense use of ‘Notably’ or ‘Importantly.’"
+  ],
+  "tell_scar_tissue": [
+    "Rejected alternatives",
+    "Repeated options introduced only to dismiss them."
+  ],
+  "tell_lingering_attention": [
+    "Claims of lasting attention",
+    "‘I keep coming back to this’ without a reason."
+  ],
+  "tell_moral_category": [
+    "Moral labels for technical details",
+    "Phrases such as ‘honest architecture.’"
+  ],
+  "tell_announced_significance": [
+    "Claims that announce importance",
+    "Repeated ‘This actually matters’ framing."
+  ],
+  "tell_parallel_reasons": [
+    "Repeated reason chains",
+    "Three sentences in a row using ‘because’ or ‘when.’"
+  ],
+  "tell_title_case_headings": [
+    "Title case in headings",
+    "Repeated title case where sentence case would fit."
+  ],
+  "tell_decorative_headers": [
+    "Decorative headings",
+    "Repeated emoji headings in formal writing."
+  ],
+  "tell_label_periods": [
+    "Periods in short bullet labels",
+    "A bold noun label ending with a period."
+  ],
+  "tell_stranded_auxiliary": [
+    "Clipped contrast endings",
+    "Repeated endings such as ‘the data didn’t.’"
+  ],
+  "tell_colon_triples": [
+    "Three-item lists after a colon",
+    "Repeated colon openings into groups of three."
+  ],
+  "tell_self_labeling_significance": [
+    "Comments on a point’s importance",
+    "Calling a point ‘the clever part’ after making it."
+  ],
+  "tell_negation_chain": [
+    "Chains of negatives",
+    "Phrases such as ‘No fluff, no filler, no jargon.’"
+  ],
+  "tell_empty_concession": [
+    "Vague concession pairs",
+    "Repeated praise followed by an unnamed challenge."
+  ],
+  "tell_intensifier_opposition": [
+    "Exaggerated opposites",
+    "‘Obsessively’ set against ‘barely at all.’"
+  ],
+  "tell_stock_reaction_frame": [
+    "Stock reaction phrases",
+    "Repeated ‘What surprised me most was’ openings."
+  ],
+  "tell_tier1a": [
+    "Tier 1A: stock vocabulary",
+    "Words to inspect for vague or inflated meaning."
+  ],
+  "tell_tier1b": [
+    "Tier 1B: wordiness",
+    "Longer or formal phrases with plainer alternatives."
+  ],
+  "tell_tier2": [
+    "Tier 2: clustered terms",
+    "Two or more terms in the same paragraph."
+  ],
+  "tell_tier3": [
+    "Tier 3: repeated words",
+    "Heavy repetition of one broad descriptive word."
+  ],
+  "tell_tier3_phrases": [
+    "Tier 3: repeated phrases",
+    "The same phrase twice, or three stock phrases."
+  ]
+}

@@ -1,0 +1,8 @@
+extends: existence
+message: "Retain both supplied assessments; ask for missing scope instead of inventing a failure."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\bwhile [^.!?\\n]{1,80}\\b(?:impressive|promising|remarkable),[^.!?\\n]{1,80}\\bremains? a challenge\\b"

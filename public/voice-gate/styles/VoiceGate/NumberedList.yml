@@ -4,4 +4,4 @@ level: warning
 scope: sentence
 nonword: true
 tokens:
-  - "(?i)\\b(?:three|four|five|six|seven|eight|nine|ten)\\s+(?:key\\s+|main\\s+|simple\\s+)?(?:things|ways|takeaways|lessons|steps|reasons|tips|rules|habits|signs|mistakes)\\b"
+  - "\\b(?:three|four|five|six|seven|eight|nine|ten)\\s+(?:key\\s+|main\\s+|simple\\s+|little\\s+)?(?:things|ways|takeaways|lessons|steps|reasons|tips|rules|habits|signs|mistakes|questions|secrets)\\b"

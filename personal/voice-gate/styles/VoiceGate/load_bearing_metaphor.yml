@@ -1,0 +1,8 @@
+extends: existence
+message: "Name the dependency; keep literal structural terminology."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\bload-bearing\\s+(?:assumptions?|claims?|invariants?|premises?|constraints?|dependencies|dependency|arguments?|abstractions?)\\b"

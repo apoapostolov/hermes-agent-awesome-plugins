@@ -27,6 +27,24 @@ the component that changed; a plugin patch does not imply a new pack release.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
 
+## [voice-gate 1.4.0] - 2026-11-05
+
+Voice Gate now gives a passage a bounded editorial review, with clearer settings and a complete comparison against the humanizer skill and all nine references.
+
+### Added
+
+- 75 mechanical families, up from 46, with separate vocabulary bands and paragraph-local clustering. The shipped comparison maps all 110 humanizer patterns, including their contextual review requirements.
+- Optional review through the selected Hermes model for claims, coherence, narrative, voice, and over-correction. Findings must quote the supplied document; model judgment remains fallible and sends documents to the configured provider.
+- `voice_gate_review` for a review plan, contextual analysis, and content-specific assessments. Revision requests allow at most two opportunities and compare protected spans and quantities before accepting completion.
+- A plugin-owned settings page with grouped controls, rewritten labels and hints, a full-width five-row exceptions editor with a dim placeholder, and two-line Vale guidance linked to GitHub. Older hosts retain the generated form.
+
+### Fixed
+
+- Word-boundary and overlapping phrase matches, lost paragraph boundaries, malformed or mixed code fences, absolute-path exception matching, nonfinite profile thresholds, partial bot switches, and stale review assessments.
+- Prose em dashes are flagged by default while bullet label separators and standalone empty table values remain allowed. Prose inside bullets and tables still follows the prose policy.
+- Turn-time Vale findings now respect disabled families and file exceptions. Generated styles use valid Unicode YAML. Vale status, check, and install paths request process approval; approval directives require Hermes v2026.7.7 (semver 0.18.1), below this plugin's 0.22.0 minimum.
+- Profile learning no longer infers prohibitions from absence, escapes its destination through a profile name, or overwrites an existing profile. Personal and public share the fixes; profile learning remains personal-only.
+
 ## [voice-gate 1.3.5] - 2026-11-05
 
 The exceptions setting is a box now, not a line.

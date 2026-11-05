@@ -149,8 +149,14 @@ def build(rules_module: Any) -> Dict[Path, str]:
     out: Dict[Path, str] = {}
     for family, filename, level, message, scope in PACK:
         out[STYLE / filename] = _existence(level, message, rules_module.BASE_RULES[family], scope)
-    out[STYLE / "NegationTriad.yml"] = NEGATION
+    out[STYLE / "NegationTriad.yml"] = _existence('warning', "Inspect the not-just/but contrast in context: %s.", [rules_module._NEGATION_TRIAD.pattern], 'sentence').replace('nonword: false', 'nonword: true')
+    shape_constants = {'WhOpener.yml': '_WH_OPENER', 'HedgeStack.yml': '_HEDGE_STACKED',
+                       'FutureNarrative.yml': '_FUTURE_NARRATIVE', 'NumberedList.yml': '_NUMBER_INFLATION',
+                       'Hashtags.yml': '_HASHTAG', 'Compression.yml': '_OVER_COMPRESSION',
+                       'ToolFingerprint.yml': '_TOOL_FINGERPRINT', 'AssistantResidue.yml': '_ASSISTANT_RESIDUE',
+                       'TemplateResidue.yml': '_TEMPLATE_RESIDUE'}
     for filename, level, message, token in SHAPES:
+        token = getattr(rules_module, shape_constants[filename]).pattern
         out[STYLE / filename] = (
             "extends: existence\n"
             f"message: {json.dumps(message)}\n"
@@ -160,17 +166,29 @@ def build(rules_module: Any) -> Dict[Path, str]:
             "tokens:\n"
             f"  - {json.dumps(token)}\n"
         )
+    # New rules come from the same compiled definitions the Python engine uses.
+    for key, (_ids, severity, token, _floor, repair) in rules_module.mechanics.SPECS.items():
+        if token:
+            out[STYLE / f'{key}.yml'] = (
+                'extends: existence\n'
+                f'message: {json.dumps(repair)}\n'
+                f'level: {"error" if severity == "P0" else "warning"}\n'
+                'scope: sentence\nignorecase: true\nnonword: true\ntokens:\n'
+                f'  - {json.dumps(token, ensure_ascii=False)}\n'
+            )
+    for band, words in rules_module.mechanics.vocabulary().items():
+        out[STYLE / f'{band}.yml'] = _existence('suggestion', f'{band}: inspect meaning and context of %s.', list(words), 'sentence')
     out[Path(".vale.ini")] = INI
     return out
 
 
 def main() -> int:
-    spec = importlib.util.spec_from_file_location("vg_rules", HERE / "rules.py")
+    spec = importlib.util.spec_from_file_location("vg_package", HERE / "__init__.py", submodule_search_locations=[str(HERE)])
     module = importlib.util.module_from_spec(spec)
-    sys.modules["vg_rules"] = module
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     written = 0
-    for path, text in build(module).items():
+    for path, text in build(module.rules).items():
         target = HERE / path
         target.parent.mkdir(parents=True, exist_ok=True)
         if not target.exists() or target.read_text(encoding="utf-8") != text:

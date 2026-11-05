@@ -9,6 +9,7 @@ bundled skill can build one from a corpus of somebody's writing.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 from collections import Counter
@@ -17,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 PROFILE_SUFFIXES = (".yaml", ".yml", ".json")
 TOP_LEVEL_KEYS = {"name", "description", "applies_to", "rules", "thresholds", "preferences",
-                  "exceptions"}
+                  "exceptions", "context", "measured", "candidates"}
 RULE_KEYS = {"verdict_openers", "closing_offers", "cliche_openers", "conclusion_signposts",
              "buzzwords", "banned_words", "marketing_adjectives"}
 
@@ -95,12 +96,14 @@ def resolve(target: str) -> Optional[Path]:
 
 
 def _parse(text: str) -> Dict[str, Any]:
-    try:
-        import yaml  # type: ignore
-
-        data = yaml.safe_load(text)
-    except Exception:
+    if text.lstrip().startswith(('{', '[')):
         data = json.loads(text)
+        return data if isinstance(data, dict) else {}
+    try:
+        from ruamel.yaml import YAML
+    except ImportError as exc:
+        raise ValueError('YAML profiles need the Hermes YAML runtime; use a JSON profile on this host.') from exc
+    data = YAML(typ='safe').load(text)
     return data if isinstance(data, dict) else {}
 
 
@@ -136,13 +139,32 @@ def validate(profile: Dict[str, Any]) -> List[str]:
             issues.append("rules must be a mapping")
         else:
             for key, value in rules.items():
-                if key not in RULE_KEYS:
+                if key not in _rules().BASE_RULES:
                     issues.append(f"unknown rule list {key!r}")
                 elif not isinstance(value, (list, tuple)):
                     issues.append(f"rule list {key!r} must be a list")
     thresholds = profile.get("thresholds")
     if thresholds is not None and not isinstance(thresholds, dict):
         issues.append("thresholds must be a mapping")
+    elif thresholds:
+        for key, value in thresholds.items():
+            if key not in _rules().BASE_THRESHOLDS:
+                issues.append(f"unknown threshold {key!r}")
+                continue
+            try:
+                if isinstance(value, bool) or not math.isfinite(float(value)) or float(value) < 0:
+                    raise ValueError()
+            except (ValueError, TypeError):
+                issues.append(f"threshold {key!r} must be a finite nonnegative number")
+    preferences = profile.get('preferences')
+    if preferences is not None and not isinstance(preferences, dict):
+        issues.append('preferences must be a mapping')
+    elif preferences:
+        for key, value in preferences.items():
+            if key not in {'no_em_dash', 'no_semicolon'} or not isinstance(value, bool):
+                issues.append(f'unsupported preference or nonboolean value: {key!r}')
+    if profile.get('context') and profile['context'] not in {*_rules().CONTEXT_RELAXED, 'fiction'}:
+        issues.append('unknown context')
     if profile.get("exceptions") is not None:
         raw = profile["exceptions"]
         if not isinstance(raw, (dict, list, tuple, str)):
@@ -170,7 +192,8 @@ def _exception_names(raw: Any) -> List[str]:
     if isinstance(raw, str):
         items = [line for line in raw.splitlines() if line.strip()]
     elif isinstance(raw, (list, tuple)):
-        items = [str(item) for item in raw]
+        items = [str(key) if isinstance(item, dict) else str(item)
+                 for item in raw for key in (item.keys() if isinstance(item, dict) else [item])]
     return [item.partition(":")[0] for item in items]
 
 
@@ -229,19 +252,8 @@ def draft(samples: List[str], name: str = "my-voice") -> Dict[str, Any]:
                        % (measured["samples"], measured["words"]),
         "applies_to": ["default"],
         "thresholds": {"min_words": 200},
-        "preferences": {
-            "no_em_dash": measured["em_dashes"] == 0,
-            "no_semicolon": measured["semicolons"] == 0,
-        },
-        "rules": {
-            "verdict_openers": [],
-            "closing_offers": [],
-            "cliche_openers": [],
-            "conclusion_signposts": [],
-            "buzzwords": [],
-            "banned_words": [],
-            "marketing_adjectives": [],
-        },
+        "preferences": {},
+        "rules": {},
         "measured": measured,
         "candidates": {
             "openers": openers,

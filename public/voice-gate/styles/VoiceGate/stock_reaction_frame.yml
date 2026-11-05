@@ -1,0 +1,8 @@
+extends: existence
+message: "Preserve the stated reaction, preference, and ranking; never invent its reason."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\b(?:what surprised me most was|the most interesting part|what i love about this is)\\b"

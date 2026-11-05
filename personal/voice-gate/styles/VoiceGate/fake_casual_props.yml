@@ -1,0 +1,8 @@
+extends: existence
+message: "Remove imposed stage business; keep a supported playful voice."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\b(?:checks notes|chef.s kiss|mic drop|record scratch|narrator voice|spoiler alert)\\b|\\((?:yes, really|yes, seriously|no, really|let that sink in)\\)"

@@ -1,0 +1,8 @@
+extends: existence
+message: "State the supported difference without manufactured poles."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\bobsessively\\b[^.!?\\n]{0,100}\\bbarely at all\\b"

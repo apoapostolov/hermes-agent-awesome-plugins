@@ -4,4 +4,4 @@ level: error
 scope: sentence
 nonword: true
 tokens:
-  - "(?i)\\b(?:as an ai|as a language model|my knowledge cutoff|as of my last (?:update|training)|i cannot browse|great question|you're absolutely right)\\b"
+  - "\\b(?:as an ai|as a language model|i'm just an ai|my knowledge cutoff|as of my last (?:update|training)|i cannot browse|i don't have access to real-time|great question|you're absolutely right|i hope this helps|let me know if you)\\b"

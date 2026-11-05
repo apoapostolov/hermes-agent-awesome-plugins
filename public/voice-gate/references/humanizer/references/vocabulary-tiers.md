@@ -1,0 +1,329 @@
+<!-- markdownlint-disable MD013 -->
+
+# Vocabulary tiers and phrase tables
+
+Editorial replacement tables adapted from
+[conorbronsdon/avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing)
+v3.22.3 (MIT). Use them to choose plainer wording during rewrites and audits.
+
+These words are **not** proof of AI authorship. Many appear in ordinary human
+prose, second-language writing, and technical genres. Treat hits as prompts:
+
+- Tier 1A: prefer a plain substitute; a cluster is a stronger production signal
+  than a single hit, still not authorship proof.
+- Tier 1B: clarity and formality edits. Same fix as 1A, weaker claim. A 1B hit
+  alone is **not** evidence of machine authorship.
+- Tier 2: rewrite when two or more cluster in one paragraph without earning their
+  weight.
+- Tier 3: only act when density makes the prose vague praise instead of content.
+  Density is counted per word, so a spread of Tier 3 words is not a tell on its
+  own.
+- Never swap a correct domain term for a weaker synonym to game a list.
+- Match inflected forms (adverb, gerund, plural, conjugation) unless context gives
+  the variant a different honest meaning.
+- In **detect** mode, report Tier 1A and Tier 1B separately. Do not present a
+  wordiness fix as authorship evidence.
+
+The "appears far more often in AI text" claim behind Tier 1A is a **convention
+inherited from upstream research** (including brandonwise/humanizer-influenced
+lists), not a ratio this package has measured. Treat 1A as a useful editorial
+band, not a verified statistic.
+
+## Tier 1A — Prefer plain substitutes (frequency-band markers)
+
+Both 1A and 1B are usually replaced in cleanup and rewrite. What differs is what
+a flag means in detect mode.
+
+| Prefer over | Prefer |
+| --- | --- |
+| delve / delve into | explore, dig into, look at |
+| landscape (metaphor) | field, space, industry, world |
+| tapestry | complex structure, rich history, or name the actual complexity |
+| realm | area, field, domain |
+| paradigm | model, approach, framework |
+| embark | start, begin |
+| beacon | rewrite with a concrete claim |
+| testament to | shows, proves, demonstrates |
+| robust | strong, reliable, solid |
+| comprehensive | thorough, complete, full |
+| cutting-edge | latest, newest, advanced |
+| leverage (verb) | use |
+| pivotal | important, key, critical |
+| underscores | highlights, shows |
+| meticulous / meticulously | careful, detailed, precise |
+| seamless / seamlessly | smooth, easy, without friction |
+| game-changer / game-changing | changes how [X] works, or name what changed and why it matters |
+| hit differently / hits different | feels different, affects me/us differently, or cut |
+| watershed moment | turning point, shift, or what changed |
+| marking a pivotal moment | changing [X], leading to [Y], or state what happened |
+| the future looks bright | specific claim or cut |
+| only time will tell | specific claim or cut |
+| nestled | is located, sits, is in |
+| vibrant | lively, active, or name what is active |
+| thriving | growing, active, or cite a number |
+| despite challenges… continues to thrive | keeps growing despite [named difficulty], or name the challenge and the response |
+| showcasing | showing, demonstrating, or cut the clause |
+| deep dive / dive into | look at, examine, explore |
+| unpack / unpacking | explain, break down, walk through |
+| bustling | busy, active, or name what makes it busy |
+| intricate / intricacies | complex, detailed, or name the complexity |
+| complexities | problems, details, or name them |
+| ever-evolving | changing, growing, or describe how |
+| enduring | lasting, long-running, or cite duration |
+| daunting | hard, difficult, challenging |
+| holistic / holistically | complete, full, whole, or list what is included |
+| actionable | practical, useful, concrete |
+| impactful | effective, significant, or name the impact |
+| learnings | lessons, findings, takeaways |
+| thought leader / thought leadership | expert, authority, or name the contribution |
+| best practices | what works, proven methods, standard approach |
+| at its core | cut; state the claim |
+| synergy / synergies | combined effect, benefit of working together |
+| interplay | relationship, connection, interaction |
+| keen (intensifier) | interested, eager, or cut |
+| genuinely / genuine (intensifier) | cut; state the fact |
+| symphony (metaphor) | coordination, balance, or name the combination |
+| embrace (metaphor) | adopt, accept, use, switch to |
+| load-bearing (metaphor) | essential, critical, necessary, or name what breaks |
+| lean into | accept, embrace, or name the specific move |
+| double down | commit, increase, or name what changed |
+| take a step back | reconsider, or cut |
+| moving forward | next, from now, or cut |
+| circle back | return to, revisit, or cut |
+| on the same page | aligned, agreed, or name the agreement |
+
+**load-bearing carve-out:** unhyphenated "load bearing" is ordinary English.
+Hyphenated `load-bearing` before a literal structural noun (wall, beam, column,
+joist, truss, member, footing, slab, stud, partition, masonry, lintel, pier,
+rafter, girder, capacity), optionally with one material or position adjective,
+is building terminology. Abstract nouns such as structure, element, frame, or
+foundation still count as metaphorical when the claim is rhetorical.
+
+**gate carve-out:** established technical usage is not the metaphor. CI gates,
+gated clocks in hardware, gated memory management, security gating, and
+gated releases are terms of art; keep them. Only figurative uses that dress a
+plain condition in drama (*conversations that gate trust*, *a gated mindset*)
+count toward a cluster. (Adapted from blader/humanizer, MIT.)
+
+In technical docs, keep `robust`, `comprehensive`, `seamless`, `ecosystem`, and
+literal `leverage` when they are standard terms of art.
+
+## Tier 1B — Clarity edits (not authorship evidence)
+
+Wordiness and inflated formality. Replacing them is good writing regardless of
+who wrote the sentence. In detect mode, label these as clarity suggestions, not
+machine-authorship signals.
+
+| Prefer over | Prefer |
+| --- | --- |
+| utilize | use |
+| in order to | to |
+| due to the fact that | because |
+| serves as | is |
+| features (verb) | has, includes |
+| boasts | has |
+| presents (inflated) | is, shows, gives |
+| commence | start, begin |
+| ascertain | find out, determine, learn |
+| endeavor | effort, attempt, try |
+
+## Tier 2 — Act when two or more cluster in one paragraph
+
+| Prefer over | Prefer |
+| --- | --- |
+| harness | use, take advantage of |
+| navigate / navigating | work through, handle, deal with |
+| foster | encourage, support, build |
+| elevate | improve, raise, strengthen |
+| unleash | release, enable, unlock |
+| streamline | simplify, speed up |
+| empower | enable, let, allow |
+| bolster | support, strengthen, back up |
+| spearhead | lead, drive, run |
+| resonate / resonates with | connect with, appeal to, matter to |
+| revolutionize | change, transform, reshape, or name the change |
+| facilitate / facilitates | enable, help, allow, run |
+| underpin | support, form the basis of |
+| nuanced | specific, subtle, detailed, or name the nuance |
+| crucial | important, key, necessary |
+| multifaceted | having several parts, with several aspects, or name the facets |
+| ecosystem (metaphor) | system, community, network, market |
+| myriad | many, numerous, or give a number |
+| plethora | many, a lot of, or give a number |
+| encompass | include, cover, span |
+| catalyze | start, trigger, accelerate |
+| reimagine | rethink, redesign, rebuild |
+| galvanize | motivate, rally, push |
+| augment | add to, expand, supplement |
+| cultivate | build, develop, grow |
+| illuminate | clarify, explain, show |
+| elucidate | explain, clarify, spell out |
+| juxtapose | compare, contrast, set side by side |
+| paradigm-shifting | changes the basic model, changes how [X] is understood |
+| transformative / transformation | changes how [X] works (adjective); major change, overhaul (noun) |
+| cornerstone | foundation, basis, key part |
+| paramount | most important, top priority |
+| poised (to) | ready, set, about to |
+| burgeoning | growing, emerging, or cite a number |
+| nascent | new, early-stage, emerging |
+| quintessential | typical, classic, defining |
+| overarching | main, central, broad |
+| quietly (magic adverb) | cut, or name the concrete contrast |
+| gate / gated / gating (figurative) | condition, filter, checkpoint, or name the rule |
+| deeply (significance collocations only: deeply integrated / committed / rooted) | cut, or name what runs deep |
+| underpinning / underpinnings | basis, foundation, what supports |
+
+Literal "deeply nested", "cares deeply", and similar uses do not count toward a
+cluster.
+
+## Tier 3 — Act only at high density
+
+Replace some instances with specifics (numbers, comparisons, mechanisms) when
+one word from the list below is repeated heavily on its own. The threshold the
+engine uses is `max(3, floor(wordCount × 0.03))` uses of that one word, so a
+1,000-word piece needs about 30 uses before the word is a finding, which makes
+the number a floor for the least convincing case rather than a target, so cut an
+instance whenever it is doing no work regardless of the count.
+
+Separately listed forms count separately, so `significant` and
+`significantly` are two different counts.
+
+significant / significantly, innovative / innovation, effective / effectively,
+dynamic / dynamics, scalable / scalability, compelling, unprecedented,
+exceptional / exceptionally, remarkable / remarkably, sophisticated,
+instrumental, world-class / state-of-the-art / best-in-class, verbatim.
+
+`verbatim` is often redundant with the verb. Keep it in legal, research, or QA
+registers where it is a term of art.
+
+## Tier 3 phrases — repetition or multi-phrase clusters
+
+Flag when the same phrase appears twice, or when three or more distinct phrases
+from this list appear in one piece:
+
+| Phrase | Prefer |
+| --- | --- |
+| emerging sector / space / category | name the sector or what is emerging |
+| the integration of X with Y | name what changes for the user |
+| the intersection of X and Y | name the specific overlap that matters |
+| community-driven | name what the community does |
+| long-term sustainability | name horizon and constraint |
+| user engagement | name the action (clicks, retention, comments) |
+| decentralized compute | name the architecture or cut |
+| (sustainable) reward emissions | cite schedule and sink |
+| tokenized incentive structures | name the mechanism |
+| designed for long-term X | drop "designed for"; state the property |
+
+## Template phrases
+
+Rewrite slot-fill constructions:
+
+- "a [adjective] step towards [adjective] AI infrastructure" → name capability,
+  benchmark, or outcome
+- "a [adjective] step forward for [noun]" → name what changed
+- "Whether you're [X] or [Y]" → address the real audience, or cut
+- "I recently had the pleasure of [verb]-ing" → "I talked to," "I read," "I
+  attended"
+
+Literal-sense exclusion: neutral milestones stay clean. "a first step towards
+the full API" and "a small step towards cutting our storage bill" do not
+flag; the shape needs a vague-praise adjective such as "major", "crucial",
+or "significant" before "step". The following goal does not decide the flag.
+(Adapted from avoid-ai-writing v3.37.0 post-release tip, MIT.)
+
+## Throat-clearing openers and emphasis crutches
+
+Announcement phrases that delay the point. Cut them and state the content
+directly. (Adapted from hardikpandya/stop-slop, MIT.)
+
+Throat-clearing openers:
+
+- "Here's the thing:" / "Here's what / this / that [X]"
+- "Here's why [X]" / "Here's the problem though"
+- "The uncomfortable truth is" / "The truth is" / "The reality is"
+- "It turns out" / "The real [X] is"
+- "Let me be clear" / "I'll say it again" / "I'm going to be honest"
+- "Can we talk about" / "Here's what I find interesting"
+
+Emphasis crutches (delete — they add no meaning):
+
+- "Full stop." / "Period." / "Let that sink in."
+- "This matters because" / "Here's why that matters"
+- "Make no mistake" / "I promise"
+- "X is a feature, not a bug" / "Dressed up as"
+
+Meta-commentary (the text announcing its own structure):
+
+- "Hint:" / "Plot twist:" / "Spoiler:"
+- "You already know this, but" / "But that's another post"
+- "The rest of this essay explains..." / "Let me walk you through..."
+- "In this section, we'll..." / "As we'll see..." / "I want to explore..."
+
+Vague declaratives that announce importance without naming the specific thing:
+
+- "The reasons are structural" / "The implications are significant"
+- "This is the deepest problem" / "The stakes are high"
+- "The consequences are real"
+
+If a sentence says something is important, deep, or structural without showing
+the specific thing, cut it or replace it with the specific thing.
+
+## Transition phrases
+
+Prefer structure over stock bridges:
+
+- Moreover / Furthermore / Additionally → and, also, on top of that, or reorder
+- In today's X / In an era where → specific context or cut
+- It's worth noting that / Notably → state the fact
+- Here's what's interesting / Here's what stood out → specific lead-in
+- In conclusion / In summary / To summarize → let the close carry content
+- When it comes to → name the subject directly
+- At the end of the day → cut
+- That said / That being said → but, yet, however (do not overuse one substitute)
+
+## Abstract metaphor nouns
+
+Jargon nouns that read as technical but usually have a plainer concrete word.
+Pick the concrete word:
+
+| Metaphor noun | Prefer |
+| --- | --- |
+| substrate | base, layer, foundation |
+| wedge (verb: "wedge in") | add, introduce |
+| vector | way, method, direction |
+| locus | place, center |
+| vantage / vantage point | position, view |
+| nexus | hub, link, connection |
+| primitive (as a noun) | building block, basic operation |
+| harness (as a metaphor for a runtime wrapper) | name it: test runner, plugin host |
+| surface ("API surface") | interface, exposed methods |
+| bedrock | foundation, basis |
+| scaffolding (as metaphor) | boilerplate, setup code |
+| modality | type, format, channel |
+| paradigm | model, approach |
+| gold-plating | more polish than the job needs |
+| ratchet (as metaphor) | name the mechanism, or "a limit that only tightens" |
+| flywheel | growth loop, feedback loop |
+| north star | main goal, guiding metric |
+| endgame | last phase, end state |
+| evacuate (for moving code/users) | move out |
+
+Keep any of these when the field uses them as a precise term of art.
+
+## Hollow intensifiers and endorsement fluff
+
+Cut or replace: genuine / genuinely (empty intensifier), truly, quite frankly, to
+be honest, let's be clear, it's worth noting that, worth reading / checking out /
+your time (without a reason).
+
+Say why something matters instead of a generic thumbs-up.
+
+## Source note
+
+Tables and tier logic follow avoid-ai-writing v3.22.3 (Tier 1A/1B split) and
+brandonwise/humanizer-influenced tiering; the abstract-metaphor-nouns table
+absorbs cursor/plugins unslop (tip@99559f2). Rows that once read *describe what
+changed* now carry a concrete alternative (avoid-ai-writing v3.37.0 post-release
+tip, MIT). Keep this file as a rewrite aid. The
+main diagnosis path remains [pattern-catalog.md](pattern-catalog.md) and the
+editing sequence in [humanizing-text.md](humanizing-text.md).

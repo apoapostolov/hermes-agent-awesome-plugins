@@ -4,4 +4,4 @@ level: suggestion
 scope: sentence
 nonword: true
 tokens:
-  - "(?i)\\b(?:could|may|might|would|can)\\s+(?:potentially|possibly|eventually|ultimately)\\b"
+  - "\\b(?:could|may|might|would|can)\\s+(?:potentially|possibly|eventually|ultimately|conceivably)\\b|\\b(?:potentially|possibly)\\s+(?:could|may|might|would)\\b"

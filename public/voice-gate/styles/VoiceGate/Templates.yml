@@ -5,9 +5,6 @@ scope: sentence
 ignorecase: true
 nonword: false
 tokens:
-  - "a step towards"
-  - "a step toward"
-  - "a step forward for"
   - "whether you're a"
   - "i recently had the pleasure"
   - "the world of"

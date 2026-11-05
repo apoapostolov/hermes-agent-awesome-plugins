@@ -1,0 +1,8 @@
+extends: existence
+message: "Review the density; retain a qualification or distinction that carries meaning."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\b(?:notably|interestingly|importantly|significantly)\\b"

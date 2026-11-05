@@ -1,0 +1,8 @@
+extends: existence
+message: "Use useful structure in formal prose; sparse social decoration can be deliberate."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "(?m)^\\s*(?:#{1,6}\\s+|[-*+]\\s+)?[🚀💡✅🔥🎯🌟✨📌]\\s*(?:\\*\\*)?[^\\n]+"

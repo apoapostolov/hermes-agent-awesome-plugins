@@ -1,6 +1,6 @@
 name: "Voice Gate"
-version: "1.3.5"
-description: "Reads the prose a turn changed against your own writing profile, in Markdown, plain text, reStructuredText, AsciiDoc, Org, LaTeX, HTML and PDF, then asks for one more pass before the turn finishes. The plugin ships generic rules and loads a profile document that carries your voice; with no profile loaded it behaves like the public edition."
+version: "1.4.0"
+description: "Checks changed prose against your writing profile and the complete humanizer editorial contract. Reports contextual signals, protects source material, and allows at most two review and revision passes. Includes Vale checks and a settings page."
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2
@@ -16,294 +16,456 @@ config_schema:
   apply_hermes:
     type: bool
     default: true
-    label: Hermes
-    description: "Run the gate in this profile"
+    label: "Hermes"
+    description: "Review changed documents."
   apply_herald:
     type: bool
     default: true
-    label: Herald
-    description: "Run the gate in this profile"
+    label: "Herald"
+    description: "Review changed documents."
   apply_keeper:
     type: bool
     default: true
-    label: Keeper
-    description: "Run the gate in this profile"
+    label: "Keeper"
+    description: "Review changed documents."
   apply_steward:
     type: bool
     default: true
-    label: Steward
-    description: "Run the gate in this profile"
+    label: "Steward"
+    description: "Review changed documents."
   apply_tinker:
     type: bool
     default: true
-    label: Tinker
-    description: "Run the gate in this profile"
+    label: "Tinker"
+    description: "Review changed documents."
   vale_mode:
     type: str
-    label: Vale second opinion
-    description: "off, or advisory to add Vale alerts."
+    label: "Include Vale checks"
+    description: "Add Vale findings when a document is reviewed."
     choices: ["off", "advisory"]
   vale_min_alerts:
     type: number
-    label: Vale minimum alerts
-    description: "Speak for Vale at this many alerts."
+    label: "Minimum Vale findings"
+    description: "Show a summary after this many findings."
   vale_path:
     type: str
-    label: Vale binary
-    description: "Empty uses the plugin's copy, then PATH."
+    label: "Vale executable"
+    description: "Leave blank to find Vale automatically."
   mode:
     type: str
-    label: Mode
-    description: "warn asks once, improve keeps asking, skip is off."
+    label: "Review mode"
+    description: "Ask once, allow two passes, or turn reviews off."
     choices:
       - "warn"
       - "improve"
       - "skip"
   profile:
     type: str
-    label: Profile
-    description: "Name of a profile in HERMES_HOME/voice-profiles, or a path to one. Empty uses the generic rules."
+    label: "Writing profile"
+    description: "Leave blank to use the built-in rules."
+  context:
+    type: str
+    default: auto
+    choices: [auto, docs, technical-blog, blog, casual, linkedin, investor-email, fiction]
+    label: "Writing context"
+    description: "Auto uses your profile, then the file type."
   min_words:
     type: number
-    label: Minimum words overrides
-    description: "Shorter documents are ignored. Default 200."
+    label: "Minimum document length"
+    description: "Default: 200 words. Use 0 to check shorter text."
+  no_prose_em_dash:
+    type: bool
+    default: true
+    label: "Flag every prose em dash"
+    description: "Allow list separators and empty table values."
+  model_review:
+    type: bool
+    default: false
+    label: "Review meaning and structure"
+    description: "Use your Hermes model. Adds a review request per pass."
   exceptions:
     type: str
     rows: 5
-    placeholder: "em_dash: *.md, *.mdx\nsignposting: docs/**\nbold_lead_bullets: CHANGELOG.md"
-    label: Exceptions
-    description: "tell: glob, glob, one per line."
+    placeholder: "signposting: README.md, *.generated.md\nbold_lead_bullets: CHANGELOG.md\nmarketing_adjectives: release-notes.txt"
+    label: "File exceptions"
+    description: "Write one rule per line as rule_name: file_pattern, file_pattern. For example, signposting: README.md, docs/** skips that check in README files and docs folders. Use * in filename patterns, or all: pattern to skip every check in matching files. Leaving this blank adds no exceptions."
   # One switch per rule family. Off means the family never fires here.
   tell_closing_offers:
     type: bool
     default: true
-    label: "Closing offers"
-    description: "Ends by offering more work."
+    label: "Offers to do more"
+    description: "Offers such as ‘Let me know if you need more.’"
   tell_significance_inflation:
     type: bool
     default: true
-    label: "Significance inflation"
-    description: "Ordinary details dressed as turning points."
+    label: "Inflated importance"
+    description: "Claims such as ‘a pivotal moment.’"
   tell_copula_avoidance:
     type: bool
     default: true
-    label: "Copula avoidance"
-    description: "\"Serves as\" where \"is\" would do."
+    label: "Indirect verbs"
+    description: "‘Serves as’ where ‘is’ would do."
   tell_hedges:
     type: bool
     default: true
-    label: "Hedges"
-    description: "Uncertainty stacked until the claim vanishes."
+    label: "Repeated hedging"
+    description: "Several qualifiers without a clear claim."
   tell_signposting:
     type: bool
     default: true
-    label: "Signposting"
-    description: "Announces the point instead of making it."
+    label: "Announcements before the point"
+    description: "‘Here’s what you need to know’ and similar lead-ins."
   tell_filler:
     type: bool
     default: true
-    label: "Wordy filler"
-    description: "Phrases with a shorter honest form."
+    label: "Wordy phrases"
+    description: "‘Due to the fact that’ instead of ‘because.’"
   tell_transitions:
     type: bool
     default: true
-    label: "Chained transitions"
-    description: "\"Moreover\" and friends, carrying nothing."
+    label: "Repeated transition phrases"
+    description: "Repeated ‘Moreover,’ ‘Furthermore,’ and similar links."
   tell_trailing_qualifiers:
     type: bool
     default: true
-    label: "Trailing qualifiers"
-    description: "A hedge tacked onto the end."
+    label: "Sentence-ending qualifiers"
+    description: "Endings such as ‘for the most part.’"
   tell_gerund_openings:
     type: bool
     default: true
-    label: "Gerund openings"
-    description: "Sentences opening on \"Having\" or \"Knowing\"."
+    label: "Reflective openings"
+    description: "Repeated openings such as ‘Having reviewed…’"
   tell_negation_positive:
     type: bool
     default: true
-    label: "Negation then positive"
-    description: "\"Not about X; it is about Y\"."
+    label: "Staged contrasts"
+    description: "‘It isn’t about X. It’s about Y.’"
   tell_negation_triads:
     type: bool
     default: true
-    label: "Negation triads"
-    description: "\"Not just X, but Y\" frames."
+    label: "‘Not just … but’ framing"
+    description: "Repeated contrasts that introduce a bigger claim."
   tell_verdict_openers:
     type: bool
     default: true
-    label: "Verdict openers"
-    description: "A verdict before the subject."
+    label: "Verdict-first openings"
+    description: "‘The honest answer’ before the actual answer."
   tell_cliche_openers:
     type: bool
     default: true
-    label: "Cliche openers"
-    description: "\"In today's world\" and its cousins."
+    label: "Stock openings"
+    description: "Openings such as ‘In today’s fast-paced world.’"
   tell_conclusion_signposts:
     type: bool
     default: true
-    label: "Conclusion signposts"
-    description: "\"In conclusion\", twice or more."
+    label: "Stock conclusions"
+    description: "Repeated ‘In conclusion’ or ‘To sum up.’"
   tell_bold_pseudo_headings:
     type: bool
     default: true
-    label: "Bold pseudo-headings"
-    description: "Bold lines posing as headings."
+    label: "Bold lines used as headings"
+    description: "Whole lines of bold text outside normal headings."
   tell_bold_lead_bullets:
     type: bool
     default: true
-    label: "Bold lead-in bullets"
-    description: "Every bullet opens on a bold label."
+    label: "Repeated bold bullet labels"
+    description: "Lists where most items begin with a bold label."
   tell_buzzwords:
     type: bool
     default: true
-    label: "AI vocabulary"
-    description: "Delve, tapestry, seamless, and the rest."
+    label: "Stock vocabulary"
+    description: "Dense runs of words such as ‘delve’ and ‘tapestry.’"
   tell_marketing_adjectives:
     type: bool
     default: true
     label: "Promotional adjectives"
-    description: "Robust, cutting-edge, world-class."
+    description: "Repeated praise such as ‘world-class’ or ‘effortless.’"
   tell_banned_words:
     type: bool
     default: true
-    label: "Profile banned words"
-    description: "Your own list, from the profile."
+    label: "Words from your avoid list"
+    description: "Terms you chose to flag in your writing profile."
   tell_em_dashes:
     type: bool
     default: true
-    label: "Em dashes"
-    description: "Dash clusters where a comma would do."
+    label: "Em dashes in prose"
+    description: "Keep list separators and empty table values."
   tell_candor_frames:
     type: bool
     default: true
-    label: "Narrated candor"
-    description: "\"To be fully transparent\" instead of the thing."
+    label: "Announcements of honesty"
+    description: "‘To be fully transparent’ before a routine point."
   tell_objection_frames:
     type: bool
     default: true
-    label: "Shadowboxed objections"
-    description: "Answers an objection nobody raised."
+    label: "Unstated objections"
+    description: "‘Some might say’ without an objection to answer."
   tell_rhetorical_setup:
     type: bool
     default: true
-    label: "Rhetorical setup"
-    description: "Stages the point without making it."
+    label: "Setup before the point"
+    description: "‘Think about it’ and similar prompts."
   tell_emphasis_crutches:
     type: bool
     default: true
-    label: "Emphasis crutches"
-    description: "\"This matters because\", and similar filler."
+    label: "Empty emphasis"
+    description: "Statements of importance without a consequence."
   tell_dev_slogans:
     type: bool
     default: true
-    label: "Dev slogans"
-    description: "\"It just works\" where a property belongs."
+    label: "Developer slogans"
+    description: "Claims such as ‘It just works’ or ‘sane defaults.’"
   tell_template_phrases:
     type: bool
     default: true
-    label: "Template phrases"
-    description: "Slot-fill phrases from a template."
+    label: "Template phrasing"
+    description: "Generic introductions and inflated milestones."
   tell_wh_openers:
     type: bool
     default: true
-    label: "Wh- openers"
-    description: "\"What makes this hard is\"."
+    label: "Delayed-subject openings"
+    description: "Repeated ‘What makes this hard is’ constructions."
   tell_hedge_stacked:
     type: bool
     default: true
-    label: "Stacked hedges"
-    description: "\"Could potentially\" inside one claim."
+    label: "Stacked qualifiers"
+    description: "Pairs such as ‘could potentially.’"
   tell_parenthetical_hedge:
     type: bool
     default: true
-    label: "Parenthetical hedges"
-    description: "A hedge parked in brackets."
+    label: "Qualifiers in parentheses"
+    description: "Repeated asides such as ‘(arguably).’"
   tell_future_narrative:
     type: bool
     default: true
-    label: "Future narratives"
-    description: "\"Will become one of the most important\"."
+    label: "Vague predictions"
+    description: "‘One of the most important’ without a clear outcome."
   tell_negative_listing:
     type: bool
     default: true
-    label: "Negative listings"
-    description: "\"Not a dashboard. Not a portal.\""
+    label: "Lists of what something is not"
+    description: "Repeated negatives before the positive claim."
   tell_number_inflation:
     type: bool
     default: true
-    label: "Numbered-list bait"
-    description: "\"Three key takeaways\"."
+    label: "Numbered-list introductions"
+    description: "‘Five things to know’ and similar framing."
   tell_hashtag_stuffing:
     type: bool
     default: true
     label: "Hashtag blocks"
-    description: "Tags instead of a closing sentence."
+    description: "Six or more tags in one piece of writing."
   tell_over_compression:
     type: bool
     default: true
-    label: "Over-compression"
-    description: "Arrows standing in for words."
+    label: "Compressed prose"
+    description: "Arrows and symbols used in place of sentences."
   tell_rule_of_three:
     type: bool
     default: true
-    label: "Rule of three"
-    description: "Three-item series, again and again."
+    label: "Repeated three-item lists"
+    description: "Many short, parallel groups of three."
   tell_same_openers:
     type: bool
     default: true
-    label: "Same openers"
-    description: "Consecutive sentences opening alike."
+    label: "Repeated sentence openings"
+    description: "Several sentences starting with the same word."
   tell_staccato_runs:
     type: bool
     default: true
-    label: "Staccato runs"
-    description: "Short sentence after short sentence."
+    label: "Runs of short sentences"
+    description: "Three or more very short sentences in a row."
   tell_question_runs:
     type: bool
     default: true
-    label: "Question runs"
-    description: "Questions stacked back to back."
+    label: "Back-to-back questions"
+    description: "Repeated questions outside interviews and FAQs."
   tell_bare_bullet_runs:
     type: bool
     default: true
-    label: "Bare bullets"
-    description: "Bullets with no verb in them."
+    label: "Lists of short labels"
+    description: "Five or more short bullets without complete claims."
   tell_vague_authority:
     type: bool
     default: true
-    label: "Vague authority"
-    description: "\"Experts say\", with no names."
+    label: "Unnamed sources"
+    description: "Claims attributed to ‘experts’ without naming them."
   tell_real_actual:
     type: bool
     default: true
-    label: "Real/actual inflation"
-    description: "\"Real value\", \"actual impact\"."
+    label: "Empty ‘real’ and ‘actual’"
+    description: "Claims such as ‘real value’ without a named contrast."
   tell_endorsement_closers:
     type: bool
     default: true
-    label: "Endorsement closers"
-    description: "\"Bookmark this\", \"thank me later\"."
+    label: "Generic recommendations"
+    description: "‘Worth your time’ without explaining why."
   tell_launch_copy:
     type: bool
     default: true
-    label: "Launch copy"
-    description: "\"Say hello to\" an introduction."
+    label: "Launch-style introductions"
+    description: "‘Say hello to’ and similar product announcements."
   tell_assistant_residue:
     type: bool
     default: true
-    label: "Assistant residue"
-    description: "\"As an AI\" left in the text."
+    label: "Assistant chatter"
+    description: "Pleasantries, stock offers, and capability disclaimers."
   tell_template_residue:
     type: bool
     default: true
-    label: "Template residue"
-    description: "Placeholders like TBD left behind."
+    label: "Unfilled placeholders"
+    description: "TBD, sample fields, and bracketed instructions."
   tell_tool_fingerprints:
     type: bool
     default: true
-    label: "Tool fingerprints"
-    description: "utm_source=chatgpt in a link."
+    label: "AI tracking in links"
+    description: "AI-referrer parameters added to a URL."
+  # Generated humanizer families: scripts/sync_rule_settings.py
+  tell_citation_residue:
+    type: bool
+    default: true
+    label: "Broken citation tokens"
+    description: "Internal citation codes left in the published text."
+  tell_reasoning_residue:
+    type: bool
+    default: true
+    label: "Exposed reasoning prompts"
+    description: "Text such as ‘Let me think step by step.’"
+  tell_load_bearing_metaphor:
+    type: bool
+    default: true
+    label: "‘Load-bearing’ metaphors"
+    description: "Abstract uses such as ‘load-bearing assumption.’"
+  tell_unnecessary_hyphenation:
+    type: bool
+    default: true
+    label: "Unnecessary hyphens"
+    description: "Spellings such as ‘code-base’ and ‘in real-time.’"
+  tell_fake_casual_props:
+    type: bool
+    default: true
+    label: "Performed casualness"
+    description: "Stage directions such as ‘checks notes’ or ‘mic drop.’"
+  tell_crowd_contrast:
+    type: bool
+    default: true
+    label: "Comparisons with an unnamed crowd"
+    description: "Claims about what ‘everyone else’ was still doing."
+  tell_participial_reframe:
+    type: bool
+    default: true
+    label: "Reframing lead-ins"
+    description: "‘Put differently’ before a repeated point."
+  tell_hedged_enumeration:
+    type: bool
+    default: true
+    label: "Hesitant list openings"
+    description: "‘A few things to consider’ before the answer."
+  tell_significance_adverbs:
+    type: bool
+    default: true
+    label: "Repeated importance words"
+    description: "Dense use of ‘Notably’ or ‘Importantly.’"
+  tell_scar_tissue:
+    type: bool
+    default: true
+    label: "Rejected alternatives"
+    description: "Repeated options introduced only to dismiss them."
+  tell_lingering_attention:
+    type: bool
+    default: true
+    label: "Claims of lasting attention"
+    description: "‘I keep coming back to this’ without a reason."
+  tell_moral_category:
+    type: bool
+    default: true
+    label: "Moral labels for technical details"
+    description: "Phrases such as ‘honest architecture.’"
+  tell_announced_significance:
+    type: bool
+    default: true
+    label: "Claims that announce importance"
+    description: "Repeated ‘This actually matters’ framing."
+  tell_parallel_reasons:
+    type: bool
+    default: true
+    label: "Repeated reason chains"
+    description: "Three sentences in a row using ‘because’ or ‘when.’"
+  tell_title_case_headings:
+    type: bool
+    default: true
+    label: "Title case in headings"
+    description: "Repeated title case where sentence case would fit."
+  tell_decorative_headers:
+    type: bool
+    default: true
+    label: "Decorative headings"
+    description: "Repeated emoji headings in formal writing."
+  tell_label_periods:
+    type: bool
+    default: true
+    label: "Periods in short bullet labels"
+    description: "A bold noun label ending with a period."
+  tell_stranded_auxiliary:
+    type: bool
+    default: true
+    label: "Clipped contrast endings"
+    description: "Repeated endings such as ‘the data didn’t.’"
+  tell_colon_triples:
+    type: bool
+    default: true
+    label: "Three-item lists after a colon"
+    description: "Repeated colon openings into groups of three."
+  tell_self_labeling_significance:
+    type: bool
+    default: true
+    label: "Comments on a point’s importance"
+    description: "Calling a point ‘the clever part’ after making it."
+  tell_negation_chain:
+    type: bool
+    default: true
+    label: "Chains of negatives"
+    description: "Phrases such as ‘No fluff, no filler, no jargon.’"
+  tell_empty_concession:
+    type: bool
+    default: true
+    label: "Vague concession pairs"
+    description: "Repeated praise followed by an unnamed challenge."
+  tell_intensifier_opposition:
+    type: bool
+    default: true
+    label: "Exaggerated opposites"
+    description: "‘Obsessively’ set against ‘barely at all.’"
+  tell_stock_reaction_frame:
+    type: bool
+    default: true
+    label: "Stock reaction phrases"
+    description: "Repeated ‘What surprised me most was’ openings."
+  tell_tier1a:
+    type: bool
+    default: true
+    label: "Tier 1A: stock vocabulary"
+    description: "Words to inspect for vague or inflated meaning."
+  tell_tier1b:
+    type: bool
+    default: true
+    label: "Tier 1B: wordiness"
+    description: "Longer or formal phrases with plainer alternatives."
+  tell_tier2:
+    type: bool
+    default: true
+    label: "Tier 2: clustered terms"
+    description: "Two or more terms in the same paragraph."
+  tell_tier3:
+    type: bool
+    default: true
+    label: "Tier 3: repeated words"
+    description: "Heavy repetition of one broad descriptive word."
+  tell_tier3_phrases:
+    type: bool
+    default: true
+    label: "Tier 3: repeated phrases"
+    description: "The same phrase twice, or three stock phrases."
 provides_hooks:
   - pre_verify
   - pre_tool_call
@@ -312,3 +474,4 @@ provides_tools:
   - voice_gate_profile
   - voice_gate_learn
   - voice_gate_vale
+  - voice_gate_review

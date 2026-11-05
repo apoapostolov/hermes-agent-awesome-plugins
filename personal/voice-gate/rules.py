@@ -24,8 +24,10 @@ it, or to the reason it needs a reader instead of a rule.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from fnmatch import fnmatchcase
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from . import mechanics, sanitize
 
 _MD_EMPHASIS = re.compile(r"[*_`]+")
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
@@ -34,7 +36,7 @@ _FENCED_CODE = re.compile(r"(?ms)^\s*```.*?^\s*```[^\n]*$")
 _INLINE_CODE = re.compile(r"`[^`\n]*`")
 _PARAGRAPH_SPLIT = re.compile(r"\n\s*\n")
 
-_NEGATION_TRIAD = re.compile(r"\bnot (?:just|only)\b[^.!?]{0,90}\bbut\b", re.I)
+_NEGATION_TRIAD = re.compile(r"\b(?:not|isn't|wasn't) (?:just|only|merely)\b[^.!?]{0,90}\bbut\b", re.I)
 _NEG_POSITIVE = re.compile(
     r"\b(?:is|was)\s+not\s+(?:about|the)\b[^.!?]{0,60}[.;]\s*(?:it|this|that)\s+(?:is|was|means)\b",
     re.I,
@@ -43,6 +45,7 @@ _WHOLE_LINE_BOLD = re.compile(r"(?m)^\s*\*\*[^*\n]{2,80}\*\*\s*:?\s*$")
 _BOLD_LEAD_BULLET = re.compile(r"(?m)^\s*[-*+]\s+\*\*[^*\n]{2,60}\*\*")
 _BULLET = re.compile(r"(?m)^\s*[-*+]\s+\S")
 _EM_DASH = re.compile(r"[\u2014]")
+_BULLET_SEPARATOR = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+[^—.!?\n]+?\s+—\s+")
 _GERUND_OPENING = re.compile(
     r"(?m)^\s*(?:Having|Knowing|Feeling|Realising|Realizing|Understanding|Recognising|"
     r"Recognizing|Being|Wanting|Trying)\b"
@@ -50,7 +53,7 @@ _GERUND_OPENING = re.compile(
 
 # --- shape patterns: a sentence skeleton, not a word -----------------------
 
-_WH_OPENER = re.compile(r"(?im)(?:^|[.!?]\s+)\s*(?:what|why|how)\b[^.!?\n]{0,60}\b(?:is|was|are)\b")
+_WH_OPENER = re.compile(r"(?im)(?:^|[.!?]\s+)\s*(?:what|when|where|which|who|why|how)\s+(?!(?:is|was|are)\b)[^.!?\n]{1,60}\b(?:is|was|are)\b")
 _HEDGE_STACKED = re.compile(
     r"\b(?:could|may|might|would|can)\s+(?:potentially|possibly|eventually|ultimately|conceivably)\b"
     r"|\b(?:potentially|possibly)\s+(?:could|may|might|would)\b",
@@ -112,7 +115,7 @@ _VAGUE_AUTHORITY = re.compile(
     re.I,
 )
 _REAL_ACTUAL = re.compile(
-    r"\b(?:real|actual|genuine|true)\s+(?:utility|value|impact|difference|problem|work|cost|risk|change|story)\b",
+    r"\b(?:real|actual|genuine|true)\s+(?:utility|value|impact|difference|problem|work|cost|risk|change|story|tokenomics)\b",
     re.I,
 )
 _ENDORSEMENT_CLOSER = re.compile(
@@ -208,6 +211,7 @@ BASE_RULES: Dict[str, List[str]] = {
         "let's explore", "let's take a look", "buckle up",
         "first things first", "without further ado", "let's get started",
         "let me walk you through", "i want to explore", "the rest of this essay",
+        "heads up", "quick note", "before i forget",
     ],
     # Wordy constructions with a shorter honest form.
     "filler": [
@@ -266,7 +270,6 @@ BASE_RULES: Dict[str, List[str]] = {
     ],
     # Slot-fill template phrases from the vocabulary tiers.
     "template_phrases": [
-        "a step towards", "a step toward", "a step forward for",
         "whether you're a", "i recently had the pleasure",
         "the world of", "in the world of",
     ],
@@ -317,13 +320,14 @@ BASE_THRESHOLDS: Dict[str, float] = {
     "template_residue": 1,
     "tool_fingerprints": 1,
 }
+BASE_THRESHOLDS.update({key: spec[3] for key, spec in mechanics.SPECS.items()})
 
 # Registers where a family is a house convention rather than a tell.
 CONTEXT_RELAXED: Dict[str, Tuple[str, ...]] = {
     "docs": (
         "bold_lead_bullets", "bold_pseudo_headings", "em_dashes", "over_compression",
         "rule_of_three", "staccato_runs", "number_inflation", "template_phrases",
-        "dev_slogans", "launch_copy",
+        "dev_slogans", "launch_copy", "bare_bullet_runs", "question_runs",
     ),
     "technical-blog": (
         "bold_lead_bullets", "em_dashes", "over_compression", "rule_of_three",
@@ -333,8 +337,7 @@ CONTEXT_RELAXED: Dict[str, Tuple[str, ...]] = {
     "casual": (
         "bold_lead_bullets", "bold_pseudo_headings", "em_dashes", "over_compression",
         "rule_of_three", "staccato_runs", "question_runs", "same_openers",
-        "wh_openers", "rhetorical_setup", "number_inflation", "template_phrases",
-        "transitions", "signposting",
+        "wh_openers", "number_inflation", "template_phrases", "transitions",
     ),
     "linkedin": (
         "em_dashes", "staccato_runs", "bold_lead_bullets", "rule_of_three",
@@ -404,15 +407,41 @@ def _prose(text: str) -> str:
     them; fences and inline spans are removed before anything is counted, so
     documentation about a rule never trips that rule.
     """
-    return _INLINE_CODE.sub(" ", _FENCED_CODE.sub(" ", text))
+    return sanitize.prose(text)
 
 
 def _present(haystack: str, needles: Iterable[str]) -> List[str]:
-    return [needle for needle in needles if needle and needle in haystack]
+    return [needle for needle in needles if needle and mechanics.phrase_matches(haystack, [needle])]
+
+
+def _prose_em_dashes(text: str) -> Dict[str, Any]:
+    """Keep a bullet's first spaced separator and standalone empty table cells.
+
+    Further dashes in the item's body count, as do sentences inside table cells.
+    This distinguishes structural punctuation without exempting whole files.
+    """
+    count = 0
+    samples: List[str] = []
+    for line in text.splitlines():
+        if re.match(r'^#{1,6}\s+\[\d+(?:\.\d+){1,3}(?:[-+][\w.-]+)?\]\s+—\s+\d{4}-\d{2}-\d{2}\s*$', line):
+            continue
+        separator = _BULLET_SEPARATOR.match(line)
+        sentence_label = separator and re.search(r'\b(?:is|are|was|were|has|have|had|will|would|should|can|could|did|does|must)\b', separator[0], re.I)
+        body = line if sentence_label else _BULLET_SEPARATOR.sub(lambda match: match.group(0).replace("—", " "), line, count=1)
+        if "|" in body:
+            body = "|".join(
+                " " if _MD_EMPHASIS.sub("", cell).strip() == "—" else cell
+                for cell in re.split(r"(?<!\\)\|", body)
+            )
+        hits = len(_EM_DASH.findall(body))
+        count += hits
+        if hits and len(samples) < 6:
+            samples.append(line.strip()[:160])
+    return {"count": count, "samples": samples}
 
 
 def _starts_with(haystack: str, needles: Iterable[str]) -> List[str]:
-    return [needle for needle in needles if needle and haystack.startswith(needle)]
+    return [needle for needle in needles if needle and any(hit.start() == 0 for hit in mechanics.phrase_matches(haystack, [needle]))]
 
 
 def _runs(items: List[Any], same: Any, least: int) -> int:
@@ -500,10 +529,13 @@ def _shape_tells(text: str) -> Dict[str, Dict[str, Any]]:
     }
 
 
-def lint(text: str, profile: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def lint(text: str, profile: Optional[Dict[str, Any]] = None, path: Any = None) -> Dict[str, Any]:
     merged = merge(profile)
     rules = merged["rules"]
-    text = _prose(text)
+    raw = text
+    dash_text = sanitize.prose(raw, keep_tables=True, keep_headings=True)
+    headings = sanitize.prose(raw, keep_headings=True)
+    text = _prose(raw)
     words = len(_WORD.findall(text))
     opening = " ".join(_first_body_sentences(text)).lower()
     first_line = (_first_body_sentences(text, limit=1) or [""])[0].lower()
@@ -518,22 +550,27 @@ def lint(text: str, profile: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     ratio = (len(bold_bullets) / len(bullets)) if bullets else 0.0
 
     def counted(key: str) -> Dict[str, Any]:
-        hits = _present(low, rules[key])
-        total = sum(low.count(needle) for needle in hits)
-        return {"count": total, "matches": len(hits), "samples": hits[:6]}
+        hits = mechanics.phrase_matches(text, rules[key])
+        if key == 'trailing_qualifiers':
+            hits = [hit for hit in hits if re.match(r'\s*(?:[.!?]|$)', text[hit.end():])]
+        result = mechanics.detail(text, hits)
+        result['matches'] = len({hit[0].lower() for hit in hits})
+        return result
 
     def shaped(pattern: Any) -> Dict[str, Any]:
         hits = pattern.findall(text)
         samples = [h if isinstance(h, str) else h[0] for h in hits][:6]
         return {"count": len(hits), "samples": samples}
 
-    hashtags = _HASHTAG.findall(text)
+    hashtags = [tag for tag in _HASHTAG.findall(text)
+                if not (re.fullmatch(r'#[0-9a-f]{6}(?:[0-9a-f]{2})?', tag, re.I) and re.search(r'\d', tag))
+                and tag not in {'#include', '#define', '#pragma'}]
 
     tells: Dict[str, Dict[str, Any]] = {
         "verdict_openers": {"count": 1 if _present(opening, rules["verdict_openers"]) else 0,
                             "samples": _present(opening, rules["verdict_openers"])},
-        "closing_offers": {"count": len(_present(low, rules["closing_offers"])),
-                           "samples": _present(low, rules["closing_offers"])},
+        "closing_offers": {"count": len(_present(' '.join(all_sentences[-2:]), rules["closing_offers"])),
+                           "samples": _present(' '.join(all_sentences[-2:]), rules["closing_offers"])},
         "cliche_openers": {"count": 1 if _starts_with(first_line, rules["cliche_openers"]) else 0,
                            "samples": _starts_with(first_line, rules["cliche_openers"])},
         "conclusion_signposts": {"count": len(signposts), "samples": signposts[:3]},
@@ -558,7 +595,7 @@ def lint(text: str, profile: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         "gerund_openings": {"count": len(_GERUND_OPENING.findall(text)), "samples": []},
         "bold_pseudo_headings": {"count": len(_WHOLE_LINE_BOLD.findall(text)), "samples": []},
         "bold_lead_bullets": {"count": len(bold_bullets), "ratio": round(ratio, 2), "samples": []},
-        "em_dashes": {"count": len(_EM_DASH.findall(text)), "samples": []},
+        "em_dashes": _prose_em_dashes(dash_text),
         "wh_openers": shaped(_WH_OPENER),
         "hedge_stacked": shaped(_HEDGE_STACKED),
         "parenthetical_hedge": shaped(_PARENTHETICAL_HEDGE),
@@ -566,7 +603,7 @@ def lint(text: str, profile: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         "negative_listing": shaped(_NEG_LISTING),
         "number_inflation": shaped(_NUMBER_INFLATION),
         "over_compression": shaped(_OVER_COMPRESSION),
-        "tool_fingerprints": shaped(_TOOL_FINGERPRINT),
+        "tool_fingerprints": mechanics.detail(raw, list(_TOOL_FINGERPRINT.finditer(sanitize.prose(raw, keep_urls=True)))),
         "template_residue": shaped(_TEMPLATE_RESIDUE),
         "rule_of_three": shaped(_RULE_OF_THREE),
         "assistant_residue": shaped(_ASSISTANT_RESIDUE),
@@ -577,7 +614,17 @@ def lint(text: str, profile: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         "hashtag_stuffing": {"count": len(hashtags), "samples": hashtags[:8]},
     }
     tells.update(_shape_tells(text))
-    return {"words": words, "profile": merged["name"], "tells": tells}
+    template_hits = list(re.finditer(r'\ba (?:major|crucial|significant|pivotal|transformative|groundbreaking) step (?:towards?|forward for)\b', text, re.I))
+    tells['template_phrases']['count'] += len(template_hits)
+    tells['template_phrases']['samples'].extend(hit[0] for hit in template_hits[:3])
+    context = merged['context'] or context_for_path(path)
+    tells.update(mechanics.lint(text, headings, context))
+    # These are publication residue, so their raw tokens must survive URL masking.
+    residue_text = sanitize.prose(raw, keep_tables=True, keep_headings=True)
+    for key in ('citation_residue',):
+        tells[key] = mechanics.detail(residue_text, list(re.finditer(mechanics.SPECS[key][2], residue_text, re.I)))
+    return {"words": words, "profile": merged["name"], "context": context, "tells": tells,
+            "interpretation": "editorial_signals_only", "review_source": str(Path(__file__).parent / 'references/humanizer/SKILL.md')}
 
 
 TELL_KEYS = (
@@ -628,6 +675,7 @@ TELL_KEYS = (
     "template_residue",
     "tool_fingerprints",
 )
+TELL_KEYS += tuple(mechanics.SPECS) + ('tier1a', 'tier1b', 'tier2', 'tier3', 'tier3_phrases')
 
 TELL_ALIASES = {
     "em_dash": "em_dashes",
@@ -701,6 +749,9 @@ def canonical_tell(name: Any) -> str:
     key = str(name or "").strip().lower().replace("-", "_").replace(" ", "_")
     if key in _WILDCARD_TELLS:
         return "*"
+    pattern = re.fullmatch(r'pattern_([0-9]+)', key)
+    if pattern and 1 <= int(pattern[1]) <= 110:
+        return f'pattern_{int(pattern[1])}'
     if key in TELL_KEYS:
         return key
     if key in TELL_ALIASES:
@@ -746,6 +797,8 @@ def normalise_exceptions(value: Any) -> Dict[str, List[str]]:
             globs = globs.get("globs") or globs.get("paths") or globs.get("files") or []
         if isinstance(globs, str):
             globs = globs.replace(";", ",").split(",")
+        if not isinstance(globs, (list, tuple)):
+            continue
         key = canonical_tell(tell)
         if not key:
             continue
@@ -782,11 +835,13 @@ def suppressed(profile: Optional[Dict[str, Any]], path: Any) -> List[str]:
     hit: List[str] = []
     for tell, globs in table.items():
         for glob in globs:
-            if glob in ("*", "**") or fnmatchcase(base, glob) or fnmatchcase(posix, glob):
+            suffixes = [posix[index + 1:] for index, char in enumerate(posix) if char == '/']
+            relative_match = not glob.startswith('/') and not re.match(r'^[a-z]:', glob) and any(fnmatchcase(suffix, glob) for suffix in suffixes)
+            if glob in ("*", "**") or fnmatchcase(base, glob) or fnmatchcase(posix, glob) or relative_match:
                 hit.append(tell)
                 break
     if "*" in hit:
-        return list(TELL_KEYS)
+        return [*TELL_KEYS, *[f'pattern_{number}' for number in range(1, 111)]]
     return hit
 
 
@@ -828,6 +883,7 @@ def gate_findings(
     profile: Optional[Dict[str, Any]] = None,
     path: Any = None,
     disabled: Optional[Iterable[str]] = None,
+    structured: bool = False,
 ) -> List[str]:
     """The tells worth asking for another pass over.
 
@@ -842,11 +898,26 @@ def gate_findings(
     words = int(result.get("words") or 0)
     found: List[str] = []
     register = merged["context"] or context_for_path(path)
-    skip = set(suppressed(profile, path)) | set(relaxed(register)) | set(disabled or ())
+    register_relaxed = set(relaxed(register))
+    if merged["preferences"].get("no_em_dash"):
+        register_relaxed.discard("em_dashes")
+    skip = set(suppressed(profile, path)) | register_relaxed | set(disabled or ())
 
     def emit(key: str, text: str) -> None:
         if key not in skip:
-            found.append(text)
+            if structured:
+                severity = mechanics.SPECS.get(key, (None, 'P1'))[1]
+                if key in {'transitions', 'copula_avoidance', 'conclusion_signposts', 'rule_of_three'}:
+                    severity = 'P2'
+                if key in {'assistant_residue', 'tool_fingerprints', 'template_residue', 'vague_authority', 'significance_inflation'}:
+                    severity = 'P0'
+                found.append({'rule': key, 'message': text, 'severity': severity,
+                              'band': key if key.startswith('tier') else 'style',
+                              'requires_review': key not in {'em_dashes', 'citation_residue'},
+                              'samples': (tells.get(key) or {}).get('samples', []),
+                              'positions': (tells.get(key) or {}).get('positions', [])})
+            else:
+                found.append(text)
 
     def count(key: str) -> int:
         return int((tells.get(key) or {}).get("count") or 0)
@@ -927,8 +998,15 @@ def gate_findings(
     if count("banned_words"):
         emit("banned_words", f"banned word {count('banned_words')} ({samples('banned_words')})")
     if merged["preferences"].get("no_em_dash") and count("em_dashes"):
-        emit("em_dashes", f"em dash {count('em_dashes')}")
+        emit("em_dashes", f"prose em dash {count('em_dashes')}")
     elif count("em_dashes") >= int(thresholds["em_dashes"]):
         emit("em_dashes", f"em dash cluster {count('em_dashes')}")
+
+    for key, (_, _severity, _pattern, floor, repair) in mechanics.SPECS.items():
+        if count(key) >= max(1, int(thresholds.get(key, floor))):
+            emit(key, f"{key.replace('_', ' ')} {count(key)} ({samples(key)}). {repair}")
+    for key, floor, label in [('tier1a', 1, 'Tier 1A marker; review meaning'), ('tier1b', 1, 'Tier 1B clarity; not authorship evidence'), ('tier2', 2, 'Tier 2 paragraph cluster'), ('tier3', 3, 'Tier 3 repeated-word density'), ('tier3_phrases', 2, 'Tier 3 phrase cluster')]:
+        if count(key) >= floor:
+            emit(key, f"{label} {count(key)} ({samples(key)})")
 
     return found

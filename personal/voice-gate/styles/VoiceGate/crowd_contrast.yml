@@ -1,0 +1,8 @@
+extends: existence
+message: "Name the actual comparison or retain the supported fact alone."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "\\bwhile (?:everyone else|the (?:industry|world)) (?:was |were )?still (?:debating|arguing|writing|talking)\\b|\\bwhile (?:everyone else|the industry) (?:wrote think-pieces|played catch-up)\\b"

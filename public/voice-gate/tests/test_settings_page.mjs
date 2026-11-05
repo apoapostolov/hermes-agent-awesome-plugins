@@ -1,0 +1,98 @@
+/** Exercise the real page with a fake gateway; never save live Hermes settings.
+ * Uses the host's existing React/jsdom development dependencies.
+ */
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const runtime = process.env.HERMES_AGENT_ROOT || resolve(pluginRoot, '../../hermes-agent')
+const require = createRequire(resolve(runtime, 'package.json'))
+const { JSDOM } = require('jsdom')
+const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost/' })
+Object.assign(globalThis, { window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true })
+const React = require('react')
+const { createRoot } = require('react-dom/client')
+const { act } = React
+const requests = [], opened = []
+const fields = [
+  { key: 'mode', type: 'string', value: 'improve', label: 'Mode', description: 'Review mode.' },
+  { key: 'vale_mode', type: 'string', value: 'advisory', label: 'Vale second opinion', description: 'Vale mode.' },
+  { key: 'vale_min_alerts', type: 'number', value: 3, label: 'Vale minimum alerts', description: 'Minimum.' },
+  { key: 'vale_path', type: 'string', value: '', label: 'Vale binary', description: 'Optional executable path.' },
+  { key: 'exceptions', type: 'string', value: '', label: 'Exceptions', description: 'One exception per line: rule_name: file_pattern, file_pattern.' }
+]
+const row = { key: 'voice-gate', name: 'Voice Gate', settings_schema: fields }
+globalThis.__vgHost = {
+  state: { profile: { get: () => 'default' }, connectionId: { get: () => 'local' } },
+  async requestProfile(route, method, params) {
+    assert.equal(route.targetProfile, 'default')
+    assert.equal(route.connectionId, 'local')
+    assert.equal(method, 'plugins.manage')
+    requests.push(params)
+    if (params.action === 'list') return { plugins: [row] }
+    for (const [key, value] of Object.entries(params.values)) fields.find(field => field.key === key).value = value
+    return { ok: true, plugin: row }
+  }
+}
+const temporary = await mkdtemp(resolve(tmpdir(), 'voice-gate-ui-'))
+const reactUrl = pathToFileURL(require.resolve('react')).href
+const mock = `import React from ${JSON.stringify(reactUrl)};
+export const host = globalThis.__vgHost;
+export const useValue = atom => atom.get();
+export const Input = props => React.createElement('input', props);
+export const Textarea = props => React.createElement('textarea', {className:'placeholder:text-muted-foreground', ...props});
+export const Button = ({variant,size,...props}) => React.createElement('button', props);
+export const Switch = ({onCheckedChange,checked,...props}) => React.createElement('input', {...props,type:'checkbox',checked,onChange:e=>onCheckedChange(e.target.checked)});
+export const Select = ({onValueChange,...props}) => React.createElement('div', props);
+export const SelectContent = props => React.createElement('div',props);
+export const SelectItem = props => React.createElement('span',props);
+export const SelectTrigger = props => React.createElement('span',props);
+export const SelectValue = () => null;`
+await writeFile(resolve(temporary, 'sdk.mjs'), mock)
+const source = (await readFile(resolve(pluginRoot, 'desktop/plugin.js'), 'utf8'))
+  .replace("from '@hermes/plugin-sdk'", `from ${JSON.stringify(pathToFileURL(resolve(temporary, 'sdk.mjs')).href)}`)
+  .replace("from 'react'", `from ${JSON.stringify(reactUrl)}`)
+await writeFile(resolve(temporary, 'page.mjs'), source)
+const page = await import(pathToFileURL(resolve(temporary, 'page.mjs')).href)
+let contribution
+const ctx = { registerSettingsPage: value => { contribution = value }, os: { openExternal: async url => { opened.push(url); return true } } }
+page.default.register(ctx)
+const root = createRoot(document.getElementById('root'))
+try {
+  await act(async () => { root.render(contribution.render()) })
+  const input = document.querySelector('textarea')
+  assert.equal(input.rows, 5)
+  assert.equal(input.style.width, '100%')
+  assert.equal(input.closest('section').style.width, '100%')
+  assert.match(input.placeholder, /signposting: README\.md/)
+  assert.match(input.className, /placeholder:text-muted/)
+  const vale = document.querySelector('[aria-label="Vale checks"]')
+  assert.equal(vale.querySelector('p').children.length, 2)
+  assert.match(vale.querySelector('p').textContent, /entirely on your computer/)
+  const link = vale.querySelector('a')
+  await act(async () => { link.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true })) })
+  assert.equal(opened[0], 'https://github.com/vale-cli/vale#install')
+  const value = 'signposting: docs/**\nbold_lead_bullets: README.md'
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
+  await act(async () => {
+    setter.call(input, value)
+    input.dispatchEvent(new window.Event('input', { bubbles: true }))
+  })
+  assert.equal(input.value, value)
+  const save = document.querySelector('button[type="submit"]')
+  assert.equal(save.disabled, false)
+  await act(async () => { document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })) })
+  assert.deepEqual(requests.at(-1).values, { exceptions: value })
+  assert.equal(save.disabled, true)
+  assert.equal(document.querySelector('[role="status"]').textContent, 'Changes saved.')
+  assert.throws(() => page.changedValues([{ key: 'count', type: 'number', value: 3, label: 'Count' }], { count: 'NaN' }))
+  console.log('Settings page: five-row full-width input, placeholder, two-line Vale intro, install link, scoped multiline save and validation passed.')
+} finally {
+  await act(async () => { root.unmount() })
+  dom.window.close()
+  await rm(temporary, { recursive: true, force: true })
+}

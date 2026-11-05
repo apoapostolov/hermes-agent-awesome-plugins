@@ -91,7 +91,7 @@ def main() -> int:
     fence = rules.lint("```text\ndelve tapestry seamless\n```\n")
     check("fenced code does not count", rules.gate_findings(fence) == [], str(rules.gate_findings(fence)))
     three = rules.lint("We delve once, delve twice, and delve a third time in this note.")
-    check("three buzzwords stay under the floor", not rules.gate_findings(three), str(rules.gate_findings(three)))
+    check("vocabulary markers are identified separately", any('Tier 1A' in item for item in rules.gate_findings(three)), str(rules.gate_findings(three)))
 
     # ---- the style pack tracks rules.py
     spec = importlib.util.spec_from_file_location("vg_gen", PLUGIN / "scripts" / "gen_style_pack.py")
@@ -186,7 +186,7 @@ def main() -> int:
     check("a basename glob matches in any directory",
           rules.suppressed({"exceptions": {"em_dash": ["readme.md"]}}, "deep/docs/README.md"))
     check("a wildcard tell silences every family",
-          rules.suppressed({"exceptions": {"all": ["*.md"]}}, "x.md") == list(rules.TELL_KEYS))
+          set(rules.TELL_KEYS) <= set(rules.suppressed({"exceptions": {"all": ["*.md"]}}, "x.md")))
     check("an unknown tell is ignored", rules.normalise_exceptions({"nonsense": ["*.md"]}) == {})
     check("a semicolon separates globs",
           rules.normalise_exceptions("em_dash: *.md; *.txt")["em_dashes"] == ["*.md", "*.txt"])
@@ -225,7 +225,7 @@ def main() -> int:
          "emphasis crutch"),
         ("slogan instead of a property", "Batteries included. Zero config.\n",
          "slogan instead of a property"),
-        ("template phrase", "A step towards the world of better tools.\n", "template phrase"),
+        ("template phrase", "A major step towards the world of better tools.\n", "template phrase"),
         ("copula avoidance", "It serves as a base and boasts a cache.\n", "copula avoidance"),
         ("wh- opener", "What makes this hard is time. Why this matters is trust.\n", "wh- opener"),
         ("stacked hedge", "It could potentially work and may eventually ship.\n", "stacked hedge"),
@@ -277,8 +277,8 @@ def main() -> int:
     check("register: a plain note does not",
           any("bold lead-in" in i for i in fires(readme, "notes.txt")),
           " ".join(fires(readme, "notes.txt")))
-    check("register: an explicit context relaxes",
-          not any("em dash" in i for i in
+    check("register: an explicit prose dash policy wins",
+          any("em dash" in i for i in
                   fires("One \u2014 two \u2014 three \u2014 four \u2014 five.\n",
                         "notes.txt", {"preferences": {"no_em_dash": True}, "context": "casual"})))
     check("register: docs is inferred from a path",

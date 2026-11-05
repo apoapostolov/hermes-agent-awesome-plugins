@@ -1,159 +1,67 @@
-<div align="center">
-  <h1>Voice Gate, personal edition</h1>
-  <strong>Finds the AI tells in Markdown, measured against your own writing.</strong>
-  <p>Same checks as the public build, driven by a profile document instead of one fixed rule set.</p>
-  <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.5-2ea44f" alt="Version 1.3.5" /></a>
-    <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
-  </p>
-</div>
+# Voice Gate
 
-<div align="center">
-  <img src="docs/hero.png" width="100%" alt="Voice Gate, personal edition" />
-</div>
+![Version](https://img.shields.io/badge/version-1.4.0-blue)
 
-## What it reads
+Voice Gate reviews prose files Hermes changes before a turn finishes. It finds wording and structural patterns that deserve another read, then asks for a source-faithful revision or an explanation for keeping the passage. A match is an editorial signal, not evidence of AI authorship.
 
-Voice Gate reads the prose a turn changed, not only Markdown: plain text, reStructuredText, AsciiDoc, Org and LaTeX documents, HTML pages and PDFs are all judged, and a PDF is decoded here rather than through a library. Code inside a document is ignored, so a README that quotes a banned phrase is not flagged for quoting it, and a file that is mainly source code carries no prose to judge and is skipped.
-
-## What the edition adds
-
-The public build carries one list of generic tells. This edition carries the same list plus a loader for profiles: small YAML or JSON files where a person writes down the openings they refuse, the offers they never make, the vocabulary they avoid, and the thresholds that match their writing. With no profile set, it behaves exactly like the public build.
-
-It also ships four tools and a skill, so an agent can work the gate on purpose rather than waiting for a turn to end.
-
-| Tool | What it does |
-| --- | --- |
-| `voice_gate_check` | Runs the active profile over text or any prose file it can read, and returns the findings and the raw counts. Use it before sending something long, or to explain an objection. |
-| `voice_gate_profile` | Shows the active profile with its rule counts and thresholds, lists the profiles on disk, or validates one. |
-| `voice_gate_learn` | Reads a corpus of somebody's writing and returns a draft profile with measured habits and candidate openings and closings. With `save`, it writes the draft for editing. |
-| `voice_gate_vale` | Installs and runs [Vale](https://vale.sh) on prose files you name. The release is pinned, the sha256 is checked before unpacking, the copy lives under `HERMES_HOME/plugin-data/voice-gate/`, and the install goes to the approval prompt because it downloads and runs a binary. |
-
-The `voice-profile-builder` skill walks the whole procedure: what to collect, how to read the measurements, which candidates to keep, and how to check the result against writing the person is happy with.
-
-## Install
-
-```bash
-hermes plugins install https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/voice-gate
-hermes plugins enable voice-gate
-```
-
-## Profiles
-
-A profile is looked up by name in `HERMES_HOME/voice-profiles/`, most specific first, then in the plugin's own `profiles/` directory. A path also works. `profiles/example.yaml` is a commented template.
-
-The home is resolved rather than assumed: `HERMES_HOME` when it is set, then the Windows install under `%LOCALAPPDATA%\hermes`, then `~/.hermes`, choosing the first that holds a `voice-profiles` folder. A host that starts without the variable, which the desktop backend does, still finds the profile written next to its config.
-
-```yaml
-name: my-voice
-applies_to: [default]
-thresholds:
-  min_words: 200
-preferences:
-  no_em_dash: true
-rules:
-  verdict_openers: [the real question, the honest headline]
-  closing_offers: [let me know if, i hope this helps]
-  banned_words: [synergy]
-```
-
-A list you leave out keeps the generic rules, so a profile can be three lines or three hundred. `applies_to` limits the gate to named Hermes profiles; leave it out to run wherever the plugin is enabled.
-
-## Build a profile from your own writing
-
-```
-voice_gate_learn(name="my-voice", paths=["D:/exports/chats", "D:/mail/sent"], save=true)
-voice_gate_profile(action="validate", profile="my-voice")
-voice_gate_check(text="<a paragraph you wrote>", profile="my-voice")
-```
-
-The learning pass measures sentence length, em dashes, semicolons, bold lines, contractions, and exclamations, then lists the opening and closing phrases that repeat. Repetition is evidence of a habit; a single sample is not. The skill covers the rest, including the rule that a profile stores shapes, never the person's own sentences.
-
-`hermes plugins doctor` resolves its argument as a directory slug, so the spaced display name does not address it; pass the path instead: `hermes plugins doctor ~/.hermes/plugins/voice-gate` (on Windows, `%LOCALAPPDATA%\hermes\plugins\voice-gate`).
-
-## Settings
-
-Settings → Plugins → Voice Gate.
-
-| Setting | What it does |
-| --- | --- |
-| Mode | `warn` asks once per turn, `improve` keeps asking inside the host's nudge budget, `skip` turns the gate off. |
-| Hermes, Herald, Keeper, Steward, Tinker | boolean, default on | Which bots run the gate. Unticking one leaves that profile alone; the boxes live in the default profile's config, so one set covers the install. |
-| Profile | Name in `HERMES_HOME/voice-profiles` or a path. Empty uses the generic rules. |
-| Minimum words overrides | 0 uses the profile's floor. A positive number overrides it for every profile. |
-| Vale second opinion | `advisory` runs Vale over the same changed files and appends one line when it reports at least the minimum number of alerts; `off` leaves it out. |
-| Vale minimum alerts | The threshold Vale has to reach before the gate mentions it. Three by default. |
-| Vale binary | Path to a Vale binary. Empty uses the plugin's copy, then `PATH`. |
+![Voice Gate](docs/hero.png)
 
 ## What it checks
 
-Markdown only: `.md`, `.markdown`, `.mdx`. Paths under `.git`, `node_modules`, `.venv`, `venv`, `dist`, `build` and `__pycache__` are skipped. The tell list, the thresholds and the wording of the objection all come from the active profile, so two people running this plugin get two different gates.
+The built-in checker has 75 rule families. They cover stock phrases, vocabulary bands, repeated sentence shapes, formatting, and text left over from an assistant or draft. Documentation conventions, code, quotations, and exact syntax receive different treatment from ordinary prose.
 
-## Exceptions
+The complete humanizer skill and all nine references are included as a versioned review contract. [The comparison](docs/HUMANIZER-COVERAGE.md) maps all 110 catalog patterns to the implementation, records defects fixed since 1.3.5, and explains the remaining limits. Rules about evidence, coherence, reader priorities, narrative, and voice need contextual judgment. Turn on **Review meaning and structure** to use your selected Hermes model for those checks. This sends the reviewed documents to that model's normal provider and adds a request per pass.
 
-A family can be wrong for a kind of file. A generated reference page repeats the same sentence on every page, and a template that leads every bullet with a bold label is doing its job. An exception silences one family for the files a glob matches and leaves the rule in force everywhere else.
+**Ask once** (`warn`) raises findings once. **Review and revise** (`improve`) allows at most two review opportunities, compares protected material and quantities, and reports lack of progress. **Off** (`skip`) disables automatic review. The hook runs on changed files reported by Hermes; ordinary chat replies need an explicit tool check.
 
-```yaml
-exceptions:
-  signposting: docs/reference/**
-  bold_lead_bullets: CHANGELOG.md, docs/api/*.md
+Markdown, plain text, reStructuredText, AsciiDoc, Org, LaTeX, HTML, and simple text PDFs are supported. The PDF reader does not provide OCR or reconstruct complex font mappings and layouts. Preservation checks recognize Markdown spans and quantity changes; they cannot prove semantic equivalence.
+
+## Settings
+
+Open Settings, Plugins, Voice Gate. The page groups review behavior, bots, Vale, exceptions, and the wording rules by purpose. Settings are saved for the profile named on the page. Older Desktop builds without the settings-page SDK keep the generated settings form.
+
+Prose em dashes are flagged by default. A bullet label separator such as `- Status — Ready` and a table cell containing only `—` are formatting and remain allowed. A prose sentence in a bullet or table still follows the prose policy. Code, quotes, and literal examples remain protected.
+
+The full-width **File exceptions** box shows five rows and a dim example until you enter text. Write one rule per line, followed by a colon and comma-separated filename patterns:
+
+```text
+signposting: README.md, docs/**
+bold_lead_bullets: CHANGELOG.md
+marketing_adjectives: *.generated.md
+pattern_97: stories/**
+all: vendor/**
 ```
 
-The tell is any family name from the table above, in any spelling its aliases accept, or `all` to silence every family for those files. A glob is matched against the file name and against the whole path, so `README.md` matches in every directory and `docs/**` matches one tree. Write the block in the profile or in the plugin's Exceptions setting; both merge, and the profile is never modified by the setting.
+Use the family name without `tell_`, a catalog key from `pattern_1` through `pattern_110`, or `all` for every check. A filename matches at any depth; `docs/**` matches a docs subtree, including absolute paths. Exceptions apply only when a check has a file path. Turning off a family also removes its turn-time Vale findings.
 
-An exception needs a path to test. Text passed to `voice_gate_check` without a `path` has none, so it is judged with the plain rules.
+## Tools
+
+- `voice_gate_check` checks text or paths and returns findings, review guidance, and gate eligibility.
+- `voice_gate_review` returns the review plan, runs optional model analysis, or records an assessment tied to the exact file contents. A recorded assessment cannot waive changed protected material or the strict prose-dash policy.
+- `voice_gate_vale` reports status, checks files, or installs the pinned Vale executable.
 
 ## Vale
 
-`voice_gate_vale` installs and runs [Vale](https://vale.sh), the prose linter, on prose files you name. The release is pinned, the sha256 is checked against the digest in `vale.py` before anything is unpacked, and the copy lives under `HERMES_HOME/plugin-data/voice-gate/`. The install call goes to the approval prompt, because it downloads and runs a binary.
+[Vale](https://github.com/vale-cli/vale#install) is a local prose style checker. It is an independent project; the Microsoft writing style can be installed as a Vale style package. The settings page explains Vale above its controls and links to its GitHub installation guide.
 
-```text
-voice_gate_vale(action="status")
-voice_gate_vale(action="install")
-voice_gate_vale(action="check", paths=["docs/release-notes.md"])
+Leave **Vale executable** blank to search the plugin-managed copy and PATH. The bundled style pack needs no download. Optional installation verifies the archive against a digest pinned in the plugin before extracting it. Status, checking, and installation request approval before starting a program. Approval directives need Hermes v2026.7.7 (semver 0.18.1); this plugin requires Hermes 0.22.0 or newer.
+
+Vale is off by default. Its turn-time findings respect family switches and file exceptions; standalone Vale uses the generic pack and does not reproduce a personal profile. The Python checker works without Vale or model review.
+
+## Install and update
+
+```sh
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/voice-gate
 ```
 
-Status resolves an existing binary from the `Vale binary` setting, then the plugin's own copy, then `PATH`, so a Vale you already installed is used as-is. Checks return Vale's own report and a count per severity.
+Restart Hermes Desktop after updating so both halves load the same version.
 
-### The style pack
+## Development checks
 
-`styles/VoiceGate/` holds the rules Vale runs. Every file in it is generated from `rules.py` by `scripts/gen_style_pack.py`, so the pack cannot describe a different list than the engine; `scripts/check_style_pack.py` exits nonzero when the two drift, which makes it usable in CI.
+Run the Python scripts in `tests/`, `python scripts/check_style_pack.py`, and `node tests/test_settings_page.mjs`. Set `HERMES_AGENT_ROOT` to a Hermes checkout with Desktop dependencies installed for the settings test. The test mounts the actual page with an SDK fixture and checks scoped loading, editing, validation, and saving; it is not a screenshot test.
 
-```text
-python scripts/check_style_pack.py
-```
+## Personal writing profiles
 
-Nine rules: `Terms`, `Marketing`, `Significance`, `Signposts`, `Openers`, `Hedges`, `Filler`, `Transitions` and `NegationTriad`. The first five alert at `warning` and the rest at `suggestion`, and `.vale.ini` sets `MinAlertLevel = warning`, so the nudge is driven by the rules that matter.
+This edition also registers `voice_gate_profile`, `voice_gate_learn`, and the voice-profile-builder skill. Load an approved JSON profile from `HERMES_HOME/voice-profiles`, or supply its path. YAML profiles use the host's optional `ruamel.yaml` support; PyYAML is not required. An invalid profile is reported and falls back to the built-in rules.
 
-The pack is portable. Copy `.vale.ini` and `styles/` into a repository and Vale, the VS Code extension and any pre-commit hook judge the same prose by the same list.
-
-### A second opinion in the turn
-
-`Vale second opinion` has two states. `off`, the default, leaves Vale out of the turn entirely. `advisory` runs it over the same changed Markdown the engine read and appends one line to the nudge:
-
-```text
-voice-gate improve: fix 1 file(s) before this turn ends. notes.md: AI vocabulary 5 (delve, tapestry). Vale reports 6 alert(s) in 1 file(s) (Terms 3, Significance 2, Signposts 1); first at line 5: In conclusion.
-```
-
-It speaks only when Vale reports at least `Vale minimum alerts` warnings, three by default, and only when a binary resolves. An alert below that threshold, a missing binary, or a report that fails to parse leaves the nudge exactly as the engine wrote it. Vale runs on the files the engine already accepted by word count, at most six of them.
-
-The engine and the pack catch the same generic families, so the line Vale adds is position and a per-rule breakdown rather than new words. Profile-specific lists belong to the engine, which is where a person's own vocabulary is enforced without regenerating a style.
-
-## Tests
-
-```text
-python tests/test_voice_gate.py
-```
-
-The same twenty-one checks the public edition runs, plus the profile path.
-
-## This edition ships with no personal data
-
-The profile that makes the gate personal lives in `HERMES_HOME/voice-profiles/`, outside the plugin tree. The repository carries the loader, the template, and the skill; it never carries anybody's profile. That is what makes this edition publishable.
-
-## Limits
-
-- The checks are heuristics in English, tuned by a profile rather than proven by one.
-- It reads only what a turn changed, never a whole repository, and never runs on commit.
-- It cannot rewrite anything. The next pass belongs to the agent.
-- A profile that fires on the person's own good writing is too tight; loosen a threshold rather than adding an exception.
+Learning accepts explicitly curated author samples and saves a draft for review. It does not infer bans from absent punctuation, reverse frequent author signatures into prohibitions, overwrite an existing profile, or establish authorship. Private profiles and author corpora are not shipped with the plugin.

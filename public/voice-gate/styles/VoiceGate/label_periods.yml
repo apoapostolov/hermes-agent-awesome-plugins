@@ -1,0 +1,8 @@
+extends: existence
+message: "Inspect the label punctuation; do not change full-sentence bullets."
+level: warning
+scope: sentence
+ignorecase: true
+nonword: true
+tokens:
+  - "(?m)^\\s*[-*+]\\s+\\*\\*[^*.\\n]{1,35}\\.\\*\\*\\s+\\S"

@@ -1,0 +1,32 @@
+extends: existence
+message: "tier1b: inspect meaning and context of %s."
+level: suggestion
+scope: sentence
+ignorecase: true
+nonword: false
+tokens:
+  - "ascertain"
+  - "ascertained"
+  - "ascertaining"
+  - "ascertains"
+  - "boast"
+  - "boasts"
+  - "commence"
+  - "commenced"
+  - "commences"
+  - "commencing"
+  - "due to the fact that"
+  - "endeavor"
+  - "endeavored"
+  - "endeavoring"
+  - "endeavors"
+  - "feature"
+  - "features"
+  - "in order to"
+  - "present"
+  - "presents"
+  - "serves as"
+  - "utilize"
+  - "utilized"
+  - "utilizes"
+  - "utilizing"
