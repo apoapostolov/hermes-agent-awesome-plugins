@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import time
 
@@ -13,6 +14,9 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules["hermes_break_plugin"] = mod
 assert spec.loader is not None
 spec.loader.exec_module(mod)
+
+# A spawned child only needs to exist and be attributable; give it no more.
+CHILD_ENV = {"PATH": os.environ.get("PATH", ""), "SYSTEMROOT": os.environ.get("SYSTEMROOT", "")}
 
 
 def test_fmt():
@@ -305,3 +309,78 @@ def test_session_delete_forgets_its_again_budget():
     mod._on_session_delete(session_id="sa")
     assert not any(key[0] == "sa" for key in mod._again_by_fp)
     mod._on_post_tool_call(tool_call_id="dup-b")
+
+
+def test_a_call_without_a_tool_call_id_is_cleared_by_its_post_hook():
+    # A surface that omits tool_call_id still fires the matching post hook, so
+    # the row the pre hook created has to be findable from post alone (#18).
+    with mod._lock:
+        mod._inflight.clear()
+        mod._broken.clear()
+        mod._again_by_fp.clear()
+    mod._on_pre_tool_call(tool_name="terminal", tool_call_id="", session_id="s-anon",
+                          task_id="t-1", args={"command": "echo hi"})
+    assert len(mod._inflight) == 1
+    key = next(iter(mod._inflight))
+    assert mod._inflight[key]["id"] == key
+    mod._on_post_tool_call(tool_name="terminal", tool_call_id="", session_id="s-anon", task_id="t-1")
+    assert not mod._inflight
+
+
+def test_break_reaches_a_call_without_a_tool_call_id():
+    with mod._lock:
+        mod._inflight.clear()
+        mod._broken.clear()
+        mod._again_by_fp.clear()
+    mod._on_pre_tool_call(tool_name="terminal", tool_call_id="", session_id="s-anon",
+                          task_id="t-1", args={"command": "sleep 300"})
+    for item in mod._inflight.values():
+        if item.get("poll"):
+            item["poll"].cancel()
+    assert "Broke" in mod._break_oldest(hint=None, again=False, session_id="s-anon")
+    text = mod._on_transform_tool_result(tool_name="terminal", tool_call_id="", session_id="s-anon",
+                                         task_id="t-1", result="partial")
+    assert text is not None and "Broken by /break" in text and "partial" in text
+    mod._on_post_tool_call(tool_name="terminal", tool_call_id="", session_id="s-anon", task_id="t-1")
+    assert not mod._inflight
+
+
+def test_a_later_calls_child_stays_out_of_an_older_kill_list():
+    with mod._lock:
+        mod._inflight.clear()
+        mod._broken.clear()
+        mod._again_by_fp.clear()
+    mod._on_pre_tool_call(tool_name="web_search", tool_call_id="older", session_id="ss", args={"query": "q"})
+    older = mod._inflight["older"]
+    time.sleep(0.02)
+    mod._on_pre_tool_call(tool_name="terminal", tool_call_id="later", session_id="ss", args={"command": "bg"})
+    later = mod._inflight["later"]
+    for item in (older, later):
+        if item.get("poll"):
+            item["poll"].cancel()
+
+    daemon = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], env=CHILD_ENV)
+    try:
+        with mod._lock:
+            mod._attach_pids(later)
+        assert daemon.pid in later["pids"]
+        # the claim must not shrink the older row's exclusion window
+        assert daemon.pid not in older["seen"]
+        assert daemon.pid not in mod._kill_list_for(older)
+    finally:
+        daemon.terminate()
+        daemon.wait()
+
+    if hasattr(mod, "_attach_spawned_pid"):
+        # the personal edition's Popen hook claims a pid the same way
+        spawned = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], env=CHILD_ENV)
+        try:
+            mod._attach_spawned_pid(spawned.pid)
+            assert spawned.pid in later["pids"]
+            assert spawned.pid not in older["seen"]
+            assert spawned.pid not in mod._kill_list_for(older)
+        finally:
+            spawned.terminate()
+            spawned.wait()
+    mod._on_post_tool_call(tool_call_id="older")
+    mod._on_post_tool_call(tool_call_id="later")

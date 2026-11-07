@@ -36,6 +36,7 @@ PID_POLL_FOR_S = 2.5
 SPAWN_TOOLS = frozenset({"terminal", "process"})
 SALVAGE_MAX = 8192
 MAX_AGAIN = 2
+ANON_KEY = "::anon::"
 
 _lock = threading.Lock()
 _inflight: dict[str, dict[str, Any]] = {}
@@ -219,7 +220,13 @@ def _newest() -> Optional[dict[str, Any]]:
 
 
 def _attach_pids(item: dict[str, Any]) -> None:
-    """Claim processes spawned after this tool call started (caller holds lock)."""
+    """Claim processes spawned after this tool call started (caller holds lock).
+
+    A claim lands in ``pids`` only, never in ``seen``. ``_kill_list_for`` drops a
+    later call's children from an older call's kill list by reading
+    ``now - seen``, so stamping a claimed pid into ``seen`` would hand that
+    child straight to every older row still in flight.
+    """
     claimed = _claimed_pids()
     seen: set[int] = item["seen"]
     pids: list[int] = item["pids"]
@@ -227,7 +234,6 @@ def _attach_pids(item: dict[str, Any]) -> None:
         if pid in seen or pid in claimed:
             continue
         pids.append(pid)
-        seen.add(pid)
 
 
 def _watch_tick(item: dict[str, Any]) -> None:
@@ -423,11 +429,19 @@ def _visible_items(session_id: Optional[str] = None) -> list[dict[str, Any]]:
 
 
 def _kill_list_for(target: dict[str, Any]) -> list[int]:
+    """Processes born after ``target`` started that no later call owns.
+
+    ``seen`` holds a call's opening baseline and nothing else, so a pid a later
+    call claimed is still inside ``now - seen`` for that call. Its ``pids`` are
+    subtracted explicitly as well, which keeps a child already attributed to a
+    later call out of every older row's kill list.
+    """
     now = set(_descendants(os.getpid()))
     later_new: set[int] = set()
     for item in _inflight.values():
         if item["started_at"] > target["started_at"]:
             later_new |= now - set(item.get("seen") or [])
+            later_new |= set(item.get("pids") or [])
     return sorted((now - set(target.get("seen") or [])) - later_new)
 
 
@@ -478,9 +492,26 @@ def _parse_args(raw_args: str) -> tuple[Optional[str], Optional[str]]:
     return None, text
 
 
+def _call_key(kwargs: dict[str, Any], name: str) -> str:
+    """The ``_inflight`` key for one hook event: its call id, or a stable fallback.
+
+    Core always sends a coalesced ``tool_call_id``, but a surface that omits one
+    still fires matching pre, post and transform hooks. The fallback is
+    therefore derived from kwargs all three events carry, so the post hook can
+    clear the row its pre hook created and a /break marker still finds its
+    result. A per-call timestamp here leaked one row per such call.
+    """
+    call_id = str(kwargs.get("tool_call_id") or "").strip()
+    if call_id:
+        return call_id
+    session = str(kwargs.get("session_id") or "")
+    task = str(kwargs.get("task_id") or "")
+    return f"{name}{ANON_KEY}{session}{ANON_KEY}{task}"
+
+
 def _on_pre_tool_call(**kwargs: Any) -> None:
-    tool_call_id = str(kwargs.get("tool_call_id") or "") or f"{kwargs.get('tool_name')}-{time.monotonic()}"
     name = str(kwargs.get("tool_name") or "tool")
+    tool_call_id = _call_key(kwargs, name)
     item = {
         "id": tool_call_id,
         "name": name,
@@ -498,17 +529,15 @@ def _on_pre_tool_call(**kwargs: Any) -> None:
 
 
 def _on_post_tool_call(**kwargs: Any) -> None:
-    tool_call_id = str(kwargs.get("tool_call_id") or "")
-    if not tool_call_id:
-        return
+    name = str(kwargs.get("tool_name") or "tool")
     with _lock:
-        _drop(tool_call_id)
+        _drop(_call_key(kwargs, name))
 
 
 def _on_transform_tool_result(**kwargs: Any) -> Optional[str]:
-    tool_call_id = str(kwargs.get("tool_call_id") or "")
+    name = str(kwargs.get("tool_name") or "tool")
     with _lock:
-        mark = _broken.pop(tool_call_id, None)
+        mark = _broken.pop(_call_key(kwargs, name), None)
     if not mark:
         return None
     prior = _content_text(kwargs.get("result"))
