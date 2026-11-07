@@ -219,6 +219,10 @@ def on_pre_llm_call(**kwargs):
 
 def _pre_llm_call(**kwargs):
     session_id = str(kwargs.get("session_id") or "")
+    # Cron runs have no human to approve a held turn; routing a hold here
+    # interrupts the job before it can do any work. Shadow-only on cron.
+    if str(kwargs.get("platform") or "").lower() == "cron":
+        return None
     if _CTX is not None:
         _LAST["mode"] = _mode(_CTX)
         _LAST["config_path"] = _config_path(_CTX)

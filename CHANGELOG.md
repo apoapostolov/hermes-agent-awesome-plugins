@@ -35,6 +35,8 @@ Both standalone editions carry these features. Catalog admission remains blocked
 - The three cache-guard branches were a boolean arrangement whose fast path only worked by accident. They are written explicitly now. A same-tier swap needs an affordable miss, a move inside the current band always holds, and a move out of the band holds unless it is a big upgrade or cheap.
 - A confirm tier held the tier but still let the turn send on the model you had not approved. It now interrupts the in-flight send and owes your prompt back, so the strip waits and the approved model answers the request you actually sent.
 - The confirm strip led with a bold "Yes". It now reads `Approve:` in bold, with `Yes, <tier>`, `No`, `Free`, the other tier names, and `X` all plain.
+- **voice-gate.** A markdown heading's first spaced em dash is title punctuation, the same structural role a bullet's label separator plays, so `## Better capabilities — skills and presets` stopped counting as prose; a second dash inside the heading still does, and bullets read as before.
+- **hermes-jev-routing.** A cron run has no human to approve a held turn, so a routing hold interrupted the job before it could do its work. `pre_llm_call` now returns no decision on the `cron` platform, leaving the turn on the configured model; every other platform routes as before.
 
 ## [voice-gate 1.4.4] - 2026-11-05
 
