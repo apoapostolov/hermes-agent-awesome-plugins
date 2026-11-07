@@ -425,6 +425,11 @@ def _prose_em_dashes(text: str) -> Dict[str, Any]:
     for line in text.splitlines():
         if re.match(r'^#{1,6}\s+\[\d+(?:\.\d+){1,3}(?:[-+][\w.-]+)?\]\s+—\s+\d{4}-\d{2}-\d{2}\s*$', line):
             continue
+        if re.match(r'^#{1,6}\s+', line):
+            # A heading's first spaced separator is title punctuation, the same
+            # structural role a bullet's label separator plays below. Dashes
+            # further into the heading still count as prose.
+            line = re.sub(r'\s+—\s+', ' ', line, count=1)
         separator = _BULLET_SEPARATOR.match(line)
         sentence_label = separator and re.search(r'\b(?:is|are|was|were|has|have|had|will|would|should|can|could|did|does|must)\b', separator[0], re.I)
         body = line if sentence_label else _BULLET_SEPARATOR.sub(lambda match: match.group(0).replace("—", " "), line, count=1)
