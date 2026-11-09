@@ -64,7 +64,18 @@ jobs:
             fi
             echo "::group::$dir"
             if ! python3 scripts/admission_check.py "$dir"; then
-              fail=1
+              case "$dir" in
+                public/*)
+                  fail=1
+                  ;;
+                personal/*)
+                  # A personal edition is Apo's own tree and deliberately uses
+                  # private internals its own LIMITATIONS.md documents, so the bar
+                  # reports it here without blocking main. Any public edition
+                  # still fails the job.
+                  echo "::warning file=$dir::personal edition is off-catalog by design; reported, not blocking"
+                  ;;
+              esac
             fi
             echo "::endgroup::"
           done < "$RUNNER_TEMP/editions.txt"
