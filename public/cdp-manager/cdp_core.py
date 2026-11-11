@@ -21,6 +21,12 @@ CONFIG_PATH = PLUGIN_ROOT / "config.json"
 DEFAULT_PORTS = [9222, 9333, 9335]
 PROBE_TIMEOUT_S = 1.0
 
+# Chrome normally binds the DevTools listener to 127.0.0.1, but a launch
+# whose IPv4 bind loses a race falls back to [::1] alone. Probing both
+# families keeps that instance visible instead of reporting it dead, which
+# made the supervisor relaunch a browser that was already up, forever.
+PROBE_HOSTS = ("127.0.0.1", "[::1]")
+
 DEFAULT_CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe"
 DEFAULT_PROFILE = str(
     Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
@@ -28,6 +34,10 @@ DEFAULT_PROFILE = str(
 )
 
 _lock = threading.RLock()
+
+# Port -> the address family that answered last, so a live port is not
+# paid for with a second timed-out probe on every tick.
+_live_host: dict = {}
 
 
 # ── config ────────────────────────────────────────────────────────────
@@ -73,26 +83,43 @@ def mutate_config(fn) -> dict:
 # ── probing ───────────────────────────────────────────────────────────
 
 def probe_port(port: int) -> dict:
-    """One /json/version probe. Returns the same shape the JS renders."""
+    """One /json/version probe. Returns the same shape the JS renders.
+
+    Both address families are tried: a Chrome that lost its IPv4 bind race
+    answers on [::1] only, and an IPv4-only probe reports that instance dead
+    while it serves CDP perfectly well.
+    """
+    port = int(port)
     t0 = time.monotonic()
-    url = f"http://127.0.0.1:{int(port)}/json/version"
-    try:
-        with urllib.request.urlopen(url, timeout=PROBE_TIMEOUT_S) as res:
-            if res.status != 200:
-                return {"port": int(port), "state": "dead", "reason": f"HTTP {res.status}"}
-            j = json.loads(res.read().decode("utf-8", "replace"))
+    known = _live_host.get(port)
+    hosts = ([known] if known else []) + [h for h in PROBE_HOSTS if h != known]
+    reason = "no listener"
+    for host in hosts:
+        url = f"http://{host}:{port}/json/version"
+        try:
+            with urllib.request.urlopen(url, timeout=PROBE_TIMEOUT_S) as res:
+                if res.status != 200:
+                    reason = f"HTTP {res.status}"
+                    continue
+                j = json.loads(res.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as e:
+            # Something else answers on this family; the other may be ours.
+            reason = f"HTTP {e.code}"
+            continue
+        except Exception:
+            continue
+        _live_host[port] = host
         return {
-            "port": int(port),
+            "port": port,
             "state": "live",
             "browser": j.get("Browser") or "unknown browser",
             "pid": int(j["Process Id"]) if str(j.get("Process Id", "")).isdigit() else None,
             "ws": j.get("webSocketDebuggerUrl"),
+            "host": host,
             "ms": int((time.monotonic() - t0) * 1000),
         }
-    except urllib.error.HTTPError as e:
-        return {"port": int(port), "state": "dead", "reason": f"HTTP {e.code}"}
-    except Exception:
-        return {"port": int(port), "state": "dead", "reason": "no listener"}
+    _live_host.pop(port, None)
+    return {"port": port, "state": "dead", "reason": reason}
 
 
 def probe_all(ports: list[int] | None = None) -> list[dict]:
@@ -116,16 +143,20 @@ def _is_picker_target(t: dict) -> bool:
 
 def list_targets(port: int) -> list[dict]:
     """Every CDP target on the port (the /json/list endpoint)."""
-    try:
-        with urllib.request.urlopen(
-            f"http://127.0.0.1:{int(port)}/json/list",
-            timeout=PROBE_TIMEOUT_S,
-        ) as res:
-            if res.status != 200:
-                return []
-            return json.loads(res.read().decode("utf-8", "replace")) or []
-    except Exception:
-        return []
+    port = int(port)
+    known = _live_host.get(port)
+    hosts = ([known] if known else []) + [h for h in PROBE_HOSTS if h != known]
+    for host in hosts:
+        try:
+            with urllib.request.urlopen(
+                f"http://{host}:{port}/json/list",
+                timeout=PROBE_TIMEOUT_S,
+            ) as res:
+                if res.status == 200:
+                    return json.loads(res.read().decode("utf-8", "replace")) or []
+        except Exception:
+            continue
+    return []
 
 
 def wedged(port: int) -> dict:
@@ -186,17 +217,36 @@ def launch(port: int, mode: str | None = None, profile: str | None = None) -> di
     chrome = cfg["chromePath"]
     if not Path(chrome).exists():
         return {"ok": False, "error": f"chrome.exe not found at {chrome}"}
-    headless = (mode or load_config().get("mode") or "headful") == "headless"
+    # The remembered mode lives under mode_<port>. Reading a bare "mode" key
+    # made a launch without an explicit mode reset a headless port to a
+    # window, and remember that instead.
+    headless = (mode or cfg.get(f"mode_{port}") or "headful") == "headless"
     prof = resolve_profile(port, profile, cfg)
     if prof.startswith("chrome:"):
         problem = check_profile_dir(port, prof, cfg)
         if problem:
             return {"ok": False, "error": problem}
+    # A second Chrome on an occupied user-data-dir hands off to the running
+    # instance and exits, so the debug port never binds and every later launch
+    # reports "no listener" while the profile stays locked. Refuse with the pid
+    # that holds it instead of spawning a process that cannot work.
+    data_dir = profile_data_dir(prof, port, cfg)
+    holder = profile_holder(data_dir)
+    if holder is not None:
+        return {
+            "ok": False,
+            "port": port,
+            "error": (
+                f"no DevTools listener on port {port}, and a running Chrome "
+                f"(pid {holder}) already holds this profile dir "
+                f"({data_dir}); close that Chrome, then launch again"
+            ),
+        }
     flags = subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
     args = [
         chrome,
         f"--remote-debugging-port={port}",
-        f"--user-data-dir={profile_data_dir(prof, port, cfg)}",
+        f"--user-data-dir={data_dir}",
         "--no-first-run",
         # Startup URL: keeps Chrome off the profile picker. The picker is a
         # browser_ui target with no real page, and then Target.createTarget
@@ -327,9 +377,9 @@ def _norm_dir(p: str) -> str:
     return os.path.normcase(os.path.normpath(p))
 
 
-def main_chrome_dirs() -> list[str] | None:
-    """user-data-dirs held by running main Chrome instances (no --type=).
-    None when the scan itself fails (caller decides how to treat that)."""
+def chrome_instances() -> list[dict] | None:
+    """Running main Chrome processes (no --type= child) as
+    {pid, dir, debugPort}. None when the scan itself fails (caller decides)."""
     import subprocess
     import sys as _sys
     if _sys.platform != "win32":
@@ -338,25 +388,56 @@ def main_chrome_dirs() -> list[str] | None:
         out = subprocess.run(
             ["powershell.exe", "-NoProfile", "-Command",
              "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
-             "Where-Object {$_.CommandLine -notmatch '--type=' -and $_.CommandLine -notmatch 'remote-debugging-port'} | "
-             "ForEach-Object { $_.CommandLine }"],
+             "Where-Object {$_.CommandLine -notmatch '--type='} | "
+             "ForEach-Object { \"$($_.ProcessId)::$($_.CommandLine)\" }"],
             capture_output=True, text=True, timeout=20,
         )
-        dirs = []
+        found = []
         for line in (out.stdout or "").splitlines():
             line = line.strip()
-            if "chrome.exe" not in line:
+            if "chrome.exe" not in line or "::" not in line:
                 continue
-            m = __import__("re").search(r"--user-data-dir=(\"[^\"]+\"|\S+)", line)
+            raw_pid, _, cmd = line.partition("::")
+            if not raw_pid.strip().isdigit():
+                continue
+            m = __import__("re").search(r"--user-data-dir=(\"[^\"]+\"|\S+)", cmd)
             if m:
-                dirs.append(_norm_dir(m.group(1).strip('"')))
+                d = m.group(1).strip('"')
             else:
-                real = chrome_user_data_dir()
-                if real:
-                    dirs.append(_norm_dir(real))
-        return dirs
+                d = chrome_user_data_dir()
+            if not d:
+                continue
+            p = __import__("re").search(r"--remote-debugging-port=(\d+)", cmd)
+            found.append({
+                "pid": int(raw_pid.strip()),
+                "dir": _norm_dir(d),
+                "debugPort": int(p.group(1)) if p else None,
+            })
+        return found
     except Exception:
         return None
+
+
+def main_chrome_dirs() -> list[str] | None:
+    """user-data-dirs held by running main Chrome instances with no debug
+    port of their own. None when the scan itself fails."""
+    found = chrome_instances()
+    if found is None:
+        return None
+    return [i["dir"] for i in found if i["debugPort"] is None]
+
+
+def profile_holder(data_dir: str) -> int | None:
+    """pid of a running Chrome holding *data_dir*, whatever its debug port.
+
+    Any instance on that dir makes a fresh launch hand off and exit, so the
+    caller only needs to know whether one exists and which pid to name.
+    """
+    target = _norm_dir(data_dir)
+    for inst in chrome_instances() or []:
+        if inst["dir"] == target:
+            return inst["pid"]
+    return None
 
 
 def check_profile_dir(port: int, profile_id: str, cfg: dict | None = None) -> str | None:
@@ -461,6 +542,21 @@ def stop(port: int) -> dict:
     port = int(port)
     live = probe_port(port)
     if live["state"] != "live":
+        cfg = load_config()
+        holder = profile_holder(profile_data_dir(resolve_profile(port, None, cfg), port, cfg))
+        if holder is not None:
+            # Dead port, live profile holder: a stray Chrome owns the dir, and
+            # only closing that browser frees the port for a launch.
+            return {
+                "ok": False,
+                "port": port,
+                "orphan": True,
+                "pid": holder,
+                "error": (
+                    f"no DevTools listener on port {port}, but a running Chrome "
+                    f"(pid {holder}) holds its profile dir; close that Chrome"
+                ),
+            }
         return {"ok": True, "already": True, "port": port}
     # Browser.close over the version endpoint's WS is the full-browser close.
     # Chrome may still hold the port briefly, so allow one immediate retry.
@@ -497,11 +593,14 @@ def _browser_close_ws(browser_ws: str | None) -> None:
 
     u = urlparse(browser_ws)
     host, port = u.hostname, u.port or 80
+    # Chrome validates the Host header as an IP literal, so an IPv6 endpoint
+    # needs brackets: a listener on [::1] refuses "Host: ::1:9333" with 500.
+    host_header = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
     sock = socket.create_connection((host, port), timeout=3)
     key = base64.b64encode(os.urandom(16)).decode()
     handshake = (
         f"GET {u.path} HTTP/1.1\r\n"
-        f"Host: {host}:{port}\r\n"
+        f"Host: {host_header}\r\n"
         "Upgrade: websocket\r\n"
         "Connection: Upgrade\r\n"
         f"Sec-WebSocket-Key: {key}\r\n"

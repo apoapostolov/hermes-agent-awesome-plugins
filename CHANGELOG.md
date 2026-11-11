@@ -3,6 +3,35 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [cdp-manager 1.0.3] - 2026-11-11
+
+The dialog could not start a port. Every launch and every profile switch sent a
+`profile` field in its request body, and the desktop's native-HTTP guard reads a
+body key of that name as a Hermes profile selector. `hermes` is a reserved
+profile name and a `chrome:<dir>` id is not a valid one, so the guard refused the
+whole request with `403 profile_scope_mismatch` before the plugin's own route
+ran. Launch, restart and profile changes now send `browserProfile`; the old key
+still parses for callers that carry no ticket.
+
+Probes only asked `127.0.0.1`. A Chrome that loses the IPv4 bind race serves
+CDP on `[::1]` alone, so the port read dead while a browser was up: the
+supervisor relaunched, the running instance swallowed each new launch through
+its profile singleton and exited, and the port stayed dead with the fail streak
+climbing. Probes now try both families and remember the one that answered, so
+such an instance is visible and can be closed. The clean `Browser.close` sends
+a bracketed `Host` header, because an IPv6 endpoint rejects `Host: ::1:9333`.
+
+Launch also refuses to spawn a second Chrome when a running one already holds
+that port's profile directory, naming the pid instead of reporting
+`no listener after 8s`, and stop names the same orphan rather than claiming the
+port was already down. A launch without an explicit mode reads the remembered
+`mode_<port>`; it used to read a bare `mode` key that never existed, so
+launching a headless port from chat flipped it back to a window and remembered
+that instead.
+
+Restart Hermes Desktop after updating: the Python half of a plugin does not
+reload in place.
+
 ## [reddit 1.1.0] - 2026-11-05
 
 Reddit adds a local library of saved posts and comments, searchable source excerpts, summaries, context, notes and tags, and a Desktop browser with unread filtering and annotation editing. Bounded sync/refresh, source expiry and identifier-only bookmark transfer keep retrieval tied to current source access. A summary queue checks source hashes before attaching annotations. Background cleanup runs while Hermes is loaded; online revalidation is optional. Processes coordinate rate budgets and token refresh, and credential files use authenticated encryption, with DPAPI-protected keys on Windows.

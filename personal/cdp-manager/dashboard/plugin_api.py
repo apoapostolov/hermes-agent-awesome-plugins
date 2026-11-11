@@ -43,7 +43,18 @@ class PreferredBody(BaseModel):
 class PortBody(BaseModel):
     port: int
     mode: str | None = None  # 'headful' | 'headless'
-    profile: str | None = None  # 'hermes' | 'guest' | 'chrome:<dirname>'
+    # Chrome profile id: 'hermes' | 'guest' | 'chrome:<dirname>'.
+    #
+    # Deliberately NOT named `profile`: the dashboard's native-HTTP guard reads
+    # a JSON body key called `profile` as a Hermes profile selector and refuses
+    # the request with 403 profile_scope_mismatch whenever the value is not an
+    # existing profile name ('hermes' is reserved, 'chrome:<dir>' is not a valid
+    # name), which killed every launch and every profile switch.
+    browserProfile: str | None = None
+    profile: str | None = None  # legacy alias, for callers without a ticket
+
+    def selected_profile(self) -> str | None:
+        return self.browserProfile or self.profile
 
 
 class PollBody(BaseModel):
@@ -57,7 +68,8 @@ class ModeBody(BaseModel):
 
 class ProfileBody(BaseModel):
     port: int
-    profile: str  # 'hermes' | 'guest' | 'chrome:<dirname>'
+    browserProfile: str | None = None  # see PortBody: never sent as `profile`
+    profile: str | None = None  # legacy alias, for callers without a ticket
 
 
 # Supervisor: starts the managed port on backend boot ("on hermes launch")
@@ -103,7 +115,11 @@ def mode(body: ModeBody):
 def profile(body: ProfileBody):
     """Save the profile for a port (remembered, reused by the next launch
     including supervisor auto-starts). Unknown ids fall back to hermes."""
-    sel = cdp_core.resolve_profile(body.port, body.profile)
+    sel_id = body.browserProfile or body.profile
+    if not sel_id:
+        # An empty body must not silently reset a port to the default profile.
+        return {"ok": False, "error": "browserProfile is required"}
+    sel = cdp_core.resolve_profile(body.port, sel_id)
     cdp_core.mutate_config(lambda c: c.update({f"profile_{int(body.port)}": sel}))
     return {"ok": True, "port": int(body.port), "profile": sel}
 
@@ -123,7 +139,7 @@ def probe(body: PortsBody):
 
 @router.post("/launch")
 def launch(body: PortBody):
-    out = cdp_core.launch(body.port, mode=body.mode, profile=body.profile)
+    out = cdp_core.launch(body.port, mode=body.mode, profile=body.selected_profile())
     cdp_core.invalidate_health()
     return out
 

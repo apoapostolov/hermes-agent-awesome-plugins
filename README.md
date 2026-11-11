@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Reddit 1.1.0 adds a searchable local saved-content library, a Desktop browser, background cleanup and dedicated account/content management tools. Summaries, context, notes and tags remain tied to source freshness; bookmark transfer excludes source text. Both standalone editions provide 22 tools. Catalog admission is pending the host OAuth capabilities described in the plugin's limitations.
+CDP Manager 1.0.3 repairs the port dialog: launching a port and switching a port's profile were refused by the host's profile-scope guard because the request body carried a `profile` field. Probes now find a Chrome that serves CDP on IPv6 only, so a port whose browser is up no longer reads dead, and a launch refuses by name when a stray Chrome still holds the profile directory.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 

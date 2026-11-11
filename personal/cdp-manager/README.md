@@ -7,7 +7,7 @@
 Statusbar plugin + `cdp` agent tool for managing local Chrome DevTools
 Protocol (CDP) debug ports on 127.0.0.1.
 
-- Statusbar plug glyph opens the port dialog: live state, browser, pid and
+- Statusbar plug glyph opens the port dialog: live state, browser and
   latency per port, probed only while the dialog is open.
 - Per-port glyph buttons: launch (starts Chrome with
   `--remote-debugging-port`, no visible terminal, windowed or headless), stop

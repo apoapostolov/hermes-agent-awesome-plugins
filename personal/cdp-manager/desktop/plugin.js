@@ -376,7 +376,9 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
       actionLockRef.current = true
       const mode = cfg?.modes?.[port]
       const profile = cfg?.selections?.[port]
-      const r = await api(`/${kind}`, { port, ...(kind === 'launch' && mode ? { mode } : {}), ...(kind === 'launch' && profile ? { profile } : {}) })
+      // `browserProfile`, never `profile`: the host's native-HTTP guard reads a body
+      // key named `profile` as a Hermes profile scope and answers 403.
+      const r = await api(`/${kind}`, { port, ...(kind === 'launch' && mode ? { mode } : {}), ...(kind === 'launch' && profile ? { browserProfile: profile } : {}) })
       if (r?.error) {
         onNotify(`${kind} failed: ${r.error}`)
         return
@@ -427,7 +429,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
       return
     }
     const profile = cfg?.selections?.[port]
-    const r = await restartPort(port, { mode, ...(profile ? { profile } : {}) })
+    const r = await restartPort(port, { mode, ...(profile ? { browserProfile: profile } : {}) })
     if (r.error) {
       onNotify(`restart failed: ${r.error}`)
       return
@@ -453,7 +455,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
     if (prev === profile) return
     let saved
     try {
-      const r = await api('/profile', { port, profile })
+      const r = await api('/profile', { port, browserProfile: profile })
       saved = r?.profile || profile
     } catch {
       onNotify('profile save failed')
@@ -465,7 +467,7 @@ function PanelDialog({ open, onOpenChange, cfg, setCfg, onNotify }) {
       return
     }
     const mode = cfg?.modes?.[port]
-    const r = await restartPort(port, { ...(mode ? { mode } : {}), profile: saved })
+    const r = await restartPort(port, { ...(mode ? { mode } : {}), browserProfile: saved })
     if (r.error) {
       onNotify(`restart failed: ${r.error}`)
       return
