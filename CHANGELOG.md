@@ -50,6 +50,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **pack:** moves the **catalog-redesign** pin to `4922c06`, which restores an archived skill from its panel.
 
+## [1.27.19] - 2026-11-16
+
+### Changed
+
+- **pack:** moves the **catalog-redesign** pin to `613f00a`, where a skill's switch archives or revives it and the third column is headed **Tags**.
+
 ## [catalog-redesign 1.0.4] - 2026-11-16
 
 ### Added
