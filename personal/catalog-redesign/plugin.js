@@ -3355,55 +3355,13 @@ export function CatalogPage() {
             }),
         kind === 'tools'
           ? null
-          : el('div', {
+          : jsx(SegmentedControl, {
               key: 'filter',
-              style: { display: 'flex', alignItems: 'center', gap: 2, flex: '0 0 auto', position: 'relative' }
-            }, [
-              ...filterOptions.map(opt => {
-                const active = filter === opt.id
-                const showArrow = opt.id === 'catalog' && kind === 'skills'
-                return jsx('button', {
-                  key: opt.id,
-                  type: 'button',
-                  onClick: () => setFilter(opt.id),
-                  style: {
-                    fontSize: 11,
-                    padding: '2px 8px',
-                    borderRadius: 6,
-                    border: active ? `1px solid ${C.stroke}` : '1px solid transparent',
-                    background: active ? C.surface : 'transparent',
-                    color: active ? C.text : C.text3,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4
-                  },
-                  children: [
-                    opt.label,
-                    showArrow && jsx('span', {
-                      onClick: e => { e.stopPropagation(); setSourcesOpen(o => !o) },
-                      style: { cursor: 'pointer', marginLeft: 2 },
-                      children: 'â–¾'
-                    })
-                  ]
-                })
-              }),
-              sourcesOpen && kind === 'skills' && effectiveFilter === 'catalog' && jsx('div', {
-                style: { position: 'absolute', top: '100%', right: 0, marginTop: 4, padding: 8, borderRadius: 8, border: `1px solid ${C.stroke}`, background: C.surface, zIndex: 100, maxHeight: 260, overflowY: 'auto', minWidth: 160 },
-                children: SKILL_SOURCES.map(src => jsx('label', { key: src, style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '2px 0', cursor: 'pointer' }, children: [
-                  jsx('input', { type: 'checkbox', checked: !disabledSkillSources.has(src), onChange: e => {
-                    setDisabledSkillSources(prev => {
-                      const next = new Set(prev)
-                      if (e.target.checked) next.delete(src); else next.add(src)
-                      return next
-                    })
-                    setReloadKey(k => k + 1)
-                  } }),
-                  jsx('span', { children: src })
-                ] }))
-              })
-            ]),
-
+              options: filterOptions,
+              value: filter,
+              onChange: next => setFilter(next),
+              sizing: 'content'
+            })
       ),
       el(
         'div',
