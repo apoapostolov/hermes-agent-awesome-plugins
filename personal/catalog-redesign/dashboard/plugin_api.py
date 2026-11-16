@@ -8,7 +8,9 @@ so an offline window still paints the last good catalog.
 Routes (mounted at ``/api/plugins/hermes-catalog-redesign/``):
 
 * ``GET /health`` — version, cache age and row count, for a one-line probe.
-* ``GET /catalog/plugins`` — the projected plugin catalog; ``?refresh=1``
+* ``GET /catalog/plugins`` and ``GET /catalog/skills`` — the two published
+  catalogs the native Capabilities page reads, projected to the fields the page
+  draws and served one page at a time (``?page=1&size=150&q=``). ``?refresh=1``
   bypasses the TTL (the page's Refresh action).
 * ``GET /icons`` — plugin artwork found in each installed plugin folder, as data
   URLs, so a row can show the plugin's own image instead of initials.
@@ -20,9 +22,11 @@ Routes (mounted at ``/api/plugins/hermes-catalog-redesign/``):
 from __future__ import annotations
 
 import base64
+import gzip
 import json
 import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -35,15 +39,26 @@ from pydantic import BaseModel
 
 router = APIRouter()
 
-CATALOG_URL = "https://hermes-agent.nousresearch.com/docs/api/plugins.json"
-CATALOG_TTL = 6 * 3600
-FETCH_TIMEOUT = 90
-CACHE_VERSION = 1
+# The same published snapshots the native Capabilities page fetches, on the
+# static docs host: the public domain redirects there without CORS headers, and
+# the GitHub API splits one catalog across a thousand paginated calls.
+CATALOG_BASE = "https://nousresearch.github.io/hermes-agent/docs/api"
+CATALOG_FILES = {"plugins": "plugins.json", "skills": "skills.json"}
+CATALOG_TTL = 30 * 60
+FETCH_TIMEOUT = 120
+CACHE_VERSION = 2
+
+DEFAULT_PAGE_SIZE = 150
+MAX_PAGE_SIZE = 500
+DESCRIPTION_CHARS = 200
+TAG_LIMIT = 4
 
 SLUG_RE = re.compile(r"[^a-z0-9]+")
 SCREENSHOT_LIMIT = 4
 
-_state: dict[str, Any] = {"at": 0.0, "payload": None}
+# kind -> {"rows": [...], "at": float, "source": str, "error": str|None}
+_snapshots: dict[str, dict[str, Any]] = {}
+_snapshot_lock = threading.Lock()
 _icons: dict[str, Any] = {"at": 0.0, "rows": []}
 
 ICONS_TTL = 900
@@ -73,8 +88,12 @@ def hermes_home() -> Path:
     return Path.home() / ".hermes"
 
 
-def cache_file() -> Path:
-    return hermes_home() / "cache" / "hermes-catalog-redesign" / "plugins.json"
+def cache_dir() -> Path:
+    return hermes_home() / "cache" / "hermes-catalog-redesign"
+
+
+def snapshot_file(kind: str) -> Path:
+    return cache_dir() / f"{kind}.json"
 
 
 def slug(value: Any) -> str:
@@ -86,131 +105,305 @@ def _strings(value: Any, limit: int | None = None) -> list[str]:
     return rows[:limit] if limit else rows
 
 
-def project(row: dict[str, Any]) -> dict[str, Any]:
+def _text(value: Any, limit: int = 0) -> str:
+    text = str(value or "").strip()
+    if limit and len(text) > limit:
+        text = text[: limit - 1].rstrip() + "…"
+    return text
+
+
+def _search_key(*parts: Any) -> str:
+    """One lowercase haystack per row: a query is then one substring test."""
+    return " ".join(_text(part).lower() for part in parts if _text(part))
+
+
+def project_plugin(row: dict[str, Any]) -> dict[str, Any]:
     """One catalog entry in the shape the page draws, and nothing else."""
     name = str(row.get("name") or "").strip()
     caps = row.get("capabilities") if isinstance(row.get("capabilities"), dict) else {}
     images = [url for url in _strings(row.get("screenshots")) if url.startswith("https://")]
+    category = _text(row.get("category")) or "general"
+    description = _text(row.get("description"))
 
     return {
         "key": slug(name),
         "name": name,
         "slug": slug(name),
-        "description": str(row.get("description") or "").strip(),
-        "category": str(row.get("category") or "general"),
-        "tier": str(row.get("tier") or "community"),
-        "maintainer": str(row.get("maintainer") or ""),
-        "maintainerSlug": str(row.get("maintainerSlug") or ""),
-        "version": str(row.get("version") or ""),
-        "hero": str(row.get("image") or "") if str(row.get("image") or "").startswith("https://") else "",
+        "description": description,
+        "category": category,
+        "tier": _text(row.get("tier")) or "community",
+        "maintainer": _text(row.get("maintainer")),
+        "maintainerSlug": _text(row.get("maintainerSlug")),
+        "version": _text(row.get("version")),
+        "hero": _text(row.get("image")) if _text(row.get("image")).startswith("https://") else "",
         "screenshots": images[:SCREENSHOT_LIMIT],
         "stars": row.get("stars") if isinstance(row.get("stars"), int) else None,
-        "requiresHermes": str(row.get("requiresHermes") or ""),
+        "requiresHermes": _text(row.get("requiresHermes")),
         "platforms": _strings(row.get("platforms")),
         "tools": _strings(caps.get("providesTools")),
         "hooks": _strings(caps.get("providesHooks")),
         "middleware": _strings(caps.get("providesMiddleware")),
         "requiresEnv": _strings(caps.get("requiresEnv")),
-        "installCommand": str(row.get("installCommand") or ""),
-        "docsUrl": str(row.get("docsUrl") or ""),
-        "repo": str(row.get("repo") or ""),
-        "sha": str(row.get("sha") or ""),
-        "shaShort": str(row.get("shaShort") or ""),
-        "addedAt": str(row.get("addedAt") or ""),
-        "updatedAt": str(row.get("updatedAt") or ""),
+        "installCommand": _text(row.get("installCommand")),
+        "docsUrl": _text(row.get("docsUrl")),
+        "repo": _text(row.get("repo")),
+        "sha": _text(row.get("sha")),
+        "shaShort": _text(row.get("shaShort")),
+        "addedAt": _text(row.get("addedAt")),
+        "updatedAt": _text(row.get("updatedAt")),
         "featured": row.get("featured") if isinstance(row.get("featured"), int) else None,
+        "s": _search_key(name, description, category, " ".join(_strings(caps.get("providesTools")))),
     }
 
 
-def payload_for(rows: list[dict[str, Any]], fetched_at: str, cached: bool) -> dict[str, Any]:
+def project_skill(row: dict[str, Any]) -> dict[str, Any]:
+    """One skills snapshot row, trimmed to what a catalog row and panel read.
+
+    The published snapshot holds 104k rows; keeping every field of every row in
+    memory costs hundreds of megabytes, so the projection is the point.
+    """
+    name = _text(row.get("name"))
+    category = _text(row.get("category")) or "uncategorized"
+    description = _text(row.get("description"), DESCRIPTION_CHARS)
+    tags = _strings(row.get("tags"), TAG_LIMIT)
+    identifier = _text(row.get("identifier")) or name
+    install_identifier = _text(row.get("installIdentifier")) or identifier
+
     return {
-        "version": CACHE_VERSION,
-        "fetched_at": fetched_at,
-        "cached": cached,
-        "count": len(rows),
-        "rows": rows,
+        "key": slug(name) or slug(identifier),
+        "name": name,
+        "description": description,
+        "category": category,
+        "categoryLabel": _text(row.get("categoryLabel")) or category.replace("-", " ").title(),
+        "source": _text(row.get("source")) or "hub",
+        "tags": tags,
+        "identifier": identifier,
+        "installIdentifier": install_identifier,
+        "installCommand": _text(row.get("installCmd")),
+        "docsPath": _text(row.get("docsPath")),
+        "s": _search_key(name, description, category, " ".join(tags), identifier),
     }
 
 
-def read_disk() -> dict[str, Any] | None:
+def _project(kind: str, row: dict[str, Any]) -> dict[str, Any]:
+    return project_skill(row) if kind == "skills" else project_plugin(row)
+
+
+def _read_disk_snapshot(kind: str) -> tuple[list[dict[str, Any]], float]:
+    path = snapshot_file(kind)
+
     try:
-        raw = json.loads(cache_file().read_text(encoding="utf-8"))
+        rows = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        return None
-    if not isinstance(raw, dict) or raw.get("version") != CACHE_VERSION or not isinstance(raw.get("rows"), list):
-        return None
-    return raw
+        return [], 0.0
+
+    return (rows if isinstance(rows, list) else []), path.stat().st_mtime
 
 
-def write_disk(payload: dict[str, Any]) -> None:
-    path = cache_file()
+def _write_disk_snapshot(kind: str, rows: list[dict[str, Any]]) -> None:
+    path = snapshot_file(kind)
+
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        tmp.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
         tmp.replace(path)
     except Exception:
         # A cache we cannot write costs one network fetch, never the page.
         pass
 
 
-def fetch_catalog() -> dict[str, Any]:
+def _download(kind: str) -> list[dict[str, Any]]:
+    """Fetch one published snapshot and project it, newest rows as they come."""
+    url = f"{CATALOG_BASE}/{CATALOG_FILES[kind]}"
     request = urllib.request.Request(
-        CATALOG_URL,
-        headers={"Accept": "application/json", "User-Agent": "hermes-catalog-redesign/1"},
+        url,
+        headers={
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "User-Agent": f"hermes-catalog-redesign/{CACHE_VERSION}",
+        },
     )
+
     with urllib.request.urlopen(request, timeout=FETCH_TIMEOUT) as response:
-        data = json.loads(response.read().decode("utf-8"))
+        raw = response.read()
+        encoding = str(response.headers.get("Content-Encoding") or "")
+
+    # urllib does not negotiate compression itself: a gzip body arrives as bytes
+    # that look like a JSON parse error rather than a transport detail.
+    if encoding == "gzip" or raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
+
+    data = json.loads(raw.decode("utf-8"))
 
     if not isinstance(data, list):
-        raise ValueError("catalog feed is not a list")
+        raise ValueError(f"{kind} catalog is not a list")
 
-    rows = [project(row) for row in data if isinstance(row, dict) and str(row.get("name") or "").strip()]
-    fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    payload = payload_for(rows, fetched_at, False)
-    write_disk(payload)
+    rows = [_project(kind, row) for row in data if isinstance(row, dict) and str(row.get("name") or "").strip()]
 
-    return payload
+    if kind == "plugins":
+        # The feed carries no order a reader can name, so rank it once here and
+        # page a stable list: featured first, then stars, then name.
+        rows.sort(key=lambda r: (-(r.get("featured") or 0), -(r.get("stars") or 0), r.get("name", "").lower()))
+
+    return rows
 
 
-def current_payload(force: bool = False) -> dict[str, Any]:
-    """Memory → TTL → disk → network, in that order."""
+def snapshot(kind: str, force: bool = False) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Slim rows for one published catalog: memory -> disk TTL -> network.
+
+    Returns the rows plus a small meta dict the route adds to the response, so a
+    stale disk copy still paints and the page can say the network failed.
+    """
     now = time.time()
 
-    if not force and _state["payload"] is not None and now - _state["at"] < CATALOG_TTL:
-        return _state["payload"]
+    with _snapshot_lock:
+        cached = _snapshots.get(kind)
 
-    try:
-        payload = fetch_catalog()
-        _state.update({"at": now, "payload": payload})
-        return payload
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, OSError, json.JSONDecodeError) as exc:
-        disk = read_disk()
-        if disk is not None:
-            disk = dict(disk)
-            disk["cached"] = True
-            disk["error"] = f"{type(exc).__name__}: {exc}"
-            # Keep serving the snapshot; retry the network on the next TTL window.
-            _state.update({"at": now, "payload": disk})
-            return disk
-        raise
+        if cached and not force and now - cached["at"] < CATALOG_TTL:
+            return cached["rows"], {"source": cached["source"], "fetched_at": cached["fetchedAt"], "error": cached["error"]}
+
+        rows: list[dict[str, Any]] = []
+        source = "network"
+        error = None
+
+        try:
+            rows = _download(kind)
+            _write_disk_snapshot(kind, rows)
+        except Exception as exc:
+            rows, mtime = _read_disk_snapshot(kind)
+
+            if rows:
+                source = "disk"
+                error = f"{type(exc).__name__}: {exc}"
+            else:
+                raise
+
+        fetched_at = (
+            datetime.now(timezone.utc).isoformat(timespec="seconds")
+            if source == "network"
+            else datetime.fromtimestamp(_read_disk_snapshot(kind)[1] or now, timezone.utc).isoformat(timespec="seconds")
+        )
+
+        _snapshots[kind] = {"rows": rows, "at": now, "source": source, "fetchedAt": fetched_at, "error": error}
+
+        return rows, {"source": source, "fetched_at": fetched_at, "error": error}
+
+
+def paged(rows: list[dict[str, Any]], page: int, size: int, query: str) -> dict[str, Any]:
+    """One page of a projected catalog, plus the totals the header counts."""
+    size = max(1, min(int(size or DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE))
+    needle = str(query or "").strip().lower()
+    matched = [row for row in rows if needle in row["s"]] if needle else rows
+    total = len(matched)
+    total_pages = max(1, (total + size - 1) // size)
+    page = max(1, min(int(page or 1), total_pages))
+    start = (page - 1) * size
+
+    return {
+        "rows": matched[start : start + size],
+        "total": total,
+        "page": page,
+        "totalPages": total_pages,
+        "size": size,
+    }
 
 
 @router.get("/health")
 def health() -> dict[str, Any]:
-    payload = _state["payload"]
     return {
         "ok": True,
         "version": CACHE_VERSION,
-        "rows": payload["count"] if payload else 0,
-        "fetched_at": payload["fetched_at"] if payload else None,
-        "cache_file": str(cache_file()),
+        "catalogs": {
+            kind: {
+                "rows": len(state["rows"]),
+                "age_seconds": round(time.time() - state["at"]),
+                "source": state["source"],
+                "error": state["error"],
+            }
+            for kind, state in _snapshots.items()
+        },
+        "cache_dir": str(cache_dir()),
     }
 
 
 @router.get("/catalog/plugins")
-def catalog_plugins(refresh: int = 0) -> dict[str, Any]:
-    return current_payload(force=bool(refresh))
+def catalog_plugins(page: int = 1, size: int = DEFAULT_PAGE_SIZE, q: str = "", refresh: int = 0) -> dict[str, Any]:
+    rows, meta = snapshot("plugins", force=bool(refresh))
+    return {**paged(rows, page, size, q), **meta}
+
+
+@router.get("/catalog/skills")
+def catalog_skills(page: int = 1, size: int = DEFAULT_PAGE_SIZE, q: str = "", refresh: int = 0) -> dict[str, Any]:
+    rows, meta = snapshot("skills", force=bool(refresh))
+    return {**paged(rows, page, size, q), **meta}
+
+
+FRONTMATTER_RE = re.compile(r"^([A-Za-z][\w-]*):\s*(.*)$")
+
+
+def _frontmatter(path: Path) -> dict[str, str]:
+    """The handful of SKILL.md header fields an archive row shows."""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+
+    if not text.startswith("---"):
+        return {}
+
+    body = text.split("---", 2)[1] if text.count("---") >= 2 else ""
+    fields: dict[str, str] = {}
+
+    for line in body.splitlines():
+        match = FRONTMATTER_RE.match(line.strip())
+
+        if match:
+            fields[match.group(1).lower()] = match.group(2).strip().strip('"').strip("'")
+
+    return fields
+
+
+@router.get("/skills/archive")
+def skills_archive() -> dict[str, Any]:
+    """Skills the curator moved to ``skills/.archive``, as rows the page can draw.
+
+    Archiving is a directory move, not a registry entry, so the folder on disk is
+    the only truth here: one subdirectory per archived skill, each carrying the
+    SKILL.md it was archived with.
+    """
+    root = hermes_home() / "skills" / ".archive"
+    rows: list[dict[str, Any]] = []
+
+    if root.is_dir():
+        for folder in sorted(root.iterdir(), key=lambda f: f.name.lower()):
+            manifest = folder / "SKILL.md"
+
+            if not folder.is_dir() or not manifest.exists():
+                continue
+
+            meta = _frontmatter(manifest)
+            name = meta.get("name") or folder.name
+
+            try:
+                archived = datetime.fromtimestamp(manifest.stat().st_mtime, timezone.utc).isoformat(timespec="seconds")
+            except OSError:
+                archived = ""
+
+            rows.append(
+                {
+                    "key": slug(name) or slug(folder.name),
+                    "name": name,
+                    "description": _text(meta.get("description"), DESCRIPTION_CHARS),
+                    "category": _text(meta.get("category")) or "archived",
+                    "version": _text(meta.get("version")),
+                    "archivedAt": archived,
+                    "folder": folder.name,
+                    "path": str(folder),
+                }
+            )
+
+    return {"rows": rows, "total": len(rows), "root": str(root)}
 
 
 class ToggleRequest(BaseModel):

@@ -108,7 +108,13 @@ const cache = {
   servers: null,
   serversAt: 0,
   mcpCatalog: null,
-  mcpCatalogAt: 0
+  mcpCatalogAt: 0,
+  catalogTotal: 0,
+  skillsCatalog: null,
+  skillsCatalogAt: 0,
+  skillsCatalogTotal: 0,
+  archived: null,
+  archivedAt: 0
 }
 
 /** Read a plugin-state atom without assuming the app's store library: `get`
@@ -377,74 +383,92 @@ const GATEWAY_WAIT_MS = 20000
 const INSTALLED_CACHE_MS = 15 * 60 * 1000
 const INSTALLED_SNAPSHOT_KEY = 'installed.v1'
 
+async function loadCatalogPage(kind, { page = 1, size = PAGE_SIZE, query = '', force = false } = {}) {
+  if (typeof ctxRef?.rest !== 'function' || restUnavailable) {
+    throw new Error('The plugin catalog service is not reachable')
+  }
+
+  const params = new URLSearchParams({ page: String(page), size: String(size) })
+  const needle = String(query || '').trim()
+
+  if (needle) {
+    params.set('q', needle)
+  }
+
+  if (force) {
+    params.set('refresh', '1')
+  }
+
+  const payload = await withTimeout(
+    ctxRef.rest(`/catalog/${kind}?${params.toString()}`),
+    REST_MS,
+    'The plugin catalog service'
+  )
+
+  if (!payload || !Array.isArray(payload.rows)) {
+    throw new Error(`The ${kind} catalog service returned no rows`)
+  }
+
+  const rows = payload.rows
+
+  return {
+    rows,
+    total: typeof payload.total === 'number' ? payload.total : rows.length,
+    page: typeof payload.page === 'number' ? payload.page : page,
+    totalPages: typeof payload.totalPages === 'number' ? payload.totalPages : 1,
+    error: payload.error || null,
+    source: payload.source || 'network'
+  }
+}
+
+/** Page one of the plugin catalog: the counts and the installed rows reuse it. */
 async function loadCatalogPlugins(force = false) {
   if (!force && cache.catalog && Date.now() - cache.catalogAt < CACHE_MS) {
     return cache.catalog
   }
 
-  // The plugin's own REST half when the host serves it. A door that is missing
-  // or slow must not own the page, so it is bounded and remembered.
-  if (typeof ctxRef?.rest === 'function' && !restUnavailable) {
-    try {
-      const payload = await withTimeout(
-        ctxRef.rest(`/catalog/plugins${force ? '?refresh=1' : ''}`),
-        REST_MS,
-        'The plugin catalog service'
-      )
+  const result = await loadCatalogPage('plugins', { page: 1, force })
 
-      if (payload && Array.isArray(payload.rows)) {
-        cache.catalog = payload.rows
-        cache.catalogAt = Date.now()
-        cache.catalogError = payload.error || null
-
-        return cache.catalog
-      }
-    } catch (err) {
-      const message = String(err?.message || err)
-
-      // Only a door that does not exist is worth remembering: a slow first call
-      // is the plugin API fetching five megabytes upstream, and it must be
-      // retried rather than written off for the session.
-      if (/\b40[134]\b|not found|unavailable/i.test(message)) {
-        restUnavailable = true
-      }
-
-      console.warn('[catalog] plugin catalog door failed, trying the public feed:', message)
-    }
-  }
-
-  // Same public feed the app itself reads (it serves `Access-Control-Allow-Origin: *`).
-  const response = await withTimeout(
-    fetch(`${FEED_URL}${force ? `?t=${Date.now()}` : ''}`, { credentials: 'omit' }),
-    FETCH_MS,
-    'The public catalog feed'
-  )
-
-  if (!response.ok) {
-    throw new Error(`the public catalog feed responded ${response.status}`)
-  }
-
-  const body = await withTimeout(response.json(), FETCH_MS, 'The public catalog feed')
-  // The published feed is a bare array; a proxy in front of it may wrap the
-  // rows, so both shapes read the same.
-  const list = Array.isArray(body)
-    ? body
-    : Array.isArray(body?.rows)
-      ? body.rows
-      : Array.isArray(body?.plugins)
-        ? body.plugins
-        : []
-
-  if (!list.length) {
-    throw new Error('the public catalog feed returned no entries')
-  }
-
-  cache.catalog = list
+  cache.catalog = result.rows
   cache.catalogAt = Date.now()
-  cache.catalogError = null
-  console.info('[catalog] catalog feed:', list.length, 'entries')
+  cache.catalogTotal = result.total
+  cache.catalogError = result.error
 
   return cache.catalog
+}
+
+/** Page one of the skills catalog, for the header count and the warm pass. */
+async function loadCatalogSkillsOnce(force = false) {
+  if (!force && cache.skillsCatalog && Date.now() - cache.skillsCatalogAt < CACHE_MS) {
+    return cache.skillsCatalog
+  }
+
+  const result = await loadCatalogPage('skills', { page: 1, force })
+
+  cache.skillsCatalog = result.rows
+  cache.skillsCatalogAt = Date.now()
+  cache.skillsCatalogTotal = result.total
+
+  return cache.skillsCatalog
+}
+
+/** Skills the curator moved to ``skills/.archive``: a folder read, not a hub call. */
+async function loadArchivedSkills(force = false) {
+  if (!force && cache.archived && Date.now() - cache.archivedAt < CACHE_MS) {
+    return cache.archived
+  }
+
+  const payload = await withTimeout(
+    ctxRef.rest(`/skills/archive${force ? '?refresh=1' : ''}`),
+    REST_MS,
+    'The plugin catalog service'
+  )
+  const rows = Array.isArray(payload?.rows) ? payload.rows : []
+
+  cache.archived = rows
+  cache.archivedAt = Date.now()
+
+  return rows
 }
 
 /**
@@ -600,7 +624,8 @@ async function warm(profile, kind, filter, onLanded) {
     'plugins-detail': ['plugins-installed', () => loadInstalledPlugins(profile)],
     catalog: ['catalog-plugins', () => loadCatalogPlugins()],
     'skills-installed': ['skills-installed', () => loadInstalledSkills(profile)],
-    'skills-catalog': ['hub-skills', () => loadHubSkills('', 1, profile)],
+    'skills-catalog': ['catalog-skills', () => loadCatalogSkillsOnce()],
+    'skills-archive': ['skills-archive', () => loadArchivedSkills()],
     'connectors-installed': ['servers', () => loadServers(profile)],
     'connectors-catalog': ['mcp-catalog', () => loadMcpCatalog(profile)],
     tools: ['toolsets', () => loadToolsets(profile)]
@@ -672,24 +697,6 @@ async function loadPluginIcons() {
   return icons
 }
 
-/** Skills hub: a page of the browsable catalog, or a search hit list. */
-async function loadHubSkills(query, page, profile) {
-  const params = query
-    ? { action: 'search', query, ...scopeParam(profile) }
-    : { action: 'browse', page, page_size: 100, ...scopeParam(profile) }
-  const result = await withTimeout(
-    host.request('skills.manage', params),
-    RPC_MS,
-    'The gateway (skills.manage)'
-  )
-
-  return {
-    rows: Array.isArray(result?.results) ? result.results : Array.isArray(result?.items) ? result.items : [],
-    page: typeof result?.page === 'number' ? result.page : page,
-    totalPages: typeof result?.total_pages === 'number' ? result.total_pages : null,
-    total: typeof result?.total === 'number' ? result.total : null
-  }
-}
 
 /* ---------------------------------------------------------------- mapping */
 
@@ -804,12 +811,12 @@ function skillItem(row) {
   }
 }
 
-function hubSkillItem(row) {
+function catalogSkillItem(row) {
   const name = str(row.name)
-  const identifier = str(row.identifier) || name
+  const identifier = str(row.installIdentifier) || str(row.identifier) || name
 
   return {
-    uid: `hub:${identifier}`,
+    uid: `hub:${str(row.identifier) || name}`,
     kind: 'skill',
     origin: 'catalog',
     key: name,
@@ -817,11 +824,43 @@ function hubSkillItem(row) {
     name: name || identifier,
     short: shortName(name || identifier),
     description: str(row.description),
-    category: str(row.trust) || str(row.source) || 'hub',
+    category: str(row.categoryLabel) || str(row.category) || 'hub',
     tier: str(row.source) || 'hub',
     provider: str(row.source),
+    tags: Array.isArray(row.tags) ? row.tags.filter(tag => typeof tag === 'string') : [],
     installed: false,
     enabled: true,
+    usage: 0,
+    tools: [],
+    hooks: [],
+    middleware: [],
+    requiresEnv: [],
+    platforms: [],
+    screenshots: []
+  }
+}
+
+/** A skill the curator archived: the .archive folder is the whole record. */
+function archivedSkillItem(row) {
+  const name = str(row.name)
+
+  return {
+    uid: `archive:${str(row.folder) || name}`,
+    kind: 'skill',
+    origin: 'archive',
+    key: name,
+    name: name || str(row.folder),
+    short: shortName(name || str(row.folder)),
+    description: str(row.description),
+    category: str(row.category) || 'archived',
+    tier: 'archived',
+    provider: 'curator',
+    version: str(row.version),
+    archivedAt: str(row.archivedAt),
+    folder: str(row.folder),
+    path: str(row.path),
+    installed: false,
+    enabled: false,
     usage: 0,
     tools: [],
     hooks: [],
@@ -916,6 +955,13 @@ function mcpCatalogItem(row) {
 }
 
 /** Catalog rows remember which of them this profile already has installed. */
+/** Append a page without duplicating a row an earlier page already painted. */
+function mergeRows(previous, incoming) {
+  const seen = new Set(previous.map(row => row.uid))
+
+  return [...previous, ...incoming.filter(row => !seen.has(row.uid))]
+}
+
 function annotateCatalog(rows, installed) {
   if (!installed.length) {
     return rows
@@ -2499,6 +2545,7 @@ export function CatalogPage() {
   const [countsTick, setCountsTick] = useState(0)
   const [reloadKey, setReloadKey] = useState(0)
   const hoverTimer = useRef(null)
+  const sentinelRef = useRef(null)
 
   // Tools have no public catalog: the filter is a no-op there and the page
   // says so by hiding it rather than offering a dead segment.
@@ -2636,14 +2683,28 @@ export function CatalogPage() {
               })
               .catch(() => {})
           } else {
-            const catalog = await loadCatalogPlugins(reloadKey > 0)
+            const first = page <= 1
+            const result = await loadCatalogPage('plugins', {
+              page,
+              query: query.trim(),
+              force: reloadKey > 0 && first
+            })
 
             if (!alive) {
               return
             }
 
-            setItems(annotateCatalog(catalog.map(catalogItem), installed.map(installedPluginItem)))
-            setPageInfo({ totalPages: null, total: catalog.length })
+            const merged = annotateCatalog(result.rows.map(catalogItem), installed.map(installedPluginItem))
+
+            setItems(previous => (first ? merged : mergeRows(previous, merged)))
+            setPageInfo({ totalPages: result.totalPages, total: result.total })
+            cache.catalogTotal = result.total
+
+            if (first) {
+              cache.catalog = result.rows
+              cache.catalogAt = Date.now()
+              cache.catalogError = result.error
+            }
           }
         } else if (kind === 'skills') {
           if (effectiveFilter === 'installed') {
@@ -2655,15 +2716,37 @@ export function CatalogPage() {
 
             setItems(skills.map(skillItem))
             setPageInfo({ totalPages: null, total: skills.length })
-          } else {
-            const hub = await loadHubSkills(query.trim(), page, profile)
+          } else if (effectiveFilter === 'archive') {
+            const archived = await loadArchivedSkills(reloadKey > 0)
 
             if (!alive) {
               return
             }
 
-            setItems(hub.rows.map(hubSkillItem))
-            setPageInfo({ totalPages: hub.totalPages, total: hub.total })
+            setItems(archived.map(archivedSkillItem))
+            setPageInfo({ totalPages: null, total: archived.length })
+          } else {
+            const first = page <= 1
+            const result = await loadCatalogPage('skills', {
+              page,
+              query: query.trim(),
+              force: reloadKey > 0 && first
+            })
+
+            if (!alive) {
+              return
+            }
+
+            const mapped = result.rows.map(catalogSkillItem)
+
+            setItems(previous => (first ? mapped : mergeRows(previous, mapped)))
+            setPageInfo({ totalPages: result.totalPages, total: result.total })
+            cache.skillsCatalogTotal = result.total
+
+            if (first) {
+              cache.skillsCatalog = result.rows
+              cache.skillsCatalogAt = Date.now()
+            }
           }
         } else if (kind === 'connectors') {
           if (effectiveFilter === 'installed') {
@@ -2761,13 +2844,22 @@ export function CatalogPage() {
     return ctxRef?.addEventListener?.(window, 'keydown', onKey, true)
   }, [settingsOpen])
 
+  // A catalog kind is paged by the gateway: the query and the ranking already
+  // ran over the whole snapshot, so the page neither re-filters nor re-sorts,
+  // and the rows on screen are exactly the page it asked for.
+  const isPaged = effectiveFilter === 'catalog' && (kind === 'plugins' || kind === 'skills')
+
   const filtered = useMemo(() => {
-    const base = kind === 'plugins' && effectiveFilter === 'catalog' ? sortCatalog(items) : items
+    if (isPaged) {
+      return items
+    }
 
-    return base.filter(item => matches(item, query.trim()))
-  }, [items, kind, effectiveFilter, query])
+    return items.filter(item => matches(item, query.trim()))
+  }, [items, isPaged, query])
 
-  const visible = filtered.slice(0, limit)
+  const visible = isPaged ? filtered : filtered.slice(0, limit)
+  const pagesLeft = Boolean(pageInfo.totalPages) && page < pageInfo.totalPages
+  const hasMore = isPaged ? pagesLeft : filtered.length > visible.length
 
   const counts = useMemo(
     () => ({
@@ -2777,6 +2869,8 @@ export function CatalogPage() {
       plugins: cache.quickInstalled?.length ?? cache.installed?.length ?? 0,
       pluginsCatalog: cache.catalog?.length ?? 0,
       skills: cache.skills?.length ?? 0,
+      archived: cache.archived?.length ?? 0,
+      skillsCatalog: cache.skillsCatalogTotal ?? 0,
       connectors: cache.servers?.length ?? 0,
       connectorPresets: cache.mcpCatalog?.length ?? 0,
       tools: cache.toolsets?.length ?? 0
@@ -2786,7 +2880,7 @@ export function CatalogPage() {
 
   const subtitle = {
     plugins: `${counts.plugins} installed · ${counts.pluginsCatalog} in the catalog`,
-    skills: `${counts.skills} installed`,
+    skills: `${counts.skills} installed · ${counts.archived} archived · ${counts.skillsCatalog} in the catalog`,
     connectors: `${counts.connectors} configured · ${counts.connectorPresets} presets`,
     tools: `${counts.tools} toolsets`
   }[kind]
@@ -2800,6 +2894,45 @@ export function CatalogPage() {
     hoverTimer.current?.()
     hoverTimer.current = later(() => setHover({ item, rect, x, y }), HOVER_DELAY)
   }, [])
+
+  const loadMore = useCallback(() => {
+    if (loading) {
+      return
+    }
+
+    if (isPaged) {
+      if (pagesLeft) {
+        setPage(value => value + 1)
+      }
+
+      return
+    }
+
+    setLimit(value => value + PAGE_SIZE)
+  }, [loading, isPaged, pagesLeft])
+
+  // Reaching the end of the list fetches the next page by itself: a catalog of
+  // 104k rows is not something a reader should have to click through.
+  useEffect(() => {
+    const node = sentinelRef.current
+
+    if (!isPaged || !hasMore || !node || typeof IntersectionObserver === 'undefined') {
+      return undefined
+    }
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          loadMore()
+        }
+      },
+      { rootMargin: '600px 0px' }
+    )
+
+    observer.observe(node)
+
+    return () => observer.disconnect()
+  }, [isPaged, hasMore, loadMore, visible.length, pageInfo.totalPages])
 
   const onHoverEnd = useCallback(() => {
     hoverTimer.current?.()
@@ -2941,11 +3074,26 @@ export function CatalogPage() {
       id: 'installed',
       label: `Installed ${kind === 'plugins' ? counts.plugins : kind === 'skills' ? counts.skills : kind === 'connectors' ? counts.connectors : counts.tools}`
     },
+    // Skills carry a third state: the curator moves an unused skill into
+    // skills/.archive rather than deleting it, so it is neither installed
+    // (it does not load) nor absent (it is one move from coming back).
+    kind === 'skills'
+      ? {
+          id: 'archive',
+          label: `Archive ${counts.archived}`
+        }
+      : null,
     {
       id: 'catalog',
-      label: `Catalog ${kind === 'plugins' ? counts.pluginsCatalog : counts.connectorPresets || ''}`.trim()
+      label: `Catalog ${
+        kind === 'plugins'
+          ? counts.pluginsCatalog
+          : kind === 'skills'
+            ? counts.skillsCatalog
+            : counts.connectorPresets || ''
+      }`.trim()
     }
-  ]
+  ].filter(Boolean)
 
   return el(
     'div',
@@ -3171,40 +3319,26 @@ export function CatalogPage() {
               onToggle: toggleRow
             })
           ),
-          filtered.length > visible.length
+          el('div', { key: 'sentinel', ref: sentinelRef, style: { height: 1 } }),
+          hasMore
             ? el(
                 'div',
-                { style: { display: 'flex', justifyContent: 'center', padding: '14px 0' } },
+                { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '14px 0 20px' } },
                 jsx(Button, {
                   size: 'sm',
                   variant: 'outline',
-                  onClick: () => setLimit(value => value + PAGE_SIZE),
-                  children: `Show ${Math.min(PAGE_SIZE, filtered.length - visible.length)} more of ${filtered.length}`
-                })
-              )
-            : null,
-          kind === 'skills' && effectiveFilter === 'catalog' && pageInfo.totalPages && pageInfo.totalPages > 1
-            ? el(
-                'div',
-                { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, padding: '12px 0' } },
-                jsx(Button, {
-                  size: 'xs',
-                  variant: 'ghost',
-                  disabled: page <= 1,
-                  onClick: () => setPage(value => Math.max(1, value - 1)),
-                  children: 'Previous'
+                  loading,
+                  onClick: loadMore,
+                  children: isPaged
+                    ? `Load more of ${(pageInfo.total || 0).toLocaleString()}`
+                    : `Show ${Math.min(PAGE_SIZE, filtered.length - visible.length)} more of ${filtered.length}`
                 }),
-                jsx('span', {
-                  style: { fontSize: 11, color: C.text4 },
-                  children: `Page ${page} of ${pageInfo.totalPages}`
-                }),
-                jsx(Button, {
-                  size: 'xs',
-                  variant: 'ghost',
-                  disabled: page >= pageInfo.totalPages,
-                  onClick: () => setPage(value => value + 1),
-                  children: 'Next'
-                })
+                isPaged && pageInfo.total
+                  ? jsx('span', {
+                      style: { fontSize: 10.5, color: C.text4 },
+                      children: `${visible.length.toLocaleString()} of ${pageInfo.total.toLocaleString()} rows read`
+                    })
+                  : null
               )
             : null
         )

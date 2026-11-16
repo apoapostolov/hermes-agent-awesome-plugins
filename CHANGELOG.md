@@ -26,6 +26,23 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **pack:** pins **catalog-redesign 1.0.0** at `03d0a81`, the catalog page that puts skills, plugins, connectors and tools in one list of wide rows. Twenty entries now, and the pack sits at `1.27.14`. Both trees carry the plugin; the pin is the personal one, as every pack pin is.
 
+## [catalog-redesign 1.0.1] - 2026-11-16
+
+### Changed
+
+- **catalog-redesign:** both Catalog filters now read the published snapshots the native Capabilities page reads, `plugins.json` and `skills.json` on `nousresearch.github.io/hermes-agent/docs/api`, instead of a script-specific feed and a hub walk. The skills catalog reports 104,239 rows where it used to report whatever a time-limited multi-source search returned, which on this machine was 66.
+- **catalog-redesign:** the catalog filters page through the snapshot on the gateway side, 150 rows at a time, with the true total in the header and the row count under the list. Reaching the end of the list loads the next page, and **Load more** stays as a button. Search runs over the whole snapshot, so a hit on row 90,000 shows up as quickly as a hit on page one. First open in a thirty-minute window pays for the download and parse; after that a page answers in about 20 ms.
+- **catalog-redesign:** the plugins catalog is ranked once when the snapshot is projected, featured first, then stars, then name, so paging returns a stable list rather than a per-window sort of whichever rows happened to load.
+
+### Added
+
+- **catalog-redesign:** **Archive** beside Installed and Catalog for skills. The curator archives an unused skill by moving its directory into `skills/.archive`, so the page reads that folder directly: name, description, category and version from each `SKILL.md`, with the archived time in the panel. Seventeen archived skills on this machine, and the header counts them beside the other two.
+- **catalog-redesign:** `GET /catalog/skills` and `GET /skills/archive` on the Python half, and `page`, `size` and `q` on both catalog routes. A page handler that cannot reach the network falls back to the last snapshot on disk and says so instead of blanking the list.
+
+### Fixed
+
+- **catalog-redesign:** the header counts now read the snapshot total instead of the number of painted rows, so the plugins count no longer sat at zero until a feed had parsed, and the skills subtitle reports installed, archived and catalog together.
+
 ## [catalog-redesign 1.0.0] - 2026-11-16
 
 ### Added

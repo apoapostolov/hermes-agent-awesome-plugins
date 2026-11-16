@@ -37,3 +37,11 @@ MCP has no JSON-RPC method for enabling or disabling a server, so the connector 
 ## What the public edition drops
 
 The connector switch. Enabling or disabling an MCP server needs the same guarded config write the app's Connectors tab performs, which lives behind `hermes_cli.web_routers._common.config_write_scope` and `save_config`; MCP itself has no JSON-RPC method for it, and the SDK exposes no door. The catalog tree therefore lists connectors with their state and leaves the switch to the native page, and its `plugin_api.py` carries three routes instead of four. Everything else, including the plugin, skill and toolset switches, is identical in both trees.
+
+## Catalog sources
+
+Both catalog filters read the published snapshots on `nousresearch.github.io/hermes-agent/docs/api`, the same two files the native Capabilities page reads. The skills snapshot is 66 MB of JSON; parsing it costs about five seconds the first time in a thirty-minute window and the gateway then holds the projected rows, which is roughly 100,000 rows of name, description, category, tags and install identifier. Nothing else from the snapshot is kept.
+
+Paging is server-side, so search matches any row in the snapshot rather than only the rows already painted. The trade is that a page request needs the gateway; with the Python half missing, neither catalog paints and the page falls back to the installed list.
+
+Archived skills are read from `skills/.archive` for the active profile. That folder is the whole record: a skill is archived by moving its directory, so a row shows the name, description, category and version its `SKILL.md` still carries, plus the fold's modification time. Restoring one is a move back that this page does not perform.
