@@ -1182,11 +1182,14 @@ function layoutFor(item) {
     // skills/.archive so it stops loading, on moves it back out.
     item.kind === 'skill' ||
     (CAN_TOGGLE_CONNECTORS && item.kind === 'connector' && item.origin === 'installed')
-  const tagsOnTextLine = item.kind === 'plugin'
+  const online = item.origin === 'catalog'
+  const tagsOnTextLine = item.kind === 'plugin' && !online
   const tail = tagsOnTextLine ? '190px' : '210px'
-  const columns = switchable ? `44px minmax(0, 1fr) ${tail} 44px` : `44px minmax(0, 1fr) ${tail}`
+  const columns = online
+    ? (switchable ? '44px minmax(0, 1fr) 44px' : '44px minmax(0, 1fr)')
+    : (switchable ? `44px minmax(0, 1fr) ${tail} 44px` : `44px minmax(0, 1fr) ${tail}`)
 
-  return { switchable, tagsOnTextLine, columns }
+  return { switchable, tagsOnTextLine, columns, online }
 }
 
 function Row({ item, selected, pending, onOpen, onHover, onHoverEnd, onToggle }) {
@@ -1328,7 +1331,9 @@ function Row({ item, selected, pending, onOpen, onHover, onHoverEnd, onToggle })
                 children: text
               })
         ),
-        layout.tagsOnTextLine
+        layout.online
+          ? null
+          : layout.tagsOnTextLine
           ? jsx('span', {
               title: item.short,
               style: {
