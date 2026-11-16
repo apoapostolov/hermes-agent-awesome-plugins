@@ -3,6 +3,16 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [1.27.12] - 2026-11-16
+
+### Added
+
+- **radio-plus:** version `1.5.0`. TuneIn joins Radio Browser, its popular list and Shoutcast as a fourth source, searched by name or `genre:` through TuneIn's OPML endpoint. Each station answers a playlist rather than a stream, so the plugin route resolves it before the player sees it, and pages thirty rows at a time. TuneIn carries many stations the other directories do not index.
+- **radio-plus:** Settings, Plugins, Radio Plus gains **Restore the default stations**, a button that puts back any of the seven starter stations that is no longer in the list and reports how many came back. It only adds: your own stations stay and a renamed starter keeps your name.
+- **radio-plus:** the panel shows what is on air. A new route reads the ICY metadata the player cannot and answers with the track any stream announces, so a Radio Browser row or an address you added yourself shows artist and song, with the artist's profile link. A directory row that already knows what was playing, as TuneIn and Shoutcast both do, fills the line until the stream's first announcement.
+
+TuneIn is an undocumented public endpoint whose terms describe personal listening rather than redistribution, and the README says so. The new routes are mounted at dashboard start, so the app needs one restart after updating.
+
 ## [1.27.10] - 2026-11-16
 
 ### Fixed

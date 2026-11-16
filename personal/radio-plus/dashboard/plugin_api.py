@@ -1,4 +1,4 @@
-"""Radio Plus backend API: the Shoutcast directory, without renderer CORS.
+"""Radio Plus backend API: the radio directories, without renderer CORS.
 
 The renderer cannot talk to ``directory.shoutcast.com`` directly: the directory
 sends no ``Access-Control-Allow-Origin`` header and answers ``OPTIONS`` with 405,
@@ -13,7 +13,13 @@ requests the Shoutcast directory site performs for itself:
   resolved addresses are cached: a dead station drops out of the results instead
   of surfacing a row that cannot play.
 
-No key, account, or credential is involved. Only the Shoutcast directory is
+TuneIn answers over OPML instead: ``Search.ashx`` returns JSON when asked for
+it, but each station points at a ``Tune.ashx`` tune-in address that answers an
+M3U playlist rather than audio, so the stream address is read out of that
+playlist here. TuneIn also ignores ``offset``, so a page is a slice of the list
+its search already returned.
+
+No key, account, or credential is involved. Only these directories are
 contacted, nothing is written to disk, and the caller's query is the only thing
 forwarded.
 """
@@ -28,7 +34,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -37,11 +43,13 @@ router = APIRouter()
 
 _DIRECTORY = "https://directory.shoutcast.com"
 _TUNE_IN = "http://yp.shoutcast.com/sbin/tunein-station.pls?id={station_id}"
+_TUNEIN_SEARCH = "https://opml.radiotime.com/Search.ashx"
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 HermesRadioPlus/1.2"
 )
 _TIMEOUT = 12
+_META_TIMEOUT = 6
 _STREAM_TIMEOUT = 7
 _RESOLVE_WORKERS = 12
 _CACHE_TTL = 900.0
@@ -49,6 +57,9 @@ _QUERY_TTL = 300.0
 
 _query_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 _stream_cache: dict[int, tuple[float, str]] = {}
+_tunein_stream_cache: dict[str, tuple[float, str]] = {}
+_now_playing_cache: dict[str, tuple[float, str]] = {}
+_NOW_PLAYING_TTL = 12.0
 
 
 def _freshest(cache: dict[Any, tuple[float, Any]], key: Any, ttl: float) -> Any:
@@ -102,6 +113,29 @@ def _query_directory(path: str, query: str | None) -> list[dict[str, Any]]:
     return rows
 
 
+def _first_stream(text: str) -> str | None:
+    """Read the first stream address out of a PLS or M3U playlist.
+
+    A Shoutcast tune-in file is PLS (``File1=http://...``). A TuneIn tune-in
+    address answers an M3U whose body is often one bare address and no header at
+    all, so both shapes are read here instead of in two places.
+    """
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.partition("=")
+        if separator and key.strip().lower().startswith("file"):
+            address = _clean_stream(value.strip())
+            if address:
+                return address
+            continue
+        address = _clean_stream(line)
+        if address:
+            return address
+    return None
+
+
 def _stream_for(station_id: int) -> str | None:
     """Resolve a station's PLS tune-in file to the underlying stream URL."""
     cached = _freshest(_stream_cache, station_id, _CACHE_TTL)
@@ -115,11 +149,7 @@ def _stream_for(station_id: int) -> str | None:
     try:
         with urllib.request.urlopen(request, timeout=_STREAM_TIMEOUT) as response:
             text = response.read(65_536).decode("utf-8", "replace")
-        for line in text.splitlines():
-            key, _, value = line.partition("=")
-            if key.strip().lower() == "file1" and value.strip():
-                address = _clean_stream(value.strip())
-                break
+        address = _first_stream(text)
     except (urllib.error.URLError, TimeoutError, OSError, ValueError):
         address = None
     # A station can be listed while its tune-in file is empty. Cache the miss
@@ -181,6 +211,173 @@ def _station(row: dict[str, Any], url: str) -> dict[str, Any]:
         "homepage": homepage,
         "listeners": listeners,
         "bitrate": bitrate,
+    }
+
+
+_STREAM_TITLE = re.compile(r"StreamTitle='(.*?)';", re.S)
+
+
+def _stream_title(block: bytes) -> str:
+    """The track a stream announced in one ICY metadata block.
+
+    The block is a length-prefixed run of ``StreamTitle='Artist - Song';`` text
+    padded with NUL bytes, so the terminator matters and a truncated block simply
+    yields nothing.
+    """
+    if not block:
+        return ""
+    match = _STREAM_TITLE.search(block.decode("utf-8", "replace"))
+    if not match:
+        return ""
+    return _clean_text(match.group(1), 160)
+
+
+def _icy_title(address: str) -> dict[str, Any]:
+    """Ask a stream what is playing, the way a player does.
+
+    ICY metadata is interleaved into the audio: the server announces
+    ``icy-metaint``, every that many bytes carry a length byte and a block of
+    title text. Reading it means opening the stream, which the renderer cannot do
+    (no CORS headers on most stations) and which the browser cannot parse anyway.
+    """
+    host = urllib.parse.urlsplit(address).hostname or ""
+    if _PRIVATE_HOST.match(host):
+        return {"ok": False, "title": "", "station": "", "reason": "Local addresses are not read."}
+    request = urllib.request.Request(
+        address,
+        headers={"User-Agent": _USER_AGENT, "Icy-MetaData": "1", "Accept": "*/*"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=_META_TIMEOUT) as response:
+            station = response.headers.get("icy-name") or ""
+            metaint = _count(response.headers.get("icy-metaint"))
+            if not metaint or metaint > 65536:
+                return {"ok": False, "title": "", "station": station,
+                        "reason": "This stream does not announce track titles."}
+            audio = response.read(metaint)
+            if len(audio) < metaint:
+                return {"ok": False, "title": "", "station": station,
+                        "reason": "The stream closed before its first title."}
+            size = response.read(1)
+            length = (size[0] if size else 0) * 16
+            title = _stream_title(response.read(length) if length else b"")
+    except urllib.error.HTTPError as error:
+        return {"ok": False, "title": "", "station": "", "reason": f"The server answered HTTP {error.code}."}
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        return {"ok": False, "title": "", "station": "", "reason": f"The server did not answer ({type(error).__name__})."}
+    if not title:
+        return {"ok": False, "title": "", "station": station,
+                "reason": "The stream is between tracks."}
+    return {"ok": True, "title": title, "station": station, "reason": ""}
+
+
+def _count(value: Any) -> int:
+    """A directory number, as an int, never a bool or a crash."""
+    if isinstance(value, bool):
+        return 0
+    try:
+        return max(0, int(str(value).strip()))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _tunein_rows(query: str) -> list[dict[str, Any]]:
+    """The stations TuneIn matches for a query, in its own order.
+
+    ``types=station`` is what makes this a station search: without it the same
+    query answers a third of the rows, mixed with shows and topics that cannot
+    be played.
+    """
+    key = f"tunein\u0000{query}".lower()
+    cached = _freshest(_query_cache, key, _QUERY_TTL)
+    if cached is not None:
+        return cached
+    params = {"query": query, "render": "json", "formats": "mp3,aac", "types": "station"}
+    request = urllib.request.Request(
+        f"{_TUNEIN_SEARCH}?{urllib.parse.urlencode(params)}",
+        headers={"User-Agent": _USER_AGENT},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:
+            body = response.read(2_000_000)
+    except urllib.error.HTTPError as error:
+        raise HTTPException(status_code=502, detail=f"TuneIn returned HTTP {error.code}.") from error
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        raise HTTPException(status_code=502, detail="TuneIn is unreachable.") from error
+
+    try:
+        payload = json.loads(body.decode("utf-8-sig", "replace"))
+    except ValueError as error:
+        raise HTTPException(status_code=502, detail="TuneIn returned no readable station list.") from error
+    head = payload.get("head") if isinstance(payload, dict) else None
+    status = str(head.get("status")) if isinstance(head, dict) else ""
+    if status and status != "200":
+        raise HTTPException(status_code=502, detail=f"TuneIn answered {status}.")
+    rows = [
+        row
+        for row in (payload.get("body") if isinstance(payload, dict) else []) or []
+        if isinstance(row, dict) and row.get("type") == "audio" and _clean_stream(str(row.get("URL") or ""))
+    ]
+    _query_cache[key] = (time.time(), rows)
+    return rows
+
+
+def _tunein_stream(url: str) -> str | None:
+    """Resolve a TuneIn tune-in address to the stream behind it.
+
+    The address answers a playlist, not audio: usually an M3U holding one bare
+    URL, sometimes a redirect straight to the mount, and for a few stations an
+    HLS master playlist, which is handed on whole so the player can open it.
+    """
+    tunein_url = _clean_stream(url or "")
+    if not tunein_url:
+        return None
+    cached = _freshest(_tunein_stream_cache, tunein_url, _CACHE_TTL)
+    if cached is not None:
+        return cached or None
+    address: str | None = None
+    try:
+        request = urllib.request.Request(tunein_url, headers={"User-Agent": _USER_AGENT})
+        with urllib.request.urlopen(request, timeout=_STREAM_TIMEOUT) as response:
+            content_type = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
+            final = _clean_stream(response.geturl() or "") or ""
+            text = response.read(65_536).decode("utf-8", "replace")
+        if "#EXT-X-" in text[:1024]:
+            # An HLS master: the playlist itself is the address the player needs.
+            address = final or tunein_url
+        elif content_type in {"audio/x-mpegurl", "audio/mpegurl", "audio/x-scpls", "application/pls+xml"}:
+            address = _first_stream(text)
+        elif content_type.startswith("audio/") or content_type == "application/octet-stream":
+            # A redirect landed on the mount itself.
+            address = final or tunein_url
+        else:
+            address = _first_stream(text)
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        address = None
+    _tunein_stream_cache[tunein_url] = (time.time(), address or "")
+    return address
+
+
+def _tunein_station(row: dict[str, Any], url: str) -> dict[str, Any]:
+    guide = _clean_text(row.get("guide_id"), 40) or "station"
+    bitrate = _count(row.get("bitrate"))
+    formats = _clean_text(row.get("formats"), 20)
+    parts = [f"{bitrate} kbps"] if bitrate else []
+    if formats:
+        parts.append(formats.upper())
+    return {
+        "id": f"ti-{guide}",
+        "name": _clean_text(row.get("text"), 120) or "TuneIn station",
+        "url": url,
+        "provider": "TuneIn",
+        "description": " \u00b7 ".join(parts),
+        # ``playing`` is the track or show on air. ``subtext`` carries it too,
+        # but on a browse row it can be the station's location instead.
+        "nowPlaying": _clean_text(row.get("playing"), 120) or _clean_text(row.get("subtext"), 120),
+        "homepage": "",
+        "listeners": 0,
+        "bitrate": bitrate,
+        "reliability": _count(row.get("reliability")),
     }
 
 
@@ -322,21 +519,26 @@ def _append_log(entry: dict[str, Any]) -> None:
         return
 
 
-def _stations(rows: Iterable[dict[str, Any]], limit: int, offset: int = 0) -> dict[str, Any]:
+def _page(
+    candidates: list[dict[str, Any]],
+    total: int,
+    offset: int,
+    resolve: Callable[[dict[str, Any]], str | None],
+    build: Callable[[dict[str, Any], str], dict[str, Any]],
+    source: str,
+    sort_key: Callable[[dict[str, Any]], Any],
+) -> dict[str, Any]:
     """One page of usable stations, and what is left behind it.
 
-    The directory answers its whole list in one response, so a page is a slice of
-    rows that have already been resolved and probed. ``next`` is where the next
+    Every directory answers its whole list in one response, so a page is a slice
+    of rows that still have to be resolved and probed. ``next`` is where the next
     slice starts, which is not ``offset + len(stations)``: a row that resolves to
     nothing is consumed and skipped, so counting stations would re-read it.
     """
-    usable = [row for row in rows if _station_id(row) is not None]
-    total = len(usable)
-    candidates = usable[offset : offset + limit]
     if not candidates:
         return {"stations": [], "skipped": 0, "count": total, "next": total}
     with ThreadPoolExecutor(max_workers=min(_RESOLVE_WORKERS, len(candidates))) as pool:
-        addresses = list(pool.map(lambda row: _stream_for(_station_id(row) or 0), candidates))
+        addresses = list(pool.map(resolve, candidates))
     resolved = [(row, address) for row, address in zip(candidates, addresses) if address]
     skipped = len(candidates) - len(resolved)
     if not resolved:
@@ -349,6 +551,7 @@ def _stations(rows: Iterable[dict[str, Any]], limit: int, offset: int = 0) -> di
         # an HTML error page, a closed mount, an HLS playlist. Drop it instead of
         # handing the player a row that cannot play, and leave a line behind so
         # the failure is explainable later.
+        station = build(row, address)
         verdict = verdicts.get(address) or {"ok": False, "kind": "slow", "reason": "No answer within the probe budget."}
         if not verdict["ok"]:
             skipped += 1
@@ -356,16 +559,42 @@ def _stations(rows: Iterable[dict[str, Any]], limit: int, offset: int = 0) -> di
                 logged += 1
                 _append_log({
                     "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                    "source": "shoutcast-resolve",
-                    "name": _clean_text(row.get("Name"), 120),
+                    "source": source,
+                    "name": station["name"],
                     "url": address,
                     "reason": f"{verdict['kind']}: {verdict['reason']}",
                 })
             continue
-        stations.append(_station(row, address))
-    stations.sort(key=lambda item: item.get("listeners") or 0, reverse=True)
-    page = {"stations": stations, "skipped": skipped, "count": total, "next": offset + len(candidates)}
-    return page
+        stations.append(station)
+    stations.sort(key=sort_key, reverse=True)
+    return {"stations": stations, "skipped": skipped, "count": total, "next": offset + len(candidates)}
+
+
+def _stations(rows: Iterable[dict[str, Any]], limit: int, offset: int = 0) -> dict[str, Any]:
+    """One page of Shoutcast stations."""
+    usable = [row for row in rows if _station_id(row) is not None]
+    return _page(
+        usable[offset : offset + limit],
+        len(usable),
+        offset,
+        lambda row: _stream_for(_station_id(row) or 0),
+        _station,
+        "shoutcast-resolve",
+        lambda station: station.get("listeners") or 0,
+    )
+
+
+def _tunein_page(rows: list[dict[str, Any]], limit: int, offset: int = 0) -> dict[str, Any]:
+    """One page of TuneIn stations, the most reliable first."""
+    return _page(
+        rows[offset : offset + limit],
+        len(rows),
+        offset,
+        lambda row: _tunein_stream(str(row.get("URL") or "")),
+        _tunein_station,
+        "tunein-resolve",
+        lambda station: (station.get("reliability") or 0, station.get("bitrate") or 0),
+    )
 
 
 
@@ -403,6 +632,48 @@ def shoutcast_top(
     """
     rows = _query_directory("/Home/Top", None)
     return {"source": "shoutcast", "query": "", **_stations(rows, limit, offset)}
+
+
+@router.get("/now-playing")
+def now_playing(url: str = Query(..., min_length=8, max_length=1000)) -> dict[str, Any]:
+    """What the stream says is playing right now.
+
+    ``GET /api/plugins/radio-plus/now-playing?url=https://stream.example/live.mp3``
+
+    Works for any station in the list, not only the directories: a custom address
+    announces its track the same way. The answer is cached briefly, because a
+    panel left open asks again every twenty seconds.
+    """
+    address = _clean_stream(url)
+    if not address:
+        raise HTTPException(status_code=400, detail="That is not an http or https address.")
+    cached = _freshest(_now_playing_cache, address, _NOW_PLAYING_TTL)
+    if cached is not None:
+        return {"ok": bool(cached), "title": cached, "station": "", "reason": "" if cached else "No title announced."}
+    result = _icy_title(address)
+    _now_playing_cache[address] = (time.time(), result["title"])
+    return result
+
+
+@router.get("/tunein/search")
+def tunein_search(
+    q: str = Query(..., min_length=1, max_length=80),
+    limit: int = Query(40, ge=1, le=100),
+    # A plain default, not Query(...): the tests call these routes directly, and a
+    # Query object reaches the page builder as itself when the request never came
+    # through FastAPI. TuneIn ignores an offset of its own, so the slice is taken
+    # from the list its search already answered.
+    offset: int = 0,
+) -> dict[str, Any]:
+    """Search TuneIn by station name.
+
+    ``GET /api/plugins/radio-plus/tunein/search?q=jazz&limit=40&offset=40``
+    """
+    term = " ".join(q.split())[:80]
+    if not term:
+        raise HTTPException(status_code=400, detail="A search term is required.")
+    rows = _tunein_rows(term)
+    return {"source": "tunein", "query": term, **_tunein_page(rows, limit, offset)}
 
 
 @router.get("/probe")

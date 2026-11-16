@@ -55,6 +55,10 @@ export { jsx, jsxs, Fragment } from ${JSON.stringify(fileUrl(reactJsx))}
 // The English strings the plugin ships, so the row is checked for copy a reader
 // would actually see rather than for a translation key.
 const COPY = {
+  restoreLabel: 'Restore the default stations',
+  restoreAction: 'Restore',
+  restoreNone: 'All default stations are already in your list.',
+  restoreSome: 'Restored',
   autoplayLabel: 'Start the last station on launch',
   autoplayDescription: 'Plays the station you listened to last as soon as Hermes opens, so the status bar is live without a click. Off by default; with it off nothing plays until you press play, and a station that cannot be reached reports the reason in the panel instead of retrying.'
 }
@@ -224,6 +228,53 @@ await test('turning it back off is stored as false', async () => {
   await flip()
   assert.equal(storage['local.autoplay'], false)
   assert.equal(control().checked, false)
+})
+
+await test('the restore button brings back a shipped station you deleted', async () => {
+  // The player reads the stored list once, so the list to repair has to be in
+  // storage before the plugin registers.
+  storage['local.stations'] = [
+    { id: 'chillsynth', name: 'Chillsynth (renamed)', description: '', provider: 'Nightride FM', url: 'https://stream.nightride.fm/chillsynth.mp3' },
+    { id: 'mine', name: 'Mine', description: '', provider: 'Own', url: 'https://example.test/mine.mp3' }
+  ]
+  delete storage['local.autoplay']
+  const restoreCtx = makeCtx()
+  plugin.default.register(restoreCtx)
+  const restorePage = restoreCtx.pages[0]
+  // A container of its own: the autoplay page still owns #root.
+  const holder = document.createElement('div')
+  document.body.append(holder)
+  const restoreRoot = createRoot(holder)
+  await act(async () => {
+    restoreRoot.render(restorePage.render())
+  })
+  // Scoped to this page: the autoplay page mounted in #root carries a restore
+  // button of its own, and its player was built from the list as it was then.
+  const button = [...holder.querySelectorAll('button')].find(el => el.textContent.trim() === COPY.restoreAction)
+  assert.ok(button, 'the page carries a restore button')
+  const labels = [...holder.querySelectorAll('.hermes-radio-plus-setting-label')].map(el => el.textContent)
+  assert.ok(labels.includes(COPY.restoreLabel), 'the button sits under its own explanation')
+  await act(async () => {
+    button.click()
+  })
+  const repaired = storage['local.stations']
+  assert.equal(repaired.length, 8, 'seven shipped stations plus your own')
+  assert.ok(repaired.some(item => item.id === 'mine'), 'your own station survived')
+  assert.ok(repaired.some(item => item.id === 'chillsynth' && item.name === 'Chillsynth (renamed)'), 'a renamed shipped station kept its name')
+  assert.equal(repaired.filter(item => item.id === 'chillsynth').length, 1, 'nothing was added twice')
+  const note = [...holder.querySelectorAll('.hermes-radio-plus-setting-note')].map(el => el.textContent).join(' ')
+  assert.match(note, /Restored 6/, 'the page says how many came back')
+  await act(async () => {
+    button.click()
+  })
+  assert.equal(storage['local.stations'].length, 8, 'a second press adds nothing')
+  const again = [...holder.querySelectorAll('.hermes-radio-plus-setting-note')].map(el => el.textContent).join(' ')
+  assert.match(again, /already in your list/, 'the second press says the list is complete')
+  await act(async () => {
+    restoreRoot.unmount()
+  })
+  holder.remove()
+  delete storage['local.stations']
 })
 
 await test('a stored true reopens the page switched on', async () => {

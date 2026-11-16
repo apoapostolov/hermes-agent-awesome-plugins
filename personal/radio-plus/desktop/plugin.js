@@ -54,7 +54,15 @@ const EN = {
   shoutcastEmpty: 'No Shoutcast stations found',
   popularError: 'The popular list is unavailable. Your stations still work.',
   shoutcastError: 'Shoutcast is unavailable. Try again, or restart Hermes if you just enabled Radio Plus.',
-  sourceAll: 'All', sourcePopular: 'Popular', sourceShoutcast: 'Shoutcast',
+  sourceAll: 'All', sourcePopular: 'Popular', sourceShoutcast: 'Shoutcast', sourceTunein: 'TuneIn',
+  restoreLabel: 'Restore the default stations',
+  restoreDescription: 'Adds back any station that shipped with Radio Plus and is no longer in your list. Stations you added and names you changed stay as they are.',
+  restoreAction: 'Restore',
+  restoreNone: 'All default stations are already in your list.',
+  restoreSome: 'Restored',
+  tuneinEmpty: 'No TuneIn stations found',
+  tuneinHint: 'Type a station name. TuneIn has no top list, but genre:jazz works.',
+  tuneinError: 'TuneIn is unavailable. Try again, or restart Hermes if you just enabled Radio Plus.',
   rename: 'Rename station', renameHint: 'Station name',
   remove: 'Delete station', confirmRemove: 'Click again to delete',
   add: 'Add station', addName: 'Station name', addUrl: 'Stream URL (http or https)',
@@ -73,9 +81,9 @@ const EN = {
 }
 const LOCALES = {
   en: EN,
-  ja: { ...EN, artistProfile: 'アーティストのプロフィールを開く', audioOnly: '再生中 · 波形を表示できません', radio: 'ラジオ', browse: 'ステーションを選択', play: 'ラジオを再生', pause: 'ラジオを一時停止', next: '次のステーション', live: 'ライブ', paused: '一時停止', connecting: '接続中', error: '再生できません', retry: '再試行',   search: 'ステーションを検索… country:uk genre:jazz', loadingMore: 'さらに読み込み中…', volume: '音量', mute: 'ミュート', unmute: 'ミュート解除', save: 'ステーションを固定', unsave: '固定を解除', visit: '公式サイトを開く', noResults: '見つかりませんでした', searchHint: '名前で検索。jazz、ambient、house など。', searchError: '検索できません。おすすめは再生できます。', searching: '検索中', directory: 'Radio Browser による検索', note: 'ライブ放送 · 次へでステーションを切り替え', streamError: '接続できませんでした。再試行するか別のステーションを選んでください。', close: 'ラジオを閉じる', nowPlaying: '再生中', elsewhere: '別のウィンドウで再生中', 'chillsynthDescription': 'やさしい集中 · 暖かなシンセ', 'nightrideDescription': 'シンセウェーブ · 深夜', 'darksynthDescription': 'ダークな電子音 · 高揚感', 'spacesynthDescription': '宇宙的シンセ · レトロな未来', 'paradise-mainDescription': '多彩な選曲 · 人がキュレーション', 'paradise-mellowDescription': 'ゆったりした時間' },
-  zh: { ...EN, artistProfile: '访问艺人主页', audioOnly: '正在播放 · 无法显示波形', radio: '电台', browse: '选择电台', play: '播放电台', pause: '暂停电台', next: '下一个电台', live: '直播', paused: '已暂停', connecting: '正在连接', error: '无法播放', retry: '重试',   search: '搜索电台… country:uk genre:jazz', loadingMore: '正在加载更多…', volume: '音量', mute: '静音', unmute: '取消静音', save: '置顶电台', unsave: '取消置顶', visit: '访问电台网站', noResults: '没有找到电台', searchHint: '按名称搜索，例如 jazz、ambient 或 house。', searchError: '暂时无法搜索，精选电台仍可使用。', searching: '正在搜索', directory: '搜索由 Radio Browser 提供', note: '直播电台 · 下一首将切换电台', streamError: '无法连接，请重试或选择其他电台。', close: '关闭电台', nowPlaying: '正在播放', elsewhere: '已暂停，正在其他窗口播放', 'chillsynthDescription': '轻松专注 · 温暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑电子 · 充满能量', 'spacesynthDescription': '宇宙合成器 · 复古未来', 'paradise-mainDescription': '多元风格 · 人工精选', 'paradise-mellowDescription': '放慢节奏' },
-  'zh-hant': { ...EN, artistProfile: '造訪藝人主頁', audioOnly: '播放中 · 無法顯示波形', radio: '電台', browse: '選擇電台', play: '播放電台', pause: '暫停電台', next: '下一個電台', live: '直播', paused: '已暫停', connecting: '正在連線', error: '無法播放', retry: '重試',   search: '搜尋電台… country:uk genre:jazz', loadingMore: '正在載入更多…', volume: '音量', mute: '靜音', unmute: '取消靜音', save: '釘選電台', unsave: '取消釘選', visit: '造訪電台網站', noResults: '找不到電台', searchHint: '按名稱搜尋，例如 jazz、ambient 或 house。', searchError: '暫時無法搜尋，精選電台仍可使用。', searching: '正在搜尋', directory: '搜尋由 Radio Browser 提供', note: '直播電台 · 下一首會切換電台', streamError: '無法連線，請重試或選擇其他電台。', close: '關閉電台', nowPlaying: '正在播放', elsewhere: '已暫停，正在其他視窗播放', 'chillsynthDescription': '輕鬆專注 · 溫暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑電子 · 充滿能量', 'spacesynthDescription': '宇宙合成器 · 復古未來', 'paradise-mainDescription': '多元風格 · 人工精選', 'paradise-mellowDescription': '放慢節奏' }
+  ja: { ...EN, artistProfile: 'アーティストのプロフィールを開く', audioOnly: '再生中 · 波形を表示できません', radio: 'ラジオ', browse: 'ステーションを選択', play: 'ラジオを再生', pause: 'ラジオを一時停止', next: '次のステーション', live: 'ライブ', paused: '一時停止', connecting: '接続中', error: '再生できません', retry: '再試行',   search: 'ステーションを検索… country:uk genre:jazz', loadingMore: 'さらに読み込み中…', volume: '音量', mute: 'ミュート', unmute: 'ミュート解除', save: 'ステーションを固定', unsave: '固定を解除', visit: '公式サイトを開く', noResults: '見つかりませんでした', searchHint: '名前で検索。jazz、ambient、house など。', searchError: '検索できません。おすすめは再生できます。', searching: '検索中', directory: 'Radio Browser による検索', note: 'ライブ放送 · 次へでステーションを切り替え', streamError: '接続できませんでした。再試行するか別のステーションを選んでください。', close: 'ラジオを閉じる', nowPlaying: '再生中', elsewhere: '別のウィンドウで再生中', 'chillsynthDescription': 'やさしい集中 · 暖かなシンセ', 'nightrideDescription': 'シンセウェーブ · 深夜', 'darksynthDescription': 'ダークな電子音 · 高揚感', 'spacesynthDescription': '宇宙的シンセ · レトロな未来', 'paradise-mainDescription': '多彩な選曲 · 人がキュレーション', 'paradise-mellowDescription': 'ゆったりした時間', sourceTunein: 'TuneIn', tuneinEmpty: 'TuneIn に見つかりませんでした', tuneinHint: 'ステーション名を入力してください。genre:jazz も使えます。', tuneinError: 'TuneIn を利用できません。もう一度お試しください。', restoreLabel: '既定のステーションを復元', restoreDescription: 'このプラグインに同梱されていたステーションのうち、リストから消えているものを戻します。追加したステーションと変更した名前はそのまま残ります。', restoreAction: '復元', restoreNone: '既定のステーションはすべてリストにあります。', restoreSome: '復元しました' },
+  zh: { ...EN, artistProfile: '访问艺人主页', audioOnly: '正在播放 · 无法显示波形', radio: '电台', browse: '选择电台', play: '播放电台', pause: '暂停电台', next: '下一个电台', live: '直播', paused: '已暂停', connecting: '正在连接', error: '无法播放', retry: '重试',   search: '搜索电台… country:uk genre:jazz', loadingMore: '正在加载更多…', volume: '音量', mute: '静音', unmute: '取消静音', save: '置顶电台', unsave: '取消置顶', visit: '访问电台网站', noResults: '没有找到电台', searchHint: '按名称搜索，例如 jazz、ambient 或 house。', searchError: '暂时无法搜索，精选电台仍可使用。', searching: '正在搜索', directory: '搜索由 Radio Browser 提供', note: '直播电台 · 下一首将切换电台', streamError: '无法连接，请重试或选择其他电台。', close: '关闭电台', nowPlaying: '正在播放', elsewhere: '已暂停，正在其他窗口播放', 'chillsynthDescription': '轻松专注 · 温暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑电子 · 充满能量', 'spacesynthDescription': '宇宙合成器 · 复古未来', 'paradise-mainDescription': '多元风格 · 人工精选', 'paradise-mellowDescription': '放慢节奏', sourceTunein: 'TuneIn', tuneinEmpty: '没有找到 TuneIn 电台', tuneinHint: '输入电台名称，也可以使用 genre:jazz。', tuneinError: '暂时无法访问 TuneIn，请重试。', restoreLabel: '恢复默认电台', restoreDescription: '把随插件附带、但已不在列表中的电台加回来。你添加的电台和改过的名称保持不变。', restoreAction: '恢复', restoreNone: '默认电台都在列表里。', restoreSome: '已恢复' },
+  'zh-hant': { ...EN, artistProfile: '造訪藝人主頁', audioOnly: '播放中 · 無法顯示波形', radio: '電台', browse: '選擇電台', play: '播放電台', pause: '暫停電台', next: '下一個電台', live: '直播', paused: '已暫停', connecting: '正在連線', error: '無法播放', retry: '重試',   search: '搜尋電台… country:uk genre:jazz', loadingMore: '正在載入更多…', volume: '音量', mute: '靜音', unmute: '取消靜音', save: '釘選電台', unsave: '取消釘選', visit: '造訪電台網站', noResults: '找不到電台', searchHint: '按名稱搜尋，例如 jazz、ambient 或 house。', searchError: '暫時無法搜尋，精選電台仍可使用。', searching: '正在搜尋', directory: '搜尋由 Radio Browser 提供', note: '直播電台 · 下一首會切換電台', streamError: '無法連線，請重試或選擇其他電台。', close: '關閉電台', nowPlaying: '正在播放', elsewhere: '已暫停，正在其他視窗播放', 'chillsynthDescription': '輕鬆專注 · 溫暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑電子 · 充滿能量', 'spacesynthDescription': '宇宙合成器 · 復古未來', 'paradise-mainDescription': '多元風格 · 人工精選', 'paradise-mellowDescription': '放慢節奏', restoreLabel: '恢復預設電台', restoreDescription: '把隨外掛附帶、但已不在清單中的電台加回來。你新增的電台和改過的名稱維持不變。', restoreAction: '恢復', restoreNone: '預設電台都在清單裡。', restoreSome: '已恢復' }
 }
 
 // Disk plugins are not scanned by Tailwind. Only plugin layout lives here;
@@ -175,6 +183,11 @@ function streamUrl(value) {
   } catch { return null }
 }
 
+async function nowPlaying(ctx, url) {
+  if (typeof ctx.rest !== 'function') return { ok: false, title: '' }
+  return ctx.rest(`/now-playing?${new URLSearchParams({ url })}`, { timeoutMs: 12000 })
+}
+
 async function fetchJson(url, signal) {
   const response = await fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]), credentials: 'omit' })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -248,6 +261,9 @@ const PAGE_SIZE = 40
 // The Shoutcast directory answers its whole list at once, so its page is smaller:
 // every row costs a resolve and a probe before it reaches the list.
 const SHOUTCAST_PAGE = 30
+// TuneIn resolves a playlist per row before it can play, so it pages by thirty
+// too.
+const TUNEIN_PAGE = 30
 
 const TAG_PATTERN = /\b(country|genre):("[^"]+"|\S+)/gi
 
@@ -419,6 +435,47 @@ async function shoutcastStations(ctx, text, options = {}) {
   }
 }
 
+async function tuneinQuery(ctx, text, { offset = 0, limit = TUNEIN_PAGE } = {}) {
+  const payload = await ctx.rest(`/tunein/search?${new URLSearchParams({ q: text, limit: String(limit), offset: String(offset) })}`, { timeoutMs: 30000 })
+  const rows = Array.isArray(payload?.stations) ? payload.stations : []
+  return {
+    stations: uniqueStations(rows.flatMap(row => {
+      const url = streamUrl(row?.url)
+      if (!url || typeof row.id !== 'string' || typeof row.name !== 'string') return []
+      return [{
+        id: row.id,
+        name: row.name.trim(),
+        url,
+        provider: 'TuneIn',
+        description: row.description ?? '',
+        nowPlaying: row.nowPlaying ?? '',
+        homepage: ''
+      }]
+    })),
+    skipped: Number(payload?.skipped) || 0,
+    hasMore: Number(payload?.next ?? 0) < Number(payload?.count ?? 0),
+    nextOffset: Number(payload?.next ?? 0)
+  }
+}
+
+async function tuneinStations(ctx, text, options = {}) {
+  if (typeof ctx.rest !== 'function') throw new Error('The TuneIn route is not loaded')
+  // TuneIn takes free text, like Shoutcast: a genre tag is the closest thing it
+  // understands, and a country tag has no equivalent there, so a country-only
+  // query answers empty instead of searching for the literal tag.
+  const parsed = parseQuery(text)
+  const query = parsed.name || parsed.genre
+  if (!query) return { stations: [], hls: 0, skipped: 0, hasMore: false, nextOffset: 0 }
+  const results = await Promise.all(searchTerms(query).map(term => tuneinQuery(ctx, term, options)))
+  return {
+    stations: uniqueStations(results.flatMap(result => result.stations)),
+    hls: 0,
+    skipped: results.reduce((total, result) => total + result.skipped, 0),
+    hasMore: results.some(result => result.hasMore),
+    nextOffset: Math.max(...results.map(result => result.nextOffset))
+  }
+}
+
 function sameStation(a, b) {
   return a.id === b.id || a.url === b.url
 }
@@ -513,6 +570,14 @@ function reportFailure(ctx, station, reason) {
     if (!verdict?.kind) return
     console.error(`[radio-plus] probe ${station.url}: ${verdict.kind} ${verdict.status} ${verdict.contentType} ${verdict.reason ?? ''}`)
   })
+}
+
+// The shipped list is a starting point, not a floor: a station you deleted on
+// purpose stays deleted. This answers what a restore would bring back, by id or
+// by address, so a renamed station is not restored twice under its old name.
+function missingDefaults(current) {
+  const list = Array.isArray(current) ? current.filter(validStation) : []
+  return SEED_STATIONS.filter(seed => !list.some(item => item.id === seed.id || item.url === seed.url))
 }
 
 function createPlayer(ctx) {
@@ -718,6 +783,17 @@ function createPlayer(ctx) {
     ctx.storage.set('local.stations', next)
   }
 
+  // Restores the stations this plugin shipped with and nothing else: your own
+  // addresses and your edits to a shipped one are left as they are, and the
+  // answer says how many came back so the settings page can report it.
+  function restoreDefaults() {
+    const current = stations.get()
+    const missing = missingDefaults(current)
+    if (!missing.length) return 0
+    saveStations([...current, ...missing.map(item => ({ ...item }))])
+    return missing.length
+  }
+
   function tidyName(value) {
     return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
   }
@@ -825,7 +901,7 @@ function createPlayer(ctx) {
     return true
   }
 
-  return { station, stations, favorites, volume, status, meterMode, lastError, open, play, stop, toggle, next, setVolume, mute, favorite, updateStation, removeStation, addStation, waveform, startIfRequested }
+  return { station, stations, favorites, volume, status, meterMode, lastError, open, play, stop, toggle, next, setVolume, mute, favorite, updateStation, removeStation, addStation, waveform, startIfRequested, restoreDefaults }
 }
 
 function brailleTrace(samples, rows = 2) {
@@ -990,22 +1066,24 @@ function Signal({ player, ctx }) {
   const status = useValue(player.status)
   const mode = useValue(player.meterMode)
   const lastError = useValue(player.lastError)
-  const stream = new URL(station.url)
-  const endpoints = {
-    'stream.nightride.fm': `${NIGHTRIDE}status-json.xsl`,
-    'media01.gamingnow.net': 'https://media01.gamingnow.net:8010/status-json.xsl'
-  }
-  const endpoint = endpoints[stream.hostname]
+  // The stream announces its track through ICY metadata, which the renderer
+  // cannot read: most stations send no CORS headers, and the metadata is
+  // interleaved into the audio rather than served beside it. The plugin route
+  // reads it for any station in the list, so Radio Browser and custom addresses
+  // get a title as well as the two directories that send one in their rows.
   const metadata = useQuery({
-    queryKey: [ID, 'metadata', endpoint],
-    queryFn: ({ signal }) => fetchJson(endpoint, signal),
-    enabled: status === 'live' && Boolean(endpoint),
-    staleTime: 20000, refetchInterval: status === 'live' ? 25000 : false, retry: 1
+    queryKey: [ID, 'now-playing', station.url],
+    queryFn: () => nowPlaying(ctx, station.url),
+    enabled: status === 'live' && typeof ctx.rest === 'function',
+    staleTime: 15000, refetchInterval: status === 'live' ? 20000 : false, retry: 0
   })
-  const sources = metadata.data?.icestats?.source
-  const source = (Array.isArray(sources) ? sources : sources ? [sources] : []).find(source => source.listenurl?.endsWith(stream.pathname))
-  const track = status === 'live' && typeof source?.title === 'string' ? source.title : ''
-  const credit = trackCredit(track ? source : null)
+  // A directory row already knows what was on air when it was fetched: TuneIn
+  // sends the show or the track, Shoutcast sends CurrentTrack. Keep it for the
+  // moment between pressing play and the stream's first announcement, and for a
+  // station whose stream announces nothing.
+  const announced = status === 'live' ? metadata.data?.title ?? '' : ''
+  const track = announced || (status === 'live' ? station.nowPlaying ?? '' : '')
+  const credit = trackCredit(track ? { title: track } : null)
   const artist = useQuery({
     queryKey: [ID, 'artist-profile', credit.artist],
     queryFn: ({ signal }) => resolveArtist(credit.artist, signal, ctx),
@@ -1101,7 +1179,9 @@ function StationRow({ station, player }) {
   ] })
 }
 
-const SOURCE_LABELS = { all: 'sourceAll', popular: 'sourcePopular', shoutcast: 'sourceShoutcast' }
+const SOURCE_LABELS = { all: 'sourceAll', popular: 'sourcePopular', shoutcast: 'sourceShoutcast', tunein: 'sourceTunein' }
+const SOURCE_PAGE = { all: PAGE_SIZE, popular: PAGE_SIZE, shoutcast: SHOUTCAST_PAGE, tunein: TUNEIN_PAGE }
+const EMPTY_LABELS = { shoutcast: 'shoutcastEmpty', tunein: 'tuneinEmpty' }
 
 function Stations({ player, ctx }) {
   const t = usePluginI18n(ID)
@@ -1155,6 +1235,19 @@ function Stations({ player, ctx }) {
     queryKey: [ID, 'shoutcast', query], queryFn: () => shoutcastStations(ctx, query),
     enabled: source === 'shoutcast' && text === query, staleTime: 300000, retry: false
   })
+  const tunein = useQuery({
+    queryKey: [ID, 'tunein', query], queryFn: () => tuneinStations(ctx, query),
+    enabled: source === 'tunein' && text === query, staleTime: 300000, retry: false
+  })
+  // One place that says which source answers which question, so a fourth source
+  // is a row in these maps rather than another branch in five ternaries.
+  const sourceQuery = { all: browser, popular, shoutcast, tunein }
+  const fetchPage = {
+    all: (token, offset) => searchStations(token, new AbortController().signal, { offset }),
+    popular: (token, offset) => popularStations(new AbortController().signal, { offset }),
+    shoutcast: (token, offset) => shoutcastStations(ctx, token, { offset }),
+    tunein: (token, offset) => tuneinStations(ctx, token, { offset })
+  }
   // A tag query is a browse of the directory, so your own stations step aside;
   // a plain name query still filters them and keeps them on top.
   const parsedText = parseQuery(text)
@@ -1163,20 +1256,16 @@ function Stations({ player, ctx }) {
   const matches = item => !filterText || [item.name, item.description, item.provider].some(value => fold(value).includes(fold(filterText)))
   // All three sources page: the search and the top list take an offset, and the
   // Shoutcast route slices its own list the same way.
-  const active = source === 'popular' ? popular : source === 'shoutcast' ? shoutcast : browser
+  const active = sourceQuery[source]
   const canPage = (source !== 'all' || text.length >= 2) && Boolean(active.data?.hasMore) && moreState !== 'done'
   const loadMore = async () => {
     if (!canPage || moreBusy.current || query !== queryRef.current) return
     moreBusy.current = true
     const token = query
-    const offset = moreOffset.current || (source === 'shoutcast' ? SHOUTCAST_PAGE : PAGE_SIZE)
+    const offset = moreOffset.current || SOURCE_PAGE[source]
     setMoreState('loading')
     try {
-      const next = source === 'popular'
-        ? await popularStations(new AbortController().signal, { offset })
-        : source === 'shoutcast'
-          ? await shoutcastStations(ctx, token, { offset })
-          : await searchStations(token, new AbortController().signal, { offset })
+      const next = await fetchPage[source](token, offset)
       // A query typed while this was in flight wins: drop the stale page.
       if (queryRef.current !== token) return
       moreOffset.current = next.nextOffset || offset + PAGE_SIZE
@@ -1202,7 +1291,7 @@ function Stations({ player, ctx }) {
     ? (text.length >= 2 && query === text ? browser.data : null)
     : source === 'popular'
       ? popular.data
-      : (text === query ? shoutcast.data : null)
+      : (text === query ? active.data : null)
   const remote = [...(remoteResult?.stations ?? []), ...more]
     .filter(item => source !== 'popular' || !text || matches(item))
   const results = uniqueStations([...local, ...remote])
@@ -1210,12 +1299,12 @@ function Stations({ player, ctx }) {
   // result must not remove a row above it and move the target under the pointer.
   const anchored = results.some(item => sameStation(item, browseStation)) ? results : [browseStation, ...results]
   const items = anchored.some(item => sameStation(item, current)) ? anchored : [current, ...anchored]
-  const activeQuery = source === 'all' ? browser : source === 'popular' ? popular : shoutcast
+  const activeQuery = active
   const pending = source === 'all'
     ? text.length >= 2 && (text !== query || browser.isFetching)
-    : activeQuery.isFetching || (source === 'shoutcast' && text !== query)
+    : activeQuery.isFetching || (source !== 'popular' && text !== query)
   const failed = activeQuery.isError && (source !== 'all' || text.length >= 2)
-  const errorText = source === 'popular' ? t('popularError') : source === 'shoutcast' ? t('shoutcastError') : t('searchError')
+  const errorText = t({ popular: 'popularError', shoutcast: 'shoutcastError', tunein: 'tuneinError' }[source] ?? 'searchError')
   const empty = !pending && !failed && results.length === 0 && (text.length > 0 || source !== 'all')
   const hls = remoteResult?.hls ?? 0
   const skipped = remoteResult?.skipped ?? 0
@@ -1291,7 +1380,7 @@ function Stations({ player, ctx }) {
         moreState === 'loading' && jsx('div', { className: 'hermes-radio-plus-more', role: 'status', children: t('loadingMore') }),
       pending && !items.length && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: t('searching') }),
       failed && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: errorText }),
-      empty && !failed && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: source === 'shoutcast' ? t('shoutcastEmpty') : t('noResults') }),
+      empty && !failed && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: source === 'tunein' && !text ? t('tuneinHint') : t(EMPTY_LABELS[source] ?? 'noResults') }),
       hls > 0 && !HLS && jsx('div', { className: 'hermes-radio-plus-error', children: `${hls} ${t('hlsNote')}` }),
       skipped > 0 && jsx('div', { className: 'hermes-radio-plus-error', children: `${skipped} ${t('skippedNote')}` })
     ] })
@@ -1349,9 +1438,10 @@ function RadioBar({ player, ctx }) {
 
 // Settings ▸ Plugins ▸ Radio Plus. One switch, the sanctioned way to ship an
 // optional behaviour: the default stays off and the user opts in.
-function RadioSettingsPage({ ctx }) {
+function RadioSettingsPage({ ctx, player }) {
   const t = usePluginI18n(ID)
   const [on, setOn] = useState(autoplayOnLaunch(ctx.storage))
+  const [restored, setRestored] = useState(null)
   const row = {
     checked: on,
     id: 'radio-plus-autoplay',
@@ -1362,8 +1452,31 @@ function RadioSettingsPage({ ctx }) {
       ctx.storage.set(AUTOPLAY_KEY, next)
     }
   }
+  // One button, one meaning: bring back what shipped. It never removes a
+  // station, so a list built over months is not reset to the seed list.
+  const restore = () => {
+    const count = typeof player?.restoreDefaults === 'function' ? player.restoreDefaults() : 0
+    setRestored(count)
+  }
+  const restoreRow = jsxs('div', { className: 'hermes-radio-plus-setting', children: [
+    jsxs('div', {
+      className: 'hermes-radio-plus-setting-text',
+      children: [
+        jsx('span', { className: 'hermes-radio-plus-setting-label', children: t('restoreLabel') }),
+        jsx('span', { className: 'hermes-radio-plus-setting-note', children: t('restoreDescription') })
+      ]
+    }),
+    jsx(Button, { variant: 'secondary', size: 'micro', onClick: restore, children: t('restoreAction') })
+  ] })
+  const restoreNote = restored === null
+    ? null
+    : jsx('div', {
+      className: 'hermes-radio-plus-setting-note',
+      role: 'status',
+      children: restored ? `${t('restoreSome')} ${restored}` : t('restoreNone')
+    })
   const ToggleRow = pluginSdk.ToggleRow
-  if (ToggleRow) return jsx(ToggleRow, row)
+  if (ToggleRow) return jsxs('div', { children: [jsx(ToggleRow, row), restoreRow, restoreNote] })
   // An older build without ToggleRow still gets a working control.
   const Switch = pluginSdk.Switch
   const control = Switch
@@ -1374,27 +1487,31 @@ function RadioSettingsPage({ ctx }) {
       'aria-label': row.label,
       onChange: event => row.onChange(event.target.checked)
     })
-  return jsxs('div', {
-    className: 'hermes-radio-plus-setting',
-    children: [
-      jsxs('div', {
-        className: 'hermes-radio-plus-setting-text',
-        children: [
-          jsx('span', { className: 'hermes-radio-plus-setting-label', children: row.label }),
-          jsx('span', { className: 'hermes-radio-plus-setting-note', children: row.description })
-        ]
-      }),
-      control
-    ]
-  })
+  return jsxs('div', { children: [
+    jsxs('div', {
+      className: 'hermes-radio-plus-setting',
+      children: [
+        jsxs('div', {
+          className: 'hermes-radio-plus-setting-text',
+          children: [
+            jsx('span', { className: 'hermes-radio-plus-setting-label', children: row.label }),
+            jsx('span', { className: 'hermes-radio-plus-setting-note', children: row.description })
+          ]
+        }),
+        control
+      ]
+    }),
+    restoreRow,
+    restoreNote
+  ] })
 }
 
-export { artistProfile, resolveArtist, trackCredit, autoplayOnLaunch, shouldAutoplay, RadioSettingsPage, parseQuery, searchParams }
+export { artistProfile, resolveArtist, trackCredit, autoplayOnLaunch, shouldAutoplay, RadioSettingsPage, parseQuery, searchParams, missingDefaults }
 
 export default {
   id: ID,
   name: 'Radio Plus',
-  description: 'Live radio with an editable station list, Radio Browser and Shoutcast search, and an audio-reactive waveform.',
+  description: 'Live radio with an editable station list, Radio Browser, Shoutcast and TuneIn search, and an audio-reactive waveform.',
   defaultEnabled: false,
   register(ctx) {
     ctx.i18n.register(LOCALES)
@@ -1410,7 +1527,7 @@ export default {
         title: 'Radio Plus',
         icon: 'radio-tower',
         order: 70,
-        render: () => jsx(RadioSettingsPage, { ctx })
+        render: () => jsx(RadioSettingsPage, { ctx, player })
       })
     }
     // After the first paint, so the window is up and the audio element can start

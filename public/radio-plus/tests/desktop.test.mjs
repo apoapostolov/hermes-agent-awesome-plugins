@@ -48,7 +48,7 @@ const source = readFileSync(path.join(root, 'desktop', 'plugin.js'), 'utf8')
   .replace("from 'react/jsx-runtime'", "from './jsx.mjs'")
   .concat(`
 export {
-  createPlayer, popularStations, sameStation, searchStations, shoutcastStations,
+  createPlayer, popularStations, sameStation, searchStations, shoutcastStations, tuneinStations, nowPlaying,
   streamUrl, uniqueStations, validStation, SEED_STATIONS, SOURCE_LABELS,
   transliterate, fold, searchTerms, mediaFailure, isHlsUrl, rowsToStations, matchScore
 }
@@ -265,6 +265,113 @@ await test('shoutcastStations stops asking once the directory is spent', async (
   assert.equal(page.hasMore, false, 'next reached the end of the list')
 })
 
+await test('tuneinStations maps the plugin route and drops unusable rows', async () => {
+  const paths = []
+  const ctx = {
+    ...makeCtx(),
+    rest: async pathName => {
+      paths.push(pathName)
+      return {
+        stations: [
+          { id: 'ti-s1', name: 'One Jazz', url: 'https://streaming.broadcast.radio/onejazz', description: '128 kbps · MP3', nowPlaying: 'Espen Eriksen Trio' },
+          { id: 'ti-s2', name: 'No Stream', url: null },
+          { id: 7, name: 'Bad Id', url: 'https://example.test/x' },
+          { id: 'ti-s3', name: 'Duplicate', url: 'https://streaming.broadcast.radio/onejazz' }
+        ],
+        skipped: 2,
+        count: 84,
+        next: 30
+      }
+    }
+  }
+  const page = await plugin.tuneinStations(ctx, 'jazz')
+  assert.equal(paths.length, 1, 'one term means one request')
+  assert.match(paths[0], /^\/tunein\/search\?q=jazz&limit=30&offset=0$/)
+  assert.equal(page.stations.length, 1, 'a row without a stream or with a bad id is dropped')
+  assert.equal(page.stations[0].provider, 'TuneIn')
+  assert.equal(page.stations[0].nowPlaying, 'Espen Eriksen Trio')
+  assert.equal(page.skipped, 2, 'the route says how many rows it could not resolve')
+  assert.equal(page.hasMore, true, 'eighty-four rows are more than one page')
+  assert.equal(page.nextOffset, 30)
+})
+
+await test('tuneinStations asks for the next slice by offset', async () => {
+  const paths = []
+  const ctx = {
+    ...makeCtx(),
+    rest: async pathName => {
+      paths.push(pathName)
+      return { stations: [{ id: 'ti-s1', name: 'One', url: 'https://example.test/1' }], skipped: 0, count: 84, next: 60 }
+    }
+  }
+  const page = await plugin.tuneinStations(ctx, 'jazz', { offset: 30 })
+  assert.match(paths[0], /offset=30/)
+  assert.equal(page.nextOffset, 60)
+  assert.equal(page.hasMore, true)
+})
+
+await test('tuneinStations stops at the end of the list', async () => {
+  const ctx = {
+    ...makeCtx(),
+    rest: async () => ({ stations: [{ id: 'ti-s1', name: 'One', url: 'https://example.test/1' }], skipped: 0, count: 84, next: 84 })
+  }
+  const page = await plugin.tuneinStations(ctx, 'jazz', { offset: 60 })
+  assert.equal(page.hasMore, false, 'next reached the end of the list')
+})
+
+await test('tuneinStations searches a genre tag and drops a country tag', async () => {
+  const paths = []
+  const ctx = { ...makeCtx(), rest: async pathName => { paths.push(pathName); return { stations: [] } } }
+  const none = await plugin.tuneinStations(ctx, 'country:bg')
+  assert.deepEqual(paths, [], 'a country-only query is not sent as the literal tag')
+  assert.equal(none.stations.length, 0)
+  await plugin.tuneinStations(ctx, 'genre:jazz')
+  assert.match(paths[0], /q=jazz&/, 'the genre is the text TuneIn searches for')
+})
+
+await test('missingDefaults names only the shipped stations you deleted', () => {
+  const seeds = plugin.SEED_STATIONS
+  assert.equal(seeds.length, 7, 'the shipped list is the seven starter stations')
+  const current = [
+    { ...seeds[0], name: 'Renamed by hand' },
+    { id: 'mine', name: 'Mine', url: 'https://example.test/mine' }
+  ]
+  const missing = plugin.missingDefaults(current)
+  assert.deepEqual(missing.map(item => item.id), seeds.slice(1).map(item => item.id))
+  assert.ok(!missing.some(item => item.id === seeds[0].id), 'a renamed shipped station is still present')
+  assert.ok(!missing.some(item => item.id === 'mine'), 'your own station is never a candidate')
+  assert.deepEqual(plugin.missingDefaults(seeds), [], 'nothing is missing from the full list')
+})
+
+await test('nowPlaying asks the route for the title of one address', async () => {
+  const paths = []
+  const ctx = {
+    ...makeCtx(),
+    rest: async pathName => {
+      paths.push(pathName)
+      return { ok: true, title: 'Sakunera - After Eight', station: 'Nightride' }
+    }
+  }
+  const result = await plugin.nowPlaying(ctx, 'https://stream.nightride.fm/nightride.mp3')
+  assert.match(paths[0], /^\/now-playing\?url=https%3A%2F%2Fstream\.nightride\.fm%2Fnightride\.mp3$/)
+  assert.equal(result.title, 'Sakunera - After Eight')
+})
+
+await test('nowPlaying answers empty when the plugin route is missing', async () => {
+  const ctx = { ...makeCtx() }
+  delete ctx.rest
+  const result = await plugin.nowPlaying(ctx, 'https://stream.example/live.mp3')
+  assert.equal(result.ok, false, 'a build without the route must not throw into the panel')
+})
+
+await test('a track credit splits the artist out of the announced title', () => {
+  const credit = plugin.trackCredit({ title: 'Aphex Twin - Xtal' })
+  assert.equal(credit.artist, 'Aphex Twin')
+  assert.equal(credit.title, 'Xtal')
+  const plain = plugin.trackCredit({ title: 'Morning News' })
+  assert.equal(plain.artist, '', 'a show name is not split into an artist')
+})
+
 await test('the popular list pages with an offset', async () => {
   const controller = new AbortController()
   const first = await plugin.popularStations(controller.signal, { limit: 20 })
@@ -432,8 +539,8 @@ await test('the second page continues where the first stopped', async () => {
   assert.equal(overlap.length, 0, `page two repeated ${overlap.length} rows from page one`)
 })
 
-await test('source labels cover the three picker tabs', () => {
-  assert.deepEqual(Object.keys(plugin.SOURCE_LABELS), ['all', 'popular', 'shoutcast'])
+await test('source labels cover the four picker tabs', () => {
+  assert.deepEqual(Object.keys(plugin.SOURCE_LABELS), ['all', 'popular', 'shoutcast', 'tunein'])
 })
 
 const failed = results.filter(([status]) => status === 'FAIL')

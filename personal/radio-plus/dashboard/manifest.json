@@ -1,8 +1,8 @@
 {
   "name": "radio-plus",
   "label": "Radio Plus",
-  "description": "Shoutcast directory search backend for the Radio Plus desktop player",
-  "version": "1.4.0",
+  "description": "Directory and track-title backend for the Radio Plus desktop player",
+  "version": "1.5.0",
   "api": "plugin_api.py",
   "tab": { "hidden": true }
 }
