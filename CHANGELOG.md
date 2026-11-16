@@ -3,6 +3,11 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [next-steps 1.0.2] - 2026-11-16
+
+### Changed
+
+- **next-steps:** publishes its prompt-section sizes through `prompt_texts()`, so `scripts/admission_check.py` can measure the rule instead of warning that it cannot. The check imports `prompt_section.py`, calls the hook and fails a release whose section would be skipped by the host for being over 2,200 characters. Nothing changes at runtime: the section, its sizes and the clamp are the same as 1.0.1, and no tool, hook or setting moved.
 ## [1.27.13] - 2026-11-16
 
 ### Fixed
