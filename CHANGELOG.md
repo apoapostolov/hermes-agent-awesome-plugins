@@ -38,6 +38,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **pack:** moves the **catalog-redesign** pin to `670b1e4`, which reports the plugins catalog total rather than the first page.
 
+## [1.27.17] - 2026-11-16
+
+### Added
+
+- **pack:** moves the **catalog-redesign** pin to `4922c06`, which restores an archived skill from its panel.
+
 ## [catalog-redesign 1.0.3] - 2026-11-16
 
 ### Added
