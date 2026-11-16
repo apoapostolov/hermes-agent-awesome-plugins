@@ -3,6 +3,12 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [1.27.13] - 2026-11-16
+
+### Fixed
+
+- **radio-plus:** version `1.5.1`. Switching from **All** to Popular, Shoutcast or TuneIn no longer carries the station you had selected into that list. The picker kept the playing station and the last selected row above every result so that selecting a row could not move it under the pointer, which is right on All, where your own stations are part of the list, and wrong on a directory tab, where that row is not part of the answer. A directory tab now lists what its directory answered, including an empty answer.
+
 ## [1.27.12] - 2026-11-16
 
 ### Added

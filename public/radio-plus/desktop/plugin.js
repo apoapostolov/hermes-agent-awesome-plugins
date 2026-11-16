@@ -475,6 +475,21 @@ async function tuneinStations(ctx, text, options = {}) {
   }
 }
 
+// Which rows the picker shows. Only the All tab mixes your own stations into
+// its list, so only there can a row that is missing from the answer still belong
+// above it: the row you selected, and the station that is playing. Popular,
+// Shoutcast and TuneIn answer from their own directory, and a station carried
+// over from All is not part of that answer.
+function listRows(results, { browseStation, current, ownList }) {
+  const rows = Array.isArray(results) ? results : []
+  const anchored = ownList && browseStation && !rows.some(item => sameStation(item, browseStation))
+    ? [browseStation, ...rows]
+    : rows
+  return ownList && current && !anchored.some(item => sameStation(item, current))
+    ? [current, ...anchored]
+    : anchored
+}
+
 function sameStation(a, b) {
   return a.id === b.id || a.url === b.url
 }
@@ -1258,8 +1273,8 @@ function Stations({ player, ctx }) {
   const results = uniqueStations([...local, ...remote])
   // Keep the previously prepended row until the search changes: selecting a
   // result must not remove a row above it and move the target under the pointer.
-  const anchored = results.some(item => sameStation(item, browseStation)) ? results : [browseStation, ...results]
-  const items = anchored.some(item => sameStation(item, current)) ? anchored : [current, ...anchored]
+  // That only applies to the tab that owns those rows.
+  const items = listRows(results, { browseStation, current, ownList: source === 'all' })
   const activeQuery = active
   const pending = source === 'all'
     ? text.length >= 2 && (text !== query || browser.isFetching)
@@ -1467,7 +1482,7 @@ function RadioSettingsPage({ ctx, player }) {
   ] })
 }
 
-export { artistProfile, resolveArtist, trackCredit, autoplayOnLaunch, shouldAutoplay, RadioSettingsPage, parseQuery, searchParams, missingDefaults }
+export { artistProfile, resolveArtist, trackCredit, autoplayOnLaunch, shouldAutoplay, RadioSettingsPage, parseQuery, searchParams, missingDefaults, listRows }
 
 export default {
   id: ID,

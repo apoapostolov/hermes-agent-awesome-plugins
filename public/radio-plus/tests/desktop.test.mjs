@@ -329,6 +329,33 @@ await test('tuneinStations searches a genre tag and drops a country tag', async 
   assert.match(paths[0], /q=jazz&/, 'the genre is the text TuneIn searches for')
 })
 
+await test('a directory tab shows its own rows, not the station carried over from All', () => {
+  const playing = { id: 'chillsynth', name: 'Chillsynth', url: 'https://stream.nightride.fm/chillsynth.mp3' }
+  const results = [
+    { id: 'ti-s1', name: 'One Jazz', url: 'https://stream.test/one' },
+    { id: 'ti-s2', name: 'Two Jazz', url: 'https://stream.test/two' }
+  ]
+  const tab = plugin.listRows(results, { browseStation: playing, current: playing, ownList: false })
+  assert.deepEqual(tab.map(item => item.id), ['ti-s1', 'ti-s2'], 'the TuneIn tab lists what TuneIn answered')
+  const all = plugin.listRows(results, { browseStation: playing, current: playing, ownList: true })
+  assert.deepEqual(all.map(item => item.id), ['chillsynth', 'ti-s1', 'ti-s2'], 'All keeps the playing station above its results')
+})
+
+await test('a tab that already lists the playing station does not repeat it', () => {
+  const playing = { id: 'ti-s1', name: 'One Jazz', url: 'https://stream.test/one' }
+  const results = [playing, { id: 'ti-s2', name: 'Two Jazz', url: 'https://stream.test/two' }]
+  for (const ownList of [true, false]) {
+    const rows = plugin.listRows(results, { browseStation: playing, current: playing, ownList })
+    assert.deepEqual(rows.map(item => item.id), ['ti-s1', 'ti-s2'], `no duplicate with ownList=${ownList}`)
+  }
+})
+
+await test('an empty directory answer stays empty instead of showing a carried row', () => {
+  const playing = { id: 'chillsynth', name: 'Chillsynth', url: 'https://stream.nightride.fm/chillsynth.mp3' }
+  assert.deepEqual(plugin.listRows([], { browseStation: playing, current: playing, ownList: false }), [])
+  assert.deepEqual(plugin.listRows([], { browseStation: playing, current: playing, ownList: true }).map(item => item.id), ['chillsynth'])
+})
+
 await test('missingDefaults names only the shipped stations you deleted', () => {
   const seeds = plugin.SEED_STATIONS
   assert.equal(seeds.length, 7, 'the shipped list is the seven starter stations')
