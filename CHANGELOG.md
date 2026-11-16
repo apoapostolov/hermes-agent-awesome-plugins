@@ -29,6 +29,14 @@ the component that changed; a plugin patch does not imply a new pack release.
 - **next-steps:** the bundled prompt rule stays inside the host cap. With a decision classifier loaded and recommendations on, the section reached 2,335 characters against the host's 2,200, and Hermes skips an oversized plugin section instead of truncating it, so the rule that ends a reply in chips never reached the model while both tools still answered. The rule is terser now, `MAX_CHARS` sits at 2,100, and the section drops its optional paragraphs rather than overflowing, so neither a longer nor a shorter host cap can lose it whole. Five tests pin every combination under the cap, the dropped-paragraph order, and the non-desktop fallback.
 - **next-steps:** 1.0.0 was re-cut twice while this defect was being found and fixed, so install 1.0.1 and ignore a `1.0.0` reading older than this entry.
 
+## [1.27.9] - 2026-11-16
+
+### Added
+
+- **radio-plus:** version `1.4.0`. Popular and Shoutcast page as the list is scrolled, not only the search. The Popular list asks Radio Browser for its next twenty rows by offset; the Shoutcast route slices its own directory list, which arrives whole, and says where the next slice starts and how many rows exist. The renderer tracks the offset a page actually consumed, so a row that resolves to nothing is not read again, and it stops asking once a page adds nothing new. Shoutcast pages thirty rows at a time because each row costs a resolve and a probe before it can play.
+
+A running dashboard keeps the plugin backend it imported at startup, so the Shoutcast half of this needs the app restarted once; Popular and the search page take effect on a plugin toggle.
+
 ## [1.27.8] - 2026-11-16
 
 ### Changed

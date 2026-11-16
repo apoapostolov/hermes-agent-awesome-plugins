@@ -15,7 +15,7 @@
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
     <a href="./package.json"><img src="https://img.shields.io/badge/Language-JavaScript-555" alt="Language: JavaScript"></a>
-    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.10-blue" alt="Pack: 1.27.10"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.11-blue" alt="Pack: 1.27.10"></a>
     <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Last%20release-2026--11--16-blue" alt="Last release: 2026-10-31"></a>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a>
   </p>
@@ -30,7 +30,7 @@
 
 Queue Container Fix 1.0.0 moves the per-message controls of a queued prompt from the end of its row to the start of its first line, where they stay on screen. A queued row used to draw its expand chevron, pencil, steering wheel and send button in the row's last column, past the end of the message text, and they only appeared while the pointer was over the row. They now come before the text, resting at a little over half strength and coming to full on hover or keyboard focus. The control column takes only the width of the buttons a row actually has, so a gateway-owned entry with no controls keeps its message at the left margin instead of leaving a gap. Background commands, subagents and artifact rows are untouched. It is a stylesheet over the composer status stack, so it ships personal-only; see its `LIMITATIONS.md` for why catalog review cannot take it. Enable it in Capabilities, Plugins, and the change lands without a restart.
 
-Radio Plus 1.0.0 is an extended edition of the **Radio** plugin bundled with Hermes Desktop, and its first listed release: a stipple hero, a code-drawn icon, a capture of the picker from the running app, and a README written to the house page. The bundled player ships seven fixed stations, searches one directory, and skips HLS; this edition keeps its oscilloscope, transport, artist links and dictation-aware pause, and makes the rest work for any station: the list is editable (name and stream address together), any `http` or `https` stream can be added and is checked before it is saved, the picker searches Radio Browser, its popular list and the Shoutcast directory, a Cyrillic query is also sent transliterated so `Хоризонт` finds `BNR Horizont`, HLS stations play through a vendored `hls.js` 1.6.15, and a station that will not play says why in the panel and in `radio-plus/station-log.jsonl`. Version 1.1.0 added a settings page with one switch, start the last station on launch, off by default, 1.2.0 added tags to the search field, `country:uk` and `genre:jazz` alone or with a name, and 1.3.0 loads results a page at a time as the list is scrolled. The bundled Radio plugin draws the same status-bar slot, so disable it. Enable Radio Plus in Capabilities, Plugins, then toggle it off and on so the renderer loads the new module, and restart the app once so the dashboard mounts its routes.
+Radio Plus 1.0.0 is an extended edition of the **Radio** plugin bundled with Hermes Desktop, and its first listed release: a stipple hero, a code-drawn icon, a capture of the picker from the running app, and a README written to the house page. The bundled player ships seven fixed stations, searches one directory, and skips HLS; this edition keeps its oscilloscope, transport, artist links and dictation-aware pause, and makes the rest work for any station: the list is editable (name and stream address together), any `http` or `https` stream can be added and is checked before it is saved, the picker searches Radio Browser, its popular list and the Shoutcast directory, a Cyrillic query is also sent transliterated so `Хоризонт` finds `BNR Horizont`, HLS stations play through a vendored `hls.js` 1.6.15, and a station that will not play says why in the panel and in `radio-plus/station-log.jsonl`. Version 1.1.0 added a settings page with one switch, start the last station on launch, off by default, 1.2.0 added tags to the search field, `country:uk` and `genre:jazz` alone or with a name, 1.3.0 loads results a page at a time as the list is scrolled, and 1.4.0 does the same on Popular and Shoutcast. The bundled Radio plugin draws the same status-bar slot, so disable it. Enable Radio Plus in Capabilities, Plugins, then toggle it off and on so the renderer loads the new module, and restart the app once so the dashboard mounts its routes.
 
 Next Steps 1.0.1 fixes the part of 1.0.0 that never worked. The plugin's own prompt rule, the one that asks a reply to end in chips instead of "say the word and I'll…", measured 2,335 characters with a decision classifier loaded, and Hermes skips a plugin prompt section over its 2,200-character cap instead of trimming it, so the whole rule was dropped and the chips only appeared when the model chose them. The rule is terser now (1,828 characters with recommendations, 2,091 with the risky paragraph as well), `MAX_CHARS` sits at 2,100, and the section drops its optional paragraphs rather than overflowing. Update if you installed 1.0.0; the tools were never affected and the chips you sent still worked.
 
@@ -38,7 +38,7 @@ Restart Hermes Desktop after updating; the Python and desktop halves do not relo
 
 Jev Routing 1.1.1 and Reasoning Switch 1.1.4 are pinned by the pack now, so a pack install brings both: per-turn model routing from TypeSafe Jev, and a status-bar control for reasoning effort. Neither is a new release; see the [changelog](CHANGELOG.md) for their own entries.
 
-The pack is at 1.27.10. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
+The pack is at 1.27.11. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
 ## In the app
 
@@ -85,7 +85,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.10). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
+Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.11). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
 
 ### Status Bar
 

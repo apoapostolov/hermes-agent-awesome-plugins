@@ -245,6 +245,10 @@ async function browseRows(path, signal) {
 // list asks for the next page when the reader reaches the bottom.
 const PAGE_SIZE = 40
 
+// The Shoutcast directory answers its whole list at once, so its page is smaller:
+// every row costs a resolve and a probe before it reaches the list.
+const SHOUTCAST_PAGE = 30
+
 const TAG_PATTERN = /\b(country|genre):("[^"]+"|\S+)/gi
 
 function parseQuery(text) {
@@ -348,20 +352,27 @@ async function searchStations(text, signal, { offset = 0, limit = PAGE_SIZE } = 
     stations: ranked,
     hls: results.reduce((total, result) => total + result.hls, 0),
     // A full page means the directory had at least one more row behind it.
-    hasMore: results.some(result => result.count >= limit)
+    hasMore: results.some(result => result.count >= limit),
+    nextOffset: offset + limit
   }
 }
 
-async function popularStations(signal) {
+async function popularStations(signal, { offset = 0, limit = PAGE_SIZE } = {}) {
   await ensureDirectory(signal)
-  const result = rowsToStations(await browseRows('stations/topvote/60?hidebroken=true', signal))
-  return { stations: uniqueStations(result.stations), hls: result.hls }
+  // The top list takes an offset like the search does, so it pages the same way.
+  const result = rowsToStations(await browseRows(`stations/topvote/${limit}?hidebroken=true&offset=${offset}`, signal))
+  return {
+    stations: uniqueStations(result.stations),
+    hls: result.hls,
+    hasMore: result.count >= limit,
+    nextOffset: offset + limit
+  }
 }
 
-async function shoutcastQuery(ctx, text) {
+async function shoutcastQuery(ctx, text, { offset = 0, limit = SHOUTCAST_PAGE } = {}) {
   const path = text
-    ? `/shoutcast/search?${new URLSearchParams({ q: text, limit: '30' })}`
-    : '/shoutcast/top?limit=30'
+    ? `/shoutcast/search?${new URLSearchParams({ q: text, limit: String(limit), offset: String(offset) })}`
+    : `/shoutcast/top?${new URLSearchParams({ limit: String(limit), offset: String(offset) })}`
   const payload = await ctx.rest(path, { timeoutMs: 30000 })
   const rows = Array.isArray(payload?.stations) ? payload.stations : []
   return {
@@ -378,11 +389,16 @@ async function shoutcastQuery(ctx, text) {
         homepage: httpsUrl(row.homepage)
       }]
     })),
-    skipped: Number(payload?.skipped) || 0
+    skipped: Number(payload?.skipped) || 0,
+    // The directory sends its list whole, so the route says where the next slice
+    // starts and how many rows exist; a short page still has more behind it when
+    // rows were skipped for resolving to nothing.
+    hasMore: Number(payload?.next ?? 0) < Number(payload?.count ?? 0),
+    nextOffset: Number(payload?.next ?? 0)
   }
 }
 
-async function shoutcastStations(ctx, text) {
+async function shoutcastStations(ctx, text, options = {}) {
   if (typeof ctx.rest !== 'function') throw new Error('The Shoutcast route is not loaded')
   // The Shoutcast directory takes free text, not tags. A genre tag is the closest
   // thing it understands, so `genre:jazz` searches it for jazz and a country tag
@@ -391,12 +407,15 @@ async function shoutcastStations(ctx, text) {
   const query = parsed.name || parsed.genre
   // Nothing typed still means the top list; a tag the directory cannot match
   // (a country) answers empty instead of searching for the literal tag.
-  if (String(text ?? '').trim() && !query) return { stations: [], hls: 0, skipped: 0 }
-  const results = await Promise.all(searchTerms(query).map(term => shoutcastQuery(ctx, term)))
+  if (String(text ?? '').trim() && !query) return { stations: [], hls: 0, skipped: 0, hasMore: false }
+  const results = await Promise.all(searchTerms(query).map(term => shoutcastQuery(ctx, term, options)))
   return {
     stations: uniqueStations(results.flatMap(result => result.stations)),
     hls: 0,
-    skipped: results.reduce((total, result) => total + result.skipped, 0)
+    skipped: results.reduce((total, result) => total + result.skipped, 0),
+    // Two terms answer two lists; whichever has rows left keeps the list asking.
+    hasMore: results.some(result => result.hasMore),
+    nextOffset: Math.max(...results.map(result => result.nextOffset))
   }
 }
 
@@ -1098,7 +1117,8 @@ function Stations({ player, ctx }) {
   // the query that fetched them, so a new query clears them.
   const [more, setMore] = useState([])
   const [moreState, setMoreState] = useState('idle')
-  const morePage = useRef(0)
+  const moreOffset = useRef(0)
+  const moreRows = useRef([])
   const moreBusy = useRef(false)
   const queryRef = useRef('')
   const [adding, setAdding] = useState(false)
@@ -1116,8 +1136,9 @@ function Stations({ player, ctx }) {
   useEffect(() => {
     queryRef.current = query
     setMore([])
+    moreRows.current = []
     setMoreState('idle')
-    morePage.current = 0
+    moreOffset.current = 0
   }, [query, source])
   // All: your stations plus a name search of Radio Browser.
   // Popular: Radio Browser's most-voted stations, filtered as you type.
@@ -1140,21 +1161,33 @@ function Stations({ player, ctx }) {
   const filterText = parsedText.name
   const tagQuery = Boolean(parsedText.country || parsedText.genre)
   const matches = item => !filterText || [item.name, item.description, item.provider].some(value => fold(value).includes(fold(filterText)))
-  // Radio Browser is the only paged source: Popular is a fixed top list and the
-  // Shoutcast route answers one page.
-  const canPage = source === 'all' && text.length >= 2 && Boolean(browser.data?.hasMore) && moreState !== 'done'
+  // All three sources page: the search and the top list take an offset, and the
+  // Shoutcast route slices its own list the same way.
+  const active = source === 'popular' ? popular : source === 'shoutcast' ? shoutcast : browser
+  const canPage = (source !== 'all' || text.length >= 2) && Boolean(active.data?.hasMore) && moreState !== 'done'
   const loadMore = async () => {
     if (!canPage || moreBusy.current || query !== queryRef.current) return
     moreBusy.current = true
     const token = query
+    const offset = moreOffset.current || (source === 'shoutcast' ? SHOUTCAST_PAGE : PAGE_SIZE)
     setMoreState('loading')
     try {
-      const next = await searchStations(token, new AbortController().signal, { offset: (morePage.current + 1) * PAGE_SIZE })
+      const next = source === 'popular'
+        ? await popularStations(new AbortController().signal, { offset })
+        : source === 'shoutcast'
+          ? await shoutcastStations(ctx, token, { offset })
+          : await searchStations(token, new AbortController().signal, { offset })
       // A query typed while this was in flight wins: drop the stale page.
       if (queryRef.current !== token) return
-      morePage.current += 1
-      setMore(current => uniqueStations([...current, ...next.stations]))
-      setMoreState(next.hasMore ? 'idle' : 'done')
+      moreOffset.current = next.nextOffset || offset + PAGE_SIZE
+      const merged = uniqueStations([...moreRows.current, ...next.stations])
+      // A page that adds nothing new means the list is finished, whatever the
+      // source claims: a backend that ignores the offset answers the same rows
+      // again, and asking for them on every scroll is wasted work.
+      const added = merged.length > moreRows.current.length
+      moreRows.current = merged
+      setMore(merged)
+      setMoreState(added && next.hasMore ? 'idle' : 'done')
     } catch {
       if (queryRef.current === token) setMoreState('idle')
     } finally {
@@ -1170,7 +1203,7 @@ function Stations({ player, ctx }) {
     : source === 'popular'
       ? popular.data
       : (text === query ? shoutcast.data : null)
-  const remote = [...(remoteResult?.stations ?? []), ...(source === 'all' ? more : [])]
+  const remote = [...(remoteResult?.stations ?? []), ...more]
     .filter(item => source !== 'popular' || !text || matches(item))
   const results = uniqueStations([...local, ...remote])
   // Keep the previously prepended row until the search changes: selecting a

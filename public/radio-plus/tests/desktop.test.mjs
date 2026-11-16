@@ -236,7 +236,45 @@ await test('shoutcastStations asks for the top list when there is no query', asy
   const paths = []
   const ctx = { ...makeCtx(), rest: async pathName => { paths.push(pathName); return { stations: [] } } }
   await plugin.shoutcastStations(ctx, '')
-  assert.deepEqual(paths, ['/shoutcast/top?limit=30'])
+  assert.deepEqual(paths, ['/shoutcast/top?limit=30&offset=0'])
+})
+
+await test('shoutcastStations asks for a page and says whether rows are left', async () => {
+  const paths = []
+  const ctx = {
+    ...makeCtx(),
+    rest: async pathName => {
+      paths.push(pathName)
+      return { stations: [{ id: 'sc-1', name: 'One', url: 'http://example.test/1' }], skipped: 0, count: 90, next: 30 }
+    }
+  }
+  const first = await plugin.shoutcastStations(ctx, 'jazz')
+  assert.match(paths[0], /offset=0/)
+  assert.equal(first.hasMore, true, 'rows are left behind the first page')
+  assert.equal(first.nextOffset, 30)
+  await plugin.shoutcastStations(ctx, 'jazz', { offset: 30 })
+  assert.match(paths[1], /offset=30/, 'the second call asks for the next slice')
+})
+
+await test('shoutcastStations stops asking once the directory is spent', async () => {
+  const ctx = {
+    ...makeCtx(),
+    rest: async () => ({ stations: [{ id: 'sc-1', name: 'One', url: 'http://example.test/1' }], skipped: 0, count: 30, next: 30 })
+  }
+  const page = await plugin.shoutcastStations(ctx, 'jazz', { offset: 30 })
+  assert.equal(page.hasMore, false, 'next reached the end of the list')
+})
+
+await test('the popular list pages with an offset', async () => {
+  const controller = new AbortController()
+  const first = await plugin.popularStations(controller.signal, { limit: 20 })
+  const second = await plugin.popularStations(controller.signal, { limit: 20, offset: 20 })
+  assert.ok(first.stations.length > 0 && second.stations.length > 0, 'both pages came back')
+  assert.equal(first.hasMore, true, 'a full page means more behind it')
+  assert.equal(first.nextOffset, 20)
+  const firstIds = new Set(first.stations.map(item => item.id))
+  const overlap = second.stations.filter(item => firstIds.has(item.id))
+  assert.equal(overlap.length, 0, `page two repeated ${overlap.length} stations`)
 })
 
 await test('shoutcastStations reports a missing backend instead of pretending it worked', async () => {

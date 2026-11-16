@@ -322,23 +322,25 @@ def _append_log(entry: dict[str, Any]) -> None:
         return
 
 
-def _stations(rows: Iterable[dict[str, Any]], limit: int) -> tuple[list[dict[str, Any]], int]:
-    candidates: list[dict[str, Any]] = []
-    for row in rows:
-        identifier = _station_id(row)
-        if identifier is None:
-            continue
-        candidates.append(row)
-        if len(candidates) >= limit:
-            break
+def _stations(rows: Iterable[dict[str, Any]], limit: int, offset: int = 0) -> dict[str, Any]:
+    """One page of usable stations, and what is left behind it.
+
+    The directory answers its whole list in one response, so a page is a slice of
+    rows that have already been resolved and probed. ``next`` is where the next
+    slice starts, which is not ``offset + len(stations)``: a row that resolves to
+    nothing is consumed and skipped, so counting stations would re-read it.
+    """
+    usable = [row for row in rows if _station_id(row) is not None]
+    total = len(usable)
+    candidates = usable[offset : offset + limit]
     if not candidates:
-        return [], 0
+        return {"stations": [], "skipped": 0, "count": total, "next": total}
     with ThreadPoolExecutor(max_workers=min(_RESOLVE_WORKERS, len(candidates))) as pool:
         addresses = list(pool.map(lambda row: _stream_for(_station_id(row) or 0), candidates))
     resolved = [(row, address) for row, address in zip(candidates, addresses) if address]
     skipped = len(candidates) - len(resolved)
     if not resolved:
-        return [], skipped
+        return {"stations": [], "skipped": skipped, "count": total, "next": offset + len(candidates)}
     verdicts = _probe_many([address for _, address in resolved])
     stations: list[dict[str, Any]] = []
     logged = 0
@@ -362,7 +364,8 @@ def _stations(rows: Iterable[dict[str, Any]], limit: int) -> tuple[list[dict[str
             continue
         stations.append(_station(row, address))
     stations.sort(key=lambda item: item.get("listeners") or 0, reverse=True)
-    return stations, skipped
+    page = {"stations": stations, "skipped": skipped, "count": total, "next": offset + len(candidates)}
+    return page
 
 
 
@@ -370,28 +373,36 @@ def _stations(rows: Iterable[dict[str, Any]], limit: int) -> tuple[list[dict[str
 def shoutcast_search(
     q: str = Query(..., min_length=1, max_length=80),
     limit: int = Query(40, ge=1, le=60),
+    # A plain default, not Query(...): the tests call these routes directly, and a
+    # Query object reaches _stations as itself when the request never came through
+    # FastAPI. A large offset simply answers an empty page.
+    offset: int = 0,
 ) -> dict[str, Any]:
     """Search the Shoutcast directory by station name, genre, or keyword.
 
-    ``GET /api/plugins/radio-plus/shoutcast/search?q=jazz&limit=40``
+    ``GET /api/plugins/radio-plus/shoutcast/search?q=jazz&limit=40&offset=40``
     """
     term = " ".join(q.split())[:80]
     if not term:
         raise HTTPException(status_code=400, detail="A search term is required.")
     rows = _query_directory("/Search/UpdateSearch", term)
-    stations, skipped = _stations(rows, limit)
-    return {"source": "shoutcast", "query": term, "count": len(rows), "skipped": skipped, "stations": stations}
+    return {"source": "shoutcast", "query": term, **_stations(rows, limit, offset)}
 
 
 @router.get("/shoutcast/top")
-def shoutcast_top(limit: int = Query(40, ge=1, le=60)) -> dict[str, Any]:
+def shoutcast_top(
+    limit: int = Query(40, ge=1, le=60),
+    # A plain default, not Query(...): the tests call these routes directly, and a
+    # Query object reaches _stations as itself when the request never came through
+    # FastAPI. A large offset simply answers an empty page.
+    offset: int = 0,
+) -> dict[str, Any]:
     """Popular Shoutcast stations, busiest first.
 
-    ``GET /api/plugins/radio-plus/shoutcast/top?limit=40``
+    ``GET /api/plugins/radio-plus/shoutcast/top?limit=40&offset=40``
     """
     rows = _query_directory("/Home/Top", None)
-    stations, skipped = _stations(rows, limit)
-    return {"source": "shoutcast", "query": "", "count": len(rows), "skipped": skipped, "stations": stations}
+    return {"source": "shoutcast", "query": "", **_stations(rows, limit, offset)}
 
 
 @router.get("/probe")

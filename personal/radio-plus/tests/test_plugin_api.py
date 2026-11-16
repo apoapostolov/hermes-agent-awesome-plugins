@@ -95,9 +95,9 @@ def test_stations_drop_unresolvable_rows_and_sort_by_listeners(monkeypatch):
     ]
     monkeypatch.setattr(api, "_stream_for", lambda station_id: None if station_id == 1 else f"http://example.test/{station_id}")
     monkeypatch.setattr(api, "_probe", lambda url: {"ok": True, "kind": "audio", "status": 200, "contentType": "audio/mpeg", "reason": ""})
-    stations, skipped = api._stations(rows, limit=10)
-    assert [item["id"] for item in stations] == ["sc-2", "sc-3"]
-    assert skipped == 1
+    page = api._stations(rows, limit=10)
+    assert [item["id"] for item in page["stations"]] == ["sc-2", "sc-3"]
+    assert page["skipped"] == 1
 
 
 def test_stations_drop_addresses_that_no_longer_serve_audio(monkeypatch):
@@ -110,9 +110,9 @@ def test_stations_drop_addresses_that_no_longer_serve_audio(monkeypatch):
     })
     logged: list[dict] = []
     monkeypatch.setattr(api, "_append_log", lambda entry: logged.append(entry))
-    stations, skipped = api._stations(rows, limit=10)
-    assert [item["id"] for item in stations] == ["sc-7"]
-    assert skipped == 1
+    page = api._stations(rows, limit=10)
+    assert [item["id"] for item in page["stations"]] == ["sc-7"]
+    assert page["skipped"] == 1
     assert logged and logged[0]["source"] == "shoutcast-resolve"
     assert "html" in logged[0]["reason"]
 
@@ -124,6 +124,29 @@ def test_stations_respect_limit_before_resolving(monkeypatch):
     monkeypatch.setattr(api, "_probe", lambda url: {"ok": True, "kind": "audio", "status": 200, "contentType": "audio/mpeg", "reason": ""})
     api._stations(rows, limit=5)
     assert len(calls) == 5
+
+
+def test_stations_page_with_an_offset_and_say_where_the_next_one_starts(monkeypatch):
+    """A page is a slice of the directory list, and rows that resolve to nothing
+    still count as consumed, so the next page does not read them again."""
+    rows = [dict(ROW, ID=index) for index in range(1, 13)]
+    seen: list[int] = []
+    monkeypatch.setattr(api, "_stream_for", lambda station_id: seen.append(station_id) or f"http://example.test/{station_id}")
+    # Station 5 resolves to nothing, so its page comes back one station short.
+    monkeypatch.setattr(api, "_stream_for", lambda station_id: None if station_id == 5 else f"http://example.test/{station_id}")
+    monkeypatch.setattr(api, "_probe", lambda url: {"ok": True, "kind": "audio", "status": 200, "contentType": "audio/mpeg", "reason": ""})
+    first = api._stations(rows, limit=4)
+    assert [item["id"] for item in first["stations"]] == ["sc-1", "sc-2", "sc-3", "sc-4"]
+    assert first["count"] == 12
+    assert first["next"] == 4
+    second = api._stations(rows, limit=4, offset=4)
+    assert [item["id"] for item in second["stations"]] == ["sc-6", "sc-7", "sc-8"]
+    assert second["skipped"] == 1
+    assert second["next"] == 8, "a skipped row is consumed, so the next page starts past it"
+    assert first["stations"][0]["id"] != second["stations"][0]["id"]
+    last = api._stations(rows, limit=4, offset=12)
+    assert last["stations"] == []
+    assert last["next"] == 12 == last["count"], "past the end there is nothing left"
 
 
 def test_probe_rejects_non_http_and_local_addresses():
@@ -159,6 +182,21 @@ def test_live_top_is_sorted_by_listeners():
     result = api.shoutcast_top(limit=8)
     listeners = [station["listeners"] for station in result["stations"]]
     assert listeners == sorted(listeners, reverse=True)
+
+
+@pytest.mark.skipif(not LIVE, reason="set RADIO_PLUS_LIVE=1 to query Shoutcast")
+def test_live_top_pages_with_an_offset():
+    """The route pages the real directory: page two is not page one, and the
+    response says where the next slice starts."""
+    first = api.shoutcast_top(limit=6)
+    second = api.shoutcast_top(limit=6, offset=6)
+    assert first["stations"] and second["stations"]
+    assert first["next"] == 6, "the first page ends where the second starts"
+    assert second["next"] == 12
+    assert first["count"] > first["next"], "the directory holds more than one page"
+    first_ids = {station["id"] for station in first["stations"]}
+    repeated = [station for station in second["stations"] if station["id"] in first_ids]
+    assert not repeated, f"page two repeated {len(repeated)} stations"
 
 
 @pytest.mark.skipif(not LIVE, reason="set RADIO_PLUS_LIVE=1 to query Shoutcast")

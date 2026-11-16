@@ -4,7 +4,7 @@
   <strong>Live radio in the status bar, with a station list you own.</strong>
   <p>An extended edition of the bundled Radio plugin: editable stations, three directories, and a station log that says why a stream will not play.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.2-2ea44f" alt="Version 1.2.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.4.0-2ea44f" alt="Version 1.2.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -64,10 +64,12 @@ them; both enabled means two players in one bar.
   Quotes hold a value with a space: `genre:"smooth jazz"`. A tag query browses
   the directory, so your own stations step aside instead of sitting on top of the
   results; the Shoutcast source understands a genre tag but has no country index.
-- Scroll for more. Results arrive forty at a time, and reaching the bottom of
-  the list asks the directory for the next page, so a broad query like
-  `genre:jazz` costs one page up front instead of every row the directory holds.
-  The list says when it is loading and stops asking once a page comes back short.
+- Scroll for more, on all three sources. A search and the Popular list arrive
+  forty at a time and ask for the next page when you reach the bottom, so a broad
+  query like `genre:jazz` costs one page up front instead of every row the
+  directory holds. Shoutcast pages thirty at a time, because every row there
+  costs a resolve and a probe before it can play. The list says when it is
+  loading, and it stops asking once a page comes back short or adds nothing new.
 - Search in Cyrillic or Latin. A Cyrillic query is also sent transliterated, so
   `Хоризонт` reaches `BNR Horizont` and `Христо Ботев` reaches its HLS stream.
   Local matching folds both scripts the same way.
