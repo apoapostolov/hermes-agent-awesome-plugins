@@ -4,7 +4,7 @@
   <strong>One page for skills, plugins, connectors and tools.</strong>
   <p>A wide catalog with one row per item, a hover preview, and a detail panel that carries the artwork.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.1-2ea44f" alt="Version 1.0.1" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.2-2ea44f" alt="Version 1.0.2" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>

@@ -2867,7 +2867,9 @@ export function CatalogPage() {
       // same list: counting only the 75s detail scan left the header at zero
       // while the rows were already on screen.
       plugins: cache.quickInstalled?.length ?? cache.installed?.length ?? 0,
-      pluginsCatalog: cache.catalog?.length ?? 0,
+      // The total the gateway reports for the snapshot, not the number of rows it
+      // happened to send: page one is 150 of 2,380 and the header says which.
+      pluginsCatalog: cache.catalogTotal || (cache.catalog?.length ?? 0),
       skills: cache.skills?.length ?? 0,
       archived: cache.archived?.length ?? 0,
       skillsCatalog: cache.skillsCatalogTotal ?? 0,
@@ -2878,9 +2880,11 @@ export function CatalogPage() {
     [items, loading, reloadKey, countsTick]
   )
 
+  const n = value => Number(value || 0).toLocaleString()
+
   const subtitle = {
-    plugins: `${counts.plugins} installed · ${counts.pluginsCatalog} in the catalog`,
-    skills: `${counts.skills} installed · ${counts.archived} archived · ${counts.skillsCatalog} in the catalog`,
+    plugins: `${n(counts.plugins)} installed · ${n(counts.pluginsCatalog)} in the catalog`,
+    skills: `${n(counts.skills)} installed · ${n(counts.archived)} archived · ${n(counts.skillsCatalog)} in the catalog`,
     connectors: `${counts.connectors} configured · ${counts.connectorPresets} presets`,
     tools: `${counts.tools} toolsets`
   }[kind]
@@ -3072,7 +3076,15 @@ export function CatalogPage() {
   const filterOptions = [
     {
       id: 'installed',
-      label: `Installed ${kind === 'plugins' ? counts.plugins : kind === 'skills' ? counts.skills : kind === 'connectors' ? counts.connectors : counts.tools}`
+      label: `Installed ${Number(
+        kind === 'plugins'
+          ? counts.plugins
+          : kind === 'skills'
+            ? counts.skills
+            : kind === 'connectors'
+              ? counts.connectors
+              : counts.tools
+      ).toLocaleString()}`
     },
     // Skills carry a third state: the curator moves an unused skill into
     // skills/.archive rather than deleting it, so it is neither installed
@@ -3080,18 +3092,18 @@ export function CatalogPage() {
     kind === 'skills'
       ? {
           id: 'archive',
-          label: `Archive ${counts.archived}`
+          label: `Archive ${Number(counts.archived).toLocaleString()}`
         }
       : null,
     {
       id: 'catalog',
-      label: `Catalog ${
+      label: `Catalog ${Number(
         kind === 'plugins'
           ? counts.pluginsCatalog
           : kind === 'skills'
             ? counts.skillsCatalog
-            : counts.connectorPresets || ''
-      }`.trim()
+            : counts.connectorPresets || 0
+      ).toLocaleString()}`
     }
   ].filter(Boolean)
 

@@ -32,6 +32,13 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **pack:** moves the **catalog-redesign** pin to `607cd2c`, which reads the published plugins and skills snapshots instead of a local feed and a hub walk, and adds the skills archive. Both trees carry it; the pin is the personal one, as every pack pin is.
 
+## [catalog-redesign 1.0.2] - 2026-11-16
+
+### Fixed
+
+- **catalog-redesign:** the plugins catalog count reads the snapshot total instead of the length of page one, so the header and the filter report 2,380 plugins rather than the 150 rows the first page carries. The skills count already read its total, which is why it looked right while the plugins count did not.
+- **catalog-redesign:** counts carry thousands separators in the header, the filter labels and the row counter, so 104,239 reads as 104,239 rather than a run of digits.
+
 ## [catalog-redesign 1.0.1] - 2026-11-16
 
 ### Changed
@@ -62,6 +69,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 - **catalog-redesign:** two settings, **Always show installed** and a **Header order** control that reorders the kind selector, on the page's gear and under Settings, Plugins, Catalog Redesign.
 
 The page reads no app markup: it draws from the plugin SDK (`ctx.register*`, `ctx.storage`, `ctx.rest`, `host.state`, `host.request`), so the public and personal trees carry the same build. The Python half mounts with the gateway, so the catalog and the artwork appear after one restart.
+
+## [1.27.14] - 2026-11-16
+
+### Changed
+
+- **radio-plus:** version `1.5.2`. The public edition now carries three search sources instead of four: TuneIn stays personal-only, because it answers over an undocumented endpoint whose terms describe personal listening and a catalog listing should not call it. The cut removes the chip, the query, the dashboard route and every string that named it. The public README also stops advertising HLS playback, which that edition has never shipped, and says those rows are hidden and counted instead.
 
 ## [1.27.13] - 2026-11-16
 
