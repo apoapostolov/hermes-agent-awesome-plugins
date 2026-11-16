@@ -3,10 +3,26 @@ import {
   RowButton, SearchField, STATUSBAR_AREAS, Tip, usePluginI18n,
   useQuery, useValue
 } from '@hermes/plugin-sdk'
+// The namespace import is deliberate: a named import of a component this build
+// may not export throws at module evaluation and takes the whole plugin down.
+import * as pluginSdk from '@hermes/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
 const ID = 'radio-plus'
+// One preference, stored in the plugin's own storage so it travels with the
+// plugin's data and never touches app config. Off unless it was switched on.
+const AUTOPLAY_KEY = 'local.autoplay'
+
+function autoplayOnLaunch(storage) {
+  return storage?.get?.(AUTOPLAY_KEY, false) === true
+}
+
+// The launch rule in one place: switched on, and something the user actually
+// played is still in the list.
+function shouldAutoplay(storage, station) {
+  return autoplayOnLaunch(storage) && validStation(station)
+}
 const NIGHTRIDE = 'https://stream.nightride.fm/'
 // First-run station list. It is copied into `local.stations` the first time the
 // plugin opens; from then on the stored list is the truth, so a renamed or
@@ -27,6 +43,8 @@ const EN = {
   search: 'Find a station…', volume: 'Volume', audioOnly: 'Audio playing · visualizer unavailable',
   mute: 'Mute radio', unmute: 'Unmute radio', save: 'Pin station', unsave: 'Unpin station',
   visit: 'Visit station website', artistProfile: 'Visit artist profile',
+  settingsTitle: 'Radio Plus', autoplayLabel: 'Start the last station on launch',
+  autoplayDescription: 'Plays the station you listened to last as soon as Hermes opens, so the status bar is live without a click. Off by default; with it off nothing plays until you press play, and a station that cannot be reached reports the reason in the panel instead of retrying.',
   noResults: 'No stations found', searchHint: 'Search by station name. Try jazz, ambient, or house.',
   searchError: 'Station search is unavailable. Your presets still work.', searching: 'Searching stations',
   directory: 'Search powered by Radio Browser', note: 'Live radio · next switches stations',
@@ -127,6 +145,10 @@ const CSS = `
 .hermes-radio-plus-edit input:focus-visible,.hermes-radio-plus-add input:focus-visible{outline:1px solid var(--ui-accent);outline-offset:-1px}
 .hermes-radio-plus-edit-actions,.hermes-radio-plus-add-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .hermes-radio-plus-add-note{font-size:11px;line-height:16px;color:var(--ui-text-secondary)}
+.hermes-radio-plus-setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; }
+.hermes-radio-plus-setting-text { display: flex; flex-direction: column; gap: 4px; max-width: 62ch; }
+.hermes-radio-plus-setting-label { font-size: 13px; font-weight: 500; }
+.hermes-radio-plus-setting-note { font-size: 12px; opacity: .72; line-height: 1.45; }
 `
 
 function httpsUrl(value) {
@@ -666,7 +688,15 @@ function createPlayer(ctx) {
     bus.close()
     if (audioContext) void audioContext.close()
   })
-  return { station, stations, favorites, volume, status, meterMode, lastError, open, play, stop, toggle, next, setVolume, mute, favorite, updateStation, removeStation, addStation, waveform }
+  // Read once, at launch. A switch flipped mid-session must not start audio
+  // behind the user, and a station that was never played must not start either.
+  function startIfRequested() {
+    if (!shouldAutoplay(ctx.storage, restored)) return false
+    void play(restored)
+    return true
+  }
+
+  return { station, stations, favorites, volume, status, meterMode, lastError, open, play, stop, toggle, next, setVolume, mute, favorite, updateStation, removeStation, addStation, waveform, startIfRequested }
 }
 
 function brailleTrace(samples, rows = 2) {
@@ -1125,7 +1155,49 @@ function RadioBar({ player, ctx }) {
   ] })
 }
 
-export { artistProfile, resolveArtist, trackCredit }
+// Settings ▸ Plugins ▸ Radio Plus. One switch, the sanctioned way to ship an
+// optional behaviour: the default stays off and the user opts in.
+function RadioSettingsPage({ ctx }) {
+  const t = usePluginI18n(ID)
+  const [on, setOn] = useState(autoplayOnLaunch(ctx.storage))
+  const row = {
+    checked: on,
+    id: 'radio-plus-autoplay',
+    label: t('autoplayLabel'),
+    description: t('autoplayDescription'),
+    onChange: next => {
+      setOn(next)
+      ctx.storage.set(AUTOPLAY_KEY, next)
+    }
+  }
+  const ToggleRow = pluginSdk.ToggleRow
+  if (ToggleRow) return jsx(ToggleRow, row)
+  // An older build without ToggleRow still gets a working control.
+  const Switch = pluginSdk.Switch
+  const control = Switch
+    ? jsx(Switch, { checked: on, 'aria-label': row.label, onCheckedChange: value => row.onChange(value === true) })
+    : jsx('input', {
+      type: 'checkbox',
+      checked: on,
+      'aria-label': row.label,
+      onChange: event => row.onChange(event.target.checked)
+    })
+  return jsxs('div', {
+    className: 'hermes-radio-plus-setting',
+    children: [
+      jsxs('div', {
+        className: 'hermes-radio-plus-setting-text',
+        children: [
+          jsx('span', { className: 'hermes-radio-plus-setting-label', children: row.label }),
+          jsx('span', { className: 'hermes-radio-plus-setting-note', children: row.description })
+        ]
+      }),
+      control
+    ]
+  })
+}
+
+export { artistProfile, resolveArtist, trackCredit, autoplayOnLaunch, shouldAutoplay, RadioSettingsPage }
 
 export default {
   id: ID,
@@ -1140,5 +1212,17 @@ export default {
     ctx.onDispose(() => style.remove())
     const player = createPlayer(ctx)
     ctx.register({ id: 'player', area: STATUSBAR_AREAS.right, order: 10, render: () => jsx(RadioBar, { player, ctx }) })
+    if (typeof ctx.registerSettingsPage === 'function') {
+      ctx.registerSettingsPage({
+        id: ID,
+        title: 'Radio Plus',
+        icon: 'radio-tower',
+        order: 70,
+        render: () => jsx(RadioSettingsPage, { ctx })
+      })
+    }
+    // After the first paint, so the window is up and the audio element can start
+    // without racing the app's own boot.
+    setTimeout(() => player.startIfRequested(), 1200)
   }
 }

@@ -4,7 +4,7 @@
   <strong>Live radio in the status bar, with a station list you own.</strong>
   <p>An extended edition of the bundled Radio plugin: editable stations, three directories, and a station log that says why a stream will not play.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.2.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.0-2ea44f" alt="Version 1.2.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -70,6 +70,14 @@ them; both enabled means two players in one bar.
   reaches the list, under a two-second budget, so a directory entry that now
   serves an HTML error page is dropped and counted rather than played.
 
+## Settings
+
+Settings, Plugins, Radio Plus holds one switch.
+
+**Start the last station on launch** is off by default. With it on, the station you listened to last starts playing as soon as Hermes opens, so the status bar is live without a click. With it off, nothing plays until you press play, and a station that cannot be reached reports the reason in the panel instead of retrying.
+
+The switch is read once, at launch. Flipping it during a session changes what the next launch does and never starts audio behind you. It is stored with the plugin's own data, not in app config, and a station you have never played does not count as a station to resume.
+
 ## Install
 
 The pack:
@@ -100,6 +108,11 @@ dashboard mounts plugin routes at startup; until then that chip reports itself
 unavailable and everything else works.
 
 The bundled Radio plugin should be disabled while this one is enabled.
+
+## Tests
+
+`node tests/settings.test.mjs` renders the settings page with the app's own React
+and jsdom, flips the switch the way a user does, and reads the stored key back.
 
 ## Requirements and Limits
 

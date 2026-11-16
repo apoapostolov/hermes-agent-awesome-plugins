@@ -98,8 +98,8 @@ export const useQuery = options => {
 `)
 
 const source = readFileSync(path.resolve(import.meta.dirname, '..', 'desktop', 'plugin.js'), 'utf8')
-  .replace("from '@hermes/plugin-sdk'", "from './sdk.mjs'")
-  .replace("from 'react'", "from './react.mjs'")
+  .replaceAll("from '@hermes/plugin-sdk'", "from './sdk.mjs'")
+  .replaceAll("from 'react'", "from './react.mjs'")
   .replace("from 'react/jsx-runtime'", "from './jsx.mjs'")
   .concat('\nexport { Stations, createPlayer, SEED_STATIONS }\n')
 writeFileSync(path.join(dir, 'plugin.mjs'), source)

@@ -10,6 +10,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 - **next-steps:** the bundled prompt rule stays inside the host cap. With a decision classifier loaded and recommendations on, the section reached 2,335 characters against the host's 2,200, and Hermes skips an oversized plugin section instead of truncating it, so the rule that ends a reply in chips never reached the model while both tools still answered. The rule is terser now, `MAX_CHARS` sits at 2,100, and the section drops its optional paragraphs rather than overflowing, so neither a longer nor a shorter host cap can lose it whole. Five tests pin every combination under the cap, the dropped-paragraph order, and the non-desktop fallback.
 - **next-steps:** 1.0.0 was re-cut twice while this defect was being found and fixed, so install 1.0.1 and ignore a `1.0.0` reading older than this entry.
 
+## [1.27.4] - 2026-11-16
+
+### Added
+
+- **radio-plus:** version `1.1.0`. A settings page under Settings, Plugins, Radio Plus with one switch, **Start the last station on launch**. It is off by default; with it on, the station you listened to last starts playing when Hermes opens, and with it off nothing plays until you press play. The switch is read once at launch, so flipping it mid-session changes the next launch rather than starting audio behind you, and a station that was never played is not resumed. The preference lives in the plugin's own storage, so it travels with the plugin's data and never touches app config.
+
 ## [1.27.3] - 2026-11-16
 
 ### Added

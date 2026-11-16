@@ -43,8 +43,8 @@ writeFileSync(path.join(dir, 'react.mjs'), 'export const useEffect = () => {}\ne
 writeFileSync(path.join(dir, 'jsx.mjs'), 'export const jsx = () => null\nexport const jsxs = () => null\nexport const Fragment = null\n')
 
 const source = readFileSync(path.join(root, 'desktop', 'plugin.js'), 'utf8')
-  .replace("from '@hermes/plugin-sdk'", "from './sdk.mjs'")
-  .replace("from 'react'", "from './react.mjs'")
+  .replaceAll("from '@hermes/plugin-sdk'", "from './sdk.mjs'")
+  .replaceAll("from 'react'", "from './react.mjs'")
   .replace("from 'react/jsx-runtime'", "from './jsx.mjs'")
   .concat(`
 export {
