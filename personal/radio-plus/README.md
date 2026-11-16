@@ -4,7 +4,7 @@
   <strong>Live radio in the status bar, with a station list you own.</strong>
   <p>An extended edition of the bundled Radio plugin: editable stations, three directories, and a station log that says why a stream will not play.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.1-2ea44f" alt="Version 1.2.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.2-2ea44f" alt="Version 1.2.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -16,7 +16,7 @@
 ## Screenshot
 
 <div align="center">
-  <img src="docs/screenshot.png" width="560" alt="The station picker: a search field, the All, Popular and Shoutcast chips, the add button, seven stored stations and the transport row" />
+  <img src="docs/screenshot-tags.png" width="560" alt="The station picker with country:uk typed in the search field, the All, Popular and Shoutcast chips, and a list of stations from the United Kingdom above the transport row" />
 </div>
 
 ## Where this comes from
@@ -81,10 +81,6 @@ them; both enabled means two players in one bar.
 - Skip the dead rows. Every resolved Shoutcast address is probed before it
   reaches the list, under a two-second budget, so a directory entry that now
   serves an HTML error page is dropped and counted rather than played.
-
-<div align="center">
-  <img src="docs/screenshot-tags.png" width="480" alt="The picker with country:uk typed in the search field, listing stations from the United Kingdom" />
-</div>
 
 ## Settings
 
@@ -153,10 +149,11 @@ The last one loads the shipped `plugin.js` in Electron, points `attachHls` at a
 real BNR stream, and requires the audio clock to advance, which is the only
 honest test of an HLS path.
 
-`docs/screenshot.png` is a capture of the running app: a second Hermes instance
-with a copy of the real profile, the picker opened over CDP, the app chrome
-hidden so the panel's translucency composites on one colour, then cropped to the
-popover. `docs/hero.png` is a stipple illustration with the title overlaid.
+`docs/screenshot-tags.png` is a capture of the running app: a second Hermes
+instance with a copy of the real profile, `country:uk` typed into the picker,
+the app chrome hidden so the panel's translucency composites on one colour, then
+cropped to the popover. `docs/screenshot.png` is the same rig with the search
+field empty, so it shows the stored stations instead. `docs/hero.png` is a stipple illustration with the title overlaid.
 `docs/icon.png` is the mark, drawn in code so it stays crisp at 48px.
 
 ## License
