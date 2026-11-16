@@ -10,6 +10,7 @@ A retired or held plugin keeps its `personal/<id>/` tree so it can be revived. I
 
 | Plugin | State | Since | Why | Revives when |
 | --- | --- | --- | --- | --- |
+| [queue-container-fix](personal/queue-container-fix/README.md) | On hold | 2026-11-16 | Disabled: caused Hermes desktop start/render issues; surface needs rework before re-enabling. | When the queue row CSS injection is reworked and verified stable on desktop. |
 | _(none)_ | — | — | — | — |
 
 **Revived:** [better-capabilities](personal/better-capabilities/README.md) came back on
