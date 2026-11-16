@@ -91,7 +91,7 @@ const FEED_URL = 'https://hermes-agent.nousresearch.com/docs/api/plugins.json'
 let ctxRef = null
 let restUnavailable = false
 let closePanel = null
-let settings = { alwaysShowInstalled: false, kindOrder: KIND_IDS }
+let settings = { alwaysShowInstalled: true, kindOrder: KIND_IDS }
 
 // Renderer-side cache: the page unmounts on every navigation and the catalog
 // is a megabyte-scale payload, so it survives a remount instead of refetching.
@@ -265,7 +265,7 @@ function savedSettings() {
 
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
       settings = {
-        alwaysShowInstalled: false,
+        alwaysShowInstalled: raw.alwaysShowInstalled !== false,
         kindOrder: normalizeOrder(raw.kindOrder)
       }
     }
