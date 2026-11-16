@@ -8,6 +8,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 ### Changed
 
 - **next-steps:** publishes its prompt-section sizes through `prompt_texts()`, so `scripts/admission_check.py` can measure the rule instead of warning that it cannot. The check imports `prompt_section.py`, calls the hook and fails a release whose section would be skipped by the host for being over 2,200 characters. Nothing changes at runtime: the section, its sizes and the clamp are the same as 1.0.1, and no tool, hook or setting moved.
+## [1.27.14] - 2026-11-16
+
+### Added
+
+- **pack:** pins **catalog-redesign 1.0.0** at `03d0a81`, the catalog page that puts skills, plugins, connectors and tools in one list of wide rows. Twenty entries now, and the pack sits at `1.27.14`. Both trees carry the plugin; the pin is the personal one, as every pack pin is.
+
 ## [catalog-redesign 1.0.0] - 2026-11-16
 
 ### Added
