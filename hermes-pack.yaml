@@ -8,7 +8,7 @@ plugins:
     ref: 95912dde8d01ef3fd99bdd84c18cacbba185ad4b
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/next-steps
-    ref: a1075cc1b5d09410a59be8679323749e212229e1
+    ref: 2629dffaf8c133c64e995e4fd08f14a4cc8a4f09
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/provider-status
     ref: bdb74343ea2ae4119b4062414c15b88cf80410a5
