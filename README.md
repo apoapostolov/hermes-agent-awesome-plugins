@@ -15,7 +15,7 @@
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
     <a href="./package.json"><img src="https://img.shields.io/badge/Language-JavaScript-555" alt="Language: JavaScript"></a>
-    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.14-blue" alt="Pack: 1.27.14"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.15-blue" alt="Pack: 1.27.15"></a>
     <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Last%20release-2026--11--16-blue" alt="Last release: 2026-10-31"></a>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a>
   </p>
@@ -28,7 +28,7 @@
 
 ## Latest plugin update
 
-Catalog Redesign 1.0.0 is a catalog page of its own: one wide row per skill, plugin, connector and tool, with a hover preview and a detail panel that slides in from the right. Rows carry a thumbnail, the name with its description, and one column that matters for that kind, tags or the normalized short name. Artwork is real: a published plugin borrows the catalog's hero image, and a plugin outside the catalog uses a logo its own folder ships, so the row stops showing initials where the plugin has a face. The panel puts that image across its header, keeps a 44px section rail, and carries the on/off switch beside Close. The page adds its own route, sidebar row and palette entry and leaves the native Capabilities page as it is. Install it alone or through the pack; see [its README](personal/catalog-redesign/README.md).
+Catalog Redesign 1.0.1 reads the same published catalogs the native Capabilities page reads, 2,380 plugins and about 104,000 skills, and adds an Archive segment for the skills the curator retired. It is a catalog page of its own: one wide row per skill, plugin, connector and tool, with a hover preview and a detail panel that slides in from the right. Rows carry a thumbnail, the name with its description, and one column that matters for that kind, tags or the normalized short name. Artwork is real: a published plugin borrows the catalog's hero image, and a plugin outside the catalog uses a logo its own folder ships, so the row stops showing initials where the plugin has a face. The panel puts that image across its header, keeps a 44px section rail, and carries the on/off switch beside Close. The page adds its own route, sidebar row and palette entry and leaves the native Capabilities page as it is. Install it alone or through the pack; see [its README](personal/catalog-redesign/README.md).
 
 Queue Container Fix 1.0.0 moves the per-message controls of a queued prompt from the end of its row to the start of its first line, where they stay on screen. A queued row used to draw its expand chevron, pencil, steering wheel and send button in the row's last column, past the end of the message text, and they only appeared while the pointer was over the row. They now come before the text, resting at a little over half strength and coming to full on hover or keyboard focus. The control column takes only the width of the buttons a row actually has, so a gateway-owned entry with no controls keeps its message at the left margin instead of leaving a gap. Background commands, subagents and artifact rows are untouched. It is a stylesheet over the composer status stack, so it ships personal-only; see its `LIMITATIONS.md` for why catalog review cannot take it. Enable it in Capabilities, Plugins, and the change lands without a restart.
 
@@ -40,7 +40,7 @@ Restart Hermes Desktop after updating; the Python and desktop halves do not relo
 
 Jev Routing 1.1.1 and Reasoning Switch 1.1.4 are pinned by the pack now, so a pack install brings both: per-turn model routing from TypeSafe Jev, and a status-bar control for reasoning effort. Neither is a new release; see the [changelog](CHANGELOG.md) for their own entries.
 
-The pack is at 1.27.14. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
+The pack is at 1.27.15. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
 ## In the app
 
@@ -90,7 +90,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.14). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
+Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.15). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
 
 ### Status Bar
 

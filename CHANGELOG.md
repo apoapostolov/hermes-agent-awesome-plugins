@@ -26,6 +26,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **pack:** pins **catalog-redesign 1.0.0** at `03d0a81`, the catalog page that puts skills, plugins, connectors and tools in one list of wide rows. Twenty entries now, and the pack sits at `1.27.14`. Both trees carry the plugin; the pin is the personal one, as every pack pin is.
 
+## [1.27.15] - 2026-11-16
+
+### Changed
+
+- **pack:** moves the **catalog-redesign** pin to `607cd2c`, which reads the published plugins and skills snapshots instead of a local feed and a hub walk, and adds the skills archive. Both trees carry it; the pin is the personal one, as every pack pin is.
+
 ## [catalog-redesign 1.0.1] - 2026-11-16
 
 ### Changed
