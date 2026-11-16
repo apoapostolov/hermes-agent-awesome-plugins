@@ -3,6 +3,12 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [1.27.9] - 2026-11-16
+
+### Added
+
+- **pack:** pins **queue-container-fix 1.0.0**, the plugin that moves a queued prompt's controls to the start of its first line. Nineteen entries now, the pack sits at `1.27.9`, and `subdir: personal/queue-container-fix` is pinned to `847b6b5`. The plugin carries no public edition, so a pack install of it is the personal tree.
+
 ## [queue-container-fix 1.0.0] - 2026-11-16
 
 ### Added
