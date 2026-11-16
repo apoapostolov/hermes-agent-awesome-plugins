@@ -303,7 +303,9 @@ def _probe(url: str) -> dict[str, Any]:
 def _log_path() -> "Any":
     from pathlib import Path
 
-    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
+    # Same home resolution the other user plugins use: HERMES_HOME when the
+    # process has it, otherwise the Windows per-user install root.
+    home = Path(os.environ.get("HERMES_HOME") or Path(os.environ.get("LOCALAPPDATA", Path.home())) / "hermes")
     return home / "radio-plus" / "station-log.jsonl"
 
 
