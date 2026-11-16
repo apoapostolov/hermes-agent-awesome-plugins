@@ -40,7 +40,7 @@ const SEED_STATIONS = [
 const EN = {
   radio: 'Radio', browse: 'Choose a station', play: 'Play radio', pause: 'Pause radio', next: 'Next station',
   live: 'Live', paused: 'Paused', connecting: 'Connecting', error: 'Stream unavailable', retry: 'Try again',
-  search: 'Find a station… country:bg genre:jazz', volume: 'Volume', audioOnly: 'Audio playing · visualizer unavailable',
+  search: 'Find a station… country:bg genre:jazz', loadingMore: 'Loading more stations…', volume: 'Volume', audioOnly: 'Audio playing · visualizer unavailable',
   mute: 'Mute radio', unmute: 'Unmute radio', save: 'Pin station', unsave: 'Unpin station',
   visit: 'Visit station website', artistProfile: 'Visit artist profile',
   settingsTitle: 'Radio Plus', autoplayLabel: 'Start the last station on launch',
@@ -73,9 +73,9 @@ const EN = {
 }
 const LOCALES = {
   en: EN,
-  ja: { ...EN, artistProfile: 'アーティストのプロフィールを開く', audioOnly: '再生中 · 波形を表示できません', radio: 'ラジオ', browse: 'ステーションを選択', play: 'ラジオを再生', pause: 'ラジオを一時停止', next: '次のステーション', live: 'ライブ', paused: '一時停止', connecting: '接続中', error: '再生できません', retry: '再試行', search: 'ステーションを検索… country:bg genre:jazz', volume: '音量', mute: 'ミュート', unmute: 'ミュート解除', save: 'ステーションを固定', unsave: '固定を解除', visit: '公式サイトを開く', noResults: '見つかりませんでした', searchHint: '名前で検索。jazz、ambient、house など。', searchError: '検索できません。おすすめは再生できます。', searching: '検索中', directory: 'Radio Browser による検索', note: 'ライブ放送 · 次へでステーションを切り替え', streamError: '接続できませんでした。再試行するか別のステーションを選んでください。', close: 'ラジオを閉じる', nowPlaying: '再生中', elsewhere: '別のウィンドウで再生中', 'chillsynthDescription': 'やさしい集中 · 暖かなシンセ', 'nightrideDescription': 'シンセウェーブ · 深夜', 'darksynthDescription': 'ダークな電子音 · 高揚感', 'spacesynthDescription': '宇宙的シンセ · レトロな未来', 'paradise-mainDescription': '多彩な選曲 · 人がキュレーション', 'paradise-mellowDescription': 'ゆったりした時間' },
-  zh: { ...EN, artistProfile: '访问艺人主页', audioOnly: '正在播放 · 无法显示波形', radio: '电台', browse: '选择电台', play: '播放电台', pause: '暂停电台', next: '下一个电台', live: '直播', paused: '已暂停', connecting: '正在连接', error: '无法播放', retry: '重试', search: '搜索电台… country:bg genre:jazz', volume: '音量', mute: '静音', unmute: '取消静音', save: '置顶电台', unsave: '取消置顶', visit: '访问电台网站', noResults: '没有找到电台', searchHint: '按名称搜索，例如 jazz、ambient 或 house。', searchError: '暂时无法搜索，精选电台仍可使用。', searching: '正在搜索', directory: '搜索由 Radio Browser 提供', note: '直播电台 · 下一首将切换电台', streamError: '无法连接，请重试或选择其他电台。', close: '关闭电台', nowPlaying: '正在播放', elsewhere: '已暂停，正在其他窗口播放', 'chillsynthDescription': '轻松专注 · 温暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑电子 · 充满能量', 'spacesynthDescription': '宇宙合成器 · 复古未来', 'paradise-mainDescription': '多元风格 · 人工精选', 'paradise-mellowDescription': '放慢节奏' },
-  'zh-hant': { ...EN, artistProfile: '造訪藝人主頁', audioOnly: '播放中 · 無法顯示波形', radio: '電台', browse: '選擇電台', play: '播放電台', pause: '暫停電台', next: '下一個電台', live: '直播', paused: '已暫停', connecting: '正在連線', error: '無法播放', retry: '重試', search: '搜尋電台… country:bg genre:jazz', volume: '音量', mute: '靜音', unmute: '取消靜音', save: '釘選電台', unsave: '取消釘選', visit: '造訪電台網站', noResults: '找不到電台', searchHint: '按名稱搜尋，例如 jazz、ambient 或 house。', searchError: '暫時無法搜尋，精選電台仍可使用。', searching: '正在搜尋', directory: '搜尋由 Radio Browser 提供', note: '直播電台 · 下一首會切換電台', streamError: '無法連線，請重試或選擇其他電台。', close: '關閉電台', nowPlaying: '正在播放', elsewhere: '已暫停，正在其他視窗播放', 'chillsynthDescription': '輕鬆專注 · 溫暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑電子 · 充滿能量', 'spacesynthDescription': '宇宙合成器 · 復古未來', 'paradise-mainDescription': '多元風格 · 人工精選', 'paradise-mellowDescription': '放慢節奏' }
+  ja: { ...EN, artistProfile: 'アーティストのプロフィールを開く', audioOnly: '再生中 · 波形を表示できません', radio: 'ラジオ', browse: 'ステーションを選択', play: 'ラジオを再生', pause: 'ラジオを一時停止', next: '次のステーション', live: 'ライブ', paused: '一時停止', connecting: '接続中', error: '再生できません', retry: '再試行',   search: 'ステーションを検索… country:bg genre:jazz', loadingMore: 'さらに読み込み中…', volume: '音量', mute: 'ミュート', unmute: 'ミュート解除', save: 'ステーションを固定', unsave: '固定を解除', visit: '公式サイトを開く', noResults: '見つかりませんでした', searchHint: '名前で検索。jazz、ambient、house など。', searchError: '検索できません。おすすめは再生できます。', searching: '検索中', directory: 'Radio Browser による検索', note: 'ライブ放送 · 次へでステーションを切り替え', streamError: '接続できませんでした。再試行するか別のステーションを選んでください。', close: 'ラジオを閉じる', nowPlaying: '再生中', elsewhere: '別のウィンドウで再生中', 'chillsynthDescription': 'やさしい集中 · 暖かなシンセ', 'nightrideDescription': 'シンセウェーブ · 深夜', 'darksynthDescription': 'ダークな電子音 · 高揚感', 'spacesynthDescription': '宇宙的シンセ · レトロな未来', 'paradise-mainDescription': '多彩な選曲 · 人がキュレーション', 'paradise-mellowDescription': 'ゆったりした時間' },
+  zh: { ...EN, artistProfile: '访问艺人主页', audioOnly: '正在播放 · 无法显示波形', radio: '电台', browse: '选择电台', play: '播放电台', pause: '暂停电台', next: '下一个电台', live: '直播', paused: '已暂停', connecting: '正在连接', error: '无法播放', retry: '重试',   search: '搜索电台… country:bg genre:jazz', loadingMore: '正在加载更多…', volume: '音量', mute: '静音', unmute: '取消静音', save: '置顶电台', unsave: '取消置顶', visit: '访问电台网站', noResults: '没有找到电台', searchHint: '按名称搜索，例如 jazz、ambient 或 house。', searchError: '暂时无法搜索，精选电台仍可使用。', searching: '正在搜索', directory: '搜索由 Radio Browser 提供', note: '直播电台 · 下一首将切换电台', streamError: '无法连接，请重试或选择其他电台。', close: '关闭电台', nowPlaying: '正在播放', elsewhere: '已暂停，正在其他窗口播放', 'chillsynthDescription': '轻松专注 · 温暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑电子 · 充满能量', 'spacesynthDescription': '宇宙合成器 · 复古未来', 'paradise-mainDescription': '多元风格 · 人工精选', 'paradise-mellowDescription': '放慢节奏' },
+  'zh-hant': { ...EN, artistProfile: '造訪藝人主頁', audioOnly: '播放中 · 無法顯示波形', radio: '電台', browse: '選擇電台', play: '播放電台', pause: '暫停電台', next: '下一個電台', live: '直播', paused: '已暫停', connecting: '正在連線', error: '無法播放', retry: '重試',   search: '搜尋電台… country:bg genre:jazz', loadingMore: '正在載入更多…', volume: '音量', mute: '靜音', unmute: '取消靜音', save: '釘選電台', unsave: '取消釘選', visit: '造訪電台網站', noResults: '找不到電台', searchHint: '按名稱搜尋，例如 jazz、ambient 或 house。', searchError: '暫時無法搜尋，精選電台仍可使用。', searching: '正在搜尋', directory: '搜尋由 Radio Browser 提供', note: '直播電台 · 下一首會切換電台', streamError: '無法連線，請重試或選擇其他電台。', close: '關閉電台', nowPlaying: '正在播放', elsewhere: '已暫停，正在其他視窗播放', 'chillsynthDescription': '輕鬆專注 · 溫暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑電子 · 充滿能量', 'spacesynthDescription': '宇宙合成器 · 復古未來', 'paradise-mainDescription': '多元風格 · 人工精選', 'paradise-mellowDescription': '放慢節奏' }
 }
 
 // Disk plugins are not scanned by Tailwind. Only plugin layout lives here;
@@ -149,6 +149,7 @@ const CSS = `
 .hermes-radio-plus-setting-text { display: flex; flex-direction: column; gap: 4px; max-width: 62ch; }
 .hermes-radio-plus-setting-label { font-size: 13px; font-weight: 500; }
 .hermes-radio-plus-setting-note { font-size: 12px; opacity: .72; line-height: 1.45; }
+.hermes-radio-plus-more{display:flex;align-items:center;justify-content:center;padding:6px 0;font-size:11px;opacity:.6}
 `
 
 function httpsUrl(value) {
@@ -217,11 +218,14 @@ function isHlsRow(row) {
 function rowsToStations(rows) {
   const stations = []
   let hls = 0
-  for (const row of Array.isArray(rows) ? rows : []) {
+  const list = Array.isArray(rows) ? rows : []
+  for (const row of list) {
     if (isHlsRow(row)) hls += 1
     stations.push(...browseStation(row))
   }
-  return { stations, hls }
+  // The raw count, not the station count: a full page of rows means there is
+  // probably another page behind it, even when some rows mapped to nothing.
+  return { stations, hls, count: list.length }
 }
 
 async function browseRows(path, signal) {
@@ -237,6 +241,10 @@ async function browseRows(path, signal) {
 
 // Tags in the search field, so a query stays one line and needs no extra
 // controls: `country:bg`, `genre:jazz`, and both at once with a name.
+// One page of results at a time: the directory answers 40 rows fast, and the
+// list asks for the next page when the reader reaches the bottom.
+const PAGE_SIZE = 40
+
 const TAG_PATTERN = /\b(country|genre):("[^"]+"|\S+)/gi
 
 function parseQuery(text) {
@@ -259,8 +267,11 @@ function parseQuery(text) {
 // Radio Browser indexes a two-letter ISO code for a country and free-form tags
 // for a genre. Two letters is a code; anything longer is a country name, which
 // the directory also accepts.
-function searchParams({ name = '', country = '', genre = '' } = {}) {
-  const params = new URLSearchParams({ limit: '60', hidebroken: 'true', order: 'votes', reverse: 'true' })
+function searchParams({ name = '', country = '', genre = '', limit = PAGE_SIZE, offset = 0 } = {}) {
+  const params = new URLSearchParams({
+    limit: String(limit), hidebroken: 'true', order: 'votes', reverse: 'true'
+  })
+  if (offset > 0) params.set('offset', String(offset))
   if (name) params.set('name', name)
   if (country) {
     if (country.length === 2) params.set('countrycode', country.toUpperCase())
@@ -306,12 +317,12 @@ function matchScore(item, terms) {
   return best
 }
 
-async function searchStations(text, signal) {
+async function searchStations(text, signal, { offset = 0, limit = PAGE_SIZE } = {}) {
   await ensureDirectory(signal)
   const parsed = parseQuery(text)
   // Transliteration only matters for the name; the tags are already ASCII.
   const terms = parsed.name ? searchTerms(parsed.name) : ['']
-  const results = await Promise.all(terms.map(name => browserQuery({ ...parsed, name }, signal)))
+  const results = await Promise.all(terms.map(name => browserQuery({ ...parsed, name, offset, limit }, signal)))
   const seen = uniqueStations(results.flatMap(result => result.stations))
   // The directory answers by votes, which is the wrong order for a named station.
   // Rank by name match, then keep the directory order as a stable tie-breaker.
@@ -324,7 +335,9 @@ async function searchStations(text, signal) {
     : seen
   return {
     stations: ranked,
-    hls: results.reduce((total, result) => total + result.hls, 0)
+    hls: results.reduce((total, result) => total + result.hls, 0),
+    // A full page means the directory had at least one more row behind it.
+    hasMore: results.some(result => result.count >= limit)
   }
 }
 
@@ -1070,6 +1083,13 @@ function Stations({ player, ctx }) {
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
   const [source, setSource] = useState('all')
+  // Pages after the first one, appended as the reader scrolls. They belong to
+  // the query that fetched them, so a new query clears them.
+  const [more, setMore] = useState([])
+  const [moreState, setMoreState] = useState('idle')
+  const morePage = useRef(0)
+  const moreBusy = useRef(false)
+  const queryRef = useRef('')
   const [adding, setAdding] = useState(false)
   const [draftName, setDraftName] = useState('')
   const [draftUrl, setDraftUrl] = useState('')
@@ -1082,6 +1102,12 @@ function Stations({ player, ctx }) {
     const timer = setTimeout(() => setQuery(text), 350)
     return () => clearTimeout(timer)
   }, [text])
+  useEffect(() => {
+    queryRef.current = query
+    setMore([])
+    setMoreState('idle')
+    morePage.current = 0
+  }, [query, source])
   // All: your stations plus a name search of Radio Browser.
   // Popular: Radio Browser's most-voted stations, filtered as you type.
   // Shoutcast: the Shoutcast directory through the plugin's own route.
@@ -1103,6 +1129,27 @@ function Stations({ player, ctx }) {
   const filterText = parsedText.name
   const tagQuery = Boolean(parsedText.country || parsedText.genre)
   const matches = item => !filterText || [item.name, item.description, item.provider].some(value => fold(value).includes(fold(filterText)))
+  // Radio Browser is the only paged source: Popular is a fixed top list and the
+  // Shoutcast route answers one page.
+  const canPage = source === 'all' && text.length >= 2 && Boolean(browser.data?.hasMore) && moreState !== 'done'
+  const loadMore = async () => {
+    if (!canPage || moreBusy.current || query !== queryRef.current) return
+    moreBusy.current = true
+    const token = query
+    setMoreState('loading')
+    try {
+      const next = await searchStations(token, new AbortController().signal, { offset: (morePage.current + 1) * PAGE_SIZE })
+      // A query typed while this was in flight wins: drop the stale page.
+      if (queryRef.current !== token) return
+      morePage.current += 1
+      setMore(current => uniqueStations([...current, ...next.stations]))
+      setMoreState(next.hasMore ? 'idle' : 'done')
+    } catch {
+      if (queryRef.current === token) setMoreState('idle')
+    } finally {
+      moreBusy.current = false
+    }
+  }
   // Only the All tab mixes your stations with a directory search. Choosing
   // Popular or Shoutcast shows that source alone: appending sixty remote rows
   // under your own stations looked like the chip had done nothing.
@@ -1112,7 +1159,8 @@ function Stations({ player, ctx }) {
     : source === 'popular'
       ? popular.data
       : (text === query ? shoutcast.data : null)
-  const remote = (remoteResult?.stations ?? []).filter(item => source !== 'popular' || !text || matches(item))
+  const remote = [...(remoteResult?.stations ?? []), ...(source === 'all' ? more : [])]
+    .filter(item => source !== 'popular' || !text || matches(item))
   const results = uniqueStations([...local, ...remote])
   // Keep the previously prepended row until the search changes: selecting a
   // result must not remove a row above it and move the target under the pointer.
@@ -1186,8 +1234,17 @@ function Stations({ player, ctx }) {
       ] }),
       addNote && jsx('div', { className: 'hermes-radio-plus-add-note', role: 'status', children: addNote })
     ] }),
-    jsxs('div', { ref: listRef, className: 'hermes-radio-plus-list', 'data-radio-pending': pending, children: [
-      ...items.map(station => jsx(StationRow, { station, player }, station.id)),
+    jsxs('div', {
+      ref: listRef,
+      className: 'hermes-radio-plus-list',
+      'data-radio-pending': pending,
+      onScroll: event => {
+        const list = event.currentTarget
+        if (list.scrollHeight - list.scrollTop - list.clientHeight < 160) void loadMore()
+      },
+      children: [
+        ...items.map(station => jsx(StationRow, { station, player }, station.id)),
+        moreState === 'loading' && jsx('div', { className: 'hermes-radio-plus-more', role: 'status', children: t('loadingMore') }),
       pending && !items.length && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: t('searching') }),
       failed && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: errorText }),
       empty && !failed && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: source === 'shoutcast' ? t('shoutcastEmpty') : t('noResults') }),

@@ -10,6 +10,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 - **next-steps:** the bundled prompt rule stays inside the host cap. With a decision classifier loaded and recommendations on, the section reached 2,335 characters against the host's 2,200, and Hermes skips an oversized plugin section instead of truncating it, so the rule that ends a reply in chips never reached the model while both tools still answered. The rule is terser now, `MAX_CHARS` sits at 2,100, and the section drops its optional paragraphs rather than overflowing, so neither a longer nor a shorter host cap can lose it whole. Five tests pin every combination under the cap, the dropped-paragraph order, and the non-desktop fallback.
 - **next-steps:** 1.0.0 was re-cut twice while this defect was being found and fixed, so install 1.0.1 and ignore a `1.0.0` reading older than this entry.
 
+## [1.27.6] - 2026-11-16
+
+### Added
+
+- **radio-plus:** version `1.3.0`. Search results load a page at a time. The first page is forty rows, and reaching the bottom of the list asks the directory for the next forty, so a broad query like `genre:jazz` no longer fetches every matching station before showing the first one. The list shows a loading row while a page is in flight, stops asking when a page comes back short, and drops a page that arrives after the query changed. Your own stations and the Popular and Shoutcast sources keep their single-shot behaviour, because those lists are not paged.
+
 ## [1.27.5] - 2026-11-16
 
 ### Added

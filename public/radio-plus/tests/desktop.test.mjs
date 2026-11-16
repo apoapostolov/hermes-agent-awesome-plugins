@@ -358,6 +358,35 @@ await test('a genre tag returns that genre', async () => {
   assert.ok(stations.length > 0, 'no stations came back for genre:jazz')
 })
 
+await test('a page is a limit and an offset, and the first page sends no offset', () => {
+  const first = Object.fromEntries(plugin.searchParams({ name: 'jazz' }))
+  assert.equal(first.limit, '40')
+  assert.equal(first.offset, undefined, 'the first page asks for no offset')
+  const second = Object.fromEntries(plugin.searchParams({ name: 'jazz', offset: 40 }))
+  assert.equal(second.offset, '40')
+  assert.equal(second.limit, '40')
+})
+
+await test('a full page reports more behind it, an exhausted page does not', async () => {
+  const controller = new AbortController()
+  const full = await plugin.searchStations('genre:jazz', controller.signal, { limit: 40 })
+  assert.equal(full.hasMore, true, 'a full page means more rows exist')
+  // Nothing matches, so the directory returned fewer rows than the limit.
+  const none = await plugin.searchStations('zzzzqqqx', controller.signal, { limit: 40 })
+  assert.equal(none.stations.length, 0)
+  assert.equal(none.hasMore, false, 'a short page means the list is finished')
+})
+
+await test('the second page continues where the first stopped', async () => {
+  const controller = new AbortController()
+  const first = await plugin.searchStations('country:bg', controller.signal, { limit: 20 })
+  const second = await plugin.searchStations('country:bg', controller.signal, { limit: 20, offset: 20 })
+  assert.ok(first.stations.length > 0 && second.stations.length > 0, 'both pages came back')
+  const firstIds = new Set(first.stations.map(item => item.id))
+  const overlap = second.stations.filter(item => firstIds.has(item.id))
+  assert.equal(overlap.length, 0, `page two repeated ${overlap.length} rows from page one`)
+})
+
 await test('source labels cover the three picker tabs', () => {
   assert.deepEqual(Object.keys(plugin.SOURCE_LABELS), ['all', 'popular', 'shoutcast'])
 })

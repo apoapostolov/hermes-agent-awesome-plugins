@@ -141,20 +141,26 @@ exact(
     """function rowsToStations(rows) {
   const stations = []
   let hls = 0
-  for (const row of Array.isArray(rows) ? rows : []) {
+  const list = Array.isArray(rows) ? rows : []
+  for (const row of list) {
     if (isHlsRow(row)) hls += 1
     stations.push(...browseStation(row))
   }
-  return { stations, hls }
+  // The raw count, not the station count: a full page of rows means there is
+  // probably another page behind it, even when some rows mapped to nothing.
+  return { stations, hls, count: list.length }
 }""",
     """function rowsToStations(rows) {
   const stations = []
   let hls = 0
-  for (const row of Array.isArray(rows) ? rows : []) {
+  const list = Array.isArray(rows) ? rows : []
+  for (const row of list) {
     if (isHlsRow(row)) { hls += 1; continue }
     stations.push(...browseStation(row))
   }
-  return { stations, hls }
+  // The raw count, not the station count: a full page of rows means there is
+  // probably another page behind it, even when some rows mapped to nothing.
+  return { stations, hls, count: list.length }
 }""",
     "rowsToStations",
 )
