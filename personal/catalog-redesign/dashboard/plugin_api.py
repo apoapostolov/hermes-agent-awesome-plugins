@@ -338,8 +338,11 @@ def catalog_plugins(page: int = 1, size: int = DEFAULT_PAGE_SIZE, q: str = "", r
 
 
 @router.get("/catalog/skills")
-def catalog_skills(page: int = 1, size: int = DEFAULT_PAGE_SIZE, q: str = "", refresh: int = 0) -> dict[str, Any]:
+def catalog_skills(page: int = 1, size: int = DEFAULT_PAGE_SIZE, q: str = "", refresh: int = 0, sources: str = "") -> dict[str, Any]:
     rows, meta = snapshot("skills", force=bool(refresh))
+    if sources:
+        allowed = {s.strip() for s in sources.split(",") if s.strip()}
+        rows = [row for row in rows if row.get("source") in allowed]
     return {**paged(rows, page, size, q), **meta}
 
 

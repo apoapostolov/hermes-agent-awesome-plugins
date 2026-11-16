@@ -338,8 +338,11 @@ def catalog_plugins(page: int = 1, size: int = DEFAULT_PAGE_SIZE, q: str = "", r
 
 
 @router.get("/catalog/skills")
-def catalog_skills(page: int = 1, size: int = DEFAULT_PAGE_SIZE, q: str = "", refresh: int = 0) -> dict[str, Any]:
+def catalog_skills(page: int = 1, size: int = DEFAULT_PAGE_SIZE, q: str = "", refresh: int = 0, sources: str = "") -> dict[str, Any]:
     rows, meta = snapshot("skills", force=bool(refresh))
+    if sources:
+        allowed = {s.strip() for s in sources.split(",") if s.strip()}
+        rows = [row for row in rows if row.get("source") in allowed]
     return {**paged(rows, page, size, q), **meta}
 
 
@@ -504,6 +507,127 @@ def skills_archive_restore(body: RestoreRequest) -> dict[str, Any]:
         "folder": folder,
         "path": str(target),
     }
+
+
+class ToggleRequest(BaseModel):
+    """One MCP server, by the name the config uses."""
+
+    name: str
+    enabled: bool
+    profile: str | None = None
+
+
+@router.post("/servers/toggle")
+def servers_toggle(body: ToggleRequest) -> dict[str, Any]:
+    """Flip ``enabled`` on a configured MCP server.
+
+    This mirrors ``PUT /api/mcp/servers/{name}/enabled`` rather than inventing a
+    write path: the same guarded config edit, the same refusal for a server a
+    plugin provides, and the change lands for the next session or gateway cycle.
+    """
+    name = str(body.name or "").strip()
+
+    if not name:
+        raise HTTPException(status_code=400, detail="A server name is required")
+
+    from hermes_cli.config import load_config, save_config
+    from hermes_cli.web_routers._common import config_write_scope
+    from tools.mcp_tool_common import write_mcp_server_enabled
+    from tui_gateway.mcp_rpc_helpers import server_configs_with_sources
+
+    with config_write_scope(body.profile):
+        cfg = load_config()
+        _servers, plugins = server_configs_with_sources(cfg.get("mcp_servers") or {})
+
+        if name in plugins:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Server '{name}' is provided by plugin '{plugins[name]}' and cannot be modified",
+            )
+
+        servers = cfg.get("mcp_servers")
+
+        if not isinstance(servers, dict) or name not in servers:
+            raise HTTPException(status_code=404, detail=f"Server '{name}' not found")
+
+        if not isinstance(servers[name], dict):
+            raise HTTPException(status_code=400, detail="Malformed server config")
+
+        write_mcp_server_enabled(servers[name], bool(body.enabled))
+        save_config(cfg)
+
+    return {"ok": True, "name": name, "enabled": bool(body.enabled)}
+
+
+def installed_plugin_dirs() -> list[tuple[str, str, Path]]:
+    """Every installed plugin folder under the plugins directory.
+
+    The manifests on disk are the list: a plugin is a directory carrying
+    ``plugin.yaml``, at the top level or nested one folder deep, which is how
+    the bundled packages are laid out.
+    """
+    root = hermes_home() / "plugins"
+    found: list[tuple[str, str, Path]] = []
+
+    if not root.is_dir():
+        return found
+
+    for manifest in sorted(root.rglob("plugin.yaml")):
+        folder = manifest.parent
+        relative = folder.relative_to(root)
+
+        if any(part.startswith(".") or part in {"__pycache__", "node_modules"} for part in relative.parts[:-1]):
+            continue
+
+        name = folder.name
+
+        try:
+            text = manifest.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+
+        match = re.search(r"^name:\s*[\"']?([^\"'\n]+)", text, re.MULTILINE)
+
+        if match:
+            name = match.group(1).strip()
+
+        found.append((name, folder.name, folder))
+
+    return found
+
+
+def _icon_data_url(folder: Path | None) -> str:
+    """The plugin's own artwork as a data URL, smallest name first.
+
+    A plugin that ships a logo in its folder has no catalog entry to borrow one
+    from, so the row would otherwise fall back to two letters. Only a file the
+    package already carries is used, nothing is fetched.
+    """
+    if folder is None or not folder.is_dir():
+        return ""
+
+    for sub in ICON_DIRS:
+        base = folder / sub if sub else folder
+
+        if not base.is_dir():
+            continue
+
+        for stem in ICON_NAMES:
+            for ext, mime in ICON_MIME.items():
+                candidate = base / f"{stem}{ext}"
+
+                if not candidate.is_file():
+                    continue
+
+                try:
+                    if candidate.stat().st_size > ICON_MAX_BYTES:
+                        continue
+
+                    return f"data:{mime};base64,{base64.b64encode(candidate.read_bytes()).decode('ascii')}"
+                except OSError:
+                    continue
+
+    return ""
 
 
 @router.get("/icons")

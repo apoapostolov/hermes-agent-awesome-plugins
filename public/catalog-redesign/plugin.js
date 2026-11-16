@@ -37,8 +37,9 @@ const ID = 'hermes-catalog-redesign'
 // MCP has no SDK or JSON-RPC door for enabling a server, so the connector
 // switch exists only where the plugin may write the config itself. The public
 // edition drops it and points at the native page instead.
-const CAN_TOGGLE_CONNECTORS = false
+const CAN_TOGGLE_CONNECTORS = true
 const ROUTE = '/catalog'
+const SKILL_SOURCES = ['ClawHub','skills.sh','GitHub','LobeHub','browse.sh','NVIDIA','optional','gstack','built-in','OpenAI','HuggingFace','Anthropic','Qdrant','Pinecone','Airtable','Notion']
 const SETTINGS_KEY = 'settings.v1'
 const CACHE_MS = 5 * 60 * 1000
 const PAGE_SIZE = 150
@@ -383,7 +384,7 @@ const GATEWAY_WAIT_MS = 20000
 const INSTALLED_CACHE_MS = 15 * 60 * 1000
 const INSTALLED_SNAPSHOT_KEY = 'installed.v1'
 
-async function loadCatalogPage(kind, { page = 1, size = PAGE_SIZE, query = '', force = false } = {}) {
+async function loadCatalogPage(kind, { page = 1, size = PAGE_SIZE, query = '', force = false, sources = '' } = {}) {
   if (typeof ctxRef?.rest !== 'function' || restUnavailable) {
     throw new Error('The plugin catalog service is not reachable')
   }
@@ -393,6 +394,10 @@ async function loadCatalogPage(kind, { page = 1, size = PAGE_SIZE, query = '', f
 
   if (needle) {
     params.set('q', needle)
+  }
+
+  if (sources) {
+    params.set('sources', sources)
   }
 
   if (force) {
@@ -2630,6 +2635,8 @@ export function CatalogPage() {
   // those caches fills, or the subtitle keeps reporting the number it saw first.
   const [countsTick, setCountsTick] = useState(0)
   const [reloadKey, setReloadKey] = useState(0)
+  const [disabledSkillSources, setDisabledSkillSources] = useState(() => new Set())
+  const [sourcesOpen, setSourcesOpen] = useState(false)
   const hoverTimer = useRef(null)
   const sentinelRef = useRef(null)
 
@@ -2830,7 +2837,8 @@ export function CatalogPage() {
             const result = await loadCatalogPage('skills', {
               page,
               query: query.trim(),
-              force: reloadKey > 0 && first
+              force: reloadKey > 0 && first,
+              sources: SKILL_SOURCES.filter(s => !disabledSkillSources.has(s)).join(',')
             })
 
             if (!alive) {
@@ -3301,6 +3309,28 @@ export function CatalogPage() {
             onClick: () => setReloadKey(k => k + 1),
             children: 'Update all'
           }),
+        kind === 'skills' && effectiveFilter === 'catalog' &&
+          jsx('div', { style: { position: 'relative', flex: '0 0 auto' }, children: [
+            jsx('button', {
+              type: 'button',
+              style: { fontSize: 11, padding: '2px 6px', borderRadius: 6, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
+              onClick: () => setSourcesOpen(o => !o),
+              children: ['Sources ▾']
+            }),
+            sourcesOpen && jsx('div', { style: { position: 'absolute', top: '100%', right: 0, marginTop: 4, padding: 8, borderRadius: 8, border: `1px solid ${C.stroke}`, background: C.surface, zIndex: 10, maxHeight: 260, overflowY: 'auto', minWidth: 160 }, children:
+              SKILL_SOURCES.map(src => jsx('label', { key: src, style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '2px 0', cursor: 'pointer' }, children: [
+                jsx('input', { type: 'checkbox', checked: !disabledSkillSources.has(src), onChange: e => {
+                  setDisabledSkillSources(prev => {
+                    const next = new Set(prev)
+                    if (e.target.checked) next.delete(src); else next.add(src)
+                    return next
+                  })
+                  setReloadKey(k => k + 1)
+                } }),
+                jsx('span', { children: src })
+              ] }))
+            })
+          ] }),
         null
       ),
       el(
