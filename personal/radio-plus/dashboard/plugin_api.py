@@ -60,6 +60,11 @@ _stream_cache: dict[int, tuple[float, str]] = {}
 _tunein_stream_cache: dict[str, tuple[float, str]] = {}
 _now_playing_cache: dict[str, tuple[float, str]] = {}
 _NOW_PLAYING_TTL = 12.0
+_QUERY_CACHE_MAX = 256
+_STREAM_CACHE_MAX = 1024
+_TUNEIN_STREAM_CACHE_MAX = 512
+_NOW_PLAYING_CACHE_MAX = 256
+_PROBE_CACHE_MAX = 512
 
 
 def _freshest(cache: dict[Any, tuple[float, Any]], key: Any, ttl: float) -> Any:
@@ -71,6 +76,14 @@ def _freshest(cache: dict[Any, tuple[float, Any]], key: Any, ttl: float) -> Any:
         cache.pop(key, None)
         return None
     return value
+
+def _trim_cache(cache: dict[Any, Any], maxsize: int) -> None:
+    """Bound a cache by evicting the oldest entries (insertion order)."""
+    while len(cache) > maxsize:
+        try:
+            del cache[next(iter(cache))]
+        except (StopIteration, KeyError):
+            break
 
 
 def _query_directory(path: str, query: str | None) -> list[dict[str, Any]]:
@@ -110,6 +123,7 @@ def _query_directory(path: str, query: str | None) -> list[dict[str, Any]]:
         raise HTTPException(status_code=502, detail="Shoutcast directory returned no readable station list.") from error
     rows = [row for row in payload if isinstance(row, dict)] if isinstance(payload, list) else []
     _query_cache[key] = (time.time(), rows)
+    _trim_cache(_query_cache, _QUERY_CACHE_MAX)
     return rows
 
 
@@ -155,6 +169,7 @@ def _stream_for(station_id: int) -> str | None:
     # A station can be listed while its tune-in file is empty. Cache the miss
     # briefly so a repeated search does not hammer a dead endpoint.
     _stream_cache[station_id] = (time.time(), address or "")
+    _trim_cache(_stream_cache, _STREAM_CACHE_MAX)
     return address
 
 
@@ -319,6 +334,7 @@ def _tunein_rows(query: str) -> list[dict[str, Any]]:
         if isinstance(row, dict) and row.get("type") == "audio" and _clean_stream(str(row.get("URL") or ""))
     ]
     _query_cache[key] = (time.time(), rows)
+    _trim_cache(_query_cache, _QUERY_CACHE_MAX)
     return rows
 
 
@@ -355,6 +371,7 @@ def _tunein_stream(url: str) -> str | None:
     except (urllib.error.URLError, TimeoutError, OSError, ValueError):
         address = None
     _tunein_stream_cache[tunein_url] = (time.time(), address or "")
+    _trim_cache(_tunein_stream_cache, _TUNEIN_STREAM_CACHE_MAX)
     return address
 
 
@@ -652,6 +669,7 @@ def now_playing(url: str = Query(..., min_length=8, max_length=1000)) -> dict[st
         return {"ok": bool(cached), "title": cached, "station": "", "reason": "" if cached else "No title announced."}
     result = _icy_title(address)
     _now_playing_cache[address] = (time.time(), result["title"])
+    _trim_cache(_now_playing_cache, _NOW_PLAYING_CACHE_MAX)
     return result
 
 
