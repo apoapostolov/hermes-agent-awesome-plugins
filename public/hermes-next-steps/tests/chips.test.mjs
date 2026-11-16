@@ -14,7 +14,7 @@ import assert from 'node:assert/strict'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pluginSource = resolve(here, '..', 'desktop', 'plugin.js')
-const dir = mkdtempSync(join(tmpdir(), 'next-steps-test-'))
+const dir = mkdtempSync(join(tmpdir(), 'hermes-next-steps-test-'))
 const nm = join(dir, 'node_modules')
 
 function pkg(name, files) {
@@ -838,7 +838,7 @@ test('busy: the click is admitted to the queue, not steered or interrupted', asy
   assert.equal(calls[0][0], 'prompt.submit')
   assert.equal(calls[0][1].session_id, 'q1')
   assert.equal(calls[0][1].text, 'Do the next thing')
-  assert.match(calls[0][1].submission_id, /^next-steps-/, 'the admission carries its own id')
+  assert.match(calls[0][1].submission_id, /^hermes-next-steps-/, 'the admission carries its own id')
   assert.equal(lines.length, 0, 'a busy click does not go through the composer busy route')
   const after = render(register({ attrs: { q1: 'Do the next thing' }, sessionId: 'q1', source: 'q-a' }))
   assert.match(chips(after)[0].props.className, /fu-chosen/)

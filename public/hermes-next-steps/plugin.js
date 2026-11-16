@@ -1,4 +1,4 @@
-// next-steps: clickable next-step question chips inside the transcript.
+// hermes-next-steps: clickable next-step question chips inside the transcript.
 // The agent ends a reply with a paragraph alone on its own line:
 //   ::nextsteps{q1="..." q2="..." q3="..."}
 // Each qN renders as a chip; click sends it as the next user turn.
@@ -1066,7 +1066,7 @@ function normalizeSubtitle(text) {
         finish(false)
         return
       }
-      var id = 'next-steps-' + Date.now().toString(36) + '-' + Math.random().toString(16).slice(2, 8)
+      var id = 'hermes-next-steps-' + Date.now().toString(36) + '-' + Math.random().toString(16).slice(2, 8)
       try {
         Promise.resolve(request('prompt.submit', { session_id: sid, text: text, submission_id: id }))
           .then(function (res) {
@@ -1248,7 +1248,7 @@ function normalizeSubtitle(text) {
           textDecoration: 'underline dotted',
         },
         title: 'Remove the proposals carried in from earlier replies',
-        'aria-label': 'Clean old next-steps',
+        'aria-label': 'Clean old next steps',
         onClick: function () {
           if (clearCarried(carrySession, groupKey)) emit(groupKey)
         },
@@ -1284,7 +1284,7 @@ function normalizeSubtitle(text) {
 }
 
 const plugin = {
-  id: 'next-steps',
+  id: 'hermes-next-steps',
   name: 'Next Steps',
   description: 'Clickable next-step question chips after assistant replies',
   register: function register(ctx) {

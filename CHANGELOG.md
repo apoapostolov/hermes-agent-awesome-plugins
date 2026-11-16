@@ -3,6 +3,12 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [hermes-next-steps 1.1.0] - 2026-11-16
+
+### Changed
+
+- **hermes-next-steps:** the catalog edition is renamed from `next-steps` to `hermes-next-steps`, because `plugin-catalog/next-steps.yaml` on `NousResearch/hermes-agent` already belongs to an unrelated plugin from another author and an entry may not take another lineage's key. The install path changes with the id, which is why this is a minor rather than a patch. The personal edition keeps the id `next-steps` and version 1.0.3, since it is not listed and nothing addresses it by catalog name.
+
 ## [next-steps 1.0.3] - 2026-11-16
 
 ### Fixed

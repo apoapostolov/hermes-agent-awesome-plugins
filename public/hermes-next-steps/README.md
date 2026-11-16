@@ -4,7 +4,7 @@
   <strong>End a reply with options instead of a promise.</strong>
   <p>Clickable next steps under every reply. Tick several and one send delivers them together.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.3-2ea44f" alt="Version 1.0.3" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.0-2ea44f" alt="Version 1.1.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -68,7 +68,7 @@ hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/herme
 Or this plugin alone:
 
 ```bash
-hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/next-steps
+hermes plugins install apoapostolov/hermes-agent-awesome-plugins/public/hermes-next-steps
 ```
 
 Enable **Next Steps** under **Capabilities → Plugins**, then `Ctrl+K` and **Reload window** so the renderer half loads. The agent half is live immediately; the chips appear only after the reload.
