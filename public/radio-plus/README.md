@@ -4,7 +4,7 @@
   <strong>Live radio in the status bar, with a station list you own.</strong>
   <p>An extended edition of the bundled Radio plugin: editable stations, three directories, and a station log that says why a stream will not play.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.5.1-2ea44f" alt="Version 1.2.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.5.2-2ea44f" alt="Version 1.2.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -32,11 +32,9 @@ What it extends, in the direction of any station rather than seven fixed ones:
 - The seven shipped stations were a fixed array in the source. Here they are a
   seeded starting list that you rename, re-point, delete, or add to.
 - The picker searched one directory. It now searches Radio Browser, Radio
-  Browser's popular list, the Shoutcast directory and TuneIn, and it crosses
-  scripts so a Bulgarian name typed in Cyrillic finds the Latin spelling the
-  directories index.
-- HLS stations, which the bundled player skips because a browser cannot open a
-  playlist without a demuxer, play here through a vendored `hls.js`.
+  Browser's popular list and the Shoutcast directory, and it crosses scripts so
+  a Bulgarian name typed in Cyrillic finds the Latin spelling the directories
+  index.
 - A station that will not play now says why, in the panel and in a log line,
   instead of failing silently.
 
@@ -52,12 +50,10 @@ them; both enabled means two players in one bar.
 - Add a station from any address with the round button at the end of the source
   row. The address is checked before it is saved, so a website URL is refused
   with a reason instead of becoming a station that never plays.
-- Search four sources. *All* mixes your stations with a Radio Browser name
-  search, *Popular* lists Radio Browser's most-voted stations, *Shoutcast*
-  searches the Shoutcast directory by name, genre, or keyword, and *TuneIn*
-  searches TuneIn, which carries many stations the other directories do not
-  index. With an empty search box the Shoutcast chip lists the busy end of the
-  directory; TuneIn has no top list, so it asks for a name instead.
+- Search three sources. *All* mixes your stations with a Radio Browser name
+  search, *Popular* lists Radio Browser's most-voted stations, and *Shoutcast*
+  searches the Shoutcast directory by name, genre, or keyword. With an empty
+  search box the Shoutcast chip lists the busy end of the directory.
 - Narrow the search with tags. `country:uk` lists stations from the United
   Kingdom and `genre:jazz` lists jazz, in any combination with a name, as in
   `sunrise country:uk genre:ambient`. The field's placeholder shows both. Two
@@ -65,33 +61,33 @@ them; both enabled means two players in one bar.
   a few short names map to their code, so `uk` finds GB and `usa` finds US.
   Quotes hold a value with a space: `genre:"smooth jazz"`. A tag query browses
   the directory, so your own stations step aside instead of sitting on top of the
-  results; the Shoutcast and TuneIn sources understand a genre tag but have no
-  country index.
-- Scroll for more, on all four sources. A search and the Popular list arrive
+  results; the Shoutcast source understands a genre tag but has no country
+  index.
+- Scroll for more, on all three sources. A search and the Popular list arrive
   forty at a time and ask for the next page when you reach the bottom, so a broad
   query like `genre:jazz` costs one page up front instead of every row the
-  directory holds. Shoutcast and TuneIn page thirty at a time, because every row
-  there costs a resolve and a probe before it can play. The list says when it is
+  directory holds. Shoutcast pages thirty at a time, because every row there
+  costs a resolve and a probe before it can play. The list says when it is
   loading, and it stops asking once a page comes back short or adds nothing new.
 - Search in Cyrillic or Latin. A Cyrillic query is also sent transliterated, so
-  `Хоризонт` reaches `BNR Horizont` and `Христо Ботев` reaches its HLS stream.
+  `Хоризонт` reaches `BNR Horizont` and `Христо Ботев` reaches its entry.
   Local matching folds both scripts the same way.
-- Play HLS stations. `hls.js` 1.6.15 is vendored into the plugin, so a playlist
-  address plays like any other station. This is what makes БНР Христо Ботев, and
-  the eleven other Bulgarian HLS stations in Radio Browser, reachable at all.
+- HLS stations are hidden here and counted. A playlist address needs a demuxer
+  this edition does not carry, so those rows are left out of the results and the
+  panel says how many were left out.
 - Read why a station failed. The panel shows the media error and the host it
   tried, and the plugin route records the failure in
   `radio-plus/station-log.jsonl`. The add form and the failure path both use the
   same probe, which reports what an address actually returns.
-- Skip the dead rows. Every resolved Shoutcast and TuneIn address is probed
+- Skip the dead rows. Every resolved Shoutcast address is probed
   before it reaches the list, under a two-second budget, so a directory entry
   that now serves an HTML error page is dropped and counted rather than played.
 - See what is on air. The panel's track line shows the title the stream itself
   announces, split into artist and song, with the artist's profile link. That
   works for any station in the list, including a Radio Browser row or an address
   you added yourself, because the plugin route reads the ICY metadata the player
-  cannot. A directory row that already knows what was playing, as TuneIn and
-  Shoutcast both do, fills the line until the stream's first announcement.
+  cannot. A Shoutcast row that already knows what was playing fills the line
+  until the stream's first announcement.
 
 ## Settings
 
@@ -120,15 +116,18 @@ hermes plugins enable radio-plus
 
 This is the listed edition. It stays inside the plugin SDK (`ctx.register`,
 `ctx.storage`, `ctx.rest`, `ctx.os.openExternal`) plus its own dashboard route.
-One feature differs: **HLS playback is personal-only.** The listed tree cannot
-carry the vendored `hls.js` build, because the admission scanner refuses a
+Two features are personal-only: **HLS playback** and **TuneIn**. The listed tree
+cannot carry the vendored `hls.js` build, because the admission scanner refuses a
 library that defines accessors on its own prototypes, and loading it from a CDN
-would run remote code in the renderer. Here an HLS station is hidden from the
-results and the panel says how many were hidden; everything else, including the
-Shoutcast search, the transliterated queries and the station log, is identical.
+would run remote code in the renderer; here an HLS station is hidden from the
+results and the panel says how many were hidden. TuneIn is an undocumented
+endpoint whose terms describe personal listening, so a listing does not call it;
+the picker carries three sources instead of four. Everything else, including the
+Shoutcast search, the transliterated queries, the track line and the station log,
+is identical.
 
 Enable it in Capabilities, Plugins. The renderer half loads on that toggle or on
-an app restart. The Shoutcast, TuneIn and now-playing routes need the app
+an app restart. The Shoutcast and now-playing routes need the app
 restarted once, because the
 dashboard mounts plugin routes at startup; until then that chip reports itself
 unavailable and everything else works.
@@ -142,14 +141,6 @@ and jsdom, flips the switch the way a user does, and reads the stored key back.
 
 ## Requirements and Limits
 
-- HLS is bundled, not native: the vendored build adds about 345 KiB to
-  `plugin.js`; the plugin loader reads up to 512 KiB, so there is room but not
-  much. Replacing the build means replacing it in place.
-- TuneIn is searched through its public OPML endpoint, which is not a documented
-  API with a support contract and whose terms describe personal listening rather
-  than redistribution. It can change or refuse without notice. Radio Browser and
-  Shoutcast carry most of the same stations, so a TuneIn failure costs coverage
-  rather than the plugin.
 - A track line depends on the station announcing one. Most Icecast and Shoutcast
   mounts do; an HLS-only station, or a stream that never sends ICY metadata, shows
   the station's own description or nothing.
@@ -162,13 +153,13 @@ and jsdom, flips the switch the way a user does, and reads the stored key back.
 - Directory data is theirs: availability, regional restrictions, and
   metadata quality belong to Radio Browser and Shoutcast.
 - No accounts, keys, or telemetry. Streams connect directly to broadcasters.
-  Searches send the typed term to Radio Browser, or to Shoutcast and TuneIn
-  through the plugin's own local route, which also reads the track a playing
-  station announces. Three hosts are contacted and no others: Radio Browser, the
-  Shoutcast directory with its tune-in files, and TuneIn's OPML endpoint, plus
-  whichever station you are playing when the panel asks what is on air. The route
-  refuses loopback and private addresses, so it cannot be turned into a scanner
-  for your network, and nothing is sent anywhere except the term you typed.
+  Searches send the typed term to Radio Browser, or to Shoutcast through the
+  plugin's own local route, which also reads the track a playing station
+  announces. Two hosts are contacted and no others: Radio Browser and the
+  Shoutcast directory with its tune-in files, plus whichever station you are
+  playing when the panel asks what is on air. The route refuses loopback and
+  private addresses, so it cannot be turned into a scanner for your network, and
+  nothing is sent anywhere except the term you typed.
 
 ## Tests
 

@@ -146,7 +146,7 @@ async function test(name, fn) {
 
 await test('the source chips render with one selected', () => {
   const labels = chips().map(chip => chip.textContent)
-  assert.deepEqual(labels, ['sourceAll', 'sourcePopular', 'sourceShoutcast', 'sourceTunein'])
+  assert.deepEqual(labels, ['sourceAll', 'sourcePopular', 'sourceShoutcast'])
   assert.equal(chips()[0].getAttribute('data-active'), 'true')
   assert.equal(chips()[1].getAttribute('data-active'), 'false')
   assert.equal(chips()[0].getAttribute('aria-pressed'), 'true')

@@ -33,7 +33,27 @@ panel says how many were hidden, so a search is never mysteriously short. Every
 other behaviour is identical, including the Shoutcast route, the transliterated
 queries, the probe and the station log.
 
-## 2. The vendored build trips one WARN
+## 2. TuneIn is personal-only
+
+**Personal:** the picker carries four sources, TuneIn among them. It adds
+stations the other directories do not index, and a genre tag finds a whole shelf
+of them.
+
+**Why it fails the catalog bar:** not the code. TuneIn answers over an
+undocumented OPML endpoint whose terms describe personal listening rather than
+redistribution, so a listed plugin that calls it makes a promise the endpoint
+does not support. The plugin repository's owner asked for the listed edition to
+carry three sources instead, and the cut removes the chip, the query, the route
+and every string that named it.
+
+**The hook that would clear it:** a documented TuneIn API with terms that allow
+redistribution, or a licensing arrangement. Nothing in the plugin needs to
+change beyond restoring the cut block.
+
+**Listed edition:** All, Popular and Shoutcast. A query that would have reached
+TuneIn answers from the other three, and nothing in the panel refers to it.
+
+## 3. The vendored build trips one WARN
 
 **Personal:** `desktop/plugin.js` carries the aliased hls.js bundle, whose single
 `appendChild` call the scanner reports as "node injection; confirm the parent is
