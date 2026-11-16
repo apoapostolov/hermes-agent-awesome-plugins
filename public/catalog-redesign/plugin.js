@@ -3279,6 +3279,13 @@ export function CatalogPage() {
           style: { fontSize: 13.5, fontWeight: 600, color: C.text, letterSpacing: '-0.01em', flex: '0 0 auto' },
           children: 'Catalog'
         }),
+        (kind === 'skills' || (kind === 'plugins' && (cache.installed || []).some(r => r.updateAvailable))) &&
+          jsx('button', {
+            type: 'button',
+            style: { fontSize: 11, padding: '2px 8px', borderRadius: 6, border: `1px solid ${C.stroke}`, background: 'transparent', color: C.text, cursor: 'pointer', flex: '0 0 auto' },
+            onClick: () => setReloadKey(k => k + 1),
+            children: 'Update all'
+          }),
         jsx('span', {
           style: {
             fontSize: 11,
