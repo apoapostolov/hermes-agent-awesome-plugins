@@ -13,6 +13,11 @@ model without tool calling still has to be able to produce chips.
 When a decision classifier is available the rule also says to ask it which options
 are worth taking now, so the reply arrives with the likely steps already picked
 instead of making the user read five chips first.
+
+Hermes skips a plugin section longer than its own cap instead of truncating it, and
+the cap is applied to the text, not to the `max_chars` a plugin declares. So the fit
+is enforced here: MAX_CHARS sits under the host's 2,200, and `_fit` drops optional
+paragraphs rather than letting a section grow past it and be lost whole.
 """
 
 from __future__ import annotations
@@ -20,30 +25,17 @@ from __future__ import annotations
 # Surfaces where the desktop half draws the directive.
 DRAWS = frozenset({"local", "desktop"})
 
-MAX_CHARS = 2_200
+# Kept under the host's 2,200 cap so the whole section survives, and used as the
+# declared max_chars on registration.
+MAX_CHARS = 2_100
 
 DESKTOP = (
-    "This chat draws Next Steps under a reply. When the next step is a choice, "
-    "do not ask for it in prose: never end with \"say the word and I'll...\", "
-    "\"want me to...?\", \"shall I...?\", a \"let me know\" line, or a list of things you "
-    "could do next.\n"
-    "Call next_steps with 2 to 5 imperative, specific options under 120 characters "
-    "each, most likely first, and do not write any ::nextsteps line yourself: the "
-    "plugin attaches the chips to the reply you are about to write. Chips are picked and "
-    "sent together by default, so pass multi=false only when the options are exclusive, "
-    "because a picked row lets the user send two contradicting steps as one message. "
-    "When some options exclude each other but the rest can be combined, pass alternates "
-    "as pairs of 1-based numbers, so a click clears its opposite instead of sending both: "
-    "[[1, 3]] means options 1 and 3 cannot both be picked. An option that means leaving "
-    "things as they are is opposed to every action, and that pairing is applied even when "
-    "you pass nothing, so say it in the labels rather than the prose. "
-    "Never offer an option you would not do as it stands.\n"
-    "If you cannot call tools, end instead with this directive alone on its own line, one "
-    "qN per option; add multi=\"0\" only for an exclusive choice, and alt=\"1,3\" for "
-    "options that cannot be picked together while the rest can:\n"
+    ""
+    "This chat draws Next Steps under a reply. When the next step is a choice, never ask for it in prose: no \"say the word\", \"want me to...?\", \"shall I...?\", \"let me know\", or a list of things you could do next.\n"
+    "Call next_steps with 2 to 5 imperative options under 120 characters, most likely first, and write no ::nextsteps line yourself: the chips attach to the reply you are about to write. Chips are picked and sent together by default, so pass multi=false only when the options are exclusive, because one picked row can send two contradicting steps. Where some options exclude each other but the rest combine, pass alternates as 1-based pairs: [[1, 3]] means 1 and 3 cannot both be picked. An option meaning \"leave things as they are\" opposes every action even when you pass nothing, so say it in a label. Never offer an option you would not do as it stands.\n"
+    "Without tool calls, end with this directive alone on its line, one qN per option, multi=\"0\" for an exclusive choice, alt=\"1,3\" for options that cannot combine:\n"
     "::nextsteps{q1=\"Push the branch and open the PR\" q2=\"Add a CHANGELOG entry\"}\n"
-    "Never put a directive inside a sentence, a list or a code block, and never write it "
-    "twice. Put what you did in the prose; the chips carry what can follow."
+    "Never put a directive inside a sentence, a list or a code block, and never write it twice. The prose says what you did; the chips carry what can follow."
 )
 
 OTHER = (
@@ -53,37 +45,44 @@ OTHER = (
 )
 
 SUBTITLE = (
-    " A chip can carry a second, dimmer line when the label alone would be misread: pass "
-    "subtitles with the chips (one entry per option, empty where it needs none) or dN on "
-    "the directive. Say what the step touches or what a bare verb hides, never what the "
-    "label already says, and leave it out when the option is already clear: a line under "
-    "every chip is noise, and it is clipped at two lines anyway."
+    ""
+    " A chip can carry a dimmer second line when its label would misread: pass subtitles (one per option, empty where none is needed) or dN. Say what the step touches that the label hides, never what the label already says, and leave it out when the option is clear: a line under every chip is noise."
 )
 
 RISK = (
-    " Mark the options that could do damage rather than just cost time: deleting or "
-    "overwriting something, rewriting published history, spending money, running a "
-    "migration, or a change that could break a working setup. Pass risk=true with the "
-    "chips, or risky=\"2\" on the directive, so those chips carry a RISKY pill; a step "
-    "that is merely slow or incomplete is not risky."
+    ""
+    " Mark options that could do damage rather than cost time: deleting or overwriting something, rewriting published history, spending money, a migration, or a change that could break a working setup. Pass risk=true, or risky=\"2\" on the directive, for the RISKY pill."
 )
 
 RECOMMEND = (
-    " When the chips are a real choice rather than an obvious next step, pass "
-    "recommend=true so the decision classifier marks the options worth taking now; they "
-    "carry a Recommended tag and start out picked, so recommend only options you would "
-    "be happy for the user to send as they stand. On the text-directive path, "
-    "next_steps_recommend returns the same verdict as an attribute to paste (rec=\"1,3\")."
+    ""
+    " When the chips are a real choice, pass recommend=true so the classifier marks the options worth taking now: they carry a Recommended tag and start picked, so recommend only what you would be happy to receive as it stands. On the directive path, next_steps_recommend returns rec=\"1,3\"."
 )
+
+
+def _fit(parts: list[str]) -> str:
+    """Join the paragraphs, dropping optional ones until the section fits MAX_CHARS.
+
+    Order is priority: the descriptions that make the features reachable go last, so
+    a section that has to shrink keeps the rule that makes chips appear at all.
+    """
+    while len(parts) > 1 and len("".join(parts)) > MAX_CHARS:
+        parts = parts[:-1]
+    return "".join(parts)
 
 
 def chips_rule(session: dict, recommends: bool = False, risk: bool = False) -> str:
     """The section's text for one session: the chip rule on the app, text-only elsewhere.
 
-    {"platform": "local"} → DESKTOP;  with a classifier → DESKTOP + RECOMMEND;
-    {"platform": "telegram"} → OTHER;  {} → OTHER
+    {"platform": "local"} -> DESKTOP;  with a classifier -> DESKTOP + RECOMMEND;
+    {"platform": "telegram"} -> OTHER;  {} -> OTHER
     """
     session = session or {}
-    if session.get("platform") in DRAWS:
-        return DESKTOP + SUBTITLE + (RECOMMEND if recommends else "") + (RISK if risk else "")
-    return OTHER
+    if session.get("platform") not in DRAWS:
+        return OTHER
+    parts = [DESKTOP, SUBTITLE]
+    if recommends:
+        parts.append(RECOMMEND)
+    if risk:
+        parts.append(RISK)
+    return _fit(parts)
