@@ -3,6 +3,19 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [hermes-next-steps 1.1.1] - 2026-11-16
+
+### Fixed
+
+- **hermes-next-steps:** the catalog edition takes the same two renderer fixes as the personal one: the per-block and per-session state maps prune what nothing is watching once they pass 64 blocks or 16 sessions, and never a block that is mid-click or still has a subscriber, while the ticks a decision classifier puts on a multi-select reply are written like a click instead of being lost on reload. No surface, tool, hook or setting changes, and the edition still ships without the chip-border animation and the jump back to an offering reply.
+
+## [next-steps 1.0.4] - 2026-11-16
+
+### Fixed
+
+- **next-steps:** the renderer kept two maps that never shrank. One holds a chip block's state for every `::nextsteps` paragraph drawn in the session, the other a carry queue and a listener set per session, so a window left open for hours carried the state of replies that had scrolled away long before. Both prune the entries nobody is watching once they pass their own size (64 blocks, 16 sessions), and a block that is mid-click or still subscribed is never dropped.
+- **next-steps:** a reply whose options arrived pre-ticked by the decision classifier lost those ticks when the window reloaded, because the first selection was applied in memory and never written. It is persisted like a click now. The pack pin moves to this commit.
+
 ## [hermes-next-steps 1.1.0] - 2026-11-16
 
 ### Changed
@@ -55,6 +68,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 ### Changed
 
 - **pack:** moves the **catalog-redesign** pin to `613f00a`, where a skill's switch archives or revives it and the third column is headed **Tags**.
+
+## [1.27.20] - 2026-11-16
+
+### Changed
+
+- **pack:** moves the **next-steps** pin to `2629dff`, which releases the chip state a long session was holding and writes the first selection a decision classifier puts on a reply. Both editions carry the fix and both are released at that tree, next-steps 1.0.4 and hermes-next-steps 1.1.1. Membership is unchanged at nineteen entries, so the number moves for the pin alone.
 
 ## [catalog-redesign 1.0.4] - 2026-11-16
 

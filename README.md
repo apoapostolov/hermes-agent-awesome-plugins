@@ -27,6 +27,8 @@
 </div>
 
 ## Latest plugin update
+**Next Steps 1.0.4** fixes two things under the chips that only showed up in a long session, and its catalog edition **hermes-next-steps 1.1.1** carries the same fixes. The renderer held one state entry for every options block it had ever drawn and one carry queue for every session, and released neither, so a window left open for hours kept the state of replies that had long since scrolled away; both maps now drop what nobody is watching once they pass 64 blocks or 16 sessions, and never a block that is mid-click or still subscribed. Separately, a reply whose options arrived pre-ticked by the decision classifier lost those ticks when the window reloaded, because the first selection was only ever applied in memory; it is written now, like a click. Nothing visible changes: the chips, the Recommended tag, the RISKY pill and the carried-forward row all behave as before. Update if you keep a session open for hours; the pack pin moves with it.
+
 **Catalog Redesign 1.0.12** turns the Capabilities page into a wide, one-row-per-item list for skills, plugins, connectors and tools. Each row carries a thumbnail, the name with its description, and one column that matters for that kind (tags or the short name). Artwork is real: a published plugin borrows the catalog's hero image, and a plugin outside the catalog uses a logo its own folder ships, so rows stop showing initials where the plugin has a face. Hover a row for a preview, click for a detail panel that slides in from the right with the hero image across its header, a 44px section rail, and the on/off switch beside Close. It adds its own route, sidebar row and palette entry and leaves the native Capabilities page alone. The online catalog now loads reliably, the default view is online, and there's an "Update all" button in the header. See [its README](personal/catalog-redesign/README.md).
 
 **Queue Container Fix 1.0.0** moves the per-message controls of a queued prompt from the end of its row to the start of its first line, where they stay on screen. Steer, edit, remove and send now sit before the text, resting at half strength and coming to full on hover or keyboard focus. The control column takes only the width of the buttons a row actually has, so a gateway-owned entry with no controls keeps its message at the left margin. Background commands, subagents and artifact rows are untouched. It ships personal-only (catalog review can't take a stylesheet over app markup). Enable it in Capabilities, Plugins, and the change lands without a restart.
@@ -85,7 +87,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.19). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
+Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.20). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
 
 ### Status Bar
 
