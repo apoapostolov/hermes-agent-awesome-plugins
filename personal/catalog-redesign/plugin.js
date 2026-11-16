@@ -3309,28 +3309,7 @@ export function CatalogPage() {
             onClick: () => setReloadKey(k => k + 1),
             children: 'Update all'
           }),
-        kind === 'skills' && effectiveFilter === 'catalog' &&
-          jsx('div', { style: { position: 'relative', flex: '0 0 auto' }, children: [
-            jsx('button', {
-              type: 'button',
-              style: { fontSize: 11, padding: '2px 6px', borderRadius: 6, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
-              onClick: () => setSourcesOpen(o => !o),
-              children: ['Sources ▾']
-            }),
-            sourcesOpen && jsx('div', { style: { position: 'absolute', top: '100%', right: 0, marginTop: 4, padding: 8, borderRadius: 8, border: `1px solid ${C.stroke}`, background: C.surface, zIndex: 10, maxHeight: 260, overflowY: 'auto', minWidth: 160 }, children:
-              SKILL_SOURCES.map(src => jsx('label', { key: src, style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '2px 0', cursor: 'pointer' }, children: [
-                jsx('input', { type: 'checkbox', checked: !disabledSkillSources.has(src), onChange: e => {
-                  setDisabledSkillSources(prev => {
-                    const next = new Set(prev)
-                    if (e.target.checked) next.delete(src); else next.add(src)
-                    return next
-                  })
-                  setReloadKey(k => k + 1)
-                } }),
-                jsx('span', { children: src })
-              ] }))
-            })
-          ] }),
+        null,
         null
       ),
       el(
@@ -3345,6 +3324,28 @@ export function CatalogPage() {
           onChange: next => setKind(next),
           sizing: 'content'
         }),
+        kind === 'skills' && effectiveFilter === 'catalog' &&
+          jsx('div', { style: { position: 'relative' }, children: [
+            jsx('button', {
+              type: 'button',
+              style: { fontSize: 11, padding: '2px 6px', borderRadius: 6, border: `1px solid ${C.stroke}`, background: 'transparent', color: C.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
+              onClick: () => setSourcesOpen(o => !o),
+              children: ['Sources ▾']
+            }),
+            sourcesOpen && jsx('div', { style: { position: 'absolute', top: '100%', right: 0, marginTop: 4, padding: 8, borderRadius: 8, border: `1px solid ${C.stroke}`, background: C.surface, zIndex: 50, maxHeight: 260, overflowY: 'auto', minWidth: 160 }, children:
+              SKILL_SOURCES.map(src => jsx('label', { key: src, style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '2px 0', cursor: 'pointer' }, children: [
+                jsx('input', { type: 'checkbox', checked: !disabledSkillSources.has(src), onChange: e => {
+                  setDisabledSkillSources(prev => {
+                    const next = new Set(prev)
+                    if (e.target.checked) next.delete(src); else next.add(src)
+                    return next
+                  })
+                  setReloadKey(k => k + 1)
+                } }),
+                jsx('span', { children: src })
+              ] }))
+            })
+          ] }),
         kind === 'tools'
           ? null
           : jsx('span', {

@@ -1,5 +1,5 @@
 name: "hermes-catalog-redesign"
-version: "1.0.13"
+version: "1.0.14"
 description: "Wide one-row-per-item catalog for skills, plugins, connectors and tools, with hover previews and a sliding detail panel."
 author: Apostol Apostolov
 license: MIT
