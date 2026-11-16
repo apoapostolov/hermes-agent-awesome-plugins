@@ -3,6 +3,12 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [queue-container-fix 1.0.0] - 2026-11-16
+
+### Added
+
+- **queue-container-fix:** a queued prompt now draws its expand, edit, steer and send controls at the start of its first line instead of in the row's last column past the end of the message, where a long prompt pushed them to the far edge of the composer and they appeared only under the pointer. The controls rest at 0.55 opacity and come to full on row hover or keyboard focus. The control column is `auto`, so a gateway-owned entry that carries no controls keeps its message at the left margin rather than reserving blank space; the first cut reserved a fixed column and left exactly that gap, which measurement on a live queued row caught. Rows in the same stack that are not queued, meaning background commands, subagents and artifacts, keep their controls at the end, verified by comparing a queue row (controls at x=305, text at x=397) against a control row (controls at x=1273, text at x=305) in one measurement pass. The plugin is a stylesheet over `composer-status-stack` and `status-row`, so it is personal-only; `LIMITATIONS.md` records why no public cut can exist.
+
 ## [next-steps 1.0.1] - 2026-11-16
 
 ### Fixed

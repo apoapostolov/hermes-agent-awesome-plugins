@@ -1,0 +1,14 @@
+name: "queue-container-fix"
+label: Queue Container Fix
+version: 1.0.0
+description: "Move each queued prompt's steer, edit and remove controls to the start of its first line, where they stay on screen and pressable."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/queue-container-fix
+tags:
+  - desktop
+  - composer
+  - queue
+  - ui

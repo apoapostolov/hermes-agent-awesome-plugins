@@ -10,7 +10,7 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Twenty plugins. Every one has a public edition.</p>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Twenty-two plugins, twenty-one of them with a public edition.</p>
 
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
@@ -28,6 +28,8 @@
 
 ## Latest plugin update
 
+Queue Container Fix 1.0.0 moves the per-message controls of a queued prompt from the end of its row to the start of its first line, where they stay on screen. A queued row used to draw its expand chevron, pencil, steering wheel and send button in the row's last column, past the end of the message text, and they only appeared while the pointer was over the row. They now come before the text, resting at a little over half strength and coming to full on hover or keyboard focus. The control column takes only the width of the buttons a row actually has, so a gateway-owned entry with no controls keeps its message at the left margin instead of leaving a gap. Background commands, subagents and artifact rows are untouched. It is a stylesheet over the composer status stack, so it ships personal-only; see its `LIMITATIONS.md` for why catalog review cannot take it. Enable it in Capabilities, Plugins, and the change lands without a restart.
+
 Radio Plus 1.0.0 is an extended edition of the **Radio** plugin bundled with Hermes Desktop, and its first listed release: a stipple hero, a code-drawn icon, a capture of the picker from the running app, and a README written to the house page. The bundled player ships seven fixed stations, searches one directory, and skips HLS; this edition keeps its oscilloscope, transport, artist links and dictation-aware pause, and makes the rest work for any station: the list is editable (name and stream address together), any `http` or `https` stream can be added and is checked before it is saved, the picker searches Radio Browser, its popular list and the Shoutcast directory, a Cyrillic query is also sent transliterated so `Хоризонт` finds `BNR Horizont`, HLS stations play through a vendored `hls.js` 1.6.15, and a station that will not play says why in the panel and in `radio-plus/station-log.jsonl`. Version 1.1.0 added a settings page with one switch, start the last station on launch, off by default, 1.2.0 added tags to the search field, `country:uk` and `genre:jazz` alone or with a name, and 1.3.0 loads results a page at a time as the list is scrolled. The bundled Radio plugin draws the same status-bar slot, so disable it. Enable Radio Plus in Capabilities, Plugins, then toggle it off and on so the renderer loads the new module, and restart the app once so the dashboard mounts its routes.
 
 Next Steps 1.0.1 fixes the part of 1.0.0 that never worked. The plugin's own prompt rule, the one that asks a reply to end in chips instead of "say the word and I'll…", measured 2,335 characters with a decision classifier loaded, and Hermes skips a plugin prompt section over its 2,200-character cap instead of trimming it, so the whole rule was dropped and the chips only appeared when the model chose them. The rule is terser now (1,828 characters with recommendations, 2,091 with the risky paragraph as well), `MAX_CHARS` sits at 2,100, and the section drops its optional paragraphs rather than overflowing. Update if you installed 1.0.0; the tools were never affected and the chips you sent still worked.
@@ -40,7 +42,7 @@ The pack is at 1.27.8. See the [changelog](CHANGELOG.md) for plugin-level update
 
 ## In the app
 
-These are captures from the running app of the parts that only make sense in place: the providers dialog, the reader, the memory review queue, skills presets, the session list and the turn meter. Eight plugins carry one; the settings for every plugin that has a settings page live under Settings, Plugins, and each plugin README shows its own.
+These are captures from the running app of the parts that only make sense in place: the providers dialog, the reader, the memory review queue, skills presets, the session list, the turn meter and the composer queue. Nine plugins carry one; the settings for every plugin that has a settings page live under Settings, Plugins, and each plugin README shows its own.
 
 <div align="center">
 <table>
@@ -57,6 +59,7 @@ These are captures from the running app of the parts that only make sense in pla
   <tr>
     <td align="center" valign="top" width="33%"><a href="personal/next-steps"><img src="personal/next-steps/docs/screenshot.png" width="260" alt="Next Steps row under a reply with unanswered options carried forward, age labels, a dismiss cross and Clean Old Proposals" /></a><br /><sub><a href="personal/next-steps"><strong>Next Steps</strong></a><br />Unanswered options carried under a later reply</sub></td>
     <td align="center" valign="top" width="33%"><a href="personal/radio-plus"><img src="personal/radio-plus/docs/screenshot-tags.png" width="260" alt="Radio Plus station picker with country:uk typed in the search field, the All, Popular and Shoutcast chips, UK stations and the transport row" /></a><br /><sub><a href="personal/radio-plus"><strong>Radio Plus</strong></a><br />Search by country or genre, forty results a page</sub></td>
+    <td align="center" valign="top" width="33%"><a href="personal/queue-container-fix"><img src="personal/queue-container-fix/docs/screenshot.png" width="260" alt="Two queued prompts above the composer, controls drawn at the start of the long row and the short row starting at the left margin" /></a><br /><sub><a href="personal/queue-container-fix"><strong>Queue Container Fix</strong></a><br />Queued prompt controls at the start of the line</sub></td>
   </tr>
 </table>
 </div>
@@ -67,7 +70,7 @@ This repository keeps two trees.
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
-**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All 20 active plugins have one.
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All but Queue Container Fix have one, because that plugin is entirely a restyle of app markup.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
@@ -118,6 +121,7 @@ Eighteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.8). **bette
 | Plugin | What you get |
 | --- | --- |
 | [Opaque Composer](personal/opaque-composer/README.md) · [public](public/opaque-composer/README.md) | Solid composer while the transcript scrolls behind it. |
+| [Queue Container Fix](personal/queue-container-fix/README.md) | Moves a queued prompt's expand, edit, steer and send controls from the end of the row to the start of its first line, visible without hovering. Personal only: it restyles app markup. |
 | [Next Steps](personal/next-steps/README.md) · [public](public/next-steps/README.md) | Clickable next steps under a reply: tick several and one send delivers them together, a Recommended tag on the options worth taking now, an amber RISKY pill on the ones that could damage something, a dim second line where a label alone would misread, and carried-forward options from earlier replies. The personal edition animates the chip border while a reply works and jumps back to the reply that offered a carried option. |
 | [Prompt Enhance](personal/prompt-enhance/README.md) · [public](public/prompt-enhance/README.md) | Rewrite a composer draft from a saved prompt library and put the finished prompt back in the field. **Not in the pack; enable separately.** |
 
@@ -186,6 +190,7 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [Drag to Pin Session](personal/drag-to-pin-session/README.md)
 - [Scroll on Switch](personal/scroll-on-switch/README.md)
 - [Opaque Composer](personal/opaque-composer/README.md)
+- [Queue Container Fix](personal/queue-container-fix/README.md)
 - [Prompt Enhance](personal/prompt-enhance/README.md) (not in the pack)
 - [Memory Review](personal/memory-review/README.md)
 - [CDP Manager](personal/cdp-manager/README.md)
