@@ -630,7 +630,7 @@ async function warm(profile, kind, filter, onLanded) {
     'connectors-catalog': ['mcp-catalog', () => loadMcpCatalog(profile)],
     tools: ['toolsets', () => loadToolsets(profile)]
   }
-  const otherFilter = filter === 'catalog' ? `${kind}-installed` : kind === 'plugins' ? 'catalog' : `${kind}-catalog`
+  const otherFilter = filter === 'catalog' ? (kind === 'plugins' ? 'catalog' : `${kind}-catalog`) : kind === 'plugins' ? 'catalog' : `${kind}-catalog`
   const first = pairs[otherFilter] || pairs[kind]
 
   // Each landed job reports back on its own, so a count appears as soon as its
