@@ -40,12 +40,12 @@ const SEED_STATIONS = [
 const EN = {
   radio: 'Radio', browse: 'Choose a station', play: 'Play radio', pause: 'Pause radio', next: 'Next station',
   live: 'Live', paused: 'Paused', connecting: 'Connecting', error: 'Stream unavailable', retry: 'Try again',
-  search: 'Find a station… country:bg genre:jazz', loadingMore: 'Loading more stations…', volume: 'Volume', audioOnly: 'Audio playing · visualizer unavailable',
+  search: 'Find a station… country:uk genre:jazz', loadingMore: 'Loading more stations…', volume: 'Volume', audioOnly: 'Audio playing · visualizer unavailable',
   mute: 'Mute radio', unmute: 'Unmute radio', save: 'Pin station', unsave: 'Unpin station',
   visit: 'Visit station website', artistProfile: 'Visit artist profile',
   settingsTitle: 'Radio Plus', autoplayLabel: 'Start the last station on launch',
   autoplayDescription: 'Plays the station you listened to last as soon as Hermes opens, so the status bar is live without a click. Off by default; with it off nothing plays until you press play, and a station that cannot be reached reports the reason in the panel instead of retrying.',
-  noResults: 'No stations found', searchHint: 'Search by name, or narrow it with country:bg and genre:jazz.',
+  noResults: 'No stations found', searchHint: 'Search by name, or narrow it with country:uk and genre:jazz.',
   searchError: 'Station search is unavailable. Your presets still work.', searching: 'Searching stations',
   directory: 'Search powered by Radio Browser', note: 'Live radio · next switches stations',
   streamError: 'This stream could not connect. Try again or choose another station.',
@@ -73,9 +73,9 @@ const EN = {
 }
 const LOCALES = {
   en: EN,
-  ja: { ...EN, artistProfile: 'アーティストのプロフィールを開く', audioOnly: '再生中 · 波形を表示できません', radio: 'ラジオ', browse: 'ステーションを選択', play: 'ラジオを再生', pause: 'ラジオを一時停止', next: '次のステーション', live: 'ライブ', paused: '一時停止', connecting: '接続中', error: '再生できません', retry: '再試行',   search: 'ステーションを検索… country:bg genre:jazz', loadingMore: 'さらに読み込み中…', volume: '音量', mute: 'ミュート', unmute: 'ミュート解除', save: 'ステーションを固定', unsave: '固定を解除', visit: '公式サイトを開く', noResults: '見つかりませんでした', searchHint: '名前で検索。jazz、ambient、house など。', searchError: '検索できません。おすすめは再生できます。', searching: '検索中', directory: 'Radio Browser による検索', note: 'ライブ放送 · 次へでステーションを切り替え', streamError: '接続できませんでした。再試行するか別のステーションを選んでください。', close: 'ラジオを閉じる', nowPlaying: '再生中', elsewhere: '別のウィンドウで再生中', 'chillsynthDescription': 'やさしい集中 · 暖かなシンセ', 'nightrideDescription': 'シンセウェーブ · 深夜', 'darksynthDescription': 'ダークな電子音 · 高揚感', 'spacesynthDescription': '宇宙的シンセ · レトロな未来', 'paradise-mainDescription': '多彩な選曲 · 人がキュレーション', 'paradise-mellowDescription': 'ゆったりした時間' },
-  zh: { ...EN, artistProfile: '访问艺人主页', audioOnly: '正在播放 · 无法显示波形', radio: '电台', browse: '选择电台', play: '播放电台', pause: '暂停电台', next: '下一个电台', live: '直播', paused: '已暂停', connecting: '正在连接', error: '无法播放', retry: '重试',   search: '搜索电台… country:bg genre:jazz', loadingMore: '正在加载更多…', volume: '音量', mute: '静音', unmute: '取消静音', save: '置顶电台', unsave: '取消置顶', visit: '访问电台网站', noResults: '没有找到电台', searchHint: '按名称搜索，例如 jazz、ambient 或 house。', searchError: '暂时无法搜索，精选电台仍可使用。', searching: '正在搜索', directory: '搜索由 Radio Browser 提供', note: '直播电台 · 下一首将切换电台', streamError: '无法连接，请重试或选择其他电台。', close: '关闭电台', nowPlaying: '正在播放', elsewhere: '已暂停，正在其他窗口播放', 'chillsynthDescription': '轻松专注 · 温暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑电子 · 充满能量', 'spacesynthDescription': '宇宙合成器 · 复古未来', 'paradise-mainDescription': '多元风格 · 人工精选', 'paradise-mellowDescription': '放慢节奏' },
-  'zh-hant': { ...EN, artistProfile: '造訪藝人主頁', audioOnly: '播放中 · 無法顯示波形', radio: '電台', browse: '選擇電台', play: '播放電台', pause: '暫停電台', next: '下一個電台', live: '直播', paused: '已暫停', connecting: '正在連線', error: '無法播放', retry: '重試',   search: '搜尋電台… country:bg genre:jazz', loadingMore: '正在載入更多…', volume: '音量', mute: '靜音', unmute: '取消靜音', save: '釘選電台', unsave: '取消釘選', visit: '造訪電台網站', noResults: '找不到電台', searchHint: '按名稱搜尋，例如 jazz、ambient 或 house。', searchError: '暫時無法搜尋，精選電台仍可使用。', searching: '正在搜尋', directory: '搜尋由 Radio Browser 提供', note: '直播電台 · 下一首會切換電台', streamError: '無法連線，請重試或選擇其他電台。', close: '關閉電台', nowPlaying: '正在播放', elsewhere: '已暫停，正在其他視窗播放', 'chillsynthDescription': '輕鬆專注 · 溫暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑電子 · 充滿能量', 'spacesynthDescription': '宇宙合成器 · 復古未來', 'paradise-mainDescription': '多元風格 · 人工精選', 'paradise-mellowDescription': '放慢節奏' }
+  ja: { ...EN, artistProfile: 'アーティストのプロフィールを開く', audioOnly: '再生中 · 波形を表示できません', radio: 'ラジオ', browse: 'ステーションを選択', play: 'ラジオを再生', pause: 'ラジオを一時停止', next: '次のステーション', live: 'ライブ', paused: '一時停止', connecting: '接続中', error: '再生できません', retry: '再試行',   search: 'ステーションを検索… country:uk genre:jazz', loadingMore: 'さらに読み込み中…', volume: '音量', mute: 'ミュート', unmute: 'ミュート解除', save: 'ステーションを固定', unsave: '固定を解除', visit: '公式サイトを開く', noResults: '見つかりませんでした', searchHint: '名前で検索。jazz、ambient、house など。', searchError: '検索できません。おすすめは再生できます。', searching: '検索中', directory: 'Radio Browser による検索', note: 'ライブ放送 · 次へでステーションを切り替え', streamError: '接続できませんでした。再試行するか別のステーションを選んでください。', close: 'ラジオを閉じる', nowPlaying: '再生中', elsewhere: '別のウィンドウで再生中', 'chillsynthDescription': 'やさしい集中 · 暖かなシンセ', 'nightrideDescription': 'シンセウェーブ · 深夜', 'darksynthDescription': 'ダークな電子音 · 高揚感', 'spacesynthDescription': '宇宙的シンセ · レトロな未来', 'paradise-mainDescription': '多彩な選曲 · 人がキュレーション', 'paradise-mellowDescription': 'ゆったりした時間' },
+  zh: { ...EN, artistProfile: '访问艺人主页', audioOnly: '正在播放 · 无法显示波形', radio: '电台', browse: '选择电台', play: '播放电台', pause: '暂停电台', next: '下一个电台', live: '直播', paused: '已暂停', connecting: '正在连接', error: '无法播放', retry: '重试',   search: '搜索电台… country:uk genre:jazz', loadingMore: '正在加载更多…', volume: '音量', mute: '静音', unmute: '取消静音', save: '置顶电台', unsave: '取消置顶', visit: '访问电台网站', noResults: '没有找到电台', searchHint: '按名称搜索，例如 jazz、ambient 或 house。', searchError: '暂时无法搜索，精选电台仍可使用。', searching: '正在搜索', directory: '搜索由 Radio Browser 提供', note: '直播电台 · 下一首将切换电台', streamError: '无法连接，请重试或选择其他电台。', close: '关闭电台', nowPlaying: '正在播放', elsewhere: '已暂停，正在其他窗口播放', 'chillsynthDescription': '轻松专注 · 温暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑电子 · 充满能量', 'spacesynthDescription': '宇宙合成器 · 复古未来', 'paradise-mainDescription': '多元风格 · 人工精选', 'paradise-mellowDescription': '放慢节奏' },
+  'zh-hant': { ...EN, artistProfile: '造訪藝人主頁', audioOnly: '播放中 · 無法顯示波形', radio: '電台', browse: '選擇電台', play: '播放電台', pause: '暫停電台', next: '下一個電台', live: '直播', paused: '已暫停', connecting: '正在連線', error: '無法播放', retry: '重試',   search: '搜尋電台… country:uk genre:jazz', loadingMore: '正在載入更多…', volume: '音量', mute: '靜音', unmute: '取消靜音', save: '釘選電台', unsave: '取消釘選', visit: '造訪電台網站', noResults: '找不到電台', searchHint: '按名稱搜尋，例如 jazz、ambient 或 house。', searchError: '暫時無法搜尋，精選電台仍可使用。', searching: '正在搜尋', directory: '搜尋由 Radio Browser 提供', note: '直播電台 · 下一首會切換電台', streamError: '無法連線，請重試或選擇其他電台。', close: '關閉電台', nowPlaying: '正在播放', elsewhere: '已暫停，正在其他視窗播放', 'chillsynthDescription': '輕鬆專注 · 溫暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑電子 · 充滿能量', 'spacesynthDescription': '宇宙合成器 · 復古未來', 'paradise-mainDescription': '多元風格 · 人工精選', 'paradise-mellowDescription': '放慢節奏' }
 }
 
 // Disk plugins are not scanned by Tailwind. Only plugin layout lives here;
@@ -264,9 +264,18 @@ function parseQuery(text) {
   return { name, country, genre }
 }
 
+// The directory indexes ISO codes, and the name people type is often not the
+// code: the United Kingdom is GB, so `country:uk` has to become GB or it finds
+// nothing. The directory has one code for the whole UK, so its home nations map
+// there too. Longer names go to the directory's own country index instead.
+const COUNTRY_ALIASES = new Map([
+  ['uk', 'GB'], ['gb', 'GB'], ['britain', 'GB'], ['england', 'GB'],
+  ['scotland', 'GB'], ['wales', 'GB'], ['northern ireland', 'GB'],
+  ['usa', 'US'], ['uae', 'AE'], ['holland', 'NL']
+])
+
 // Radio Browser indexes a two-letter ISO code for a country and free-form tags
-// for a genre. Two letters is a code; anything longer is a country name, which
-// the directory also accepts.
+// for a genre.
 function searchParams({ name = '', country = '', genre = '', limit = PAGE_SIZE, offset = 0 } = {}) {
   const params = new URLSearchParams({
     limit: String(limit), hidebroken: 'true', order: 'votes', reverse: 'true'
@@ -274,7 +283,9 @@ function searchParams({ name = '', country = '', genre = '', limit = PAGE_SIZE, 
   if (offset > 0) params.set('offset', String(offset))
   if (name) params.set('name', name)
   if (country) {
-    if (country.length === 2) params.set('countrycode', country.toUpperCase())
+    const alias = COUNTRY_ALIASES.get(country.toLowerCase())
+    if (alias) params.set('countrycode', alias)
+    else if (country.length === 2) params.set('countrycode', country.toUpperCase())
     else params.set('country', country)
   }
   if (genre) params.set('tag', genre)

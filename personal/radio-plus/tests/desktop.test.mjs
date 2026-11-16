@@ -365,6 +365,9 @@ await test('country: and genre: are parsed out of the search text', () => {
 await test('a tag becomes the parameter the directory expects', () => {
   const params = query => Object.fromEntries(plugin.searchParams(plugin.parseQuery(query)))
   assert.equal(params('country:bg').countrycode, 'BG', 'a two-letter country is a code')
+  assert.equal(params('country:uk').countrycode, 'GB', 'uk is the United Kingdom, whose code is GB')
+  assert.equal(params('country:UK').countrycode, 'GB', 'the alias ignores case')
+  assert.equal(params('country:usa').countrycode, 'US', 'a short name maps to its code')
   assert.equal(params('country:bulgaria').country, 'bulgaria', 'a longer country is a name')
   assert.equal(params('genre:jazz').tag, 'jazz')
   assert.equal(params('genre:jazz').name, undefined, 'a tag-only query sends no name')
@@ -376,8 +379,12 @@ await test('a tag becomes the parameter the directory expects', () => {
 
 await test('a country tag returns that country', async () => {
   const controller = new AbortController()
-  const { stations } = await plugin.searchStations('country:bg', controller.signal)
-  assert.ok(stations.length > 0, 'no stations came back for country:bg')
+  const uk = await plugin.searchStations('country:uk', controller.signal)
+  assert.ok(uk.stations.length > 0, 'no stations came back for country:uk')
+  // The same country under its ISO code answers with the same rows.
+  const gb = await plugin.searchStations('country:gb', controller.signal)
+  const ids = new Set(gb.stations.map(item => item.id))
+  assert.ok(uk.stations.some(item => ids.has(item.id)), 'uk and gb disagree about the United Kingdom')
 })
 
 await test('a genre tag returns that genre', async () => {
@@ -407,8 +414,8 @@ await test('a full page reports more behind it, an exhausted page does not', asy
 
 await test('the second page continues where the first stopped', async () => {
   const controller = new AbortController()
-  const first = await plugin.searchStations('country:bg', controller.signal, { limit: 20 })
-  const second = await plugin.searchStations('country:bg', controller.signal, { limit: 20, offset: 20 })
+  const first = await plugin.searchStations('country:uk', controller.signal, { limit: 20 })
+  const second = await plugin.searchStations('country:uk', controller.signal, { limit: 20, offset: 20 })
   assert.ok(first.stations.length > 0 && second.stations.length > 0, 'both pages came back')
   const firstIds = new Set(first.stations.map(item => item.id))
   const overlap = second.stations.filter(item => firstIds.has(item.id))

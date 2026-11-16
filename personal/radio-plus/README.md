@@ -4,7 +4,7 @@
   <strong>Live radio in the status bar, with a station list you own.</strong>
   <p>An extended edition of the bundled Radio plugin: editable stations, three directories, and a station log that says why a stream will not play.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.0-2ea44f" alt="Version 1.2.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.3.1-2ea44f" alt="Version 1.2.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -56,11 +56,12 @@ them; both enabled means two players in one bar.
   search, *Popular* lists Radio Browser's most-voted stations, and *Shoutcast*
   searches the Shoutcast directory by name, genre, or keyword. With an empty
   search box the Shoutcast chip lists the busy end of the directory.
-- Narrow the search with tags. `country:bg` lists stations from Bulgaria and
-  `genre:jazz` lists jazz, in any combination with a name, as in
-  `sunrise country:bg genre:ambient`. The field's placeholder shows both. Two
+- Narrow the search with tags. `country:uk` lists stations from the United
+  Kingdom and `genre:jazz` lists jazz, in any combination with a name, as in
+  `sunrise country:uk genre:ambient`. The field's placeholder shows both. Two
   letters are read as an ISO country code, a longer word as a country name, and
-  quotes hold a value with a space: `genre:"smooth jazz"`. A tag query browses
+  a few short names map to their code, so `uk` finds GB and `usa` finds US.
+  Quotes hold a value with a space: `genre:"smooth jazz"`. A tag query browses
   the directory, so your own stations step aside instead of sitting on top of the
   results; the Shoutcast source understands a genre tag but has no country index.
 - Scroll for more. Results arrive forty at a time, and reaching the bottom of
@@ -82,7 +83,7 @@ them; both enabled means two players in one bar.
   serves an HTML error page is dropped and counted rather than played.
 
 <div align="center">
-  <img src="docs/screenshot-tags.png" width="480" alt="The picker with country:bg typed in the search field, listing Bulgarian stations" />
+  <img src="docs/screenshot-tags.png" width="480" alt="The picker with country:uk typed in the search field, listing stations from the United Kingdom" />
 </div>
 
 ## Settings

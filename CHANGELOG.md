@@ -10,6 +10,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 - **next-steps:** the bundled prompt rule stays inside the host cap. With a decision classifier loaded and recommendations on, the section reached 2,335 characters against the host's 2,200, and Hermes skips an oversized plugin section instead of truncating it, so the rule that ends a reply in chips never reached the model while both tools still answered. The rule is terser now, `MAX_CHARS` sits at 2,100, and the section drops its optional paragraphs rather than overflowing, so neither a longer nor a shorter host cap can lose it whole. Five tests pin every combination under the cap, the dropped-paragraph order, and the non-desktop fallback.
 - **next-steps:** 1.0.0 was re-cut twice while this defect was being found and fixed, so install 1.0.1 and ignore a `1.0.0` reading older than this entry.
 
+## [1.27.7] - 2026-11-16
+
+### Changed
+
+- **radio-plus:** version `1.3.1`. The search placeholder now shows `country:uk`, and the tag understands it. The directory indexes ISO codes, so `country:uk` used to find nothing because the United Kingdom is `GB`. A short list of country names now maps to its code before the query goes out: `uk`, `gb`, `britain`, `england`, `scotland`, `wales` and `northern ireland` all reach GB, `usa` reaches US, `uae` reaches AE and `holland` reaches NL. Longer names still go to the directory's own country index.
+
 ## [1.27.6] - 2026-11-16
 
 ### Added
