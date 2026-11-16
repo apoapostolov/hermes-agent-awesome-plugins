@@ -3324,6 +3324,23 @@ export function CatalogPage() {
           onChange: next => setKind(next),
           sizing: 'content'
         }),
+        null,
+        kind === 'tools'
+          ? null
+          : jsx('span', {
+              key: 'divider',
+              'aria-hidden': true,
+              style: { width: 1, height: 18, background: C.stroke, margin: '0 2px', flex: '0 0 auto' }
+            }),
+        kind === 'tools'
+          ? null
+          : jsx(SegmentedControl, {
+              key: 'filter',
+              options: filterOptions,
+              value: filter,
+              onChange: next => setFilter(next),
+              sizing: 'content'
+            }),
         kind === 'skills' && effectiveFilter === 'catalog' &&
           jsx('div', { style: { position: 'relative' }, children: [
             jsx('button', {
@@ -3346,22 +3363,6 @@ export function CatalogPage() {
               ] }))
             })
           ] }),
-        kind === 'tools'
-          ? null
-          : jsx('span', {
-              key: 'divider',
-              'aria-hidden': true,
-              style: { width: 1, height: 18, background: C.stroke, margin: '0 2px', flex: '0 0 auto' }
-            }),
-        kind === 'tools'
-          ? null
-          : jsx(SegmentedControl, {
-              key: 'filter',
-              options: filterOptions,
-              value: filter,
-              onChange: next => setFilter(next),
-              sizing: 'content'
-            })
       ),
       el(
         'div',
