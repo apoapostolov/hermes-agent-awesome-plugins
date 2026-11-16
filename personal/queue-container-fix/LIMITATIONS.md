@@ -12,4 +12,6 @@ What a `public/` cut would need is a supported seam to place the controls, and n
 
 Until a seam exists, keep this personal: the pack pins `personal/queue-container-fix`, and the app renders exactly the markup this stylesheet expects.
 
+The layout is filed upstream as https://github.com/NousResearch/hermes-agent/issues/156548, so the placement can move into the row itself rather than a stylesheet over it.
+
 If upstream ever offers a row-composition hook, the plugin becomes a small SDK plugin and both trees can carry it.
