@@ -40,12 +40,12 @@ const SEED_STATIONS = [
 const EN = {
   radio: 'Radio', browse: 'Choose a station', play: 'Play radio', pause: 'Pause radio', next: 'Next station',
   live: 'Live', paused: 'Paused', connecting: 'Connecting', error: 'Stream unavailable', retry: 'Try again',
-  search: 'Find a station…', volume: 'Volume', audioOnly: 'Audio playing · visualizer unavailable',
+  search: 'Find a station… country:bg genre:jazz', volume: 'Volume', audioOnly: 'Audio playing · visualizer unavailable',
   mute: 'Mute radio', unmute: 'Unmute radio', save: 'Pin station', unsave: 'Unpin station',
   visit: 'Visit station website', artistProfile: 'Visit artist profile',
   settingsTitle: 'Radio Plus', autoplayLabel: 'Start the last station on launch',
   autoplayDescription: 'Plays the station you listened to last as soon as Hermes opens, so the status bar is live without a click. Off by default; with it off nothing plays until you press play, and a station that cannot be reached reports the reason in the panel instead of retrying.',
-  noResults: 'No stations found', searchHint: 'Search by station name. Try jazz, ambient, or house.',
+  noResults: 'No stations found', searchHint: 'Search by name, or narrow it with country:bg and genre:jazz.',
   searchError: 'Station search is unavailable. Your presets still work.', searching: 'Searching stations',
   directory: 'Search powered by Radio Browser', note: 'Live radio · next switches stations',
   streamError: 'This stream could not connect. Try again or choose another station.',
@@ -73,9 +73,9 @@ const EN = {
 }
 const LOCALES = {
   en: EN,
-  ja: { ...EN, artistProfile: 'アーティストのプロフィールを開く', audioOnly: '再生中 · 波形を表示できません', radio: 'ラジオ', browse: 'ステーションを選択', play: 'ラジオを再生', pause: 'ラジオを一時停止', next: '次のステーション', live: 'ライブ', paused: '一時停止', connecting: '接続中', error: '再生できません', retry: '再試行', search: 'ステーションを検索…', volume: '音量', mute: 'ミュート', unmute: 'ミュート解除', save: 'ステーションを固定', unsave: '固定を解除', visit: '公式サイトを開く', noResults: '見つかりませんでした', searchHint: '名前で検索。jazz、ambient、house など。', searchError: '検索できません。おすすめは再生できます。', searching: '検索中', directory: 'Radio Browser による検索', note: 'ライブ放送 · 次へでステーションを切り替え', streamError: '接続できませんでした。再試行するか別のステーションを選んでください。', close: 'ラジオを閉じる', nowPlaying: '再生中', elsewhere: '別のウィンドウで再生中', 'chillsynthDescription': 'やさしい集中 · 暖かなシンセ', 'nightrideDescription': 'シンセウェーブ · 深夜', 'darksynthDescription': 'ダークな電子音 · 高揚感', 'spacesynthDescription': '宇宙的シンセ · レトロな未来', 'paradise-mainDescription': '多彩な選曲 · 人がキュレーション', 'paradise-mellowDescription': 'ゆったりした時間' },
-  zh: { ...EN, artistProfile: '访问艺人主页', audioOnly: '正在播放 · 无法显示波形', radio: '电台', browse: '选择电台', play: '播放电台', pause: '暂停电台', next: '下一个电台', live: '直播', paused: '已暂停', connecting: '正在连接', error: '无法播放', retry: '重试', search: '搜索电台…', volume: '音量', mute: '静音', unmute: '取消静音', save: '置顶电台', unsave: '取消置顶', visit: '访问电台网站', noResults: '没有找到电台', searchHint: '按名称搜索，例如 jazz、ambient 或 house。', searchError: '暂时无法搜索，精选电台仍可使用。', searching: '正在搜索', directory: '搜索由 Radio Browser 提供', note: '直播电台 · 下一首将切换电台', streamError: '无法连接，请重试或选择其他电台。', close: '关闭电台', nowPlaying: '正在播放', elsewhere: '已暂停，正在其他窗口播放', 'chillsynthDescription': '轻松专注 · 温暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑电子 · 充满能量', 'spacesynthDescription': '宇宙合成器 · 复古未来', 'paradise-mainDescription': '多元风格 · 人工精选', 'paradise-mellowDescription': '放慢节奏' },
-  'zh-hant': { ...EN, artistProfile: '造訪藝人主頁', audioOnly: '播放中 · 無法顯示波形', radio: '電台', browse: '選擇電台', play: '播放電台', pause: '暫停電台', next: '下一個電台', live: '直播', paused: '已暫停', connecting: '正在連線', error: '無法播放', retry: '重試', search: '搜尋電台…', volume: '音量', mute: '靜音', unmute: '取消靜音', save: '釘選電台', unsave: '取消釘選', visit: '造訪電台網站', noResults: '找不到電台', searchHint: '按名稱搜尋，例如 jazz、ambient 或 house。', searchError: '暫時無法搜尋，精選電台仍可使用。', searching: '正在搜尋', directory: '搜尋由 Radio Browser 提供', note: '直播電台 · 下一首會切換電台', streamError: '無法連線，請重試或選擇其他電台。', close: '關閉電台', nowPlaying: '正在播放', elsewhere: '已暫停，正在其他視窗播放', 'chillsynthDescription': '輕鬆專注 · 溫暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑電子 · 充滿能量', 'spacesynthDescription': '宇宙合成器 · 復古未來', 'paradise-mainDescription': '多元風格 · 人工精選', 'paradise-mellowDescription': '放慢節奏' }
+  ja: { ...EN, artistProfile: 'アーティストのプロフィールを開く', audioOnly: '再生中 · 波形を表示できません', radio: 'ラジオ', browse: 'ステーションを選択', play: 'ラジオを再生', pause: 'ラジオを一時停止', next: '次のステーション', live: 'ライブ', paused: '一時停止', connecting: '接続中', error: '再生できません', retry: '再試行', search: 'ステーションを検索… country:bg genre:jazz', volume: '音量', mute: 'ミュート', unmute: 'ミュート解除', save: 'ステーションを固定', unsave: '固定を解除', visit: '公式サイトを開く', noResults: '見つかりませんでした', searchHint: '名前で検索。jazz、ambient、house など。', searchError: '検索できません。おすすめは再生できます。', searching: '検索中', directory: 'Radio Browser による検索', note: 'ライブ放送 · 次へでステーションを切り替え', streamError: '接続できませんでした。再試行するか別のステーションを選んでください。', close: 'ラジオを閉じる', nowPlaying: '再生中', elsewhere: '別のウィンドウで再生中', 'chillsynthDescription': 'やさしい集中 · 暖かなシンセ', 'nightrideDescription': 'シンセウェーブ · 深夜', 'darksynthDescription': 'ダークな電子音 · 高揚感', 'spacesynthDescription': '宇宙的シンセ · レトロな未来', 'paradise-mainDescription': '多彩な選曲 · 人がキュレーション', 'paradise-mellowDescription': 'ゆったりした時間' },
+  zh: { ...EN, artistProfile: '访问艺人主页', audioOnly: '正在播放 · 无法显示波形', radio: '电台', browse: '选择电台', play: '播放电台', pause: '暂停电台', next: '下一个电台', live: '直播', paused: '已暂停', connecting: '正在连接', error: '无法播放', retry: '重试', search: '搜索电台… country:bg genre:jazz', volume: '音量', mute: '静音', unmute: '取消静音', save: '置顶电台', unsave: '取消置顶', visit: '访问电台网站', noResults: '没有找到电台', searchHint: '按名称搜索，例如 jazz、ambient 或 house。', searchError: '暂时无法搜索，精选电台仍可使用。', searching: '正在搜索', directory: '搜索由 Radio Browser 提供', note: '直播电台 · 下一首将切换电台', streamError: '无法连接，请重试或选择其他电台。', close: '关闭电台', nowPlaying: '正在播放', elsewhere: '已暂停，正在其他窗口播放', 'chillsynthDescription': '轻松专注 · 温暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑电子 · 充满能量', 'spacesynthDescription': '宇宙合成器 · 复古未来', 'paradise-mainDescription': '多元风格 · 人工精选', 'paradise-mellowDescription': '放慢节奏' },
+  'zh-hant': { ...EN, artistProfile: '造訪藝人主頁', audioOnly: '播放中 · 無法顯示波形', radio: '電台', browse: '選擇電台', play: '播放電台', pause: '暫停電台', next: '下一個電台', live: '直播', paused: '已暫停', connecting: '正在連線', error: '無法播放', retry: '重試', search: '搜尋電台… country:bg genre:jazz', volume: '音量', mute: '靜音', unmute: '取消靜音', save: '釘選電台', unsave: '取消釘選', visit: '造訪電台網站', noResults: '找不到電台', searchHint: '按名稱搜尋，例如 jazz、ambient 或 house。', searchError: '暫時無法搜尋，精選電台仍可使用。', searching: '正在搜尋', directory: '搜尋由 Radio Browser 提供', note: '直播電台 · 下一首會切換電台', streamError: '無法連線，請重試或選擇其他電台。', close: '關閉電台', nowPlaying: '正在播放', elsewhere: '已暫停，正在其他視窗播放', 'chillsynthDescription': '輕鬆專注 · 溫暖合成器', 'nightrideDescription': '合成器浪潮 · 深夜', 'darksynthDescription': '暗黑電子 · 充滿能量', 'spacesynthDescription': '宇宙合成器 · 復古未來', 'paradise-mainDescription': '多元風格 · 人工精選', 'paradise-mellowDescription': '放慢節奏' }
 }
 
 // Disk plugins are not scanned by Tailwind. Only plugin layout lives here;
@@ -234,9 +234,43 @@ async function browseRows(path, signal) {
   throw new Error('Directory unavailable')
 }
 
-async function browserQuery(text, signal) {
-  const params = new URLSearchParams({ name: text, limit: '60', hidebroken: 'true', order: 'votes', reverse: 'true' })
-  return rowsToStations(await browseRows(`stations/search?${params}`, signal))
+// Tags in the search field, so a query stays one line and needs no extra
+// controls: `country:bg`, `genre:jazz`, and both at once with a name.
+const TAG_PATTERN = /\b(country|genre):("[^"]+"|\S+)/gi
+
+function parseQuery(text) {
+  let country = ''
+  let genre = ''
+  const name = String(text ?? '')
+    .replace(TAG_PATTERN, (match, key, value) => {
+      const clean = String(value).replace(/^"|"$/g, '').trim()
+      if (clean) {
+        if (key.toLowerCase() === 'country') country = clean
+        else genre = clean
+      }
+      return ' '
+    })
+    .replace(/\s+/g, ' ')
+    .trim()
+  return { name, country, genre }
+}
+
+// Radio Browser indexes a two-letter ISO code for a country and free-form tags
+// for a genre. Two letters is a code; anything longer is a country name, which
+// the directory also accepts.
+function searchParams({ name = '', country = '', genre = '' } = {}) {
+  const params = new URLSearchParams({ limit: '60', hidebroken: 'true', order: 'votes', reverse: 'true' })
+  if (name) params.set('name', name)
+  if (country) {
+    if (country.length === 2) params.set('countrycode', country.toUpperCase())
+    else params.set('country', country)
+  }
+  if (genre) params.set('tag', genre)
+  return params
+}
+
+async function browserQuery(query, signal) {
+  return rowsToStations(await browseRows(`stations/search?${searchParams(query)}`, signal))
 }
 
 // A Cyrillic query is sent twice: as typed, and in the Latin spelling the
@@ -273,15 +307,20 @@ function matchScore(item, terms) {
 
 async function searchStations(text, signal) {
   await ensureDirectory(signal)
-  const terms = searchTerms(text)
-  const results = await Promise.all(terms.map(term => browserQuery(term, signal)))
+  const parsed = parseQuery(text)
+  // Transliteration only matters for the name; the tags are already ASCII.
+  const terms = parsed.name ? searchTerms(parsed.name) : ['']
+  const results = await Promise.all(terms.map(name => browserQuery({ ...parsed, name }, signal)))
   const seen = uniqueStations(results.flatMap(result => result.stations))
   // The directory answers by votes, which is the wrong order for a named station.
   // Rank by name match, then keep the directory order as a stable tie-breaker.
-  const ranked = seen
-    .map((item, index) => ({ item, index, score: matchScore(item, terms) }))
-    .sort((a, b) => b.score - a.score || a.index - b.index)
-    .map(entry => entry.item)
+  // A tag-only query has no name to score, so its directory order stands.
+  const ranked = parsed.name
+    ? seen
+      .map((item, index) => ({ item, index, score: matchScore(item, terms) }))
+      .sort((a, b) => b.score - a.score || a.index - b.index)
+      .map(entry => entry.item)
+    : seen
   return {
     stations: ranked,
     hls: results.reduce((total, result) => total + result.hls, 0)
@@ -320,7 +359,15 @@ async function shoutcastQuery(ctx, text) {
 
 async function shoutcastStations(ctx, text) {
   if (typeof ctx.rest !== 'function') throw new Error('The Shoutcast route is not loaded')
-  const results = await Promise.all(searchTerms(text || '').map(term => shoutcastQuery(ctx, term)))
+  // The Shoutcast directory takes free text, not tags. A genre tag is the closest
+  // thing it understands, so `genre:jazz` searches it for jazz and a country tag
+  // is dropped rather than sent as the literal word "country:bg".
+  const parsed = parseQuery(text)
+  const query = parsed.name || parsed.genre
+  // Nothing typed still means the top list; a tag the directory cannot match
+  // (a country) answers empty instead of searching for the literal tag.
+  if (String(text ?? '').trim() && !query) return { stations: [], hls: 0, skipped: 0 }
+  const results = await Promise.all(searchTerms(query).map(term => shoutcastQuery(ctx, term)))
   return {
     stations: uniqueStations(results.flatMap(result => result.stations)),
     hls: 0,
@@ -1011,11 +1058,16 @@ function Stations({ player, ctx }) {
     queryKey: [ID, 'shoutcast', query], queryFn: () => shoutcastStations(ctx, query),
     enabled: source === 'shoutcast' && text === query, staleTime: 300000, retry: false
   })
-  const matches = item => [item.name, item.description, item.provider].some(value => fold(value).includes(fold(text)))
+  // A tag query is a browse of the directory, so your own stations step aside;
+  // a plain name query still filters them and keeps them on top.
+  const parsedText = parseQuery(text)
+  const filterText = parsedText.name
+  const tagQuery = Boolean(parsedText.country || parsedText.genre)
+  const matches = item => !filterText || [item.name, item.description, item.provider].some(value => fold(value).includes(fold(filterText)))
   // Only the All tab mixes your stations with a directory search. Choosing
   // Popular or Shoutcast shows that source alone: appending sixty remote rows
   // under your own stations looked like the chip had done nothing.
-  const local = source === 'all' ? uniqueStations([...favorites, ...stored]).filter(matches) : []
+  const local = source === 'all' && !tagQuery ? uniqueStations([...favorites, ...stored]).filter(matches) : []
   const remoteResult = source === 'all'
     ? (text.length >= 2 && query === text ? browser.data : null)
     : source === 'popular'
@@ -1197,7 +1249,7 @@ function RadioSettingsPage({ ctx }) {
   })
 }
 
-export { artistProfile, resolveArtist, trackCredit, autoplayOnLaunch, shouldAutoplay, RadioSettingsPage }
+export { artistProfile, resolveArtist, trackCredit, autoplayOnLaunch, shouldAutoplay, RadioSettingsPage, parseQuery, searchParams }
 
 export default {
   id: ID,

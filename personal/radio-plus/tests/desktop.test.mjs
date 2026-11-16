@@ -352,6 +352,40 @@ await test('a whole-word match beats a longer word that merely starts with it', 
   assert.equal(plugin.matchScore({ name: 'Smooth Jazz' }, ['Horizont']), 0)
 })
 
+await test('country: and genre: are parsed out of the search text', () => {
+  assert.deepEqual(plugin.parseQuery('country:bg'), { name: '', country: 'bg', genre: '' })
+  assert.deepEqual(plugin.parseQuery('genre:jazz'), { name: '', country: '', genre: 'jazz' })
+  assert.deepEqual(plugin.parseQuery('jazz country:bg'), { name: 'jazz', country: 'bg', genre: '' })
+  assert.deepEqual(plugin.parseQuery('COUNTRY:BG'), { name: '', country: 'BG', genre: '' })
+  assert.deepEqual(plugin.parseQuery('genre:"smooth jazz"'), { name: '', country: '', genre: 'smooth jazz' })
+  assert.deepEqual(plugin.parseQuery('Хоризонт'), { name: 'Хоризонт', country: '', genre: '' })
+  assert.deepEqual(plugin.parseQuery('   '), { name: '', country: '', genre: '' })
+})
+
+await test('a tag becomes the parameter the directory expects', () => {
+  const params = query => Object.fromEntries(plugin.searchParams(plugin.parseQuery(query)))
+  assert.equal(params('country:bg').countrycode, 'BG', 'a two-letter country is a code')
+  assert.equal(params('country:bulgaria').country, 'bulgaria', 'a longer country is a name')
+  assert.equal(params('genre:jazz').tag, 'jazz')
+  assert.equal(params('genre:jazz').name, undefined, 'a tag-only query sends no name')
+  const both = params('jazz country:bg genre:smooth')
+  assert.equal(both.name, 'jazz')
+  assert.equal(both.countrycode, 'BG')
+  assert.equal(both.tag, 'smooth')
+})
+
+await test('a country tag returns that country', async () => {
+  const controller = new AbortController()
+  const { stations } = await plugin.searchStations('country:bg', controller.signal)
+  assert.ok(stations.length > 0, 'no stations came back for country:bg')
+})
+
+await test('a genre tag returns that genre', async () => {
+  const controller = new AbortController()
+  const { stations } = await plugin.searchStations('genre:jazz', controller.signal)
+  assert.ok(stations.length > 0, 'no stations came back for genre:jazz')
+})
+
 await test('source labels cover the three picker tabs', () => {
   assert.deepEqual(Object.keys(plugin.SOURCE_LABELS), ['all', 'popular', 'shoutcast'])
 })

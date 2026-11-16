@@ -10,6 +10,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 - **next-steps:** the bundled prompt rule stays inside the host cap. With a decision classifier loaded and recommendations on, the section reached 2,335 characters against the host's 2,200, and Hermes skips an oversized plugin section instead of truncating it, so the rule that ends a reply in chips never reached the model while both tools still answered. The rule is terser now, `MAX_CHARS` sits at 2,100, and the section drops its optional paragraphs rather than overflowing, so neither a longer nor a shorter host cap can lose it whole. Five tests pin every combination under the cap, the dropped-paragraph order, and the non-desktop fallback.
 - **next-steps:** 1.0.0 was re-cut twice while this defect was being found and fixed, so install 1.0.1 and ignore a `1.0.0` reading older than this entry.
 
+## [1.27.5] - 2026-11-16
+
+### Added
+
+- **radio-plus:** version `1.2.0`. The search field takes tags, so a country or a genre no longer needs a second control: `country:bg` lists stations from Bulgaria, `genre:jazz` lists jazz, and they combine with a name as in `sunrise country:bg genre:ambient`. Two letters are read as an ISO country code and a longer word as a country name; quotes hold a value with a space. The placeholder teaches both tags. A tag query browses the directory, so your own stations step aside rather than sitting on top of the results. The Shoutcast source maps a genre tag to its free-text search and drops a country tag, which it has no index for.
+
 ## [1.27.4] - 2026-11-16
 
 ### Added
