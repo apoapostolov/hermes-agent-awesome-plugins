@@ -264,7 +264,7 @@ function savedSettings() {
 
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
       settings = {
-        alwaysShowInstalled: raw.alwaysShowInstalled !== false,
+        alwaysShowInstalled: false,
         kindOrder: normalizeOrder(raw.kindOrder)
       }
     }
