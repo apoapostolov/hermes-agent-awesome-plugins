@@ -59,7 +59,7 @@ The tool takes `options`, `multi`, `recommend`, `alternates`, `risky` and `subti
 
 ## Install
 
-Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) **0.21.0 or newer**.
+Requires [Hermes Agent](https://github.com/NousResearch/hermes-agent) **0.22.0 or newer**.
 
 ```bash
 hermes plugins pack install https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/main/hermes-pack.yaml
