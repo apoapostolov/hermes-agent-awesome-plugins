@@ -38,6 +38,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **pack:** moves the **catalog-redesign** pin to `670b1e4`, which reports the plugins catalog total rather than the first page.
 
+## [1.27.18] - 2026-11-16
+
+### Changed
+
+- **pack:** moves the **radio-plus** pin to `95912dd`, version 1.5.2 of the personal tree, after the listed edition dropped TuneIn and stopped advertising HLS. The personal tree still carries four sources and HLS playback; only the public build changed.
+
 ## [1.27.17] - 2026-11-16
 
 ### Added

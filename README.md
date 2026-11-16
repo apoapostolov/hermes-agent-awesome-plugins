@@ -15,7 +15,7 @@
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
     <a href="./package.json"><img src="https://img.shields.io/badge/Language-JavaScript-555" alt="Language: JavaScript"></a>
-    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.17-blue" alt="Pack: 1.27.17"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.18-blue" alt="Pack: 1.27.17"></a>
     <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Last%20release-2026--11--16-blue" alt="Last release: 2026-10-31"></a>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a>
   </p>
@@ -40,7 +40,7 @@ Restart Hermes Desktop after updating; the Python and desktop halves do not relo
 
 Jev Routing 1.1.1 and Reasoning Switch 1.1.4 are pinned by the pack now, so a pack install brings both: per-turn model routing from TypeSafe Jev, and a status-bar control for reasoning effort. Neither is a new release; see the [changelog](CHANGELOG.md) for their own entries.
 
-The pack is at 1.27.17. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
+The pack is at 1.27.18. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
 ## In the app
 
@@ -90,7 +90,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.17). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
+Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.18). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
 
 ### Status Bar
 
