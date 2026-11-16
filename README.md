@@ -10,12 +10,12 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Twenty-two plugins, twenty-one of them with a public edition.</p>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Twenty-three plugins, twenty-two of them with a public edition.</p>
 
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
     <a href="./package.json"><img src="https://img.shields.io/badge/Language-JavaScript-555" alt="Language: JavaScript"></a>
-    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.13-blue" alt="Pack: 1.27.10"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.14-blue" alt="Pack: 1.27.14"></a>
     <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Last%20release-2026--11--16-blue" alt="Last release: 2026-10-31"></a>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a>
   </p>
@@ -28,6 +28,8 @@
 
 ## Latest plugin update
 
+Catalog Redesign 1.0.0 is a catalog page of its own: one wide row per skill, plugin, connector and tool, with a hover preview and a detail panel that slides in from the right. Rows carry a thumbnail, the name with its description, and one column that matters for that kind, tags or the normalized short name. Artwork is real: a published plugin borrows the catalog's hero image, and a plugin outside the catalog uses a logo its own folder ships, so the row stops showing initials where the plugin has a face. The panel puts that image across its header, keeps a 44px section rail, and carries the on/off switch beside Close. The page adds its own route, sidebar row and palette entry and leaves the native Capabilities page as it is. Install it alone or through the pack; see [its README](personal/catalog-redesign/README.md).
+
 Queue Container Fix 1.0.0 moves the per-message controls of a queued prompt from the end of its row to the start of its first line, where they stay on screen. A queued row used to draw its expand chevron, pencil, steering wheel and send button in the row's last column, past the end of the message text, and they only appeared while the pointer was over the row. They now come before the text, resting at a little over half strength and coming to full on hover or keyboard focus. The control column takes only the width of the buttons a row actually has, so a gateway-owned entry with no controls keeps its message at the left margin instead of leaving a gap. Background commands, subagents and artifact rows are untouched. It is a stylesheet over the composer status stack, so it ships personal-only; see its `LIMITATIONS.md` for why catalog review cannot take it. Enable it in Capabilities, Plugins, and the change lands without a restart.
 
 Radio Plus 1.0.0 is an extended edition of the **Radio** plugin bundled with Hermes Desktop, and its first listed release: a stipple hero, a code-drawn icon, a capture of the picker from the running app, and a README written to the house page. The bundled player ships seven fixed stations, searches one directory, and skips HLS; this edition keeps its oscilloscope, transport, artist links and dictation-aware pause, and makes the rest work for any station: the list is editable (name and stream address together), any `http` or `https` stream can be added and is checked before it is saved, the picker searches Radio Browser, its popular list and the Shoutcast directory, a Cyrillic query is also sent transliterated so `Хоризонт` finds `BNR Horizont`, HLS stations play through a vendored `hls.js` 1.6.15, and a station that will not play says why in the panel and in `radio-plus/station-log.jsonl`. Version 1.1.0 added a settings page with one switch, start the last station on launch, off by default, 1.2.0 added tags to the search field, `country:uk` and `genre:jazz` alone or with a name, 1.3.0 loads results a page at a time as the list is scrolled, 1.4.0 does the same on Popular and Shoutcast, 1.5.0 adds TuneIn and the track the stream announces, and 1.5.1 stops a directory tab from carrying over the station selected on All. The bundled Radio plugin draws the same status-bar slot, so disable it. Enable Radio Plus in Capabilities, Plugins, then toggle it off and on so the renderer loads the new module, and restart the app once so the dashboard mounts its routes.
@@ -38,11 +40,11 @@ Restart Hermes Desktop after updating; the Python and desktop halves do not relo
 
 Jev Routing 1.1.1 and Reasoning Switch 1.1.4 are pinned by the pack now, so a pack install brings both: per-turn model routing from TypeSafe Jev, and a status-bar control for reasoning effort. Neither is a new release; see the [changelog](CHANGELOG.md) for their own entries.
 
-The pack is at 1.27.13. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
+The pack is at 1.27.14. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
 ## In the app
 
-These are captures from the running app of the parts that only make sense in place: the providers dialog, the reader, the memory review queue, skills presets, the session list, the turn meter and the composer queue. Nine plugins carry one; the settings for every plugin that has a settings page live under Settings, Plugins, and each plugin README shows its own.
+These are captures from the running app of the parts that only make sense in place: the providers dialog, the reader, the memory review queue, skills presets, the session list, the turn meter and the composer queue. Ten plugins carry one; the settings for every plugin that has a settings page live under Settings, Plugins, and each plugin README shows its own.
 
 <div align="center">
 <table>
@@ -60,6 +62,9 @@ These are captures from the running app of the parts that only make sense in pla
     <td align="center" valign="top" width="33%"><a href="personal/next-steps"><img src="personal/next-steps/docs/screenshot.png" width="260" alt="Next Steps row under a reply with unanswered options carried forward, age labels, a dismiss cross and Clean Old Proposals" /></a><br /><sub><a href="personal/next-steps"><strong>Next Steps</strong></a><br />Unanswered options carried under a later reply</sub></td>
     <td align="center" valign="top" width="33%"><a href="personal/radio-plus"><img src="personal/radio-plus/docs/screenshot-tags.png" width="260" alt="Radio Plus station picker with country:uk typed in the search field, the All, Popular, Shoutcast and TuneIn chips, UK stations and the transport row" /></a><br /><sub><a href="personal/radio-plus"><strong>Radio Plus</strong></a><br />Listen to your own radios, search by country or genre.</sub></td>
     <td align="center" valign="top" width="33%"><a href="personal/queue-container-fix"><img src="personal/queue-container-fix/docs/screenshot.png" width="260" alt="Two queued prompts above the composer, controls drawn at the start of the long row and the short row starting at the left margin" /></a><br /><sub><a href="personal/queue-container-fix"><strong>Queue Container Fix</strong></a><br />Queued prompt controls at the start of the line</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="33%"><a href="personal/catalog-redesign"><img src="personal/catalog-redesign/docs/screenshot.png" width="260" alt="Catalog list on the left with the detail panel open on a plugin whose hero image fills the panel header" /></a><br /><sub><a href="personal/catalog-redesign"><strong>Catalog Redesign</strong></a><br />Four kinds in one list, panel open on a hero</sub></td>
   </tr>
 </table>
 </div>
@@ -85,7 +90,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.13). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
+Twenty plugins are pinned in `hermes-pack.yaml` (pack version 1.27.14). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all twenty.
 
 ### Status Bar
 
@@ -105,6 +110,12 @@ Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.13). **bett
 | [Memory Review](personal/memory-review/README.md) · [public](public/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
 | [CDP Manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar, with a profile per port and one port a backend supervisor keeps alive. The `cdp` tool does the same from chat and repairs a Chrome profile-picker launch. |
 | [Jev Routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. The listed edition rewrites the model and the reasoning level on the request the turn is already bound to, and reports a pick on another provider rather than sending it; the personal edition moves the live session and also reads the provider catalogue, Codex quota and private pricing. |
+
+### Capabilities and catalog
+
+| Plugin | What you get |
+| --- | --- |
+| [Catalog Redesign](personal/catalog-redesign/README.md) · [public](public/catalog-redesign/README.md) | One wide row per skill, plugin, connector and tool, with a hover preview, real artwork from the catalog or the plugin's own folder, and a detail panel that carries the hero image, a section rail and the on/off switch. Switches on plugins, skills, toolsets and connectors. Leaves the native Capabilities page alone. |
 
 ### Sessions and Sidebar
 

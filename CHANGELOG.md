@@ -8,6 +8,20 @@ the component that changed; a plugin patch does not imply a new pack release.
 ### Changed
 
 - **next-steps:** publishes its prompt-section sizes through `prompt_texts()`, so `scripts/admission_check.py` can measure the rule instead of warning that it cannot. The check imports `prompt_section.py`, calls the hook and fails a release whose section would be skipped by the host for being over 2,200 characters. Nothing changes at runtime: the section, its sizes and the clamp are the same as 1.0.1, and no tool, hook or setting moved.
+## [catalog-redesign 1.0.0] - 2026-11-16
+
+### Added
+
+- **catalog-redesign:** a catalog page of its own, holding skills, plugins, connectors and tools in one list of wide rows instead of the table the native Capabilities page draws. The page registers its own route, a **Catalog** sidebar row and a palette command, and leaves the core Capabilities row untouched; **Open in native Capabilities** in each panel is the hop between the two. Every row is a grid rather than a card: a thumbnail, the name with its description, and the column that carries that kind's identity, which is the normalized short name for a plugin and the tags for skills, connectors and tools. Columns hold their position down the list, so the third column reads as a column. Off items are dimmed rather than hidden.
+- **catalog-redesign:** real artwork in place of initials. A published plugin borrows the catalog's hero image; a plugin outside the catalog gets a data URL from a logo its own folder ships, read by the plugin's own `GET /icons` route from `icon`, `logo`, `banner`, `hero`, `cover`, `thumbnail` or `preview` in the folder and its usual asset directories, capped at 300 KB. Six of the twenty-three installed plugins on this machine have such a file.
+- **catalog-redesign:** a hover card after a 240 ms dwell, with the hero image as a 16:9 band, the description, and a metadata grid of provider, version, stars and what the item includes. Near the bottom edge the card flips above the row, and it never takes the pointer.
+- **catalog-redesign:** a detail panel at 380 to 462px that slides in over a scrim, carrying the hero image across its header, a 44px section rail that opens a labelled sheet on hover, and only the sections its kind has. The item's on/off switch sits in the panel header, and the section rail's own expand toggle was removed to make room for it.
+- **catalog-redesign:** switches on plugins, skills, toolsets and configured connectors, on the row and in the panel header. Each flips at once and flips back if the backend refuses. MCP JSON-RPC has no enable or disable method, so the connector switch posts to the plugin's own `POST /servers/toggle`, which performs the same guarded config write as the app's Connectors tab: 409 for a server a plugin provides, 404 for an unknown name, and a disabled server stays in the config so it can return without being retyped.
+- **catalog-redesign:** the list paints in two tiers. `plugins.list` answers in milliseconds from the in-memory manager, so rows and the header count appear at once, and `plugins.manage list` follows in the background to add descriptions, sources, update flags and desktop-half facts; that scan takes about 75 seconds on 124 plugins, so it must never gate the paint. A snapshot of the last scan lets the next window paint before it runs, and a failed scan keeps the painted rows.
+- **catalog-redesign:** two settings, **Always show installed** and a **Header order** control that reorders the kind selector, on the page's gear and under Settings, Plugins, Catalog Redesign.
+
+The page reads no app markup: it draws from the plugin SDK (`ctx.register*`, `ctx.storage`, `ctx.rest`, `host.state`, `host.request`), so the public and personal trees carry the same build. The Python half mounts with the gateway, so the catalog and the artwork appear after one restart.
+
 ## [1.27.13] - 2026-11-16
 
 ### Fixed

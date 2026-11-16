@@ -1,0 +1,12 @@
+{
+  "name": "hermes-catalog-redesign",
+  "label": "Catalog Redesign",
+  "description": "Wide one-row-per-item catalog for skills, plugins, connectors and tools",
+  "version": "1.0.0",
+  "api": "plugin_api.py",
+  "tab": {
+    "path": "/hermes-catalog-redesign",
+    "position": "end",
+    "hidden": true
+  }
+}
