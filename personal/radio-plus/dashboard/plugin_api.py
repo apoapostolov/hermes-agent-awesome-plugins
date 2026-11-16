@@ -21,15 +21,17 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import re
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from typing import Any, Iterable
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -182,7 +184,143 @@ def _station(row: dict[str, Any], url: str) -> dict[str, Any]:
     }
 
 
-def _stations(rows: Iterable[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+_PRIVATE_HOST = re.compile(
+    r"^(?:localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|0\.|\[?::1\]?$)", re.I
+)
+
+
+_PROBE_TIMEOUT = 2.5
+_PROBE_WORKERS = 24
+_probe_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def _probe_cached(address: str) -> dict[str, Any]:
+    cached = _freshest(_probe_cache, address, _CACHE_TTL)
+    if cached is not None:
+        return cached
+    verdict = _probe(address)
+    _probe_cache[address] = (time.time(), verdict)
+    return verdict
+
+
+def _probe_many(addresses: list[str], budget: float = 2.0) -> dict[str, dict[str, Any]]:
+    """Probe addresses concurrently under a wall-clock budget.
+
+    One dead station must not hold a whole search: whatever has not answered
+    inside ``budget`` is dropped from this response, and its probe keeps running
+    so the next search finds a cached verdict instead of waiting again.
+    """
+    verdicts: dict[str, dict[str, Any]] = {}
+    pending: list[str] = []
+    for address in dict.fromkeys(addresses):
+        cached = _freshest(_probe_cache, address, _CACHE_TTL)
+        if cached is not None:
+            verdicts[address] = cached
+        else:
+            pending.append(address)
+    if not pending:
+        return verdicts
+    pool = ThreadPoolExecutor(max_workers=min(_PROBE_WORKERS, len(pending)))
+    futures = {pool.submit(_probe_cached, address): address for address in pending}
+    done, not_done = wait(futures, timeout=budget)
+    for future in done:
+        address = futures[future]
+        try:
+            verdicts[address] = future.result()
+        except Exception:  # noqa: BLE001 - a probe failure is a station failure
+            verdicts[address] = {"ok": False, "kind": "unreachable", "status": 0, "contentType": "", "reason": "The probe failed."}
+    for future in not_done:
+        future.cancel()
+    pool.shutdown(wait=False)
+    return verdicts
+
+
+def _probe(url: str) -> dict[str, Any]:
+    """Open a stream address and report what actually answers there.
+
+    The renderer cannot do this: most stations send no CORS headers, so a
+    browser fetch is refused before it starts. This is also the answer to "why
+    does this station not play": a website URL answers ``text/html``, a dead
+    mount answers 404, an HLS master playlist answers ``mpegurl``.
+    """
+    address = _clean_stream(url or "")
+    if not address:
+        return {"ok": False, "kind": "invalid", "status": 0, "contentType": "", "reason": "That is not an http or https address."}
+    host = urllib.parse.urlsplit(address).hostname or ""
+    if _PRIVATE_HOST.match(host):
+        return {"ok": False, "kind": "invalid", "status": 0, "contentType": "", "reason": "Local addresses are not probed."}
+    request = urllib.request.Request(
+        address,
+        headers={"User-Agent": _USER_AGENT, "Icy-MetaData": "1", "Accept": "*/*"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=_PROBE_TIMEOUT) as response:
+            content_type = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
+            name = response.headers.get("icy-name") or ""
+            body = response.read(2048)
+            status = response.status
+    except urllib.error.HTTPError as error:
+        return {
+            "ok": False, "kind": "http-error", "status": error.code, "contentType": "",
+            "reason": f"The server answered HTTP {error.code}.",
+        }
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        return {
+            "ok": False, "kind": "unreachable", "status": 0, "contentType": "",
+            "reason": f"The server did not answer ({type(error).__name__}).",
+        }
+
+    lowered = address.lower()
+    if "mpegurl" in content_type or lowered.endswith(".m3u8") or body[:7] == b"#EXTM3U":
+        kind = "hls"
+    elif content_type.startswith("audio/") or content_type in {"application/ogg", "video/ogg", "application/octet-stream"}:
+        kind = "audio"
+    elif content_type in {"audio/x-scpls", "audio/mpegurl", "application/pls+xml"} or lowered.endswith((".pls", ".m3u")):
+        kind = "playlist"
+    elif content_type.startswith("text/html") or body[:15].lower().lstrip().startswith(b"<!doctype") or body[:5].lower() == b"<html":
+        kind = "html"
+    elif content_type.startswith("text/"):
+        kind = "text"
+    else:
+        kind = "other"
+    return {
+        "ok": kind == "audio",
+        "kind": kind,
+        "status": status,
+        "contentType": content_type,
+        "name": _clean_text(name, 80),
+        "reason": {
+            "audio": "The address returns audio.",
+            "hls": "This is an HLS playlist. This player has no HLS support.",
+            "playlist": "This is a playlist file, not a stream address.",
+            "html": "This is a web page, not an audio stream.",
+            "text": "This address returns text, not audio.",
+            "other": f"This address returns {content_type or 'an unknown type'}, not audio.",
+        }[kind],
+    }
+
+
+def _log_path() -> "Any":
+    from pathlib import Path
+
+    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
+    return home / "radio-plus" / "station-log.jsonl"
+
+
+def _append_log(entry: dict[str, Any]) -> None:
+    """Append one JSON line, rotating at 1 MB so the file cannot grow forever."""
+    path = _log_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size > 1_000_000:
+            path.replace(path.with_suffix(".jsonl.1"))
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, ensure_ascii=True)[:2000] + "\n")
+    except OSError:
+        return
+
+
+def _stations(rows: Iterable[dict[str, Any]], limit: int) -> tuple[list[dict[str, Any]], int]:
     candidates: list[dict[str, Any]] = []
     for row in rows:
         identifier = _station_id(row)
@@ -192,15 +330,38 @@ def _stations(rows: Iterable[dict[str, Any]], limit: int) -> list[dict[str, Any]
         if len(candidates) >= limit:
             break
     if not candidates:
-        return []
+        return [], 0
     with ThreadPoolExecutor(max_workers=min(_RESOLVE_WORKERS, len(candidates))) as pool:
         addresses = list(pool.map(lambda row: _stream_for(_station_id(row) or 0), candidates))
+    resolved = [(row, address) for row, address in zip(candidates, addresses) if address]
+    skipped = len(candidates) - len(resolved)
+    if not resolved:
+        return [], skipped
+    verdicts = _probe_many([address for _, address in resolved])
     stations: list[dict[str, Any]] = []
-    for row, address in zip(candidates, addresses):
-        if address:
-            stations.append(_station(row, address))
+    logged = 0
+    for row, address in resolved:
+        # A directory row can resolve to an address that no longer serves audio:
+        # an HTML error page, a closed mount, an HLS playlist. Drop it instead of
+        # handing the player a row that cannot play, and leave a line behind so
+        # the failure is explainable later.
+        verdict = verdicts.get(address) or {"ok": False, "kind": "slow", "reason": "No answer within the probe budget."}
+        if not verdict["ok"]:
+            skipped += 1
+            if logged < 10:
+                logged += 1
+                _append_log({
+                    "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "source": "shoutcast-resolve",
+                    "name": _clean_text(row.get("Name"), 120),
+                    "url": address,
+                    "reason": f"{verdict['kind']}: {verdict['reason']}",
+                })
+            continue
+        stations.append(_station(row, address))
     stations.sort(key=lambda item: item.get("listeners") or 0, reverse=True)
-    return stations
+    return stations, skipped
+
 
 
 @router.get("/shoutcast/search")
@@ -216,7 +377,8 @@ def shoutcast_search(
     if not term:
         raise HTTPException(status_code=400, detail="A search term is required.")
     rows = _query_directory("/Search/UpdateSearch", term)
-    return {"source": "shoutcast", "query": term, "count": len(rows), "stations": _stations(rows, limit)}
+    stations, skipped = _stations(rows, limit)
+    return {"source": "shoutcast", "query": term, "count": len(rows), "skipped": skipped, "stations": stations}
 
 
 @router.get("/shoutcast/top")
@@ -226,4 +388,39 @@ def shoutcast_top(limit: int = Query(40, ge=1, le=60)) -> dict[str, Any]:
     ``GET /api/plugins/radio-plus/shoutcast/top?limit=40``
     """
     rows = _query_directory("/Home/Top", None)
-    return {"source": "shoutcast", "query": "", "count": len(rows), "stations": _stations(rows, limit)}
+    stations, skipped = _stations(rows, limit)
+    return {"source": "shoutcast", "query": "", "count": len(rows), "skipped": skipped, "stations": stations}
+
+
+@router.get("/probe")
+def probe_stream(url: str = Query(..., min_length=8, max_length=600)) -> dict[str, Any]:
+    """Report what a stream address actually returns.
+
+    ``GET /api/plugins/radio-plus/probe?url=https://example.test/stream``
+    """
+    return _probe(url)
+
+
+class StationLogEntry(BaseModel):
+    name: str = ""
+    url: str = ""
+    reason: str = ""
+    at: str = ""
+
+
+@router.post("/log")
+def write_station_log(payload: StationLogEntry) -> dict[str, str]:
+    """Keep one line per station failure for later diagnosis.
+
+    ``POST /api/plugins/radio-plus/log`` with ``{name, url, reason}``
+    """
+    entry = {
+        "at": payload.at or time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "source": "player",
+        "name": _clean_text(payload.name, 120),
+        "url": _clean_stream(_clean_text(payload.url, 400) or "") or "",
+        "reason": _clean_text(payload.reason, 300),
+    }
+    _append_log(entry)
+    return {"status": "logged", "path": str(_log_path())}
+

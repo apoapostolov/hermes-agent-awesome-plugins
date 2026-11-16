@@ -12,16 +12,20 @@ Play.
 
 - **An editable station list.** The shipped stations are seeded into plugin
   storage on first run. From then on the stored list is what the picker shows, so
-  a rename or a delete survives a restart and does not come back.
-- **Row controls.** Hover a station and use the pencil to rename it inline, or the
-  bin to delete it. Deleting takes two clicks and disarms itself after four
-  seconds. Deleting the station that is playing moves playback to the next one;
-  deleting the last one stops the player. A pin is removed with its station.
-- **Add station.** Enter a name and any `http` or `https` stream address, for
-  example a station's `.mp3` or `/;` endpoint from its own site. The name is
-  optional: the host is used when it is blank. A duplicate URL reports that it is
-  already in the list instead of adding the same stream twice.
-- **Three sources** in one row of chips:
+  an edit or a delete survives a restart and does not come back.
+- **Row controls.** Hover a station and use the pencil to edit it, or the bin to
+  delete it. The editor carries both fields, the name and the stream address, so
+  a station can be renamed and re-pointed at a new mount in one place. Deleting
+  takes two clicks and disarms itself after four seconds. Deleting the station
+  that is playing moves playback to the next one; deleting the last one stops the
+  player. A pin follows its station.
+- **Add station**, a round button on the same row as the source chips. Enter a
+  name and any `http` or `https` stream address; the name is optional and falls
+  back to the host. Before saving, the address is checked by the plugin route, so
+  a website URL is refused with "that address is not an audio stream" instead of
+  being saved as a station that will never play. A duplicate URL reports that it
+  is already in the list.
+- **Three sources** in one row of chips, one of them always visibly selected:
   - **All**: your stations plus a name search of [Radio Browser](https://api.radio-browser.info/).
   - **Popular**: Radio Browser's most-voted stations, filtered as you type.
   - **Shoutcast**: the [Shoutcast](https://directory.shoutcast.com/) directory,
@@ -29,8 +33,18 @@ Play.
     busy end of the directory, so the chip works as a shortcut into Shoutcast
     without typing anything.
 
-The status bar, the braille waveform, artist links, volume, and next-station
-cycling behave as they do in Radio. Next walks pins and the stored list.
+  Popular and Shoutcast show that source alone; only All mixes in your own
+  stations. When results are dropped, the panel says how many and why: HLS
+  streams the player cannot decode, and directory rows whose stream address no
+  longer answers with audio.
+- **Cross-script search.** Station names are indexed in the Latin spelling while
+  Bulgarian names are written in Cyrillic, so a Cyrillic query is sent twice, as
+  typed and transliterated. "Хоризонт" finds "BNR Horizont".
+
+The status bar, the braille waveform, artist links, and next-station cycling
+behave as they do in Radio. In the panel the waveform is a filler between the
+transport controls and the volume slider, not a line of its own.
+
 
 ## How the Shoutcast source works
 
@@ -42,17 +56,45 @@ mounted at `/api/plugins/radio-plus/`:
 | --- | --- |
 | `GET /shoutcast/search?q=<term>&limit=40` | Keyword search of the directory |
 | `GET /shoutcast/top?limit=40` | Popular stations, busiest first |
+| `GET /probe?url=<address>` | What a stream address actually returns |
+| `POST /log` | Record one station failure |
 
 The route performs the two requests the Shoutcast site performs for itself
 (`POST /Search/UpdateSearch`, `POST /Home/Top`). Directory rows carry no stream
 address, so each station's PLS tune-in file is resolved server-side, twelve at a
-time, and stations whose tune-in file is empty are dropped rather than listed as
-rows that cannot play. Resolved addresses and query results are cached in memory
-for a few minutes. No key, account, or credential is involved, and nothing is
-written to disk.
+time. Every resolved address is then probed: a row whose address answers with an
+HTML error page, a closed mount, or an HLS playlist is dropped instead of being
+listed as a station that cannot play, and the panel reports how many were
+skipped. Probes run under a two-second wall-clock budget, so one dead station
+cannot hold a search; its verdict is cached when it finally arrives. Resolved
+addresses, verdicts, and query results are cached in memory for a few minutes. No
+key, account, or credential is involved, and nothing leaves the machine except the
+query you typed.
 
-Because a search resolves its stations before answering, the first Shoutcast
-search takes around a second. Later searches of the same term come from cache.
+Because a search resolves and probes its stations before answering, the first
+Shoutcast search takes a few seconds. Later searches of the same term come from
+cache.
+
+## Station diagnostics
+
+When a station will not play, three things happen:
+
+- The panel shows the reason in place of the track line, taken from the browser's
+  media error (`network error`, `decode error`, `unsupported stream format`)
+  plus the host it tried.
+- `console.error` gets one `[radio-plus]` line. That is the renderer channel that
+  reaches the desktop log.
+- The plugin route writes one JSON line to
+  `$HERMES_HOME/radio-plus/station-log.jsonl`, rotating at 1 MB. It also records
+  the directory rows it dropped while resolving a Shoutcast search, so a station
+  that quietly disappeared can be explained later.
+
+`GET /probe?url=` is the same check the add form uses: it reports `kind`
+(`audio`, `hls`, `html`, `playlist`, `http-error`, `unreachable`), the HTTP
+status, the content type, and the station's `icy-name` when it sends one. It
+refuses loopback and private addresses, so it cannot be turned into a scanner for
+the local network.
+
 
 ## Install
 
@@ -97,9 +139,18 @@ credentials.
 
 ## Limitations
 
-- HLS streams are skipped, as in Radio.
-- Shoutcast resolution depends on the station's PLS file being populated. A
-  station that is listed but has no tune-in address does not appear.
+- **HLS streams cannot play.** Chromium has no HLS demuxer, so a `.m3u8` station
+  needs `hls.js`, which this plugin does not ship. The panel counts the HLS
+  results it hid instead of leaving a search mysteriously empty. This is why
+  БНР Христо Ботев, whose only public address is
+  `lb-hls.cdn.bg/.../HrBotev.stream/playlist.m3u8`, cannot be added as a working
+  station yet. БНР Хоризонт does play: Radio Browser lists a non-HLS mount
+  (`play.global.audio/testb.aac`, `icy-name: BNR Horizont`), which the
+  transliterated search reaches.
+- Shoutcast resolution depends on the station's PLS file being populated, and on
+  the resolved mount still answering with audio. Belisimo.BG is the example: the
+  directory lists two entries, one answers with an HTML page and the other times
+  out, so both are dropped and the panel says how many were skipped.
 - Waveform analysis needs CORS on the stream itself. A station that refuses it
   plays without a waveform and shows an activity indicator instead of invented
   levels; Shoutcast streams usually take this path.
@@ -109,14 +160,17 @@ credentials.
 ## Tests
 
 ```
-py -m pytest tests/test_plugin_api.py -q            # mapping rules, offline
-RADIO_PLUS_LIVE=1 py -m pytest tests/test_plugin_api.py -q   # + live Shoutcast
-node tests/desktop.test.mjs                          # renderer logic, live Radio Browser
+py -m pytest tests/test_plugin_api.py -q                      # routes, mapping, probe, log
+RADIO_PLUS_LIVE=1 py -m pytest tests/test_plugin_api.py -q    # + live Shoutcast and probes
+node tests/desktop.test.mjs                                    # player state and fetchers
+node tests/panel.test.mjs                                      # rendered panel and clicks
 ```
 
-The renderer suite imports `desktop/plugin.js` through generated SDK stubs, then
-exercises the real code: URL rules, seeding, rename, delete, add, and the two
-source fetchers.
+The renderer suites import `desktop/plugin.js` through generated SDK stubs. The
+panel suite renders the real component tree with the React and jsdom from the
+installed Hermes desktop app, then clicks the chips, the add button, and a row
+editor, which is how the selected state and the list swap are covered.
+
 
 ## References
 

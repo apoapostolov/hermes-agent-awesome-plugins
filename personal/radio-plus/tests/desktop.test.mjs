@@ -49,7 +49,8 @@ const source = readFileSync(path.join(root, 'desktop', 'plugin.js'), 'utf8')
   .concat(`
 export {
   createPlayer, popularStations, sameStation, searchStations, shoutcastStations,
-  streamUrl, uniqueStations, validStation, SEED_STATIONS, SOURCE_LABELS
+  streamUrl, uniqueStations, validStation, SEED_STATIONS, SOURCE_LABELS,
+  transliterate, fold, searchTerms, mediaFailure
 }
 `)
 writeFileSync(path.join(dir, 'plugin.mjs'), source)
@@ -134,18 +135,23 @@ await test('stored entries that fail validation are dropped', () => {
   assert.equal(player.stations.get().length, 1)
 })
 
-await test('renameStation updates the list and the current station', () => {
+await test('updateStation rewrites the name and the address together', () => {
   const ctx = makeCtx()
   const player = plugin.createPlayer(ctx)
   const target = player.stations.get()[0]
-  player.renameStation(target, '  Focus   Music  ')
+  player.favorite(target)
+  assert.equal(player.updateStation(target, { name: '  Focus   Music  ', url: 'https://example.test/new.mp3' }), true)
   assert.equal(player.stations.get()[0].name, 'Focus Music')
+  assert.equal(player.stations.get()[0].url, 'https://example.test/new.mp3')
+  assert.equal(player.favorites.get()[0].url, 'https://example.test/new.mp3', 'a pin follows the edit')
   assert.equal(player.station.get().name, 'Focus Music')
-  assert.equal(ctx.storage.get('local.stations')[0].name, 'Focus Music')
   assert.equal(ctx.storage.get('local.station').name, 'Focus Music')
-  player.renameStation(player.stations.get()[0], '   ')
-  assert.equal(player.stations.get()[0].name, 'Focus Music', 'a blank name is ignored')
+
+  assert.equal(player.updateStation(player.stations.get()[0], { name: 'Keep', url: 'not-a-url' }), false)
+  assert.equal(player.stations.get()[0].url, 'https://example.test/new.mp3', 'an invalid address changes nothing')
+  assert.equal(player.updateStation(player.stations.get()[0], { name: '   ', url: 'https://example.test/x' }), false)
 })
+
 
 await test('removeStation drops the station, its pin, and moves playback on', () => {
   const ctx = makeCtx()
@@ -219,7 +225,7 @@ await test('shoutcastStations maps the plugin route and drops unusable rows', as
       }
     }
   }
-  const stations = await plugin.shoutcastStations(ctx, 'jazz')
+  const { stations } = await plugin.shoutcastStations(ctx, 'jazz')
   assert.equal(stations.length, 1)
   assert.equal(stations[0].provider, 'Shoutcast')
   assert.equal(stations[0].nowPlaying, 'Rod Lucas')
@@ -230,7 +236,7 @@ await test('shoutcastStations asks for the top list when there is no query', asy
   const paths = []
   const ctx = { ...makeCtx(), rest: async pathName => { paths.push(pathName); return { stations: [] } } }
   await plugin.shoutcastStations(ctx, '')
-  assert.deepEqual(paths, ['/shoutcast/top?limit=40'])
+  assert.deepEqual(paths, ['/shoutcast/top?limit=30'])
 })
 
 await test('shoutcastStations reports a missing backend instead of pretending it worked', async () => {
@@ -239,7 +245,7 @@ await test('shoutcastStations reports a missing backend instead of pretending it
 
 await test('Radio Browser search returns unique, playable stations', async () => {
   const controller = new AbortController()
-  const stations = await plugin.searchStations('jazz', controller.signal)
+  const { stations, hls } = await plugin.searchStations('jazz', controller.signal)
   assert.ok(stations.length > 0, 'no results from Radio Browser')
   const ids = new Set(stations.map(item => item.id))
   const urls = new Set(stations.map(item => item.url))
@@ -249,14 +255,39 @@ await test('Radio Browser search returns unique, playable stations', async () =>
     assert.match(station.url, /^https?:\/\//)
     assert.equal(station.provider, 'Radio Browser')
   }
+  assert.equal(typeof hls, 'number')
+})
+
+await test('a Cyrillic query reaches the Latin spelling the directories index', async () => {
+  assert.equal(plugin.transliterate('Хоризонт'), 'horizont')
+  assert.equal(plugin.transliterate('Христо Ботев'), 'hristo botev')
+  assert.deepEqual(plugin.searchTerms('Хоризонт'), ['Хоризонт', 'horizont'])
+  assert.deepEqual(plugin.searchTerms('Horizont'), ['Horizont'])
+  assert.equal(plugin.fold('Хоризонт'), plugin.fold('Horizont'))
+
+  const controller = new AbortController()
+  const { stations } = await plugin.searchStations('Хоризонт', controller.signal)
+  assert.ok(stations.length > 0, 'the Cyrillic query found nothing')
+  assert.ok(
+    stations.some(item => item.name.toLowerCase().includes('horizont')),
+    `no Horizont result: ${stations.map(item => item.name).slice(0, 5).join(' | ')}`
+  )
 })
 
 await test('the popular list is non-empty and playable', async () => {
   const controller = new AbortController()
-  const stations = await plugin.popularStations(controller.signal)
+  const { stations } = await plugin.popularStations(controller.signal)
   assert.ok(stations.length > 10)
   for (const station of stations) assert.match(station.url, /^https?:\/\//)
 })
+
+await test('mediaFailure names the browser media error and the host', () => {
+  const station = { url: 'http://79.98.108.170:8002' }
+  assert.match(plugin.mediaFailure({ error: { code: 4 } }, station), /unsupported stream format \(79\.98\.108\.170\)/)
+  assert.match(plugin.mediaFailure({ error: { code: 2 } }, station), /network error/)
+  assert.match(plugin.mediaFailure(null, station), /the stream did not connect/)
+})
+
 
 await test('source labels cover the three picker tabs', () => {
   assert.deepEqual(Object.keys(plugin.SOURCE_LABELS), ['all', 'popular', 'shoutcast'])

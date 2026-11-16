@@ -41,7 +41,14 @@ const EN = {
   remove: 'Delete station', confirmRemove: 'Click again to delete',
   add: 'Add station', addName: 'Station name', addUrl: 'Stream URL (http or https)',
   addSave: 'Add', cancel: 'Cancel',
-  addInvalid: 'Enter a name and an http or https stream URL.',
+  addInvalid: 'Enter an http or https stream address.',
+  edit: 'Edit station', editName: 'Station name', editUrl: 'Stream URL', editSave: 'Save',
+  editInvalid: 'Enter an http or https stream address.',
+  checking: 'Checking the address…',
+  notAudio: 'That address is not an audio stream. Use the station stream URL, not its website.',
+  unreachableNote: 'Saved. The address did not answer yet, so it may not play.',
+  hlsNote: 'HLS streams cannot play in this player.',
+  skippedNote: 'unplayable results hidden',
   'chillsynthDescription': 'Soft focus · warm synths', 'nightrideDescription': 'Synthwave · after hours',
   'darksynthDescription': 'Dark electronics · high energy', 'spacesynthDescription': 'Cosmic synths · retro futures',
   'paradise-mainDescription': 'Eclectic · human selected', 'paradise-mellowDescription': 'A gentler pace'
@@ -63,9 +70,10 @@ const CSS = `
 .hermes-radio-plus-waveform-layer:nth-child(1){opacity:.12}
 .hermes-radio-plus-waveform-layer:nth-child(2){opacity:.28}
 .hermes-radio-plus-waveform[data-compact=true]{width:40px;height:12px;margin-inline:2px}
+.hermes-radio-plus-waveform[data-fill=true]{flex:1;width:auto;min-width:28px;height:24px;margin-inline:2px}
 .hermes-radio-plus-next{display:flex;align-items:center;width:12px;height:12px}
 .hermes-radio-plus-waveform[data-active=true]{color:var(--ui-accent);opacity:1}
-.hermes-radio-plus-signal{height:48px;padding:5px 6px 0;min-width:0}
+.hermes-radio-plus-signal{padding:0 6px 2px;min-width:0}
 .hermes-radio-plus-track{display:flex;align-items:center;gap:5px;height:19px;min-width:0;font-size:11px;line-height:16px;color:var(--ui-text-secondary)}
 .hermes-radio-plus-track-text{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0}
 .hermes-radio-plus-track[data-track=true]{color:var(--ui-text-primary)}
@@ -99,21 +107,25 @@ const CSS = `
 .hermes-radio-plus-row-copy{min-width:0;flex:1}
 .hermes-radio-plus-row-name{display:block;font-size:12px;line-height:17px;color:var(--ui-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hermes-radio-plus-volume{display:flex;align-items:center;gap:4px;height:28px;padding:2px 2px 0}
-.hermes-radio-plus-volume-space{flex:1;min-width:6px}
 .hermes-radio-plus-volume input{width:76px;min-width:0;height:3px;accent-color:var(--ui-accent);cursor:pointer}
 .hermes-radio-plus-error{font-size:11px;line-height:17px;color:var(--ui-text-secondary);padding:4px 4px 12px}
-.hermes-radio-plus-sources{display:flex;align-items:center;gap:3px;padding:0 4px 4px}
-.hermes-radio-plus-chip{height:20px;padding:0 8px;border-radius:10px;font-size:11px}
+.hermes-radio-plus-sources{display:flex;align-items:center;gap:3px;padding:0 4px 5px}
+.hermes-radio-plus-chip{height:20px;padding:0 8px;border:0;border-radius:10px;font-family:inherit;font-size:11px;line-height:20px;background:transparent;color:var(--ui-text-tertiary);opacity:.7;cursor:pointer;transition:background .12s,color .12s,opacity .12s}
+.hermes-radio-plus-chip:hover{background:var(--chrome-action-hover);color:var(--ui-text-secondary);opacity:1}
+.hermes-radio-plus-chip[data-active=true]{background:var(--ui-bg-quaternary);color:var(--ui-text-primary);opacity:1;box-shadow:inset 0 0 0 .5px var(--ui-stroke-secondary)}
+.hermes-radio-plus-chip:focus-visible{outline:1px solid var(--ui-accent);outline-offset:1px}
+.hermes-radio-plus-sources-space{flex:1;min-width:6px}
+.hermes-radio-plus-addbtn{display:flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;border-radius:999px;background:var(--ui-bg-quaternary);color:var(--ui-text-secondary);cursor:pointer;flex-shrink:0}
+.hermes-radio-plus-addbtn:hover{background:var(--chrome-action-hover);color:var(--ui-text-primary)}
+.hermes-radio-plus-addbtn[data-active=true]{color:var(--ui-accent);box-shadow:inset 0 0 0 1px var(--ui-accent)}
 .hermes-radio-plus-row-edit{opacity:0;pointer-events:none}
 .hermes-radio-plus-row:hover .hermes-radio-plus-row-edit,.hermes-radio-plus-row:focus-within .hermes-radio-plus-row-edit{opacity:1;pointer-events:auto}
 @media(hover:none){.hermes-radio-plus-row-edit{opacity:1;pointer-events:auto}}
 .hermes-radio-plus-row[data-armed=true] .hermes-radio-plus-row-remove{color:var(--ui-accent)}
-.hermes-radio-plus-rename{width:100%;min-width:0;height:18px;padding:0 4px;border-radius:3px;border:1px solid var(--ui-accent);background:transparent;color:var(--ui-text-primary);font:inherit;font-size:12px;line-height:17px}
-.hermes-radio-plus-rename:focus-visible{outline:none}
-.hermes-radio-plus-add{display:flex;flex-direction:column;gap:4px;padding:4px 6px 6px}
-.hermes-radio-plus-add input{width:100%;min-width:0;height:22px;padding:0 5px;border-radius:4px;border:1px solid var(--ui-stroke-secondary);background:transparent;color:var(--ui-text-primary);font:inherit;font-size:12px}
-.hermes-radio-plus-add input:focus-visible{outline:1px solid var(--ui-accent);outline-offset:-1px}
-.hermes-radio-plus-add-actions{display:flex;align-items:center;gap:4px}
+.hermes-radio-plus-edit,.hermes-radio-plus-add{display:flex;flex-direction:column;gap:4px;padding:5px 6px 6px;width:100%}
+.hermes-radio-plus-edit input,.hermes-radio-plus-add input{width:100%;min-width:0;height:22px;padding:0 5px;border-radius:4px;border:1px solid var(--ui-stroke-secondary);background:transparent;color:var(--ui-text-primary);font:inherit;font-size:12px}
+.hermes-radio-plus-edit input:focus-visible,.hermes-radio-plus-add input:focus-visible{outline:1px solid var(--ui-accent);outline-offset:-1px}
+.hermes-radio-plus-edit-actions,.hermes-radio-plus-add-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .hermes-radio-plus-add-note{font-size:11px;line-height:16px;color:var(--ui-text-secondary)}
 `
 
@@ -175,6 +187,20 @@ function browseStation(row) {
   }]
 }
 
+function isHlsRow(row) {
+  return Boolean(row?.hls) || /\.m3u8(?:$|\?)/i.test(row?.url_resolved ?? row?.url ?? '')
+}
+
+function rowsToStations(rows) {
+  const stations = []
+  let hls = 0
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (isHlsRow(row)) { hls += 1; continue }
+    stations.push(...browseStation(row))
+  }
+  return { stations, hls }
+}
+
 async function browseRows(path, signal) {
   for (const server of directoryServers.slice(0, 3)) {
     try {
@@ -186,37 +212,60 @@ async function browseRows(path, signal) {
   throw new Error('Directory unavailable')
 }
 
+async function browserQuery(text, signal) {
+  const params = new URLSearchParams({ name: text, limit: '60', hidebroken: 'true', order: 'votes', reverse: 'true' })
+  return rowsToStations(await browseRows(`stations/search?${params}`, signal))
+}
+
+// A Cyrillic query is sent twice: as typed, and in the Latin spelling the
+// directories actually index. "Хоризонт" has to reach "BNR Horizont".
 async function searchStations(text, signal) {
   await ensureDirectory(signal)
-  const params = new URLSearchParams({ name: text, limit: '60', hidebroken: 'true', order: 'votes', reverse: 'true' })
-  return uniqueStations((await browseRows(`stations/search?${params}`, signal)).flatMap(browseStation))
+  const results = await Promise.all(searchTerms(text).map(term => browserQuery(term, signal)))
+  return {
+    stations: uniqueStations(results.flatMap(result => result.stations)),
+    hls: results.reduce((total, result) => total + result.hls, 0)
+  }
 }
 
 async function popularStations(signal) {
   await ensureDirectory(signal)
-  return uniqueStations((await browseRows('stations/topvote/60?hidebroken=true', signal)).flatMap(browseStation))
+  const result = rowsToStations(await browseRows('stations/topvote/60?hidebroken=true', signal))
+  return { stations: uniqueStations(result.stations), hls: result.hls }
+}
+
+async function shoutcastQuery(ctx, text) {
+  const path = text
+    ? `/shoutcast/search?${new URLSearchParams({ q: text, limit: '30' })}`
+    : '/shoutcast/top?limit=30'
+  const payload = await ctx.rest(path, { timeoutMs: 30000 })
+  const rows = Array.isArray(payload?.stations) ? payload.stations : []
+  return {
+    stations: uniqueStations(rows.flatMap(row => {
+      const url = streamUrl(row?.url)
+      if (!url || typeof row.id !== 'string' || typeof row.name !== 'string') return []
+      return [{
+        id: row.id,
+        name: row.name.trim(),
+        url,
+        provider: 'Shoutcast',
+        description: row.description ?? '',
+        nowPlaying: row.nowPlaying ?? '',
+        homepage: httpsUrl(row.homepage)
+      }]
+    })),
+    skipped: Number(payload?.skipped) || 0
+  }
 }
 
 async function shoutcastStations(ctx, text) {
   if (typeof ctx.rest !== 'function') throw new Error('The Shoutcast route is not loaded')
-  const path = text
-    ? `/shoutcast/search?${new URLSearchParams({ q: text, limit: '40' })}`
-    : '/shoutcast/top?limit=40'
-  const payload = await ctx.rest(path, { timeoutMs: 25000 })
-  const rows = Array.isArray(payload?.stations) ? payload.stations : []
-  return uniqueStations(rows.flatMap(row => {
-    const url = streamUrl(row?.url)
-    if (!url || typeof row.id !== 'string' || typeof row.name !== 'string') return []
-    return [{
-      id: row.id,
-      name: row.name.trim(),
-      url,
-      provider: 'Shoutcast',
-      description: row.description ?? '',
-      nowPlaying: row.nowPlaying ?? '',
-      homepage: httpsUrl(row.homepage)
-    }]
-  }))
+  const results = await Promise.all(searchTerms(text || '').map(term => shoutcastQuery(ctx, term)))
+  return {
+    stations: uniqueStations(results.flatMap(result => result.stations)),
+    hls: 0,
+    skipped: results.reduce((total, result) => total + result.skipped, 0)
+  }
 }
 
 function sameStation(a, b) {
@@ -231,6 +280,60 @@ function uniqueStations(items) {
     ids.add(item.id)
     urls.add(item.url)
     return true
+  })
+}
+
+const CYRILLIC_LATIN = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm',
+  н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sht',
+  ъ: 'a', ь: '', ю: 'yu', я: 'ya'
+}
+
+// Bulgarian station names are written in Cyrillic while the directories index the
+// Latin spelling, so search has to cross scripts in both directions.
+function transliterate(text) {
+  return String(text ?? '').toLowerCase().replace(/[\u0400-\u04ff]/g, letter => CYRILLIC_LATIN[letter] ?? letter)
+}
+
+function fold(text) {
+  return transliterate(text).normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+}
+
+function searchTerms(text) {
+  const typed = String(text ?? '').trim()
+  const latin = transliterate(typed).replace(/\s+/g, ' ').trim()
+  return latin && latin !== typed.toLowerCase() ? [typed, latin] : [typed]
+}
+
+const MEDIA_ERRORS = { 1: 'aborted', 2: 'network error', 3: 'decode error', 4: 'unsupported stream format' }
+
+function mediaFailure(element, station) {
+  let host = station.url
+  try { host = new URL(station.url).hostname } catch {}
+  return `${MEDIA_ERRORS[element?.error?.code] ?? 'the stream did not connect'} (${host})`
+}
+
+async function checkStream(ctx, url) {
+  if (typeof ctx.rest !== 'function') return null
+  try {
+    const verdict = await ctx.rest(`/probe?${new URLSearchParams({ url })}`, { timeoutMs: 15000 })
+    return verdict && typeof verdict.ok === 'boolean' ? verdict : null
+  } catch { return null }
+}
+
+// A station that will not play leaves two trails: one console line (the renderer
+// channel that reaches desktop.log) and one line in the plugin's station log,
+// which is what makes "why does this station not work" answerable later.
+function reportFailure(ctx, station, reason) {
+  console.error(`[radio-plus] ${station.name} <${station.url}>: ${reason}`)
+  if (typeof ctx.rest !== 'function') return
+  void ctx.rest('/log', {
+    method: 'POST',
+    body: { name: station.name, url: station.url, reason, at: new Date().toISOString() }
+  }).catch(() => {})
+  void checkStream(ctx, station.url).then(verdict => {
+    if (!verdict?.kind) return
+    console.error(`[radio-plus] probe ${station.url}: ${verdict.kind} ${verdict.status} ${verdict.contentType} ${verdict.reason ?? ''}`)
   })
 }
 
@@ -253,6 +356,7 @@ function createPlayer(ctx) {
   const volume = atom(Number.isFinite(storedVolume) ? Math.max(0, Math.min(100, storedVolume)) : 25)
   const status = atom('paused')
   const meterMode = atom('levels')
+  const lastError = atom('')
   const plainStreams = new Set()
   const open = atom(false)
   let audio = null
@@ -296,6 +400,7 @@ function createPlayer(ctx) {
     station.set(next)
     ctx.storage.set('local.station', next)
     status.set('connecting')
+    lastError.set('')
     bus.postMessage({ type: 'play', sender: windowId })
     const element = new Audio()
     audio = element
@@ -315,7 +420,12 @@ function createPlayer(ctx) {
       if (metered) {
         plainStreams.add(next.url)
         void play(next, false)
-      } else stop('error')
+        return
+      }
+      const reason = mediaFailure(element, next)
+      lastError.set(reason)
+      reportFailure(ctx, next, reason)
+      stop('error')
     }
     element.addEventListener('playing', () => {
       if (current()) { clearTimeout(timeout); playGeneration = token; status.set('live') }
@@ -419,16 +529,25 @@ function createPlayer(ctx) {
     return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
   }
 
-  function renameStation(item, name) {
-    const label = tidyName(name)
-    if (!label) return
-    saveStations(stations.get().map(value => sameStation(value, item) ? { ...value, name: label } : value))
-    // The stored "last station" carries the name into the next launch.
-    if (sameStation(station.get(), item)) {
-      const renamed = { ...station.get(), name: label }
-      station.set(renamed)
-      ctx.storage.set('local.station', renamed)
+  function updateStation(item, changes) {
+    const label = tidyName(changes.name)
+    const address = streamUrl(changes.url ?? item.url)
+    if (!label || !address) return false
+    const apply = value => sameStation(value, item) ? { ...value, name: label, url: address } : value
+    saveStations(stations.get().map(apply))
+    if (favorites.get().some(value => sameStation(value, item))) {
+      const nextFavorites = favorites.get().map(apply)
+      favorites.set(nextFavorites)
+      ctx.storage.set('local.favorites', nextFavorites)
     }
+    if (!sameStation(station.get(), item)) return true
+    const before = station.get()
+    const updated = apply(before)
+    station.set(updated)
+    ctx.storage.set('local.station', updated)
+    // A new address under a live stream has to be reopened on that address.
+    if (updated.url !== before.url && (status.get() === 'live' || status.get() === 'connecting')) void play(updated)
+    return true
   }
 
   function removeStation(item) {
@@ -505,7 +624,7 @@ function createPlayer(ctx) {
     bus.close()
     if (audioContext) void audioContext.close()
   })
-  return { station, stations, favorites, volume, status, meterMode, open, play, stop, toggle, next, setVolume, mute, favorite, renameStation, removeStation, addStation, waveform }
+  return { station, stations, favorites, volume, status, meterMode, lastError, open, play, stop, toggle, next, setVolume, mute, favorite, updateStation, removeStation, addStation, waveform }
 }
 
 function brailleTrace(samples, rows = 2) {
@@ -525,7 +644,7 @@ function brailleTrace(samples, rows = 2) {
   return cells.map(cell => String.fromCharCode(0x2800 | cell))
 }
 
-function Waveform({ player, compact = false }) {
+function Waveform({ player, compact = false, fill = false }) {
   const width = compact ? 6 : 36
   const rows = compact ? 1 : 2
   const ref = useRef(null)
@@ -566,7 +685,7 @@ function Waveform({ player, compact = false }) {
     motion.addEventListener('change', updateMotion)
     return () => { loop.dispose(); motion.removeEventListener('change', updateMotion) }
   }, [active, mode, player, rows, width, station.url])
-  return jsx('div', { ref, className: 'hermes-radio-plus-waveform', style: { '--radio-columns': width }, 'data-radio-meter': width, 'data-compact': compact, 'data-meter-mode': mode, 'data-active': active, 'aria-hidden': true,
+  return jsx('div', { ref, className: 'hermes-radio-plus-waveform', style: { '--radio-columns': width }, 'data-radio-meter': width, 'data-compact': compact, 'data-fill': fill, 'data-meter-mode': mode, 'data-active': active, 'aria-hidden': true,
     children: [0, 1, 2].map(layer => jsx('span', { className: 'hermes-radio-plus-waveform-layer', children: baseline.map((cell, i) => jsx('span', { children: layer === 2 ? cell : '⠀' }, i)) }, layer)) })
 }
 
@@ -669,6 +788,7 @@ function Signal({ player, ctx }) {
   const station = useValue(player.station)
   const status = useValue(player.status)
   const mode = useValue(player.meterMode)
+  const lastError = useValue(player.lastError)
   const stream = new URL(station.url)
   const endpoints = {
     'stream.nightride.fm': `${NIGHTRIDE}status-json.xsl`,
@@ -692,9 +812,8 @@ function Signal({ player, ctx }) {
     retry: 1, retryDelay: 3000, refetchOnWindowFocus: false
   })
   const artistUrl = credit.artist ? artist.data : null
-  const text = status === 'live' ? track || (mode === 'activity' ? t('audioOnly') : '') : t(status)
+  const text = status === 'live' ? track || (mode === 'activity' ? t('audioOnly') : '') : status === 'error' && lastError ? lastError : t(status)
   return jsxs('div', { className: 'hermes-radio-plus-signal', children: [
-    jsx(Waveform, { player }),
     jsxs('div', { className: 'hermes-radio-plus-track', 'data-track': Boolean(track), role: 'status', children: [
       status === 'connecting' && jsx(GlyphSpinner, { ariaLabel: t('connecting') }),
       credit.artist && (artistUrl ? jsx(Tip, { label: `${t('artistProfile')}: ${credit.artist}`, children: jsx(Button, {
@@ -722,9 +841,11 @@ function StationRow({ station, player }) {
   const active = status === 'live' || status === 'connecting'
   const failed = current && status === 'error'
   const saved = useValue(player.favorites).some(item => sameStation(item, station))
-  const [renaming, setRenaming] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [armed, setArmed] = useState(false)
-  const [draft, setDraft] = useState(station.name)
+  const [draftName, setDraftName] = useState(station.name)
+  const [draftUrl, setDraftUrl] = useState(station.url)
+  const [note, setNote] = useState('')
   // Deleting takes two clicks and disarms itself, so a stray click on a row
   // control cannot remove a station.
   useEffect(() => {
@@ -732,33 +853,46 @@ function StationRow({ station, player }) {
     const timer = setTimeout(() => setArmed(false), 4000)
     return () => clearTimeout(timer)
   }, [armed])
+  const open = () => { setDraftName(station.name); setDraftUrl(station.url); setNote(''); setArmed(false); setEditing(true) }
+  const cancel = () => { setEditing(false); setNote('') }
   const commit = () => {
-    setRenaming(false)
-    if (draft.trim() && draft.trim() !== station.name) player.renameStation(station, draft)
+    if (!streamUrl(draftUrl)) { setNote(t('editInvalid')); return }
+    if (!player.updateStation(station, { name: draftName, url: draftUrl })) { setNote(t('editInvalid')); return }
+    setEditing(false)
+    setNote('')
   }
-  const cancel = () => { setRenaming(false); setDraft(station.name) }
   const icon = failed ? icons.AlertCircle : current && active ? icons.Pause : icons.Play
-  return jsxs('div', { className: 'hermes-radio-plus-row', 'data-current': current, 'data-pinned': saved, 'data-armed': armed, children: [
-    renaming
-      ? jsxs('div', { className: 'hermes-radio-plus-row-main', children: [
-        jsx('span', { className: 'hermes-radio-plus-row-icon', children: jsx(icons.Pencil, { size: 12 }) }),
-        jsx('span', { className: 'hermes-radio-plus-row-copy', children: jsx('input', {
-          className: 'hermes-radio-plus-rename', value: draft, autoFocus: true, 'aria-label': t('renameHint'),
-          onChange: event => setDraft(event.target.value),
+  return jsxs('div', { className: 'hermes-radio-plus-row', 'data-current': current, 'data-pinned': saved, 'data-armed': armed, 'data-editing': editing, children: [
+    editing
+      ? jsxs('div', { className: 'hermes-radio-plus-edit', children: [
+        jsx('input', {
+          value: draftName, autoFocus: true, 'aria-label': t('editName'), placeholder: t('editName'),
+          onChange: event => setDraftName(event.target.value),
           onKeyDown: event => {
             if (event.key === 'Enter') { event.preventDefault(); commit() }
             else if (event.key === 'Escape') { event.preventDefault(); cancel() }
-          },
-          onBlur: commit
-        }) })
+          }
+        }),
+        jsx('input', {
+          value: draftUrl, 'aria-label': t('editUrl'), placeholder: t('editUrl'), spellCheck: false,
+          onChange: event => setDraftUrl(event.target.value),
+          onKeyDown: event => {
+            if (event.key === 'Enter') { event.preventDefault(); commit() }
+            else if (event.key === 'Escape') { event.preventDefault(); cancel() }
+          }
+        }),
+        jsxs('div', { className: 'hermes-radio-plus-edit-actions', children: [
+          jsx(Button, { variant: 'secondary', size: 'micro', onClick: commit, children: t('editSave') }),
+          jsx(Button, { variant: 'ghost', size: 'micro', onClick: cancel, children: t('cancel') }),
+          note && jsx('span', { className: 'hermes-radio-plus-add-note', role: 'status', children: note })
+        ] })
       ] })
       : jsxs(RowButton, { className: 'hermes-radio-plus-row-main', 'aria-label': `${t(failed ? 'retry' : current && active ? 'pause' : 'play')}: ${station.name}`, title: failed ? t('streamError') : station.nowPlaying || undefined, 'aria-current': current ? 'true' : undefined,
         onClick: () => current ? player.toggle() : void player.play(station), children: [
           jsx('span', { className: 'hermes-radio-plus-row-icon', role: failed ? 'status' : undefined, 'aria-label': failed ? t('error') : undefined, children: jsx(icon, { size: 12 }) }),
           jsx('span', { className: 'hermes-radio-plus-row-copy', children: jsx('span', { className: 'hermes-radio-plus-row-name', children: station.name }) })
         ] }),
-    editable && jsx(SmallAction, { label: `${t('rename')}: ${station.name}`, icon: icons.Pencil, size: 'icon-xs', className: 'hermes-radio-plus-row-edit',
-      onClick: () => { setDraft(station.name); setArmed(false); setRenaming(true) } }),
+    editable && jsx(SmallAction, { label: `${t('edit')}: ${station.name}`, icon: icons.Pencil, size: 'icon-xs', className: 'hermes-radio-plus-row-edit', onClick: open }),
     editable && jsx(SmallAction, { label: `${t(armed ? 'confirmRemove' : 'remove')}: ${station.name}`, icon: icons.Trash2, size: 'icon-xs',
       className: `hermes-radio-plus-row-edit${armed ? ' hermes-radio-plus-row-remove' : ''}`,
       onClick: () => { if (armed) { setArmed(false); player.removeStation(station) } else setArmed(true) } }),
@@ -805,13 +939,17 @@ function Stations({ player, ctx }) {
     queryKey: [ID, 'shoutcast', query], queryFn: () => shoutcastStations(ctx, query),
     enabled: source === 'shoutcast' && text === query, staleTime: 300000, retry: false
   })
-  const matches = item => [item.name, item.description, item.provider].some(value => value?.toLowerCase().includes(text.toLowerCase()))
-  const local = uniqueStations([...favorites, ...stored]).filter(matches)
-  const remote = source === 'all'
-    ? (text.length >= 2 && query === text ? browser.data ?? [] : [])
+  const matches = item => [item.name, item.description, item.provider].some(value => fold(value).includes(fold(text)))
+  // Only the All tab mixes your stations with a directory search. Choosing
+  // Popular or Shoutcast shows that source alone: appending sixty remote rows
+  // under your own stations looked like the chip had done nothing.
+  const local = source === 'all' ? uniqueStations([...favorites, ...stored]).filter(matches) : []
+  const remoteResult = source === 'all'
+    ? (text.length >= 2 && query === text ? browser.data : null)
     : source === 'popular'
-      ? (popular.data ?? []).filter(item => !text || matches(item))
-      : (text === query ? shoutcast.data ?? [] : [])
+      ? popular.data
+      : (text === query ? shoutcast.data : null)
+  const remote = (remoteResult?.stations ?? []).filter(item => source !== 'popular' || !text || matches(item))
   const results = uniqueStations([...local, ...remote])
   // Keep the previously prepended row until the search changes: selecting a
   // result must not remove a row above it and move the target under the pointer.
@@ -824,48 +962,74 @@ function Stations({ player, ctx }) {
   const failed = activeQuery.isError && (source !== 'all' || text.length >= 2)
   const errorText = source === 'popular' ? t('popularError') : source === 'shoutcast' ? t('shoutcastError') : t('searchError')
   const empty = !pending && !failed && results.length === 0 && (text.length > 0 || source !== 'all')
-  const save = () => {
-    const outcome = player.addStation({ name: draftName, url: draftUrl })
+  const hls = remoteResult?.hls ?? 0
+  const skipped = remoteResult?.skipped ?? 0
+  const openAdd = () => { setAddNote(''); setDraftName(''); setDraftUrl(''); setAdding(true) }
+  const closeAdd = () => { setAdding(false); setDraftName(''); setDraftUrl(''); setAddNote('') }
+  const save = async () => {
+    const address = streamUrl(draftUrl)
+    if (!address) { setAddNote(t('addInvalid')); return }
+    setAddNote(t('checking'))
+    // The route can tell a stream from a web page; the renderer cannot, because
+    // a station almost never sends CORS headers.
+    const verdict = await checkStream(ctx, address)
+    if (verdict && verdict.ok === false && verdict.kind !== 'unreachable') {
+      setAddNote(verdict.kind === 'hls' ? t('hlsNote') : t('notAudio'))
+      return
+    }
+    const outcome = player.addStation({ name: draftName, url: address })
     if (!outcome.station) { setAddNote(t('addInvalid')); return }
     if (!outcome.added) { setAddNote(t('addExists')); return }
-    setAdding(false); setDraftName(''); setDraftUrl(''); setAddNote('')
+    setAdding(false)
+    setDraftName('')
+    setDraftUrl('')
+    setAddNote('')
   }
-  const closeAdd = () => { setAdding(false); setDraftName(''); setDraftUrl(''); setAddNote('') }
   return jsxs('div', { children: [
     jsx('div', { className: 'hermes-radio-plus-search', 'data-filled': Boolean(search), children: jsx(SearchField, {
       value: search, onChange: value => { setBrowseStation(player.station.get()); setSearch(value) }, placeholder: t('search'),
       containerClassName: 'hermes-radio-plus-search-field',
       trailingAction: pending ? jsx('span', { className: 'hermes-radio-plus-search-loader', children: jsx(GlyphSpinner, { ariaLabel: t('searching') }) }) : null
     }) }),
-    jsx('div', { className: 'hermes-radio-plus-sources', role: 'tablist', 'aria-label': t('radio'), children: Object.entries(SOURCE_LABELS).map(([value, label]) => jsx(Button, {
-      variant: 'chip', size: 'micro', className: 'hermes-radio-plus-chip', role: 'tab',
-      'aria-selected': source === value, 'data-active': source === value,
-      onClick: () => { setBrowseStation(player.station.get()); setSource(value) },
-      children: t(label)
-    }, value)) }),
+    jsxs('div', { className: 'hermes-radio-plus-sources', children: [
+      Object.entries(SOURCE_LABELS).map(([value, label]) => jsx('button', {
+        type: 'button', className: 'hermes-radio-plus-chip', 'data-active': source === value, 'aria-pressed': source === value,
+        onClick: () => { setBrowseStation(player.station.get()); setSource(value) },
+        children: t(label)
+      }, value)),
+      jsx('span', { className: 'hermes-radio-plus-sources-space' }),
+      jsx(Tip, { label: t('add'), children: jsx('button', {
+        type: 'button', className: 'hermes-radio-plus-addbtn', 'data-active': adding, 'aria-label': t('add'), 'aria-expanded': adding,
+        onClick: () => adding ? closeAdd() : openAdd(),
+        children: jsx(icons.Plus, { size: 12 })
+      }) })
+    ] }),
+    adding && jsxs('div', { className: 'hermes-radio-plus-add', children: [
+      jsx('input', {
+        value: draftName, autoFocus: true, placeholder: t('addName'), 'aria-label': t('addName'),
+        onChange: event => setDraftName(event.target.value)
+      }),
+      jsx('input', {
+        value: draftUrl, placeholder: t('addUrl'), 'aria-label': t('addUrl'), spellCheck: false,
+        onChange: event => setDraftUrl(event.target.value),
+        onKeyDown: event => {
+          if (event.key === 'Enter') { event.preventDefault(); void save() }
+          else if (event.key === 'Escape') { event.preventDefault(); closeAdd() }
+        }
+      }),
+      jsxs('div', { className: 'hermes-radio-plus-add-actions', children: [
+        jsx(Button, { variant: 'secondary', size: 'micro', onClick: () => void save(), children: t('addSave') }),
+        jsx(Button, { variant: 'ghost', size: 'micro', onClick: closeAdd, children: t('cancel') })
+      ] }),
+      addNote && jsx('div', { className: 'hermes-radio-plus-add-note', role: 'status', children: addNote })
+    ] }),
     jsxs('div', { ref: listRef, className: 'hermes-radio-plus-list', 'data-radio-pending': pending, children: [
-      adding
-        ? jsxs('div', { className: 'hermes-radio-plus-add', children: [
-          jsx('input', { value: draftName, placeholder: t('addName'), 'aria-label': t('addName'), autoFocus: true, onChange: event => setDraftName(event.target.value) }),
-          jsx('input', { value: draftUrl, placeholder: t('addUrl'), 'aria-label': t('addUrl'), onChange: event => setDraftUrl(event.target.value),
-            onKeyDown: event => {
-              if (event.key === 'Enter') { event.preventDefault(); save() }
-              else if (event.key === 'Escape') { event.preventDefault(); closeAdd() }
-            } }),
-          jsxs('div', { className: 'hermes-radio-plus-add-actions', children: [
-            jsx(Button, { variant: 'secondary', size: 'micro', onClick: save, children: t('addSave') }),
-            jsx(Button, { variant: 'ghost', size: 'micro', onClick: closeAdd, children: t('cancel') })
-          ] }),
-          addNote && jsx('div', { className: 'hermes-radio-plus-add-note', role: 'status', children: addNote })
-        ] })
-        : jsxs(RowButton, { className: 'hermes-radio-plus-row-main', onClick: () => { setAddNote(''); setAdding(true) }, children: [
-          jsx('span', { className: 'hermes-radio-plus-row-icon', children: jsx(icons.Plus, { size: 12 }) }),
-          jsx('span', { className: 'hermes-radio-plus-row-copy', children: jsx('span', { className: 'hermes-radio-plus-row-name', children: t('add') }) })
-        ] }),
       ...items.map(station => jsx(StationRow, { station, player }, station.id)),
       pending && !items.length && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: t('searching') }),
       failed && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: errorText }),
-      empty && !failed && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: source === 'shoutcast' ? t('shoutcastEmpty') : t('noResults') })
+      empty && !failed && jsx('div', { className: 'hermes-radio-plus-error', role: 'status', children: source === 'shoutcast' ? t('shoutcastEmpty') : t('noResults') }),
+      hls > 0 && jsx('div', { className: 'hermes-radio-plus-error', children: `${hls} ${t('hlsNote')}` }),
+      skipped > 0 && jsx('div', { className: 'hermes-radio-plus-error', children: `${skipped} ${t('skippedNote')}` })
     ] })
   ] })
 }
@@ -879,7 +1043,7 @@ function Transport({ player, ctx }) {
   return jsxs('div', { className: 'hermes-radio-plus-volume', children: [
     jsx(SmallAction, { label: t(active ? 'pause' : 'play'), icon: active ? icons.Pause : icons.Play, busy: status === 'connecting', size: 'icon-xs', onClick: player.toggle }),
     jsx(SmallAction, { label: t('next'), icon: NextArrow, size: 'icon-xs', onClick: player.next }),
-    jsx('span', { className: 'hermes-radio-plus-volume-space' }),
+    jsx(Waveform, { player, fill: true }),
     jsx(SmallAction, { label: t(volume ? 'mute' : 'unmute'), icon: volume ? icons.Volume2 : icons.VolumeX, onClick: player.mute, size: 'icon-xs' }),
     jsx('input', { type: 'range', min: 0, max: 100, step: 1, value: volume, 'aria-label': t('volume'), onChange: event => player.setVolume(Number(event.target.value)) }),
     jsx('span', { className: 'hermes-radio-plus-website', children: httpsUrl(station.homepage) && jsx(SmallAction, { label: t('visit'), icon: icons.ExternalLink, size: 'icon-xs', onClick: () => void ctx.os.openExternal(station.homepage) }) })

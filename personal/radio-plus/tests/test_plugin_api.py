@@ -21,6 +21,15 @@ _spec.loader.exec_module(api)
 
 LIVE = os.environ.get("RADIO_PLUS_LIVE") == "1"
 
+
+@pytest.fixture(autouse=True)
+def _clear_caches():
+    """Every test starts with empty caches so a verdict cannot leak across cases."""
+    for cache in (api._query_cache, api._stream_cache, api._probe_cache):
+        cache.clear()
+    yield
+
+
 ROW = {
     "ID": 99426190,
     "Name": "BEST SMOOTH JAZZ  - UK (LONDON) HOST ROD LUCAS",
@@ -85,16 +94,45 @@ def test_stations_drop_unresolvable_rows_and_sort_by_listeners(monkeypatch):
         dict(ROW, ID=3, Listeners=50),
     ]
     monkeypatch.setattr(api, "_stream_for", lambda station_id: None if station_id == 1 else f"http://example.test/{station_id}")
-    stations = api._stations(rows, limit=10)
+    monkeypatch.setattr(api, "_probe", lambda url: {"ok": True, "kind": "audio", "status": 200, "contentType": "audio/mpeg", "reason": ""})
+    stations, skipped = api._stations(rows, limit=10)
     assert [item["id"] for item in stations] == ["sc-2", "sc-3"]
+    assert skipped == 1
+
+
+def test_stations_drop_addresses_that_no_longer_serve_audio(monkeypatch):
+    """A directory row that resolves to an HTML page must not reach the player."""
+    rows = [dict(ROW, ID=7), dict(ROW, ID=8)]
+    monkeypatch.setattr(api, "_stream_for", lambda station_id: f"http://example.test/{station_id}")
+    monkeypatch.setattr(api, "_probe", lambda url: {
+        "ok": "8" not in url, "kind": "html" if "8" in url else "audio", "status": 200,
+        "contentType": "text/html" if "8" in url else "audio/mpeg", "reason": "",
+    })
+    logged: list[dict] = []
+    monkeypatch.setattr(api, "_append_log", lambda entry: logged.append(entry))
+    stations, skipped = api._stations(rows, limit=10)
+    assert [item["id"] for item in stations] == ["sc-7"]
+    assert skipped == 1
+    assert logged and logged[0]["source"] == "shoutcast-resolve"
+    assert "html" in logged[0]["reason"]
 
 
 def test_stations_respect_limit_before_resolving(monkeypatch):
     rows = [dict(ROW, ID=index) for index in range(1, 21)]
     calls: list[int] = []
     monkeypatch.setattr(api, "_stream_for", lambda station_id: calls.append(station_id) or "http://example.test/x")
+    monkeypatch.setattr(api, "_probe", lambda url: {"ok": True, "kind": "audio", "status": 200, "contentType": "audio/mpeg", "reason": ""})
     api._stations(rows, limit=5)
     assert len(calls) == 5
+
+
+def test_probe_rejects_non_http_and_local_addresses():
+    assert api._probe("")["kind"] == "invalid"
+    assert api._probe("not a url")["kind"] == "invalid"
+    assert api._probe("http://127.0.0.1:8000/stream")["kind"] == "invalid"
+    assert api._probe("http://localhost/stream")["kind"] == "invalid"
+    assert api._probe("http://192.168.1.9:8000/")["kind"] == "invalid"
+
 
 
 def test_freshest_expires_entries():
@@ -153,3 +191,60 @@ def test_router_answers_under_the_mounted_prefix():
 
     assert client.get("/api/plugins/radio-plus/shoutcast/search", params={"q": ""}).status_code == 422
     assert client.get("/api/plugins/radio-plus/shoutcast/search", params={"q": "jazz", "limit": 500}).status_code == 422
+
+
+@pytest.mark.skipif(not LIVE, reason="set RADIO_PLUS_LIVE=1 to probe real stations")
+def test_live_probe_tells_a_website_from_a_stream_from_hls():
+    """The belisimo.BG mount answers HTML; BNR Horizont answers AAC; BNR HLS is a playlist."""
+    website = api._probe("http://79.98.108.170:8002")
+    assert website["ok"] is False
+    assert website["kind"] == "html"
+
+    audio = api._probe("https://play.global.audio/testb.aac?dist=RADIOPLAY")
+    assert audio["ok"] is True
+    assert audio["kind"] == "audio"
+    assert "bnr" in audio["name"].lower()
+
+    playlist = api._probe("https://lb-hls.cdn.bg/2032/fls/Horizont.stream/playlist.m3u8")
+    assert playlist["ok"] is False
+    assert playlist["kind"] == "hls"
+
+
+def test_log_route_writes_one_json_line(monkeypatch, tmp_path):
+    import json
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    app.include_router(api.router, prefix="/api/plugins/radio-plus")
+    client = TestClient(app)
+
+    response = client.post("/api/plugins/radio-plus/log", json={
+        "name": "Belisimo.BG", "url": "http://79.98.108.170:8002", "reason": "html: this is a web page",
+    })
+    assert response.status_code == 200
+    assert response.json()["status"] == "logged"
+
+    path = tmp_path / "radio-plus" / "station-log.jsonl"
+    assert path.exists()
+    line = json.loads(path.read_text(encoding="utf-8").strip())
+    assert line["name"] == "Belisimo.BG"
+    assert line["source"] == "player"
+    assert line["url"].startswith("http://79.98.108.170")
+
+
+@pytest.mark.skipif(not LIVE, reason="set RADIO_PLUS_LIVE=1 to probe real stations")
+def test_probe_route_is_mounted():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    app.include_router(api.router, prefix="/api/plugins/radio-plus")
+    client = TestClient(app)
+
+    response = client.get("/api/plugins/radio-plus/probe", params={"url": "https://play.global.audio/testb.aac?dist=RADIOPLAY"})
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert client.get("/api/plugins/radio-plus/probe", params={"url": "x"}).status_code == 422
