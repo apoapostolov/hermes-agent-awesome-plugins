@@ -2635,6 +2635,7 @@ export function CatalogPage() {
   // those caches fills, or the subtitle keeps reporting the number it saw first.
   const [countsTick, setCountsTick] = useState(0)
   const [reloadKey, setReloadKey] = useState(0)
+  const [updateProgress, setUpdateProgress] = useState(null)
   const [disabledSkillSources, setDisabledSkillSources] = useState(() => new Set())
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const hoverTimer = useRef(null)
@@ -3306,8 +3307,26 @@ export function CatalogPage() {
           jsx('button', {
             type: 'button',
             style: { fontSize: 11, padding: '2px 8px', borderRadius: 6, border: `1px solid ${C.stroke}`, background: 'transparent', color: C.text, cursor: 'pointer', flex: '0 0 auto' },
-            onClick: () => setReloadKey(k => k + 1),
-            children: 'Update all'
+            onClick: async () => {
+              const toUpdate = (cache.installed || []).filter(r => r.updateAvailable).map(r => r.key || r.name).filter(Boolean)
+              if (!toUpdate.length && kind !== 'skills') return
+              const list = toUpdate.length ? toUpdate : []
+              setUpdateProgress({ running: true, progress: list.map(n => ({ name: n, status: 'pending' })) })
+              try {
+                await ctxRef.rest('/catalog/update-all', { method: 'POST', body: { plugins: list } })
+              } catch (e) { /* ignore */ }
+              // poll
+              const poll = async () => {
+                try {
+                  const st = await ctxRef.rest('/catalog/update-all/status')
+                  setUpdateProgress(st)
+                  if (st.running) setTimeout(poll, 2000)
+                  else { setReloadKey(k => k + 1); setTimeout(() => setUpdateProgress(null), 3000) }
+                } catch { setUpdateProgress(null) }
+              }
+              setTimeout(poll, 2000)
+            },
+            children: updateProgress?.running ? `Updating ${updateProgress.progress.filter(p => p.status === 'done' || p.status === 'failed').length}/${updateProgress.progress.length}…` : 'Update all'
           }),
         null,
         null

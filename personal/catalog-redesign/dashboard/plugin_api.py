@@ -43,6 +43,78 @@ from pydantic import BaseModel
 
 router = APIRouter()
 
+import threading
+import subprocess
+import shutil
+
+_update_lock = threading.Lock()
+_update_job: dict[str, Any] = {"running": False, "progress": [], "done": False, "error": None}
+
+
+class UpdateAllRequest(BaseModel):
+    plugins: list[str] = []
+
+
+def _hermes_bin() -> str | None:
+    return shutil.which("hermes") or shutil.which("hermes.exe")
+
+
+def _run_update_worker(names: list[str]) -> None:
+    global _update_job
+    hermes = _hermes_bin()
+    progress = [{"name": n, "status": "pending", "message": ""} for n in names]
+    _update_job = {"running": True, "progress": progress, "done": False, "error": None}
+
+    for entry in progress:
+        entry["status"] = "updating"
+        try:
+            if not hermes:
+                raise RuntimeError("hermes CLI not found on PATH")
+            proc = subprocess.run(
+                [hermes, "plugins", "update", entry["name"]],
+                capture_output=True, text=True, timeout=120,
+            )
+            if proc.returncode == 0:
+                entry["status"] = "done"
+                entry["message"] = (proc.stdout or "").strip()[:200]
+            else:
+                entry["status"] = "failed"
+                entry["message"] = (proc.stderr or proc.stdout or "").strip()[:200]
+        except subprocess.TimeoutExpired:
+            entry["status"] = "failed"
+            entry["message"] = "timed out after 120s"
+        except Exception as exc:
+            entry["status"] = "failed"
+            entry["message"] = str(exc)[:200]
+
+    _update_job["running"] = False
+    _update_job["done"] = True
+
+
+@router.post("/catalog/update-all")
+def update_all(req: UpdateAllRequest) -> dict[str, Any]:
+    if _update_lock.locked():
+        return {"status": "running", "progress": _update_job.get("progress", [])}
+    if not req.plugins:
+        return {"status": "nothing", "progress": []}
+
+    def worker():
+        with _update_lock:
+            _run_update_worker(req.plugins)
+
+    threading.Thread(target=worker, daemon=True).start()
+    return {"status": "started", "count": len(req.plugins)}
+
+
+@router.get("/catalog/update-all/status")
+def update_all_status() -> dict[str, Any]:
+    return {
+        "running": _update_job.get("running", False),
+        "done": _update_job.get("done", False),
+        "progress": _update_job.get("progress", []),
+        "error": _update_job.get("error"),
+    }
+
 # The same published snapshots the native Capabilities page fetches, on the
 # static docs host: the public domain redirects there without CORS headers, and
 # the GitHub API splits one catalog across a thousand paginated calls.
