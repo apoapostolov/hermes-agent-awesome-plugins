@@ -32,6 +32,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **pack:** moves the **catalog-redesign** pin to `607cd2c`, which reads the published plugins and skills snapshots instead of a local feed and a hub walk, and adds the skills archive. Both trees carry it; the pin is the personal one, as every pack pin is.
 
+## [1.27.16] - 2026-11-16
+
+### Fixed
+
+- **pack:** moves the **catalog-redesign** pin to `670b1e4`, which reports the plugins catalog total rather than the first page.
+
 ## [catalog-redesign 1.0.2] - 2026-11-16
 
 ### Fixed
