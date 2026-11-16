@@ -5,7 +5,7 @@ author: Apostol Apostolov
 plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/radio-plus
-    ref: 95912dde8d01ef3fd99bdd84c18cacbba185ad4b
+    ref: c76655b91c8bb69b68ac3e207dddc81819d59a2f
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/next-steps
     ref: 2629dffaf8c133c64e995e4fd08f14a4cc8a4f09
