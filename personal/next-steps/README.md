@@ -4,7 +4,7 @@
   <strong>End a reply with options instead of a promise.</strong>
   <p>Clickable next steps under every reply. Tick several and one send delivers them together.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.2-2ea44f" alt="Version 1.0.2" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.3-2ea44f" alt="Version 1.0.3" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>

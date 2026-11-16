@@ -511,10 +511,9 @@ const REC_MARK = {
 }
 
 /* An unanswered option from an earlier reply. The pill sends it; the badge says
-   how many replies back it was offered and scrolls to that reply; the X drops it
-   without sending anything. Three jobs, three separate targets, so nothing sends
-   by accident: the badge and the X stop propagation, and the X is a sibling of
-   the pill rather than a child. */
+   how many replies back it was offered; the X drops it without sending anything.
+   Two jobs, two separate targets, so nothing sends by accident: the X stops
+   propagation, and the X is a sibling of the pill rather than a child. */
 function StaleChip(props) {
   const label = props.label
   const back = props.back == null ? 1 : props.back
@@ -950,7 +949,7 @@ function Chips(props) {
      of queueing behind it. */
   const steerOn = isOn(attrs.steer)
   /* This reply's number in the session, so a carried chip can say how many
-     replies ago it was offered and scroll back to the one that offered it. */
+     replies ago it was offered. */
   const ourN = carryOn ? carrySequence(carrySession, groupKey) : 0
   const [, bumpCarry] = useState(0)
   useEffect(
@@ -1191,7 +1190,7 @@ function normalizeSubtitle(text) {
 
   /* Older replies first, in the order they were offered: the newest reply shows
      its own proposals, then everything still unanswered above it. Each carried
-     chip knows how many replies back it came from, and which block to scroll to. */
+     chip knows how many replies back it came from. */
   stale.forEach(function (entry) {
     const back = Math.max(1, ourN - (typeof entry.n === 'number' ? entry.n : ourN - 1))
     rows.push(

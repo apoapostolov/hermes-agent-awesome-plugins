@@ -3,6 +3,11 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [next-steps 1.0.3] - 2026-11-16
+
+### Fixed
+
+- **next-steps:** three comments in the catalog edition still described the jump back to an offering reply, which that edition does not ship: the badge sends the step and states its age, nothing more. Comment-only, no behaviour change. The release exists so the tree the catalog pins is a released tree rather than an unreleased edit.
 ## [next-steps 1.0.2] - 2026-11-16
 
 ### Changed
