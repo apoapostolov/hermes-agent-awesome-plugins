@@ -3,6 +3,12 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [1.25.0] - 2026-11-16
+
+### Added
+
+- **next-steps:** version `1.0.0`, pinned from `personal/next-steps`. An extended edition of Follow-up Chips ([nuonrg/hermes-plugin-followup-chips](https://github.com/nuonrg/hermes-plugin-followup-chips)), which ends a reply with clickable options and sends a click back as the next turn. This edition carries that further: ticks pick several options and one send delivers them as a single turn, a Recommended tag marks the options worth taking now, an amber RISKY pill marks the ones that could damage something, a dim second line explains a label that would otherwise misread, options from one reply that exclude each other sit together and the option that clears them closes the row, unanswered options from earlier replies follow the newest reply youngest first with an age label and a dismiss cross, and a setting lets a click steer a live turn instead of queueing behind it. Follow-up Chips and Next Steps draw the same slot under a reply, so disable one before enabling the other. The public edition drops the injected chip-border animation and the scroll back to an offering reply, both of which reach into the app's own DOM; `personal/next-steps/LIMITATIONS.md` names the hooks that would let them ship in a listing. Not submitted to the catalog yet.
+
 ## [cdp-manager 1.0.3] - 2026-11-11
 
 The dialog could not start a port. Every launch and every profile switch sent a

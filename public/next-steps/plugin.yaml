@@ -1,0 +1,99 @@
+name: next-steps
+label: Next Steps
+version: 1.0.0
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/public/next-steps
+description: >
+  An extended edition of Follow-up Chips (nuonrg/hermes-plugin-followup-chips),
+  the plugin it grew out of. Clickable next-step options under a Hermes Desktop reply. The agent calls
+  next_steps, or ends the reply with a ::nextsteps directive, and each option
+  renders as a chip that sends its text as the next user turn. Two or more chips
+  are ticked and sent as one message by default; multi="0" sends on a single
+  click. The bundled prompt rule makes the agent end a choice that way instead of
+  asking "say the word and I'll...". A chip can carry a dim second line when the
+  label alone would misread. With rec="1,3" the options a decision classifier
+  prefers arrive tagged, accented and picked, and its next_steps_recommend tool
+  can name several that belong together but never all of them, never two that are
+  alternatives, and never a "none of these" option beside an action. With
+  risky="2" an option the classifier reads as able to damage something carries a
+  RISKY pill. Both marks need a classifier plugin and are inert without one. An
+  optional hook turns an offer the model wrote in prose into the same chips before
+  the reply is stored. Every chip in a block shares one width, so a row of short
+  actions still reads as a column. With carry_over on, a reply also lists the
+  options earlier replies left unanswered, newest reply first, each labelled with
+  how many replies back it was offered and an X to drop it. With send_as_steer on,
+  a chip clicked mid-turn steers the live turn instead of queueing behind it.
+  Per-block state persists across reloads.
+tags: [desktop, ux, chat]
+provides_tools: [next_steps, next_steps_recommend]
+provides_hooks: [transform_llm_output]
+requires_hermes: ">=0.22.0"
+config_schema:
+  auto_offers:
+    type: bool
+    default: false
+    label: Turn a written offer into options
+    description: >
+      When the agent ends a reply with an offer in prose ("say the word and I'll
+      push it", "want me to run the tests?"), rewrite that closing paragraph into
+      next-step options. Off by default: the bundled prompt rule already asks the
+      agent to end a choice with the directive, and this covers the replies that
+      ignore it.
+  auto_recommend:
+    type: bool
+    default: true
+    label: Ask the decision classifier which steps to pick
+    description: >
+      When a decision classifier plugin is loaded (nerve, or jev), the prompt rule
+      also asks the agent to call next_steps_recommend before writing the options,
+      so the steps worth taking now arrive tagged and pre-picked. Costs one
+      classifier call per reply that offers a choice, roughly 200 ms. Turn it off
+      to leave every chip unmarked; the tool stays available if asked for.
+  accent_recommended:
+    type: bool
+    default: true
+    label: Accent the recommended options
+    description: >
+      Recommended chips keep the accent border and tint even while they are not
+      picked, so the suggested steps read as one group rather than a tag floating
+      on a plain chip. The tint follows the app theme, so it matches light and
+      dark. Turn it off and every chip stays on the neutral surface until you pick
+      it; the Recommended tag stays either way. This one reaches the chips by
+      attribute (accent="0"), because renderer code cannot read plugin settings.
+  flag_risky:
+    type: bool
+    default: false
+    label: Mark risky options
+    description: >
+      A classifier reads every option for what it could damage: files, a working
+      setup, a build, or money, including the cost of undoing it. Steps above the
+      bar carry a RISKY pill, so a destructive chip is never one careless click
+      away from a safe one. Off by default, because the warning is advice about
+      consequences and a guess about those is worse than none. Needs a classifier
+      plugin; without one nothing is marked.
+  send_as_steer:
+    type: bool
+    default: false
+    label: Send a chip result as a steer
+    description: >
+      A chip clicked while the agent is working joins the queue as the next turn,
+      on or off. With this on, it also steers the live turn, so the text lands
+      mid-request; a refused steer falls back to that queued turn. Off by default,
+      because steering changes the answer in progress.
+  carry_over:
+    type: bool
+    default: false
+    label: Carry unanswered options forward
+    description: >
+      A reply's options are only reachable while they are on screen. In a long
+      queued session the next reply buries them and an option you never answered is
+      gone. With this on, every reply also lists the options earlier replies left
+      unanswered, youngest reply first, each labelled with how many replies back it
+      was offered, and each carries an X to drop it from the queue. Clicking the
+      label scrolls back to the reply that made the offer. Picking a chip or
+      pressing its X retires it. Off by default, because it changes every reply:
+      with it on the agent half also appends one empty ::nextsteps block to replies
+      that offer nothing, since that slot is the only place the chips can draw.

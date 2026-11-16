@@ -28,11 +28,11 @@
 
 ## Latest plugin update
 
-CDP Manager 1.0.3 repairs the port dialog: launching a port and switching a port's profile were refused by the host's profile-scope guard because the request body carried a `profile` field. Probes now find a Chrome that serves CDP on IPv6 only, so a port whose browser is up no longer reads dead, and a launch refuses by name when a stray Chrome still holds the profile directory.
+Next Steps 1.0.0 is an extended edition of **Follow-up Chips** ([nuonrg/hermes-plugin-followup-chips](https://github.com/nuonrg/hermes-plugin-followup-chips)), the plugin it grew out of: the same clickable options under a reply, carried further. On top of the original row it adds a Recommended tag on the options worth taking now, an amber RISKY pill on the ones that could damage something, a dim second line where a label alone would misread, a queue that carries earlier replies' unanswered options forward youngest first, and a setting that steers a live turn instead of queueing. Install it, enable it, and reload the window for the renderer half; a Follow-up Chips install should be disabled first, since both draw the same slot under a reply.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
-The pack is at 1.24.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
+The pack is at 1.25.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
 ## In the app
 
@@ -74,7 +74,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **better-capabilities**, **reasoning-switch**, **prompt-enhance**, **hermes-jev-routing**, and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all fourteen.
+Fifteen plugins are pinned in `hermes-pack.yaml` (pack version 1.25.0). **better-capabilities**, **reasoning-switch**, **prompt-enhance**, **hermes-jev-routing**, and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all fifteen.
 
 ### Status Bar
 
@@ -109,6 +109,7 @@ Fourteen plugins are pinned in `hermes-pack.yaml` (pack version 1.24.0). **bette
 | Plugin | What you get |
 | --- | --- |
 | [Opaque Composer](personal/opaque-composer/README.md) · [public](public/opaque-composer/README.md) | Solid composer while the transcript scrolls behind it. |
+| [Next Steps](personal/next-steps/README.md) · [public](public/next-steps/README.md) | Clickable next steps under a reply: tick several and one send delivers them together, a Recommended tag on the options worth taking now, an amber RISKY pill on the ones that could damage something, a dim second line where a label alone would misread, and carried-forward options from earlier replies. The personal edition animates the chip border while a reply works and jumps back to the reply that offered a carried option. |
 | [Prompt Enhance](personal/prompt-enhance/README.md) · [public](public/prompt-enhance/README.md) | Rewrite a composer draft from a saved prompt library and put the finished prompt back in the field. **Not in the pack; enable separately.** |
 
 ### Writing
