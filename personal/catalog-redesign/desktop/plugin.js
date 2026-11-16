@@ -1830,18 +1830,42 @@ function DetailPanel({ item, profile, onClose, onChanged, onToggle }) {
     }
   }
 
+  /** Archiving is a directory move, so a restore is the same move reversed. */
+  const restoreSkill = () =>
+    run(
+      'Restored to skills',
+      async () => {
+        await ctxRef.rest('/skills/archive/restore', {
+          method: 'POST',
+          body: { folder: item.folder || item.key }
+        })
+
+        // Three caches just changed on disk: the archive row is gone, the
+        // installed skill is new, and both counts moved.
+        cache.archived = null
+        cache.archivedAt = 0
+        cache.skills = null
+        cache.skillsAt = 0
+      },
+      'Could not restore'
+    )
+
   const actions = []
 
   if (isSkill) {
-    actions.push({
-      id: 'toggle',
-      label: item.enabled ? 'Disable skill' : 'Enable skill',
-      icon: item.enabled ? 'circle-slash' : 'check',
-      run: toggleSkill,
-      disabled: busy || !isInstalled
-    })
-    if (!isInstalled) {
-      actions.push({ id: 'install', label: 'Install skill', icon: 'cloud-download', run: installSkill, disabled: busy })
+    if (item.origin === 'archive') {
+      actions.push({ id: 'restore', label: 'Restore skill', icon: 'history', run: restoreSkill, disabled: busy })
+    } else {
+      actions.push({
+        id: 'toggle',
+        label: item.enabled ? 'Disable skill' : 'Enable skill',
+        icon: item.enabled ? 'circle-slash' : 'check',
+        run: toggleSkill,
+        disabled: busy || !isInstalled
+      })
+      if (!isInstalled) {
+        actions.push({ id: 'install', label: 'Install skill', icon: 'cloud-download', run: installSkill, disabled: busy })
+      }
     }
   } else if (isTool) {
     actions.push({
@@ -1888,10 +1912,20 @@ function DetailPanel({ item, profile, onClose, onChanged, onToggle }) {
       value: isSkill ? item.category : isTool ? (item.enabled ? 'enabled' : 'disabled') : isConnector ? item.transport || item.category : item.provider || item.tier
     }),
     jsx(MetaRow, { key: 'version', label: 'Version', value: item.version ? `v${item.version}` : '' }),
+    item.origin === 'archive'
+      ? jsx(MetaRow, { key: 'archived', label: 'Archived', value: dateOf(item.archivedAt) })
+      : null,
     jsx(MetaRow, {
       key: 'source',
       label: 'Source',
-      value: item.origin === 'installed' ? 'Installed on this host' : isConnector ? 'MCP catalog preset' : 'Public catalog'
+      value:
+        item.origin === 'installed'
+          ? 'Installed on this host'
+          : item.origin === 'archive'
+            ? 'Archived on this host'
+            : isConnector
+              ? 'MCP catalog preset'
+              : 'Public catalog'
     }),
     jsx(MetaRow, {
       key: 'count',
@@ -1999,11 +2033,14 @@ function DetailPanel({ item, profile, onClose, onChanged, onToggle }) {
   }
 
   if (isPlugin || isSkill) {
-    const command = isSkill
-      ? item.identifier
-        ? `hermes skills install ${item.identifier}`
-        : ''
-      : item.installCommand
+    const command =
+      item.origin === 'archive'
+        ? ''
+        : isSkill
+          ? item.identifier
+            ? `hermes skills install ${item.identifier}`
+            : ''
+          : item.installCommand
 
     body.push(
       el(
@@ -2015,7 +2052,38 @@ function DetailPanel({ item, profile, onClose, onChanged, onToggle }) {
           },
           style: { borderTop: `1px solid ${C.stroke}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }
         },
-        sectionTitle('Install'),
+        sectionTitle(item.origin === 'archive' ? 'Archive' : 'Install'),
+        item.origin === 'archive'
+          ? el(
+              'div',
+              { style: { fontSize: 12, color: C.text2, lineHeight: 1.6 } },
+              'The curator moved this skill out of skills/ so it stops loading. Restore moves the folder back; nothing was deleted.'
+            )
+          : null,
+        item.origin === 'archive' && item.path
+          ? jsx(MetaRow, {
+              label: 'Folder',
+              value: item.path,
+              mono: true,
+              action: el(
+                'div',
+                { style: { display: 'flex', alignItems: 'center', gap: 4, flex: '0 0 auto' } },
+                jsx(Button, {
+                  size: 'xs',
+                  variant: 'ghost',
+                  onClick: () => ctxRef?.os?.revealPath?.(item.path),
+                  children: 'Open'
+                }),
+                jsx(Button, {
+                  size: 'xs',
+                  variant: 'ghost',
+                  'aria-label': 'Copy the folder path',
+                  onClick: () => void copy(item.path),
+                  children: jsx(Codicon, { name: 'copy', size: '0.8rem' })
+                })
+              )
+            })
+          : null,
         command
           ? el(
               'div',

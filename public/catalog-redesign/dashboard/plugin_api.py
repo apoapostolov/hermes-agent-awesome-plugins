@@ -12,6 +12,8 @@ Routes (mounted at ``/api/plugins/hermes-catalog-redesign/``):
   catalogs the native Capabilities page reads, projected to the fields the page
   draws and served one page at a time (``?page=1&size=150&q=``). ``?refresh=1``
   bypasses the TTL (the page's Refresh action).
+* ``GET /skills/archive`` — the skills the curator moved to ``skills/.archive``,
+  and ``POST /skills/archive/restore`` to move one back.
 * ``GET /icons`` — plugin artwork found in each installed plugin folder, as data
   URLs, so a row can show the plugin's own image instead of initials.
 * ``POST /servers/toggle`` — enable or disable one configured MCP server, the
@@ -26,6 +28,7 @@ import gzip
 import json
 import os
 import re
+import shutil
 import threading
 import time
 import urllib.error
@@ -404,6 +407,55 @@ def skills_archive() -> dict[str, Any]:
             )
 
     return {"rows": rows, "total": len(rows), "root": str(root)}
+
+
+class RestoreRequest(BaseModel):
+    """One archived skill, by the folder name under ``skills/.archive``."""
+
+    folder: str
+
+
+@router.post("/skills/archive/restore")
+def skills_archive_restore(body: RestoreRequest) -> dict[str, Any]:
+    """Move an archived skill back into ``skills/``.
+
+    Archiving is a directory move, so restoring one is the move reversed: no
+    deletion, no registry edit, and the same folder keeps its ``SKILL.md``. The
+    name is a single path segment and the target must be free, so a crafted body
+    cannot walk out of the skills directory or overwrite a live skill.
+    """
+    folder = str(body.folder or "").strip()
+
+    if not folder or folder in {".", ".."} or any(sep in folder for sep in ("/", "\\", ":")):
+        raise HTTPException(status_code=400, detail="A single archived folder name is required")
+
+    live_dir = hermes_home() / "skills"
+    source = live_dir / ".archive" / folder
+
+    if not source.is_dir():
+        raise HTTPException(status_code=404, detail=f"'{folder}' is not in the archive")
+
+    if not (source / "SKILL.md").exists():
+        raise HTTPException(status_code=409, detail=f"'{folder}' has no SKILL.md at its top level")
+
+    target = live_dir / folder
+
+    if target.exists():
+        raise HTTPException(status_code=409, detail=f"skills/{folder} already exists")
+
+    try:
+        shutil.move(str(source), str(target))
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}") from exc
+
+    meta = _frontmatter(target / "SKILL.md")
+
+    return {
+        "ok": True,
+        "name": meta.get("name") or folder,
+        "folder": folder,
+        "path": str(target),
+    }
 
 
 @router.get("/icons")

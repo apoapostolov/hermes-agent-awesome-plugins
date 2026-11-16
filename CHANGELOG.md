@@ -38,6 +38,13 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **pack:** moves the **catalog-redesign** pin to `670b1e4`, which reports the plugins catalog total rather than the first page.
 
+## [catalog-redesign 1.0.3] - 2026-11-16
+
+### Added
+
+- **catalog-redesign:** **Restore skill** in the panel of an archived row. Archiving is a directory move, so restoring one moves it back into `skills/`: the folder keeps its name and its `SKILL.md`, nothing is rewritten, and the skill loads again on the next turn. The Install section reads **Archive** for those rows and shows the folder with Open and copy, rather than an install command that would fetch a different copy from the hub.
+- **catalog-redesign:** `POST /skills/archive/restore` on the Python half. It takes one folder name, refuses anything that is not a single path segment, refuses a folder without a `SKILL.md` at its top level, and refuses a name that is already taken in `skills/`, so a restore cannot overwrite a live skill or walk out of the skills directory.
+
 ## [catalog-redesign 1.0.2] - 2026-11-16
 
 ### Fixed

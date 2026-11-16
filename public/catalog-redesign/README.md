@@ -4,7 +4,7 @@
   <strong>One page for skills, plugins, connectors and tools.</strong>
   <p>A wide catalog with one row per item, a hover preview, and a detail panel that carries the artwork.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.2-2ea44f" alt="Version 1.0.2" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.3-2ea44f" alt="Version 1.0.3" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -23,7 +23,7 @@ The catalog in the plugins view, with the panel open on a plugin that ships a he
 
 ## What You Can Do
 
-- Browse four kinds on one page. Plugins, Skills, Connectors and Tools switch with one control, and each kind keeps its own filters, its own search and its own count. Skills carry a third state: **Installed**, **Archive** and **Catalog**, because a skill the curator retired sits in `skills/.archive`, neither loading nor gone.
+- Browse four kinds on one page. Plugins, Skills, Connectors and Tools switch with one control, and each kind keeps its own filters, its own search and its own count. Skills carry a third state: **Installed**, **Archive** and **Catalog**, because a skill the curator retired sits in `skills/.archive`, neither loading nor gone. An archived skill restores from its panel: **Restore skill** moves the folder back into `skills/`, and the skill loads again.
 - Read a row instead of a card. A row is a thumbnail, the name with its description, and the column that matters for that kind: tags for skills, connectors and tools, the normalized short name for plugins. Columns hold their position down the list, so the third column lines up as a column rather than a caption.
 - See artwork, not initials. A published plugin borrows the catalog's hero image; a plugin outside the catalog uses a logo its own folder ships (`icon`, `logo`, `banner`, `hero`, `cover`, `thumbnail` or `preview`, up to 300 KB). A plugin with neither keeps its initials.
 - Preview without clicking. Resting on a row for 240 milliseconds opens a card under it with the hero image as a 16:9 band, the description, provider, version, stars and what the item includes. Near the bottom edge the card flips above the row, and it never takes the pointer.
