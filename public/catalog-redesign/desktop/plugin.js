@@ -3301,17 +3301,7 @@ export function CatalogPage() {
             onClick: () => setReloadKey(k => k + 1),
             children: 'Update all'
           }),
-        jsx('span', {
-          style: {
-            fontSize: 11,
-            color: C.text4,
-            minWidth: 0,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          },
-          children: subtitle
-        })
+        null
       ),
       el(
         'div',
