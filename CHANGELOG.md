@@ -10,6 +10,24 @@ the component that changed; a plugin patch does not imply a new pack release.
 - **next-steps:** the bundled prompt rule stays inside the host cap. With a decision classifier loaded and recommendations on, the section reached 2,335 characters against the host's 2,200, and Hermes skips an oversized plugin section instead of truncating it, so the rule that ends a reply in chips never reached the model while both tools still answered. The rule is terser now, `MAX_CHARS` sits at 2,100, and the section drops its optional paragraphs rather than overflowing, so neither a longer nor a shorter host cap can lose it whole. Five tests pin every combination under the cap, the dropped-paragraph order, and the non-desktop fallback.
 - **next-steps:** 1.0.0 was re-cut twice while this defect was being found and fixed, so install 1.0.1 and ignore a `1.0.0` reading older than this entry.
 
+## [1.27.3] - 2026-11-16
+
+### Added
+
+- **radio-plus:** version `1.0.0`, its first listed release. The product is the
+  one described under 1.27.0 and 1.27.2 below, now shipped with the assets and
+  documentation the other plugins carry: a stipple hero, a code-drawn icon that
+  stays readable at 48px, a screenshot captured from the running app, and a
+  README written to the house page rather than as a change log.
+
+### Changed
+
+- **radio-plus is renumbered to `1.0.0`.** The `1.1.0`, `1.2.0` and `1.2.1`
+  numbers were iterations made while the plugin was personal-only and unlisted,
+  all within one day; the tags and releases for them are retired so the listed
+  plugin starts where every other plugin in this repo started. No code changed
+  between `1.2.1` and `1.0.0` beyond the documentation and the assets.
+
 ## [1.27.2] - 2026-11-16
 
 ### Fixed

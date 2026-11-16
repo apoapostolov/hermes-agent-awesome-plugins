@@ -4,9 +4,19 @@
   <strong>Live radio in the status bar, with a station list you own.</strong>
   <p>An extended edition of the bundled Radio plugin: editable stations, three directories, and a station log that says why a stream will not play.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.2.1-2ea44f" alt="Version 1.2.0" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.0-2ea44f" alt="Version 1.2.0" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
+</div>
+
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Radio Plus" />
+</div>
+
+## Screenshot
+
+<div align="center">
+  <img src="docs/screenshot.png" width="560" alt="The station picker: a search field, the All, Popular and Shoutcast chips, the add button, seven stored stations and the transport row" />
 </div>
 
 ## Where this comes from
@@ -113,6 +123,12 @@ node tests/hls.electron.test.mjs
 The last one loads the shipped `plugin.js` in Electron, points `attachHls` at a
 real BNR stream, and requires the audio clock to advance, which is the only
 honest test of an HLS path.
+
+`docs/screenshot.png` is a capture of the running app: a second Hermes instance
+with a copy of the real profile, the picker opened over CDP, the app chrome
+hidden so the panel's translucency composites on one colour, then cropped to the
+popover. `docs/hero.png` is a stipple illustration with the title overlaid.
+`docs/icon.png` is the mark, drawn in code so it stays crisp at 48px.
 
 ## License
 

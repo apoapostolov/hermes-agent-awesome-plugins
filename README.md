@@ -30,7 +30,7 @@
 
 Next Steps 1.0.1 fixes the part of 1.0.0 that never worked. The plugin's own prompt rule, the one that asks a reply to end in chips instead of "say the word and I'll…", measured 2,335 characters with a decision classifier loaded, and Hermes skips a plugin prompt section over its 2,200-character cap instead of trimming it, so the whole rule was dropped and the chips only appeared when the model chose them. The rule is terser now (1,828 characters with recommendations, 2,091 with the risky paragraph as well), `MAX_CHARS` sits at 2,100, and the section drops its optional paragraphs rather than overflowing. Update if you installed 1.0.0; the tools were never affected and the chips you sent still worked.
 
-Radio Plus 1.2.0 is an extended edition of the **Radio** plugin bundled with Hermes Desktop, and the first release to be pinned by the pack and listed in the catalog. The bundled player ships seven fixed stations, searches one directory, and skips HLS; this edition keeps its oscilloscope, transport, artist links and dictation-aware pause, and makes the rest work for any station: the list is editable (name and stream address together), any `http` or `https` stream can be added and is checked before it is saved, the picker searches Radio Browser, its popular list and the Shoutcast directory, a Cyrillic query is also sent transliterated so `Хоризонт` finds `BNR Horizont`, HLS stations play through a vendored `hls.js` 1.6.15, and a station that will not play says why in the panel and in `radio-plus/station-log.jsonl`. The bundled Radio plugin draws the same status-bar slot, so disable it. Enable Radio Plus in Capabilities, Plugins, then restart the app once so the dashboard mounts its routes.
+Radio Plus 1.0.0 is an extended edition of the **Radio** plugin bundled with Hermes Desktop, and its first listed release: a stipple hero, a code-drawn icon, a capture of the picker from the running app, and a README written to the house page. The bundled player ships seven fixed stations, searches one directory, and skips HLS; this edition keeps its oscilloscope, transport, artist links and dictation-aware pause, and makes the rest work for any station: the list is editable (name and stream address together), any `http` or `https` stream can be added and is checked before it is saved, the picker searches Radio Browser, its popular list and the Shoutcast directory, a Cyrillic query is also sent transliterated so `Хоризонт` finds `BNR Horizont`, HLS stations play through a vendored `hls.js` 1.6.15, and a station that will not play says why in the panel and in `radio-plus/station-log.jsonl`. The bundled Radio plugin draws the same status-bar slot, so disable it. Enable Radio Plus in Capabilities, Plugins, then restart the app once so the dashboard mounts its routes.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
@@ -40,7 +40,7 @@ The pack is at 1.27.2. See the [changelog](CHANGELOG.md) for plugin-level update
 
 ## In the app
 
-These are captures from the running app of the parts that only make sense in place: the providers dialog, the reader, the memory review queue, skills presets, the session list and the turn meter. Seven plugins carry one; the settings for every plugin that has a settings page live under Settings, Plugins, and each plugin README shows its own.
+These are captures from the running app of the parts that only make sense in place: the providers dialog, the reader, the memory review queue, skills presets, the session list and the turn meter. Eight plugins carry one; the settings for every plugin that has a settings page live under Settings, Plugins, and each plugin README shows its own.
 
 <div align="center">
 <table>
@@ -56,6 +56,7 @@ These are captures from the running app of the parts that only make sense in pla
   </tr>
   <tr>
     <td align="center" valign="top" width="33%"><a href="personal/next-steps"><img src="personal/next-steps/docs/screenshot.png" width="260" alt="Next Steps row under a reply with unanswered options carried forward, age labels, a dismiss cross and Clean Old Proposals" /></a><br /><sub><a href="personal/next-steps"><strong>Next Steps</strong></a><br />Unanswered options carried under a later reply</sub></td>
+    <td align="center" valign="top" width="33%"><a href="personal/radio-plus"><img src="personal/radio-plus/docs/screenshot.png" width="260" alt="Radio Plus station picker with the search field, the All, Popular and Shoutcast chips, stored stations and the transport row" /></a><br /><sub><a href="personal/radio-plus"><strong>Radio Plus</strong></a><br />The station picker: three sources and your own stations</sub></td>
   </tr>
 </table>
 </div>
