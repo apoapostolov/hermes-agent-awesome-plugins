@@ -3,6 +3,15 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [1.26.0] - 2026-11-16
+
+### Added
+
+- **hermes-jev-routing:** version `1.1.1`, now pinned from `personal/hermes-jev-routing` instead of installed separately. Per-turn model routing from TypeSafe Jev: the personal edition moves the live session and reads the provider catalogue, Codex quota and private pricing, while the listed edition rewrites the model and reasoning level on the request the turn is already bound to and reports a pick on another provider rather than sending it.
+- **reasoning-switch:** version `1.1.4`, now pinned from `personal/reasoning-switch`. Cycles reasoning effort from the status bar with a colour per level and an optional prompt demote per level.
+
+Both were already in this repo and are unchanged by this release; the pack pins the commits that hold their current trees, so a pack install now brings them without a separate step. Their editions keep the split they already had: jev routing's public edition omits the session move and the private-pricing reads, and the reasoning switch differs only by a one-time migration of its old app storage keys, which the public edition does not run.
+
 ## [1.25.0] - 2026-11-16
 
 ### Added

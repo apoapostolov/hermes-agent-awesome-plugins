@@ -32,7 +32,9 @@ Next Steps 1.0.0 is an extended edition of **Follow-up Chips** ([nuonrg/hermes-p
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
-The pack is at 1.25.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
+Jev Routing 1.1.1 and Reasoning Switch 1.1.4 are pinned by the pack now, so a pack install brings both: per-turn model routing from TypeSafe Jev, and a status-bar control for reasoning effort. Neither is a new release; see the [changelog](CHANGELOG.md) for their own entries.
+
+The pack is at 1.26.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
 ## In the app
 
@@ -74,7 +76,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Fifteen plugins are pinned in `hermes-pack.yaml` (pack version 1.25.0). **better-capabilities**, **reasoning-switch**, **prompt-enhance**, **hermes-jev-routing**, and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all fifteen.
+Seventeen plugins are pinned in `hermes-pack.yaml` (pack version 1.26.0). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all seventeen.
 
 ### Status Bar
 
@@ -82,7 +84,7 @@ Fifteen plugins are pinned in `hermes-pack.yaml` (pack version 1.25.0). **better
 | --- | --- |
 | [Provider Status](personal/provider-status/README.md) · [public](public/provider-status/README.md) | Status-bar quota used/remaining. DeepSeek and GLM peak/off-peak gauges with countdowns. Multi-account. Rotate on low quota or reset day. Grok/Codex OAuth. Providers: Tavily, OpenCode Go, DeepSeek, GLM (z.ai), OpenRouter, Grok (xAI), Codex (OpenAI), OpenAI, Anthropic, Groq, Cerebras, Moonshot Kimi, MiniMax, Google Gemini, Hugging Face, Mistral, Qwen. |
 | [Iteration Budget Meter](personal/iteration-budget-meter/README.md) · [public](public/iteration-budget-meter/README.md) | Per-turn N/budget while work runs. Hover and click for request stats. |
-| [Reasoning Switch](personal/reasoning-switch/README.md) · [public](public/reasoning-switch/README.md) | Cycle reasoning effort from the status bar, with colors and per-level prompt demote. **Not in the pack; enable separately.** |
+| [Reasoning Switch](personal/reasoning-switch/README.md) · [public](public/reasoning-switch/README.md) | Cycle reasoning effort from the status bar, with colors and per-level prompt demote. |
 
 ### Tools and Memory
 
@@ -92,7 +94,7 @@ Fifteen plugins are pinned in `hermes-pack.yaml` (pack version 1.25.0). **better
 | [Vercel Agent Desktop Support](personal/vercel-agent-desktop-support/README.md) · [public](public/vercel-agent-desktop-support/README.md) | Operate Windows apps through the accessibility tree: click, fill, select, toggle, scroll, key combos, windows, clipboard. Headless by default, so it never takes focus or the cursor. **Windows only.** |
 | [Memory Review](personal/memory-review/README.md) · [public](public/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
 | [CDP Manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar, with a profile per port and one port a backend supervisor keeps alive. The `cdp` tool does the same from chat and repairs a Chrome profile-picker launch. |
-| [Jev Routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. The listed edition rewrites the model and the reasoning level on the request the turn is already bound to, and reports a pick on another provider rather than sending it; the personal edition moves the live session and also reads the provider catalogue, Codex quota and private pricing. **Not in the pack; enable separately.** |
+| [Jev Routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. The listed edition rewrites the model and the reasoning level on the request the turn is already bound to, and reports a pick on another provider rather than sending it; the personal edition moves the live session and also reads the provider catalogue, Codex quota and private pricing. |
 
 ### Sessions and Sidebar
 
@@ -125,7 +127,7 @@ Fifteen plugins are pinned in `hermes-pack.yaml` (pack version 1.25.0). **better
 | [RSS Reader](personal/rss-reader/README.md) · [public](public/rss-reader/README.md) | Three-column reader. Folders, mute/search, capture. Optional Hermes tools and ticker. |
 | [Reddit](personal/reddit/README.md) · [public](public/reddit/README.md) | Account access, a searchable local save library with source summaries and notes, a Desktop browser, background cleanup and 22 reading/management tools. Standalone release; catalog admission is blocked by missing host OAuth transport. |
 
-Five plugins in this repo are not in the pack and are installed separately: **better-capabilities**, **reasoning-switch** (Status Bar table), **prompt-enhance** (Composer table), **hermes-jev-routing** (Tools and Memory table), and **voice-gate** (Writing table). Every other plugin above is pinned by the pack.
+Three plugins in this repo are not in the pack and are installed separately: **better-capabilities**, **prompt-enhance** (Composer table), and **voice-gate** (Writing table). Every other plugin above is pinned by the pack.
 
 Retired and on-hold plugins live in [RETIRED.md](RETIRED.md).
 
