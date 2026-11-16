@@ -17,6 +17,13 @@ import { jsx } from 'react/jsx-runtime'
    the multi-select list of indexes; `sent` records that a block's picks were
    submitted as one turn. */
 const groups = new Map()
+const GROUP_PRUNE_THRESHOLD = 64
+function pruneGroups() {
+  if (groups.size <= GROUP_PRUNE_THRESHOLD) return
+  groups.forEach(function (g, key) {
+    if (!g.running && (!g.listeners || g.listeners.size === 0)) groups.delete(key)
+  })
+}
 
 let storage = null /* bound in register */
 /* Only the most recent choice may report the running state; every older block keeps its
@@ -69,6 +76,7 @@ function hydrate() {
 }
 
 function group(key) {
+  pruneGroups()
   let g = groups.get(key)
   if (!g) {
     g = { chosen: null, picked: [], sent: false, touched: false, running: false, listeners: new Set() }
@@ -108,6 +116,16 @@ const CARRY_STORAGE = 'carried'
 const CARRY_VERSION = 2
 const CARRY_LIMIT = 30
 const carryStates = new Map()
+function pruneCarryStates() {
+  if (carryStates.size <= 16) return
+  carryStates.forEach(function (state, sid) {
+    const ls = carryListeners.get(sid)
+    if (!ls || ls.size === 0) {
+      carryStates.delete(sid)
+      carryListeners.delete(sid)
+    }
+  })
+}
 const carryListeners = new Map()
 
 function carryListenersFor(sessionId) {
@@ -232,6 +250,7 @@ function dropSharedBucket() {
 }
 
 function carryState(sessionId) {
+  pruneCarryStates()
   if (carryStates.has(sessionId)) return carryStates.get(sessionId)
   let state = emptyCarryState()
   if (storage) {
@@ -1004,6 +1023,7 @@ function normalizeSubtitle(text) {
   if (multi && rec.length && !g.touched && !g.sent) {
     g.picked = rec.slice()
     g.touched = true
+    persistChoice(groupKey, g)
   }
 
   const picked = usePickedState(groupKey)
