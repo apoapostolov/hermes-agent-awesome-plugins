@@ -2668,7 +2668,7 @@ export function CatalogPage() {
             setLoading(false)
           }
 
-          let installed
+          let installed = cache.installed || []
 
           try {
             const quick = await loadInstalledPluginsQuick(profile)
@@ -2702,12 +2702,22 @@ export function CatalogPage() {
               })
               .catch(() => null)
 
-            installed = await loadInstalledPlugins(profile, reloadKey > 0)
+            if (effectiveFilter === 'installed') {
+              if (effectiveFilter === 'installed') {
+              installed = await loadInstalledPlugins(profile, reloadKey > 0)
+            } else {
+              installed = cache.installed || []
+              void loadInstalledPlugins(profile, reloadKey > 0).then(r => { cache.installed = r; cache.installedAt = Date.now() }).catch(() => {})
+            }
+            } else {
+              installed = cache.installed || []
+              void loadInstalledPlugins(profile, reloadKey > 0).then(r => { cache.installed = r; cache.installedAt = Date.now() }).catch(() => {})
+            }
           } catch (err) {
             // The fast list is a real answer even when the detail scan does not
             // finish: keep it on screen and say so in the console instead of
             // replacing a working list with an error.
-            if (cache.quickInstalled?.length || cache.installed?.length) {
+            if (effectiveFilter === 'installed' && (cache.quickInstalled?.length || cache.installed?.length)) {
               console.error(
                 '[catalog] plugin list scan failed, keeping what is painted:',
                 String(err?.message || err)
@@ -2715,7 +2725,11 @@ export function CatalogPage() {
               return
             }
 
-            throw err
+            if (effectiveFilter !== 'installed') {
+              console.error('[catalog] installed scan failed, proceeding with catalog:', String(err?.message || err))
+            } else {
+              throw err
+            }
           }
 
           if (!alive) {
