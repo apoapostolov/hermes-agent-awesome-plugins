@@ -1,7 +1,7 @@
 name: "radio-plus"
 label: Radio Plus
-version: 1.1.0
-description: "Live radio in the status bar with an editable station list (name and stream address), station search across Radio Browser, the popular list, and the Shoutcast directory, cross-script search for Bulgarian names, and a station log that explains why a stream will not play."
+version: 1.2.0
+description: "Live radio in the status bar, an extended edition of the bundled Radio plugin: editable stations with a name and a stream address, search across Radio Browser, its popular list and the Shoutcast directory, cross-script search for Bulgarian names, HLS playback through a bundled hls.js, and a station log that explains why a stream will not play."
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2

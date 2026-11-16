@@ -1,0 +1,14 @@
+name: "radio-plus"
+label: Radio Plus
+version: 1.2.0
+description: "Live radio in the status bar, an extended edition of the bundled Radio plugin: editable stations with a name and a stream address, search across Radio Browser, its popular list and the Shoutcast directory, cross-script search for Bulgarian names, HLS playback through a bundled hls.js, and a station log that explains why a stream will not play."
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/public/radio-plus
+tags:
+  - desktop
+  - radio
+  - shoutcast
+  - audio

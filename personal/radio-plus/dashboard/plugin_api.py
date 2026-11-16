@@ -284,7 +284,7 @@ def _probe(url: str) -> dict[str, Any]:
     else:
         kind = "other"
     return {
-        "ok": kind == "audio",
+        "ok": kind in {"audio", "hls"},
         "kind": kind,
         "status": status,
         "contentType": content_type,

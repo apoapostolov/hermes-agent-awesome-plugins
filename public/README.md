@@ -27,6 +27,7 @@ Each public plugin that diverged from personal (or is held because of it) has `L
 | drag-to-pin-session | Snapshot. Held until `host.sessions.pin` / `reorder`. |
 | better-session-appearance | Snapshot. Held until session-row slot / `setColor`. |
 | prompt-enhance | Draft API. Enhance, undo, and replace stay. Add on a saved prompt appends. |
+| radio-plus | HLS playback. The listed tree cannot carry the vendored `hls.js` build (the admission scanner refuses a library that defines accessors on its own prototypes) and will not load it from a CDN, so HLS stations are hidden and counted. Everything else is SDK-only from the start: `ctx.register`, `ctx.storage`, `ctx.rest`, `ctx.os.openExternal`, plus its own dashboard route. |
 | compact-reasoning-label | Removed from both editions. The model pill no longer includes the effort word. |
 | Other plugins | Identical to personal at the split. Review before a catalog pin. |
 | vercel-agent-desktop-support | Identical to personal. Every capability is `ctx.register_tool`; nothing to cut. |

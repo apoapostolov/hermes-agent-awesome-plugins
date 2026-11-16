@@ -206,8 +206,8 @@ def test_live_probe_tells_a_website_from_a_stream_from_hls():
     assert "bnr" in audio["name"].lower()
 
     playlist = api._probe("https://lb-hls.cdn.bg/2032/fls/Horizont.stream/playlist.m3u8")
-    assert playlist["ok"] is False
     assert playlist["kind"] == "hls"
+    assert playlist["ok"] is True, "an HLS playlist is playable now that the player ships hls.js"
 
 
 def test_log_route_writes_one_json_line(monkeypatch, tmp_path):

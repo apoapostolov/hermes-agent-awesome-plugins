@@ -50,7 +50,8 @@ const source = readFileSync(path.join(root, 'desktop', 'plugin.js'), 'utf8')
 export {
   createPlayer, popularStations, sameStation, searchStations, shoutcastStations,
   streamUrl, uniqueStations, validStation, SEED_STATIONS, SOURCE_LABELS,
-  transliterate, fold, searchTerms, mediaFailure
+  transliterate, fold, searchTerms, mediaFailure, isHlsUrl, attachHls, rowsToStations,
+  HLS
 }
 `)
 writeFileSync(path.join(dir, 'plugin.mjs'), source)
@@ -287,6 +288,43 @@ await test('mediaFailure names the browser media error and the host', () => {
   assert.match(plugin.mediaFailure({ error: { code: 2 } }, station), /network error/)
   assert.match(plugin.mediaFailure(null, station), /the stream did not connect/)
 })
+
+await test('isHlsUrl recognises a playlist address and nothing else', () => {
+  assert.equal(plugin.isHlsUrl('https://lb-hls.cdn.bg/2032/fls/HrBotev.stream/playlist.m3u8'), true)
+  assert.equal(plugin.isHlsUrl('https://host/live.m3u8?token=1'), true)
+  assert.equal(plugin.isHlsUrl('http://host/stream.mp3'), false)
+  assert.equal(plugin.isHlsUrl('http://host/m3u8'), false)
+  assert.equal(plugin.isHlsUrl(undefined), false)
+})
+
+await test('the vendored hls.js build loads with its events and version', () => {
+  assert.equal(typeof plugin.HLS, 'function', 'the vendored build did not evaluate')
+  assert.equal(plugin.HLS.version, '1.6.15')
+  assert.equal(typeof plugin.HLS.isSupported, 'function')
+  assert.equal(typeof plugin.HLS.Events.MANIFEST_PARSED, 'string')
+  assert.equal(typeof plugin.HLS.Events.ERROR, 'string')
+})
+
+await test('an HLS row survives the directory mapping and is marked', () => {
+  const rows = [
+    { stationuuid: 'a', name: 'BNR - Hristo Botev', url_resolved: 'https://lb-hls.cdn.bg/2032/fls/HrBotev.stream/playlist.m3u8', hls: true, tags: 'public radio' },
+    { stationuuid: 'b', name: 'BNR Horizont', url_resolved: 'https://play.global.audio/testb.aac', hls: false, tags: 'news' }
+  ]
+  const { stations, hls } = plugin.rowsToStations(rows)
+  assert.equal(stations.length, 2, 'an HLS station must not be dropped any more')
+  assert.equal(hls, 1)
+  assert.equal(stations[0].hls, true)
+  assert.equal(stations[1].hls, false)
+})
+
+await test('a Cyrillic query for an HLS-only station returns it', async () => {
+  const controller = new AbortController()
+  const { stations, hls } = await plugin.searchStations('Христо Ботев', controller.signal)
+  assert.ok(stations.length > 0, 'the HLS-only station was filtered out')
+  assert.ok(hls > 0, 'no HLS station was counted')
+  assert.ok(stations.some(item => item.hls === true), 'no result carried the hls mark')
+})
+
 
 
 await test('source labels cover the three picker tabs', () => {

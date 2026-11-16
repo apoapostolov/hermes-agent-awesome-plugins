@@ -10,13 +10,13 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Nineteen plugins. Every one has a public edition.</p>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Twenty plugins. Every one has a public edition.</p>
 
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
     <a href="./package.json"><img src="https://img.shields.io/badge/Language-JavaScript-555" alt="Language: JavaScript"></a>
-    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.24.0-blue" alt="Pack: 1.24.0"></a>
-    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Last%20release-2026--10--31-blue" alt="Last release: 2026-10-31"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.0-blue" alt="Pack: 1.24.0"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Last%20release-2026--11--16-blue" alt="Last release: 2026-10-31"></a>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a>
   </p>
 
@@ -28,13 +28,15 @@
 
 ## Latest plugin update
 
+Radio Plus 1.2.0 is an extended edition of the **Radio** plugin bundled with Hermes Desktop, and the first release to be pinned by the pack and listed in the catalog. The bundled player ships seven fixed stations, searches one directory, and skips HLS; this edition keeps its oscilloscope, transport, artist links and dictation-aware pause, and makes the rest work for any station: the list is editable (name and stream address together), any `http` or `https` stream can be added and is checked before it is saved, the picker searches Radio Browser, its popular list and the Shoutcast directory, a Cyrillic query is also sent transliterated so `Хоризонт` finds `BNR Horizont`, HLS stations play through a vendored `hls.js` 1.6.15, and a station that will not play says why in the panel and in `radio-plus/station-log.jsonl`. The bundled Radio plugin draws the same status-bar slot, so disable it. Enable Radio Plus in Capabilities, Plugins, then restart the app once so the dashboard mounts its routes.
+
 Next Steps 1.0.0 is an extended edition of **Follow-up Chips** ([nuonrg/hermes-plugin-followup-chips](https://github.com/nuonrg/hermes-plugin-followup-chips)), the plugin it grew out of: the same clickable options under a reply, carried further. On top of the original row it adds a Recommended tag on the options worth taking now, an amber RISKY pill on the ones that could damage something, a dim second line where a label alone would misread, a queue that carries earlier replies' unanswered options forward youngest first, and a setting that steers a live turn instead of queueing. Install it, enable it, and reload the window for the renderer half; a Follow-up Chips install should be disabled first, since both draw the same slot under a reply.
 
 Restart Hermes Desktop after updating; the Python and desktop halves do not reload in place.
 
 Jev Routing 1.1.1 and Reasoning Switch 1.1.4 are pinned by the pack now, so a pack install brings both: per-turn model routing from TypeSafe Jev, and a status-bar control for reasoning effort. Neither is a new release; see the [changelog](CHANGELOG.md) for their own entries.
 
-The pack is at 1.26.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
+The pack is at 1.27.0. See the [changelog](CHANGELOG.md) for plugin-level updates and the distinction between personal and public builds.
 
 ## In the app
 
@@ -64,7 +66,7 @@ This repository keeps two trees.
 
 **[personal/](personal/README.md)** is the full-featured edition I run. These builds may reach into Hermes Desktop internals: app DOM, persisted app keys, raw bridge calls. A Desktop update can break them. They sit outside the plugin SDK contract, so install them only if you accept that risk. The pack pins this tree.
 
-**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All 19 active plugins have one.
+**[public/](public/README.md)** is the catalog edition. These builds stay inside the Hermes plugin SDK (`ctx.register*`, `host.state` / `host.request`, `ctx.storage`, `ctx.rest`) so they can be listed. When Desktop has no hook yet, the public copy drops that surface. All 20 active plugins have one.
 
 ```bash
 hermes plugins install apoapostolov/hermes-agent-awesome-plugins/personal/<id>
@@ -79,7 +81,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Seventeen plugins are pinned in `hermes-pack.yaml` (pack version 1.26.0). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all seventeen.
+Eighteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.0). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all seventeen.
 
 ### Status Bar
 
@@ -88,6 +90,7 @@ Seventeen plugins are pinned in `hermes-pack.yaml` (pack version 1.26.0). **bett
 | [Provider Status](personal/provider-status/README.md) · [public](public/provider-status/README.md) | Status-bar quota used/remaining. DeepSeek and GLM peak/off-peak gauges with countdowns. Multi-account. Rotate on low quota or reset day. Grok/Codex OAuth. Providers: Tavily, OpenCode Go, DeepSeek, GLM (z.ai), OpenRouter, Grok (xAI), Codex (OpenAI), OpenAI, Anthropic, Groq, Cerebras, Moonshot Kimi, MiniMax, Google Gemini, Hugging Face, Mistral, Qwen. |
 | [Iteration Budget Meter](personal/iteration-budget-meter/README.md) · [public](public/iteration-budget-meter/README.md) | Per-turn N/budget while work runs. Hover and click for request stats. |
 | [Reasoning Switch](personal/reasoning-switch/README.md) · [public](public/reasoning-switch/README.md) | Cycle reasoning effort from the status bar, with colors and per-level prompt demote. |
+| [Radio Plus](personal/radio-plus/README.md) · [public](public/radio-plus/README.md) | Live radio with a station list you own: edit a name and a stream address, add any stream, search Radio Browser, its popular list and the Shoutcast directory, play HLS through a bundled hls.js (personal edition), and read why a station failed. An extended edition of the bundled Radio plugin. |
 
 ### Tools and Memory
 
@@ -187,6 +190,7 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [CDP Manager](personal/cdp-manager/README.md)
 - [RSS Reader](personal/rss-reader/README.md)
 - [Session Retitler](personal/sessionretitler/README.md)
+- [Radio Plus](personal/radio-plus/README.md)
 
 ## Support
 
