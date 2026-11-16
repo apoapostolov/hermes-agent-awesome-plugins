@@ -206,19 +206,19 @@ def prompt_variants(root: Path) -> list[tuple[str, str]] | None:
 def prompt_findings(root: Path, found: Findings, manifest: str, prod_py: str) -> None:
     declared = key(manifest, "max_chars")
     if declared.isdigit() and int(declared) > HOST_PROMPT_CAP:
-        found.add("FAIL", "rule-18", Path("plugin.yaml"), 1,
+        found.add("FAIL", "prompt-cap", Path("plugin.yaml"), 1,
                   f"max_chars {declared} is over the host's {HOST_PROMPT_CAP}; the section is dropped whole")
     variants = prompt_variants(root)
     if variants is None:
         return
     if not variants:
         if "register_system_prompt_section" in prod_py:
-            found.add("WARN", "rule-18", Path("prompt_section.py"), 1,
+            found.add("WARN", "prompt-cap", Path("prompt_section.py"), 1,
                       "registers a prompt section but no prompt_texts(); the size cannot be measured, and an oversized section is skipped whole")
         return
     for label, text in variants:
         if len(text) > HOST_PROMPT_CAP:
-            found.add("FAIL", "rule-18", Path("prompt_section.py"), 1,
+            found.add("FAIL", "prompt-cap", Path("prompt_section.py"), 1,
                       f"prompt section {label!r} is {len(text)} chars, over the host's {HOST_PROMPT_CAP}; it is skipped, not truncated")
 
 
