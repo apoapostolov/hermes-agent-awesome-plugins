@@ -4,7 +4,7 @@
   <strong>One page for skills, plugins, connectors and tools.</strong>
   <p>A wide catalog with one row per item, a hover preview, and a detail panel that carries the artwork.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.3-2ea44f" alt="Version 1.0.3" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.0.4-2ea44f" alt="Version 1.0.4" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -23,8 +23,8 @@ The catalog in the plugins view, with the panel open on a plugin that ships a he
 
 ## What You Can Do
 
-- Browse four kinds on one page. Plugins, Skills, Connectors and Tools switch with one control, and each kind keeps its own filters, its own search and its own count. Skills carry a third state: **Installed**, **Archive** and **Catalog**, because a skill the curator retired sits in `skills/.archive`, neither loading nor gone. An archived skill restores from its panel: **Restore skill** moves the folder back into `skills/`, and the skill loads again.
-- Read a row instead of a card. A row is a thumbnail, the name with its description, and the column that matters for that kind: tags for skills, connectors and tools, the normalized short name for plugins. Columns hold their position down the list, so the third column lines up as a column rather than a caption.
+- Browse four kinds on one page. Plugins, Skills, Connectors and Tools switch with one control, and each kind keeps its own filters, its own search and its own count. Skills carry a third state: **Installed**, **Archive** and **Catalog**, because a skill the curator retired sits in `skills/.archive`, neither loading nor gone. The skill switch is that state: switching a skill off moves it into the archive, switching an archived skill on brings it back, and both directions work from the row and from the panel header. An archived skill also restores from **Restore skill** in its panel.
+- Read a row instead of a card. A row is a thumbnail, the name with its description, and a **Tags** column: an item's own tags for skills, connectors and tools, the normalized short name for a plugin, all under the same heading. Columns hold their position down the list, so the third column lines up as a column rather than a caption.
 - See artwork, not initials. A published plugin borrows the catalog's hero image; a plugin outside the catalog uses a logo its own folder ships (`icon`, `logo`, `banner`, `hero`, `cover`, `thumbnail` or `preview`, up to 300 KB). A plugin with neither keeps its initials.
 - Preview without clicking. Resting on a row for 240 milliseconds opens a card under it with the hero image as a 16:9 band, the description, provider, version, stars and what the item includes. Near the bottom edge the card flips above the row, and it never takes the pointer.
 - Open the full record. Clicking a row slides in a panel at 380 to 462px with the hero image across its top, a metadata list, and only the sections that kind has: Overview, Capabilities, Install and Actions for a plugin; Overview, Install and Actions for a skill; Connection for a connector; Tools for a toolset.

@@ -1178,6 +1178,9 @@ function layoutFor(item) {
   const switchable =
     item.kind === 'tool' ||
     (item.kind === 'plugin' && item.origin === 'installed') ||
+    // A skill's switch is its archive state: off moves the folder into
+    // skills/.archive so it stops loading, on moves it back out.
+    item.kind === 'skill' ||
     (CAN_TOGGLE_CONNECTORS && item.kind === 'connector' && item.origin === 'installed')
   const tagsOnTextLine = item.kind === 'plugin'
   const tail = tagsOnTextLine ? '190px' : '210px'
@@ -1830,6 +1833,24 @@ function DetailPanel({ item, profile, onClose, onChanged, onToggle }) {
     }
   }
 
+  /** The pair of moves: one sends the folder to skills/.archive, one brings it back. */
+  const archiveSkill = () =>
+    run(
+      'Archived',
+      async () => {
+        await ctxRef.rest('/skills/archive/add', {
+          method: 'POST',
+          body: { name: item.folder || item.key }
+        })
+
+        cache.skills = null
+        cache.skillsAt = 0
+        cache.archived = null
+        cache.archivedAt = 0
+      },
+      'Could not archive'
+    )
+
   /** Archiving is a directory move, so a restore is the same move reversed. */
   const restoreSkill = () =>
     run(
@@ -1855,17 +1876,13 @@ function DetailPanel({ item, profile, onClose, onChanged, onToggle }) {
   if (isSkill) {
     if (item.origin === 'archive') {
       actions.push({ id: 'restore', label: 'Restore skill', icon: 'history', run: restoreSkill, disabled: busy })
-    } else {
-      actions.push({
-        id: 'toggle',
-        label: item.enabled ? 'Disable skill' : 'Enable skill',
-        icon: item.enabled ? 'circle-slash' : 'check',
-        run: toggleSkill,
-        disabled: busy || !isInstalled
-      })
-      if (!isInstalled) {
-        actions.push({ id: 'install', label: 'Install skill', icon: 'cloud-download', run: installSkill, disabled: busy })
+    } else if (isInstalled) {
+      actions.push({ id: 'archive', label: 'Archive skill', icon: 'archive', run: archiveSkill, disabled: busy })
+      if (!item.enabled) {
+        actions.push({ id: 'enable', label: 'Enable skill', icon: 'check', run: toggleSkill, disabled: busy })
       }
+    } else {
+      actions.push({ id: 'install', label: 'Install skill', icon: 'cloud-download', run: installSkill, disabled: busy })
     }
   } else if (isTool) {
     actions.push({
@@ -3108,6 +3125,48 @@ export function CatalogPage() {
         )
       }
 
+      if (item.kind === 'skill') {
+        const folder = item.folder || item.key
+
+        // Archiving is a move out of skills/, so the pair of calls is a pair of
+        // moves: off sends the folder to .archive, on brings it back. A skill
+        // that is installed but disabled by config is re-enabled instead, since
+        // archiving it is not what that switch asked for.
+        if (item.origin === 'archive') {
+          return flipRow(
+            item,
+            enable,
+            async () => {
+              await ctxRef.rest('/skills/archive/restore', { method: 'POST', body: { folder } })
+
+              cache.archived = null
+              cache.archivedAt = 0
+              cache.skills = null
+              cache.skillsAt = 0
+            },
+            'skill'
+          )
+        }
+
+        if (enable && !item.enabled) {
+          return flipRow(item, enable, () => host.skills.setEnabled(item.name, true, scopedProfile), 'skill')
+        }
+
+        return flipRow(
+          item,
+          enable,
+          async () => {
+            await ctxRef.rest('/skills/archive/add', { method: 'POST', body: { name: folder } })
+
+            cache.skills = null
+            cache.skillsAt = 0
+            cache.archived = null
+            cache.archivedAt = 0
+          },
+          'skill'
+        )
+      }
+
       if (item.kind === 'connector') {
         return flipRow(
           item,
@@ -3336,9 +3395,9 @@ export function CatalogPage() {
         },
         jsx('span', { children: '' }),
         jsx('span', { children: 'Name' }),
-        // A plugin keeps its normalized short name beside its tags; every other
-        // kind spends that column on the tags themselves.
-        jsx('span', { children: kind === 'plugins' ? 'Short name' : 'Tags' }),
+        // One column heading for all four kinds: what sits there is a tag,
+        // whether it is the normalized short name or the item's own tags.
+        jsx('span', { children: 'Tags' }),
         layoutFor({ kind, origin: 'installed' }).switchable ? jsx('span', { children: '' }) : null
       ),
       el(

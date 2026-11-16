@@ -13,7 +13,8 @@ Routes (mounted at ``/api/plugins/hermes-catalog-redesign/``):
   draws and served one page at a time (``?page=1&size=150&q=``). ``?refresh=1``
   bypasses the TTL (the page's Refresh action).
 * ``GET /skills/archive`` — the skills the curator moved to ``skills/.archive``,
-  and ``POST /skills/archive/restore`` to move one back.
+  with ``POST /skills/archive/add`` to move one in and
+  ``POST /skills/archive/restore`` to move one back.
 * ``GET /icons`` — plugin artwork found in each installed plugin folder, as data
   URLs, so a row can show the plugin's own image instead of initials.
 * ``POST /servers/toggle`` — enable or disable one configured MCP server, the
@@ -409,6 +410,57 @@ def skills_archive() -> dict[str, Any]:
     return {"rows": rows, "total": len(rows), "root": str(root)}
 
 
+class ArchiveRequest(BaseModel):
+    """One installed skill, by the folder name under ``skills/``."""
+
+    name: str
+
+
+def _skill_folder(value: str) -> str:
+    """A single path segment, or a 400: the archive routes never take a path."""
+    folder = str(value or "").strip()
+
+    if not folder or folder in {".", ".."} or any(sep in folder for sep in ("/", "\\", ":")):
+        raise HTTPException(status_code=400, detail="A single skill folder name is required")
+
+    return folder
+
+
+@router.post("/skills/archive/add")
+def skills_archive_add(body: ArchiveRequest) -> dict[str, Any]:
+    """Move an installed skill into ``skills/.archive``.
+
+    The same move the curator makes when a skill goes unused, offered from the
+    row: the folder keeps its name and its files, it simply stops loading. A name
+    already in the archive gets a timestamp suffix instead of overwriting the
+    copy that is there.
+    """
+    folder = _skill_folder(body.name)
+    live_dir = hermes_home() / "skills"
+    source = live_dir / folder
+
+    if not source.is_dir():
+        raise HTTPException(status_code=404, detail=f"skills/{folder} is not installed")
+
+    if not (source / "SKILL.md").exists():
+        raise HTTPException(status_code=409, detail=f"skills/{folder} has no SKILL.md at its top level")
+
+    archive_dir = live_dir / ".archive"
+    target = archive_dir / folder
+
+    if target.exists():
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        target = archive_dir / f"{folder}-{stamp}"
+
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source), str(target))
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}") from exc
+
+    return {"ok": True, "name": folder, "folder": target.name, "path": str(target)}
+
+
 class RestoreRequest(BaseModel):
     """One archived skill, by the folder name under ``skills/.archive``."""
 
@@ -424,11 +476,7 @@ def skills_archive_restore(body: RestoreRequest) -> dict[str, Any]:
     name is a single path segment and the target must be free, so a crafted body
     cannot walk out of the skills directory or overwrite a live skill.
     """
-    folder = str(body.folder or "").strip()
-
-    if not folder or folder in {".", ".."} or any(sep in folder for sep in ("/", "\\", ":")):
-        raise HTTPException(status_code=400, detail="A single archived folder name is required")
-
+    folder = _skill_folder(body.folder)
     live_dir = hermes_home() / "skills"
     source = live_dir / ".archive" / folder
 

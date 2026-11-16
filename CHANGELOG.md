@@ -50,6 +50,17 @@ the component that changed; a plugin patch does not imply a new pack release.
 
 - **pack:** moves the **catalog-redesign** pin to `4922c06`, which restores an archived skill from its panel.
 
+## [catalog-redesign 1.0.4] - 2026-11-16
+
+### Added
+
+- **catalog-redesign:** a switch on every skill row, and on the panel header, that is the skill's archive state. Switching an installed skill off moves its folder into `skills/.archive`, so it stops loading; switching an archived skill on moves it back out. Both directions are the same directory move the curator makes, and both work from the row and from the panel. A skill that is installed but disabled by config re-enables instead of archiving, since that is what its switch asked for.
+- **catalog-redesign:** `POST /skills/archive/add` on the Python half, with the checks its restore counterpart has: one path segment, a `SKILL.md` at the top level, and a name already in the archive getting a timestamp suffix rather than overwriting the copy that is there.
+
+### Changed
+
+- **catalog-redesign:** the third column is headed **Tags** for all four kinds. A plugin still fills it with its normalized short name, which is an identity rather than a tag, while skills, connectors and tools fill it with their own tags.
+
 ## [catalog-redesign 1.0.3] - 2026-11-16
 
 ### Added
