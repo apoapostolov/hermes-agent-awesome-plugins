@@ -201,12 +201,13 @@ print(f"ok public plugin.js {len(text.encode('utf-8')) / 1024:.0f} KiB")
 tests = public / "tests" / "desktop.test.mjs"
 body = tests.read_text(encoding="utf-8").replace("\r\n", "\n")
 body = body.replace(
-    "  transliterate, fold, searchTerms, mediaFailure, isHlsUrl, attachHls, rowsToStations,\n  HLS\n",
-    "  transliterate, fold, searchTerms, mediaFailure, isHlsUrl, rowsToStations\n",
+    "  transliterate, fold, searchTerms, mediaFailure, isHlsUrl, attachHls, rowsToStations,\n  matchScore, HLS\n",
+    "  transliterate, fold, searchTerms, mediaFailure, isHlsUrl, rowsToStations, matchScore\n",
 )
 for name in (
     "the vendored hls.js build loads with its events and version",
     "a Cyrillic query for an HLS-only station returns it",
+    "a Bulgarian name typed in Cyrillic returns the station itself first",
 ):
     start = body.find(f"await test('{name}'")
     if start < 0:

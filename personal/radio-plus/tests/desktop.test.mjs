@@ -51,7 +51,7 @@ export {
   createPlayer, popularStations, sameStation, searchStations, shoutcastStations,
   streamUrl, uniqueStations, validStation, SEED_STATIONS, SOURCE_LABELS,
   transliterate, fold, searchTerms, mediaFailure, isHlsUrl, attachHls, rowsToStations,
-  HLS
+  matchScore, HLS
 }
 `)
 writeFileSync(path.join(dir, 'plugin.mjs'), source)
@@ -326,6 +326,31 @@ await test('a Cyrillic query for an HLS-only station returns it', async () => {
 })
 
 
+
+await test('the named station outranks foreign lookalikes', async () => {
+  const controller = new AbortController()
+  const { stations } = await plugin.searchStations('Хоризонт', controller.signal)
+  const top = stations.slice(0, 3).map(item => item.name)
+  assert.ok(/horizont|хоризонт/i.test(top[0]), `a lookalike led: ${top.join(' | ')}`)
+  assert.ok(top.some(name => /bnr/i.test(name)), `no BNR row in the top three: ${top.join(' | ')}`)
+})
+
+await test('a Bulgarian name typed in Cyrillic returns the station itself first', async () => {
+  const controller = new AbortController()
+  const { stations } = await plugin.searchStations('Христо Ботев', controller.signal)
+  assert.ok(stations.length > 0, 'the station was not returned')
+  assert.ok(/botev|ботев/i.test(stations[0].name), `first row: ${stations[0].name}`)
+})
+
+await test('a whole-word match beats a longer word that merely starts with it', () => {
+  const terms = ['Horizont']
+  const exact = plugin.matchScore({ name: 'BNR Horizont' }, terms)
+  const lookalike = plugin.matchScore({ name: 'Horizonte 107.9 FM' }, terms)
+  const inner = plugin.matchScore({ name: 'Jovem Pan FM - Belo Horizonte' }, terms)
+  assert.ok(exact > lookalike, `exact ${exact} should beat lookalike ${lookalike}`)
+  assert.ok(lookalike >= inner, `lookalike ${lookalike} vs inner ${inner}`)
+  assert.equal(plugin.matchScore({ name: 'Smooth Jazz' }, ['Horizont']), 0)
+})
 
 await test('source labels cover the three picker tabs', () => {
   assert.deepEqual(Object.keys(plugin.SOURCE_LABELS), ['all', 'popular', 'shoutcast'])

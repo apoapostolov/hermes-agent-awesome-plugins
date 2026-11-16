@@ -50,7 +50,7 @@ const source = readFileSync(path.join(root, 'desktop', 'plugin.js'), 'utf8')
 export {
   createPlayer, popularStations, sameStation, searchStations, shoutcastStations,
   streamUrl, uniqueStations, validStation, SEED_STATIONS, SOURCE_LABELS,
-  transliterate, fold, searchTerms, mediaFailure, isHlsUrl, rowsToStations
+  transliterate, fold, searchTerms, mediaFailure, isHlsUrl, rowsToStations, matchScore
 }
 `)
 writeFileSync(path.join(dir, 'plugin.mjs'), source)
@@ -304,6 +304,24 @@ await test('an HLS row is hidden and counted in this edition', () => {
   const { stations, hls } = plugin.rowsToStations(rows)
   assert.equal(stations.length, 1, 'the listed edition cannot play an HLS playlist')
   assert.equal(hls, 1, 'the hidden HLS row must still be counted for the panel note')
+})
+
+await test('the named station outranks foreign lookalikes', async () => {
+  const controller = new AbortController()
+  const { stations } = await plugin.searchStations('Хоризонт', controller.signal)
+  const top = stations.slice(0, 3).map(item => item.name)
+  assert.ok(/horizont|хоризонт/i.test(top[0]), `a lookalike led: ${top.join(' | ')}`)
+  assert.ok(top.some(name => /bnr/i.test(name)), `no BNR row in the top three: ${top.join(' | ')}`)
+})
+
+await test('a whole-word match beats a longer word that merely starts with it', () => {
+  const terms = ['Horizont']
+  const exact = plugin.matchScore({ name: 'BNR Horizont' }, terms)
+  const lookalike = plugin.matchScore({ name: 'Horizonte 107.9 FM' }, terms)
+  const inner = plugin.matchScore({ name: 'Jovem Pan FM - Belo Horizonte' }, terms)
+  assert.ok(exact > lookalike, `exact ${exact} should beat lookalike ${lookalike}`)
+  assert.ok(lookalike >= inner, `lookalike ${lookalike} vs inner ${inner}`)
+  assert.equal(plugin.matchScore({ name: 'Smooth Jazz' }, ['Horizont']), 0)
 })
 
 await test('source labels cover the three picker tabs', () => {

@@ -10,6 +10,12 @@ the component that changed; a plugin patch does not imply a new pack release.
 - **next-steps:** the bundled prompt rule stays inside the host cap. With a decision classifier loaded and recommendations on, the section reached 2,335 characters against the host's 2,200, and Hermes skips an oversized plugin section instead of truncating it, so the rule that ends a reply in chips never reached the model while both tools still answered. The rule is terser now, `MAX_CHARS` sits at 2,100, and the section drops its optional paragraphs rather than overflowing, so neither a longer nor a shorter host cap can lose it whole. Five tests pin every combination under the cap, the dropped-paragraph order, and the non-desktop fallback.
 - **next-steps:** 1.0.0 was re-cut twice while this defect was being found and fixed, so install 1.0.1 and ignore a `1.0.0` reading older than this entry.
 
+## [1.27.2] - 2026-11-16
+
+### Fixed
+
+- **radio-plus:** version `1.2.1`. A name search answered in vote order, so the station someone typed was buried: `Хоризонт` returned a dozen Brazilian stations whose name starts with "Horizonte" ahead of `BNR Horizont`, and `Христо Ботев` returned its two entries only at the end of a short list. Results are now ranked by how well the name matches the query, with a whole-word match ahead of a longer word that merely starts with it, and the directory order kept as the stable tie-breaker. Both Bulgarian stations now lead their own search. The listed edition carries the same ranking.
+
 ## [1.27.1] - 2026-11-16
 
 ### Changed

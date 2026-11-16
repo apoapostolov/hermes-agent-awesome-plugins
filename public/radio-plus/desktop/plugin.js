@@ -219,11 +219,49 @@ async function browserQuery(text, signal) {
 
 // A Cyrillic query is sent twice: as typed, and in the Latin spelling the
 // directories actually index. "Хоризонт" has to reach "BNR Horizont".
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// A name search for a Bulgarian station comes back full of lookalikes: the Latin
+// spelling of "Хоризонт" is a prefix of "Belo Horizonte", and a dozen Brazilian
+// stations outvote a national one. Score the name against what was typed so the
+// station that carries the name sorts first.
+function matchScore(item, terms) {
+  const name = fold(item.name)
+  let best = 0
+  for (const term of terms) {
+    const needle = fold(term).trim()
+    if (!needle) continue
+    // A whole word, not a prefix of a longer one: "Horizont" must not score for
+    // "Horizonte", which is what put a dozen Brazilian stations on top.
+    const wholeWord = new RegExp(`(^|[^a-z0-9])${escapeRegExp(needle)}($|[^a-z0-9])`).test(name)
+    if (name === needle) best = Math.max(best, 12)
+    else if (wholeWord && name.startsWith(needle)) best = Math.max(best, 9)
+    else if (wholeWord) best = Math.max(best, 7)
+    else if (name.includes(needle)) best = Math.max(best, 2)
+    else {
+      const words = needle.split(/\s+/).filter(word => word.length > 2)
+      const hits = words.filter(word => name.includes(word)).length
+      if (hits) best = Math.max(best, 1 + hits)
+    }
+  }
+  return best
+}
+
 async function searchStations(text, signal) {
   await ensureDirectory(signal)
-  const results = await Promise.all(searchTerms(text).map(term => browserQuery(term, signal)))
+  const terms = searchTerms(text)
+  const results = await Promise.all(terms.map(term => browserQuery(term, signal)))
+  const seen = uniqueStations(results.flatMap(result => result.stations))
+  // The directory answers by votes, which is the wrong order for a named station.
+  // Rank by name match, then keep the directory order as a stable tie-breaker.
+  const ranked = seen
+    .map((item, index) => ({ item, index, score: matchScore(item, terms) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(entry => entry.item)
   return {
-    stations: uniqueStations(results.flatMap(result => result.stations)),
+    stations: ranked,
     hls: results.reduce((total, result) => total + result.hls, 0)
   }
 }
