@@ -1185,9 +1185,7 @@ function layoutFor(item) {
   const online = item.origin === 'catalog'
   const tagsOnTextLine = item.kind === 'plugin' && !online
   const tail = tagsOnTextLine ? '190px' : '210px'
-  const columns = online
-    ? (switchable ? '44px minmax(0, 1fr) 44px' : '44px minmax(0, 1fr)')
-    : (switchable ? `44px minmax(0, 1fr) ${tail} 44px` : `44px minmax(0, 1fr) ${tail}`)
+  const columns = switchable ? `44px minmax(0, 1fr) ${tail} 44px` : `44px minmax(0, 1fr) ${tail}`
 
   return { switchable, tagsOnTextLine, columns, online }
 }
@@ -1331,9 +1329,7 @@ function Row({ item, selected, pending, onOpen, onHover, onHoverEnd, onToggle })
                 children: text
               })
         ),
-        layout.online
-          ? null
-          : layout.tagsOnTextLine
+        layout.tagsOnTextLine
           ? jsx('span', {
               title: item.short,
               style: {
