@@ -86,3 +86,18 @@ def chips_rule(session: dict, recommends: bool = False, risk: bool = False) -> s
     if risk:
         parts.append(RISK)
     return _fit(parts)
+
+def prompt_texts() -> list[tuple[str, str]]:
+    """Every shape this section can take, for the pack's admission check.
+
+    Hermes measures the section against its own cap and skips an oversized one instead
+    of truncating it, so a size that grows past the cap costs the whole rule. Publishing
+    the variants lets scripts/admission_check.py fail a release instead of a session.
+    """
+    return [
+        ("desktop", chips_rule({"platform": "local"}, False, False)),
+        ("desktop+recommend", chips_rule({"platform": "local"}, True, False)),
+        ("desktop+risk", chips_rule({"platform": "local"}, False, True)),
+        ("desktop+recommend+risk", chips_rule({"platform": "local"}, True, True)),
+        ("other surfaces", chips_rule({"platform": "telegram"}, False, False)),
+    ]

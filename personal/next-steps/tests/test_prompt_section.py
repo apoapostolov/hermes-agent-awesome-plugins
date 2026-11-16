@@ -42,5 +42,21 @@ class FitsTheHostCap(unittest.TestCase):
             self.assertIn(needle, text)
 
 
+class PublishesItsSizes(unittest.TestCase):
+    def test_prompt_texts_covers_every_shape_and_stays_under_the_cap(self):
+        variants = ps.prompt_texts()
+        self.assertEqual(len(variants), 5)
+        self.assertEqual(len({label for label, _ in variants}), 5)
+        for label, text in variants:
+            self.assertLessEqual(len(text), ps.MAX_CHARS, (label, len(text)))
+            self.assertTrue(text.strip(), label)
+
+    def test_the_desktop_variant_is_the_rule_and_not_the_fallback(self):
+        by_label = dict(ps.prompt_texts())
+        self.assertIn("Call next_steps with", by_label["desktop"])
+        self.assertNotIn("Call next_steps with", by_label["other surfaces"])
+        self.assertNotIn("::nextsteps\(q1", by_label["other surfaces"].replace("{", "("))
+
+
 if __name__ == "__main__":
     unittest.main()

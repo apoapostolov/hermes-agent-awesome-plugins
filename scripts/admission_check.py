@@ -21,11 +21,18 @@ keys by regex.
 from __future__ import annotations
 
 import argparse
+import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 SKIP_DIRS = {"__pycache__", ".git", "node_modules", "dist", "build", ".venv", "venv"}
+
+# Hermes measures a plugin's system-prompt section against its own cap and skips an
+# oversized one instead of truncating it, so the section is lost whole at session
+# start. The cap is applied to the text, not to the max_chars a plugin declares.
+HOST_PROMPT_CAP = 2_200
 
 
 def nearby(text: str, pos: int, window: int, needle: str) -> bool:
@@ -163,6 +170,58 @@ def key(text: str, name: str) -> str:
     return match.group(1).strip().strip('"').strip("'") if match else ""
 
 
+def prompt_variants(root: Path) -> list[tuple[str, str]] | None:
+    """Every prompt-section variant a plugin publishes, or None when it publishes none.
+
+    A plugin makes its own section measurable by defining `prompt_texts()` in
+    `prompt_section.py`, returning `[[label, text], ...]` for each shape the host can
+    receive. None means the plugin ships no such module; an empty list means it ships
+    one without the hook, which is a warning rather than a finding.
+    """
+    module = root / "prompt_section.py"
+    if not module.is_file():
+        return None
+    code = (
+        "import importlib.util, json, sys\n"
+        "spec = importlib.util.spec_from_file_location('prompt_section', sys.argv[1])\n"
+        "mod = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(mod)\n"
+        "hook = getattr(mod, 'prompt_texts', None)\n"
+        "print(json.dumps([[str(a), str(b)] for a, b in hook()] if hook else []))\n"
+    )
+    try:
+        run = subprocess.run([sys.executable, "-c", code, str(module)],
+                             capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if run.returncode != 0 or not run.stdout.strip():
+        return []
+    try:
+        pairs = json.loads(run.stdout.strip().splitlines()[-1])
+        return [(str(a), str(b)) for a, b in pairs]
+    except (ValueError, TypeError):
+        return []
+
+
+def prompt_findings(root: Path, found: Findings, manifest: str, prod_py: str) -> None:
+    declared = key(manifest, "max_chars")
+    if declared.isdigit() and int(declared) > HOST_PROMPT_CAP:
+        found.add("FAIL", "rule-18", Path("plugin.yaml"), 1,
+                  f"max_chars {declared} is over the host's {HOST_PROMPT_CAP}; the section is dropped whole")
+    variants = prompt_variants(root)
+    if variants is None:
+        return
+    if not variants:
+        if "register_system_prompt_section" in prod_py:
+            found.add("WARN", "rule-18", Path("prompt_section.py"), 1,
+                      "registers a prompt section but no prompt_texts(); the size cannot be measured, and an oversized section is skipped whole")
+        return
+    for label, text in variants:
+        if len(text) > HOST_PROMPT_CAP:
+            found.add("FAIL", "rule-18", Path("prompt_section.py"), 1,
+                      f"prompt section {label!r} is {len(text)} chars, over the host's {HOST_PROMPT_CAP}; it is skipped, not truncated")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("path", help="plugin directory (one edition, not the repo)")
@@ -201,6 +260,8 @@ def main() -> int:
     if re.search(r"subprocess\.(run|Popen|call|check_output)", prod_py):
         if "pre_tool_call" not in manifest:
             found.add("WARN", "rule-12", Path("plugin.yaml"), 1, "starts a program and declares no pre_tool_call; fine only if no tool argument reaches it")
+
+    prompt_findings(root, found, manifest, prod_py)
 
     if args.entry:
         entry_path = Path(args.entry)
