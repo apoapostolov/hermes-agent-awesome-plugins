@@ -92,8 +92,7 @@ config_schema:
       queued session the next reply buries them and an option you never answered is
       gone. With this on, every reply also lists the options earlier replies left
       unanswered, youngest reply first, each labelled with how many replies back it
-      was offered, and each carries an X to drop it from the queue. Clicking the
-      label scrolls back to the reply that made the offer. Picking a chip or
-      pressing its X retires it. Off by default, because it changes every reply:
+      was offered, and each carries an X to drop it from the queue. Picking a chip
+      or pressing its X retires it. Off by default, because it changes every reply:
       with it on the agent half also appends one empty ::nextsteps block to replies
       that offer nothing, since that slot is the only place the chips can draw.

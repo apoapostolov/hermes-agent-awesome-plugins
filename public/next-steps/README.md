@@ -27,7 +27,7 @@
 - See which options could cost you something. An option the classifier reads as able to damage files, a build or money carries an amber **RISKY** pill. Off by default.
 - Read a label that would otherwise mislead. The agent can attach a dim second line to any chip, clipped at two wrapped lines with the full text on hover.
 - Let two options exclude each other. Alternating options are drawn next to each other and picking one greys the other; the option that means leaving things alone closes the row.
-- Pick up what earlier replies left unanswered. With carry on, every reply lists those options youngest reply first, each with how many replies back it was offered and an X to drop it, and the queue caps at thirty. A carried label jumps back to the reply that offered it.
+- Pick up what earlier replies left unanswered. With carry on, every reply lists those options youngest reply first, each with how many replies back it was offered and an X to drop it, and the queue caps at thirty.
 - Answer mid-turn. A step clicked while a turn is working joins the queue as the next turn; with steer on it also reaches the live turn so the text lands mid-request, and a refused steer still becomes that queued turn.
 
 The plugin has two halves. The agent half registers the options through the `next_steps` tool, or writes a `::nextsteps` directive when tool calling is off, and a bundled prompt rule asks it to end a choice that way. The renderer half draws the row under the reply and sends the text back as a normal user turn. Every chip in a block shares one width, set by the longest option, and per-block state survives a reload.
