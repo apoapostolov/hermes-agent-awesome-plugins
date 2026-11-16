@@ -32,3 +32,4 @@ Each public plugin that diverged from personal (or is held because of it) has `L
 | Other plugins | Identical to personal at the split. Review before a catalog pin. |
 | vercel-agent-desktop-support | Identical to personal. Every capability is `ctx.register_tool`; nothing to cut. |
 | hermes-jev-routing | Classifies the turn. Rewrites the model only inside the bound provider. No agent-cache lookup and no session switch. |
+| catalog-redesign | Page, hover card, panel and the plugin, skill and toolset switches are identical. The connector switch is dropped: enabling an MCP server needs the guarded config write the app's Connectors tab performs, and the SDK exposes no door for it. |
