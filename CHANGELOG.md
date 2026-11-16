@@ -3,6 +3,13 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [1.27.10] - 2026-11-16
+
+### Fixed
+
+- **pack:** `hermes-pack.yaml` parses again. Two entries had drifted from the format the CLI enforces: **reasoning-switch** carried two `ref:` lines, and a duplicate key makes the loader refuse the whole file, so `pack install` and `pack show` failed before reading a single pin; **intelligent-tool-break** carried no `ref:` at all, which the CLI rejects as a non-pin. Reasoning Switch keeps the newer of its two commits (`69cccd2`, 1.1.4, Nov 6), and Intelligent Tool Break is pinned to the commit that last changed it (`6fb2e19`). Verified with `hermes plugins pack show`, which now lists all nineteen entries.
+- **pack 1.27.9 is superseded.** Its only change was the Queue Container Fix pin, and the file it shipped could not be read, so it installs nothing. The release and its tag are removed and `1.27.10` carries the same pin in a file that parses.
+
 ## [1.27.9] - 2026-11-16
 
 ### Added
