@@ -1,0 +1,7 @@
+{
+  "name": "radio-plus",
+  "label": "Radio Plus",
+  "description": "Shoutcast directory search backend for the Radio Plus desktop player",
+  "version": "1.0.0",
+  "api": "plugin_api.py"
+}
