@@ -5,20 +5,33 @@ useless for this. The only seam that runs after tool results exist and can still
 shape what the model reads is the ``llm_request`` middleware. It receives the
 outbound provider request and may return a replacement.
 
-So each provider request is scanned: count tool results since the turn's user
-message, note whether ``delegate_task`` appears in the turn, and past the threshold
-append one short note to that user message. Nothing edits tool output, the system
-prompt is untouched, and the runtime skips a middleware that raises.
+Four decisions this file encodes, each learned from watching it run:
 
-Limits that matter: once per turn by default, silent inside a subagent, silent for
-the rest of the turn after a dispatch, and the note tells the model when to ignore
-it, so a turn that genuinely needs this thread's context is never nagged.
+1. Count tool results, not loop iterations. ``api_call_count`` counts API rounds,
+   so a turn batching three tools per round reached "10" with 30 results, and a
+   careful turn reached 10 with almost none. Context is spent per result.
+2. Name the routes from ``config.yaml``. The note used to hardcode route names, so
+   a change to the model map would have left it lying. Free models are labelled
+   free, because "this costs nothing" is the argument that travels.
+3. Ask for a sentence when the turn declines. A refusal that goes unrecorded is a
+   silence, and sixteen silences produced no data. One sentence makes the decline
+   auditable and gives the weekly audit something to classify.
+4. Escalate once. A single note is easy to skim past; the second names the bill in
+   results carried. Two per turn, never more, and a dispatch silences both.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import threading
+import time
+from pathlib import Path
+
+try:  # PyYAML ships with the host; the plugin degrades to a static label without it
+    import yaml
+except Exception:  # pragma: no cover
+    yaml = None
 
 logger = logging.getLogger(__name__)
 
@@ -27,17 +40,26 @@ _TURNS: dict[tuple[str, str], dict] = {}
 _SUBAGENTS: set[str] = set()
 _MAX_TURNS = 64
 
-_ROUTES = (
+_FALLBACK_ROUTES = (
     "scan (free, file sweeps and lookups), research (free, many pages), "
     "deep (cheap, judgment and debugging), code (cheap, edits and tests)"
 )
 
-_NOTE = (
-    "[delegation check] {calls} steps into this turn, none of them delegate_task. "
-    "If what is left is reading, sweeping, or independent items, dispatch now and route it: "
-    + _ROUTES
-    + ". If the work genuinely needs this thread's context, or the caller needs an answer "
-    "mid-task, ignore this note and continue."
+_ROUTE_CACHE: dict = {"at": 0.0, "text": None}
+_ROUTE_CACHE_TTL = 60.0
+
+_STAGE_ONE = (
+    "[delegation check] {calls} tool results this turn, none of them delegate_task. "
+    "If what is left is reading, sweeping or independent items, dispatch now: {routes}. "
+    "Children run on those routes, so a dispatch costs this thread no context and almost no model budget. "
+    "If the work genuinely needs this thread's context, or the caller needs an answer mid-task, stay inline "
+    'and say so in one sentence ("staying inline because ...") so the decline is a decision, not a silence.'
+)
+
+_STAGE_TWO = (
+    "[delegation check, second call] {calls} tool results in this single turn and still no delegate_task: "
+    "all {calls} are carried in this thread's context. What is already finished stays finished; what remains "
+    "can go out as {routes}. Dispatch the remainder, or write one sentence saying why it cannot leave this thread."
 )
 
 
@@ -61,12 +83,61 @@ def _is_subagent(kwargs) -> bool:
     return str(kwargs.get("session_id") or "") in _SUBAGENTS
 
 
-def _scan(request: dict):
-    """Return (tool_results, delegated, user_index, container) for the CURRENT turn.
+def _config_path():
+    home = os.environ.get("HERMES_HOME")
+    if home:
+        return Path(home) / "config.yaml"
+    local = os.environ.get("LOCALAPPDATA")
+    if local:
+        return Path(local) / "hermes" / "config.yaml"
+    return Path.home() / ".hermes" / "config.yaml"
 
-    Counters reset at every user message, so a long session's older tool results
-    never inflate this turn's count.
-    """
+
+def _short(description: str) -> str:
+    text = str(description or "").strip()
+    if not text:
+        return ""
+    sentence = text.split(". ")[0].rstrip(".")
+    return sentence if len(sentence) <= 60 else sentence[:57].rstrip() + "..."
+
+
+def routes_text() -> str:
+    """Describe the configured subagent routes so the note cannot go stale."""
+    cached = _ROUTE_CACHE.get("text")
+    if cached and time.monotonic() - float(_ROUTE_CACHE.get("at") or 0.0) < _ROUTE_CACHE_TTL:
+        return cached
+    text = _FALLBACK_ROUTES
+    if yaml is not None:
+        try:
+            path = _config_path()
+            if path.exists():
+                data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+                backends = ((data.get("delegation") or {}).get("backends") or {})
+                options = ((backends.get("model_map") or {}).get("options")) or []
+                parts = []
+                for option in options:
+                    if not isinstance(option, dict):
+                        continue
+                    name = str(option.get("name") or "").strip()
+                    model = str(option.get("model") or "").strip()
+                    provider = str(option.get("provider") or "").strip()
+                    if not name or not model:
+                        continue
+                    price = "free" if "free" in model.lower() else "cheap"
+                    target = f"{provider}/{model}" if provider else model
+                    purpose = _short(option.get("description"))
+                    label = f"{name} ({price}) {target}"
+                    parts.append(f"{label} for {purpose}" if purpose else label)
+                if parts:
+                    text = "; ".join(parts)
+        except Exception:
+            logger.debug("delegation-nudge: route lookup failed", exc_info=True)
+    _ROUTE_CACHE.update({"at": time.monotonic(), "text": text})
+    return text
+
+
+def _scan(request: dict):
+    """Return (tool_results, delegated, user_index, container) for the CURRENT turn."""
     messages = request.get("messages")
     if isinstance(messages, list):
         tools, delegated, user_index = 0, False, -1
@@ -140,14 +211,13 @@ def register(ctx):
             tools, delegated, user_index, container = _scan(request)
             if not container or user_index < 0:
                 return None
-            # api_call_count is the turn's own loop counter, so it counts this turn's
-            # rounds even when history holds hundreds of older tool results.
+            # Tool results are the currency: each one is a message carried in this
+            # thread. The loop counter only stands in when no results are visible.
             try:
-                calls = int(kwargs.get("api_call_count") or 0)
+                iterations = int(kwargs.get("api_call_count") or 0)
             except (TypeError, ValueError):
-                calls = 0
-            if calls <= 0:
-                calls = tools
+                iterations = 0
+            calls = tools if tools > 0 else iterations
             key = _key(kwargs)
             with _LOCK:
                 row = _bucket(key)
@@ -157,21 +227,29 @@ def register(ctx):
                 if delegated:
                     row["delegated"] = True
                     return None
-                threshold = max(1, int(_cfg("threshold", 15) or 15))
+                threshold = max(1, int(_cfg("threshold", 10) or 10))
+                escalate_at = int(_cfg("escalate_at", 25) or 25)
                 repeat = max(0, int(_cfg("repeat_after", 0) or 0))
+                stage = row["nudges"]
                 if repeat:
-                    due = calls >= threshold + row["nudges"] * repeat
+                    due = calls >= threshold + stage * repeat
+                elif stage == 0:
+                    due = calls >= threshold
+                elif stage == 1:
+                    due = escalate_at > threshold and calls >= escalate_at
                 else:
-                    due = calls >= threshold and row["nudges"] == 0
+                    due = False
                 if not due:
                     return None
-                new_request = _inject(request, container, user_index, _NOTE.format(calls=calls))
+                template = _STAGE_TWO if stage >= 1 else _STAGE_ONE
+                note = template.format(calls=calls, routes=routes_text())
+                new_request = _inject(request, container, user_index, note)
                 if new_request is None:
                     return None
                 row["nudges"] += 1
             logger.info(
-                "delegation-nudge: reminder after %s turns of the loop (session=%s turn=%s)",
-                calls, key[0], key[1],
+                "delegation-nudge: stage %s reminder after %s tool results (session=%s turn=%s)",
+                stage + 1, calls, key[0], key[1],
             )
             return {"request": new_request, "reason": "delegation-nudge", "name": "delegation-nudge"}
         except Exception:

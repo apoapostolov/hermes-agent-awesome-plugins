@@ -1,20 +1,19 @@
 name: delegation-nudge
 label: Delegation Nudge
-version: 1.1.1
+version: 1.2.0
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2
 api_version: 1
 description: >
   A live reminder that a turn is spending its own context on work a subagent
-  should carry. An llm_request middleware inspects each outbound provider request,
-  counts the turn's own loop iterations, and once past a threshold with no
-  delegate_task in that turn appends one short note to that turn's user message
-  naming the routes. Nine loop iterations in, the model is told to dispatch or to
-  say why this work belongs in the thread. It stays silent inside a subagent, goes
-  quiet for the rest of the turn after a dispatch, never edits a tool result, and
-  a middleware that raises is skipped by the runtime, so it cannot break a
-  request.
+  should carry. An llm_request middleware counts the tool results in the current
+  turn and, past ten with no delegate_task, appends one note to that turn's user
+  message naming the routes read from the configured model map, with each route's
+  provider, model and price. The note asks the model to dispatch or say why it
+  cannot, so a decline is recorded rather than silently taken. A second note at
+  twenty-five results names the bill in results carried. Two notes per turn, never
+  inside a subagent, silenced by a dispatch, and it never edits a tool result.
 provides_hooks:
   - subagent_start
   - subagent_stop
@@ -29,10 +28,15 @@ config_schema:
   threshold:
     type: int
     default: 10
-    label: Loop iterations before a reminder
-    description: A turn that reaches this many loop iterations with no delegate_task gets one reminder.
+    label: Tool results before a reminder
+    description: A turn carrying this many tool results with no delegate_task gets the first note.
+  escalate_at:
+    type: int
+    default: 25
+    label: Second note at
+    description: A turn that ignores the first note and reaches this many results gets one more. At or below the threshold, only one note is sent.
   repeat_after:
     type: int
     default: 0
-    label: Remind again every N further iterations
-    description: 0 means once per turn. A positive number re-arms the reminder after that many more iterations.
+    label: Remind again every N further results
+    description: 0 uses the two-note ladder. A positive number replaces it with a fixed repeat interval.
