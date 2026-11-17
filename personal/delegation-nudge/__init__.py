@@ -94,10 +94,20 @@ def _config_path():
 
 
 def _short(description: str) -> str:
+    """First clause of a route description, without the price prefix it repeats.
+
+    Route descriptions in config.yaml read "Free and quick: file sweeps and
+    lookups". The price is already labelled from the model name, so the colon
+    prefix is dropped and the reader gets the purpose alone.
+    """
     text = str(description or "").strip()
     if not text:
         return ""
     sentence = text.split(". ")[0].rstrip(".")
+    if ":" in sentence:
+        head, tail = sentence.split(":", 1)
+        if len(head.split()) <= 6 and tail.strip():
+            sentence = tail.strip()
     return sentence if len(sentence) <= 60 else sentence[:57].rstrip() + "..."
 
 

@@ -127,7 +127,7 @@ class NudgeTest(unittest.TestCase):
             "        - name: scan\n"
             "          provider: opencode-go\n"
             "          model: hy4-flash-free\n"
-            "          description: File sweeps and lookups. No judgment calls.\n"
+            '          description: "Free and quick: file sweeps and lookups. No judgment calls."\n'
             "        - name: deep\n"
             "          provider: opencode-go\n"
             "          model: deepseek-v4.1-flash\n"
@@ -137,6 +137,8 @@ class NudgeTest(unittest.TestCase):
         content = self.note(mw(request=chat_payload(turn_results=10), session_id="s", turn_id="t"))
         self.assertIn("scan (free) opencode-go/hy4-flash-free", content)
         self.assertIn("deep (cheap) opencode-go/deepseek-v4.1-flash", content)
+        self.assertIn("for file sweeps and lookups", content)
+        self.assertNotIn("Free and quick", content, "the price prefix repeats the free label")
 
     def test_routes_fall_back_when_config_is_absent(self):
         mw = self.middleware()

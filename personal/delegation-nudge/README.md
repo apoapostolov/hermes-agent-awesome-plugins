@@ -6,7 +6,7 @@
 </div>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.2.0-blue" alt="Version 1.2.0" />
+  <img src="https://img.shields.io/badge/version-1.2.1-blue" alt="Version 1.2.1" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT" />
 </p>
 
