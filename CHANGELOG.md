@@ -3,6 +3,13 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [radio-plus 1.5.4] - 2026-11-17
+
+### Fixed
+
+- **radio-plus:** the station log is written under `get_hermes_home() / plugin-data / radio-plus`, so a profile-scoped backend no longer writes into the launch profile's home or a stale `~/.hermes` fallback.
+- **radio-plus:** `/probe` and `/now-playing` validate every address and every redirect target with `tools.url_safety.is_safe_url`, refusing private, loopback, link-local and IPv6 ULA destinations instead of relying on a hostname regex. Both editions ship; the catalog pin is unchanged.
+
 ## [hermes-next-steps 1.1.1] - 2026-11-16
 
 ### Fixed

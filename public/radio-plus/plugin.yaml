@@ -1,6 +1,6 @@
 name: "radio-plus"
 label: Radio Plus
-version: 1.5.3
+version: 1.5.4
 description: "Live radio in the status bar, an extended edition of the bundled Radio plugin: editable stations with a name and a stream address, search across Radio Browser, its popular list and the Shoutcast directory, the track each stream announces, cross-script search for Bulgarian names, and a station log that explains why a stream will not play."
 author: Apostol Apostolov
 license: MIT

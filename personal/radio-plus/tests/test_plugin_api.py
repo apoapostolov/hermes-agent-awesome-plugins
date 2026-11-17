@@ -9,16 +9,35 @@ directory and stream resolver and run only with ``RADIO_PLUS_LIVE=1``.
 from __future__ import annotations
 
 import importlib.util
+import ipaddress
 import json
 import os
+import urllib.parse
 from pathlib import Path
 
 import pytest
+
+
+def _test_is_safe_url(url):
+    """Stand in for the host policy when tests run outside a Hermes process."""
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or parsed.username or parsed.password:
+        return False
+    host = parsed.hostname or ""
+    try:
+        address = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return host.lower() not in {"localhost", "metadata.google.internal", "metadata.goog"}
+    return not (address.is_private or address.is_loopback or address.is_link_local or address.is_unspecified)
+
+
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "dashboard" / "plugin_api.py"
 _spec = importlib.util.spec_from_file_location("radio_plus_api", MODULE_PATH)
 api = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(api)
+api.get_hermes_home = lambda: Path(os.environ.get("HERMES_HOME", str(Path.home())))
+api.is_safe_url = _test_is_safe_url
 
 LIVE = os.environ.get("RADIO_PLUS_LIVE") == "1"
 
@@ -156,6 +175,25 @@ def test_probe_rejects_non_http_and_local_addresses():
     assert api._probe("http://127.0.0.1:8000/stream")["kind"] == "invalid"
     assert api._probe("http://localhost/stream")["kind"] == "invalid"
     assert api._probe("http://192.168.1.9:8000/")["kind"] == "invalid"
+    assert api._probe("http://169.254.169.254/latest/meta-data")["kind"] == "invalid"
+    assert api._probe("http://[fc00::1]/stream")["kind"] == "invalid"
+    assert api._probe("http://[fe80::1]/stream")["kind"] == "invalid"
+
+
+def test_literal_private_hosts_are_refused_even_when_core_policy_allows(monkeypatch):
+    monkeypatch.setattr(api, "is_safe_url", lambda url: True)
+    assert api._is_safe_target("http://[fc00::1]/stream") is None
+    assert api._is_safe_target("http://[fe80::1]/stream") is None
+    assert api._is_safe_target("http://169.254.169.254/latest/meta-data") is None
+    assert api._is_safe_target("http://127.0.0.1/stream") is None
+
+
+def test_redirect_to_a_private_address_is_refused():
+    handler = api._SafeRedirectHandler()
+    with pytest.raises(api._UnsafeRedirect):
+        handler.redirect_request(None, None, 302, "Found", {}, "http://[fc00::1]/stream")
+    with pytest.raises(api._UnsafeRedirect):
+        handler.redirect_request(None, None, 302, "Found", {}, "http://127.0.0.1:8000/stream")
 
 
 
@@ -270,7 +308,11 @@ def test_tunein_rows_keep_only_playable_station_rows(monkeypatch):
         assert "query=jazz" in request.full_url
         return Response()
 
-    monkeypatch.setattr(api.urllib.request, "urlopen", fake_urlopen)
+    class Opener:
+        def open(self, request, timeout=None):
+            return fake_urlopen(request, timeout=timeout)
+
+    monkeypatch.setattr(api, "_SAFE_OPENER", Opener())
     api._query_cache.clear()
     rows = api._tunein_rows("jazz")
     assert [row["text"] for row in rows] == ["A"]
@@ -392,7 +434,8 @@ def test_live_probe_tells_a_website_from_a_stream_from_hls():
 def test_log_route_writes_one_json_line(monkeypatch, tmp_path):
     import json
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setattr(api, "get_hermes_home", lambda: tmp_path)
+    assert api._log_path() == tmp_path / "plugin-data" / "radio-plus" / "station-log.jsonl"
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
@@ -406,7 +449,7 @@ def test_log_route_writes_one_json_line(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert response.json()["status"] == "logged"
 
-    path = tmp_path / "radio-plus" / "station-log.jsonl"
+    path = tmp_path / "plugin-data" / "radio-plus" / "station-log.jsonl"
     assert path.exists()
     line = json.loads(path.read_text(encoding="utf-8").strip())
     assert line["name"] == "Belisimo.BG"

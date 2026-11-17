@@ -20,14 +20,14 @@ playlist here. TuneIn also ignores ``offset``, so a page is a slice of the list
 its search already returned.
 
 No key, account, or credential is involved. Only these directories are
-contacted, nothing is written to disk, and the caller's query is the only thing
-forwarded.
+contacted; the only file written is the station log under the Hermes home's
+plugin-data directory, and the caller's query is the only thing forwarded.
 """
 from __future__ import annotations
 
 import html
+import ipaddress
 import json
-import os
 import re
 import time
 import urllib.error
@@ -38,6 +38,16 @@ from typing import Any, Callable, Iterable
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+
+try:
+    from hermes_constants import get_hermes_home
+except ImportError:  # plugin tests load this module outside a Hermes process
+    get_hermes_home = None
+
+try:
+    from tools.url_safety import is_safe_url
+except ImportError:  # fail closed when the host's URL policy is unavailable
+    is_safe_url = None
 
 router = APIRouter()
 
@@ -110,7 +120,7 @@ def _query_directory(path: str, query: str | None) -> list[dict[str, Any]]:
             headers={"User-Agent": _USER_AGENT, "X-Requested-With": "XMLHttpRequest"},
         )
     try:
-        with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:
+        with _urlopen(request, timeout=_TIMEOUT) as response:
             body = response.read(4_000_000)
     except urllib.error.HTTPError as error:
         raise HTTPException(status_code=502, detail=f"Shoutcast directory returned HTTP {error.code}.") from error
@@ -161,7 +171,7 @@ def _stream_for(station_id: int) -> str | None:
     )
     address: str | None = None
     try:
-        with urllib.request.urlopen(request, timeout=_STREAM_TIMEOUT) as response:
+        with _urlopen(request, timeout=_STREAM_TIMEOUT) as response:
             text = response.read(65_536).decode("utf-8", "replace")
         address = _first_stream(text)
     except (urllib.error.URLError, TimeoutError, OSError, ValueError):
@@ -255,15 +265,14 @@ def _icy_title(address: str) -> dict[str, Any]:
     title text. Reading it means opening the stream, which the renderer cannot do
     (no CORS headers on most stations) and which the browser cannot parse anyway.
     """
-    host = urllib.parse.urlsplit(address).hostname or ""
-    if _PRIVATE_HOST.match(host):
+    if _is_safe_target(address) is None:
         return {"ok": False, "title": "", "station": "", "reason": "Local addresses are not read."}
     request = urllib.request.Request(
         address,
         headers={"User-Agent": _USER_AGENT, "Icy-MetaData": "1", "Accept": "*/*"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=_META_TIMEOUT) as response:
+        with _urlopen(request, timeout=_META_TIMEOUT) as response:
             station = response.headers.get("icy-name") or ""
             metaint = _count(response.headers.get("icy-metaint"))
             if not metaint or metaint > 65536:
@@ -313,7 +322,7 @@ def _tunein_rows(query: str) -> list[dict[str, Any]]:
         headers={"User-Agent": _USER_AGENT},
     )
     try:
-        with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:
+        with _urlopen(request, timeout=_TIMEOUT) as response:
             body = response.read(2_000_000)
     except urllib.error.HTTPError as error:
         raise HTTPException(status_code=502, detail=f"TuneIn returned HTTP {error.code}.") from error
@@ -354,7 +363,7 @@ def _tunein_stream(url: str) -> str | None:
     address: str | None = None
     try:
         request = urllib.request.Request(tunein_url, headers={"User-Agent": _USER_AGENT})
-        with urllib.request.urlopen(request, timeout=_STREAM_TIMEOUT) as response:
+        with _urlopen(request, timeout=_STREAM_TIMEOUT) as response:
             content_type = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
             final = _clean_stream(response.geturl() or "") or ""
             text = response.read(65_536).decode("utf-8", "replace")
@@ -401,6 +410,55 @@ def _tunein_station(row: dict[str, Any], url: str) -> dict[str, Any]:
 _PRIVATE_HOST = re.compile(
     r"^(?:localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|0\.|\[?::1\]?$)", re.I
 )
+
+
+def _literal_host_is_internal(host: str) -> bool:
+    """Reject internal literals even when the host's allow-private setting is on."""
+    try:
+        address = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return host.lower() in {"localhost", "metadata.google.internal", "metadata.goog"}
+    return bool(
+        address.is_private or address.is_loopback or address.is_link_local
+        or address.is_unspecified or address.is_multicast
+    )
+
+
+class _UnsafeRedirect(ValueError):
+    """A redirect target failed the Hermes URL-safety policy."""
+
+
+def _is_safe_target(url: Any) -> str | None:
+    """Validate an outbound address with Hermes' SSRF policy, not a host regex."""
+    candidate = _clean_stream(url)
+    if not candidate or is_safe_url is None:
+        return None
+    host = urllib.parse.urlsplit(candidate).hostname or ""
+    if _PRIVATE_HOST.match(host) or _literal_host_is_internal(host):
+        return None
+    return candidate if is_safe_url(candidate) else None
+
+
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Re-check every redirect target before following it."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if _is_safe_target(newurl) is None:
+            raise _UnsafeRedirect(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_SAFE_OPENER = urllib.request.build_opener(_SafeRedirectHandler())
+
+
+def _urlopen(request, timeout: float):
+    """Open a validated address and refuse unsafe redirects."""
+    if _is_safe_target(request.full_url) is None:
+        raise urllib.error.URLError("target refused by URL safety check")
+    try:
+        return _SAFE_OPENER.open(request, timeout=timeout)
+    except _UnsafeRedirect as error:
+        raise urllib.error.URLError("redirect refused by URL safety check") from error
 
 
 _PROBE_TIMEOUT = 2.5
@@ -460,15 +518,14 @@ def _probe(url: str) -> dict[str, Any]:
     address = _clean_stream(url or "")
     if not address:
         return {"ok": False, "kind": "invalid", "status": 0, "contentType": "", "reason": "That is not an http or https address."}
-    host = urllib.parse.urlsplit(address).hostname or ""
-    if _PRIVATE_HOST.match(host):
+    if _is_safe_target(address) is None:
         return {"ok": False, "kind": "invalid", "status": 0, "contentType": "", "reason": "Local addresses are not probed."}
     request = urllib.request.Request(
         address,
         headers={"User-Agent": _USER_AGENT, "Icy-MetaData": "1", "Accept": "*/*"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=_PROBE_TIMEOUT) as response:
+        with _urlopen(request, timeout=_PROBE_TIMEOUT) as response:
             content_type = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
             name = response.headers.get("icy-name") or ""
             body = response.read(2048)
@@ -515,12 +572,9 @@ def _probe(url: str) -> dict[str, Any]:
 
 
 def _log_path() -> "Any":
-    from pathlib import Path
-
-    # Same home resolution the other user plugins use: HERMES_HOME when the
-    # process has it, otherwise the Windows per-user install root.
-    home = Path(os.environ.get("HERMES_HOME") or Path(os.environ.get("LOCALAPPDATA", Path.home())) / "hermes")
-    return home / "radio-plus" / "station-log.jsonl"
+    if get_hermes_home is None:
+        raise RuntimeError("The Hermes home resolver is unavailable.")
+    return get_hermes_home() / "plugin-data" / "radio-plus" / "station-log.jsonl"
 
 
 def _append_log(entry: dict[str, Any]) -> None:

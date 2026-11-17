@@ -2,7 +2,7 @@
   "name": "radio-plus",
   "label": "Radio Plus",
   "description": "Directory and track-title backend for the Radio Plus desktop player",
-  "version": "1.5.2",
+  "version": "1.5.4",
   "api": "plugin_api.py",
   "tab": { "hidden": true }
 }
