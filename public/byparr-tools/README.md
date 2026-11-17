@@ -6,6 +6,17 @@
   <p><a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" /></a> <img src="https://img.shields.io/badge/version-0.2.0-green" alt="0.2.0" /></p>
 </div>
 
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="byparr-tools" />
+</div>
+
+## What's New in 0.2.0
+
+- Nine tools now ship instead of three: `solver_status` reports health and latency, `solver_bridge` injects challenge cookies into a browser over CDP, `solver_extract` parses JSON-LD and metadata, `solver_fetch` falls back from a direct request to the solver, and `jar_list` / `jar_clear` manage the session-scoped cookie jar.
+- `tool_execution` middleware retries a walled `web_extract` or `browser_exec` result through the solver. It is fail-open and configurable by tool name.
+- Every machine-specific value moved into Settings or an environment variable. `FLARESOLVERR_URL`, `BYPARR_CDP_URL` and the proxy secret keys override the stored settings for one host.
+- A single-flight queue with bounded retries prevents the timeouts that parallel solver calls produced.
+
 ## What You Can Do
 
 - Fetch solved HTML from a JS- or Cloudflare-walled page through the solver configured in Settings.

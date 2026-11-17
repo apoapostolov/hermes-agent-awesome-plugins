@@ -1,3 +1,13 @@
+## [byparr-tools 0.2.0] - 2026-11-17
+
+First public release. Nine read-only tools over any FlareSolverr-compatible solver: solved HTML, challenge cookies as a CDP payload, batch clean text, health status, structured extraction, a fetch with solver fallback, and a session-scoped cookie jar with list and clear. The solver address, browser CDP endpoint and proxy credentials all come from Settings or environment variables, so no machine-specific value is baked into either edition.
+
+A `tool_execution` middleware retries walled `web_extract` or `browser_exec` results through the solver. It is fail-open, configurable by tool name, and never wraps the plugin's own tools. A single-flight queue with bounded retries replaces the unthrottled calls that timed out under parallel load.
+
+## [byparr-mcp 0.2.0] - 2026-11-17
+
+First release of the portable companion. A dependency-free stdio MCP server exposes `solver_get`, `solver_cookies`, `solver_load` and `solver_status` to Codex, mcporter and other MCP clients, so the same solver is reachable outside Hermes. The solver URL is forwarded from Settings as `BYPAAR_BASE_URL`; cookie values stay hidden unless `showValues` is true. Both editions carry a generated hero, and both ship at 0.2.0.
+
 ## [delegation-nudge 1.3.0] - 2026-11-17
 
 First listing. The public edition (`public/hermes-delegation-nudge`, catalog name

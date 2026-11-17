@@ -5,6 +5,17 @@ It exposes four read-only tools to any MCP client, so Codex, mcporter, Claude
 Desktop or another Hermes can use the same solver the native `byparr-tools`
 plugin uses. Dependency-free: only Python 3.10+ standard library is required.
 
+
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="byparr-mcp" />
+</div>
+
+## What's New in 0.2.0
+
+- First public release. Four tools: `solver_get`, `solver_cookies`, `solver_load` and `solver_status`.
+- The stdio server is dependency-free Python 3.10+ and reads its solver address from `BYPAAR_BASE_URL`, forwarded from the Settings page.
+- No machine-specific address is baked in, and cookie values stay hidden unless `showValues` is true.
+
 ## Setup
 
 1. Run a solver reachable over HTTP. For example:
