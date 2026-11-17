@@ -15,6 +15,11 @@ assert spec.loader is not None
 spec.loader.exec_module(mod)
 
 
+def test_default_interval_is_ten():
+    assert mod.DEFAULTS["interval"] == 10
+    assert mod._cfg(_FakeCtx(), "interval") == 10
+
+
 def test_count_user_messages():
     history = [
         {"role": "user", "content": "first real prompt"},
@@ -322,6 +327,7 @@ def test_register_owns_auxiliary_task():
 
 
 if __name__ == "__main__":
+    test_default_interval_is_ten()
     test_count_user_messages()
     test_clean_title_truncates_instead_of_dropping()
     test_digest_sees_boundary_message()

@@ -47,7 +47,7 @@ PLUGIN_ID = "sessionretitler"
 AUX_TASK = "sessionretitler_title"
 
 DEFAULTS = {
-    "interval": 20,       # user messages between retitles
+    "interval": 10,       # user messages between retitles
     "max_pairs": 20,      # exchanges fed into the digest
     "min_pairs": 4,       # give up below this even at the interval boundary
     "timeout": 45.0,      # LLM call budget, seconds

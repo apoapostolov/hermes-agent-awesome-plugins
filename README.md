@@ -27,6 +27,8 @@
 </div>
 
 ## Latest plugin update
+**Session Retitler 1.1.3** retitles a session after 10 titleable user messages by default, down from 20, so the name catches up with a topic change sooner. Nothing else moves: the delta trigger, the user-title wall, the digest and the `sessionretitler_title` auxiliary slot are the same as in 1.1.2, and a per-profile `interval` setting still overrides the default. Both editions ship it; update and restart the backend once for the new default to load.
+
 **Session Retitler 1.1.2** no longer depends on the session count landing exactly on a multiple of its interval. The count is read from the live history each turn, and compaction, an interrupted turn or a long tool loop can move it by more than one message, so a boundary missed once used to be lost for good. The trigger is now a delta from the last rename, and a count that compaction pulls backwards is rebased. A rename that came back from the model but could not be written restores the previous name instead of leaving the session untitled, and tries again on the next turn; a session whose title has no recorded provenance is treated as one you set and left alone. The interval, the digest size and the auxiliary slot are unchanged. Update both editions and restart the backend when convenient.
 
 **Radio Plus 1.5.4** writes its station log under the active Hermes home's `plugin-data/radio-plus` directory and checks every outbound stream address and redirect with Hermes' URL-safety policy, so a profile-scoped backend cannot log to the wrong home and the probe and track-title routes cannot be used to reach a private network. Nothing in the picker changes. Reinstall or update both editions; the backend restart is still yours.

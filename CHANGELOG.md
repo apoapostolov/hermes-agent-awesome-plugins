@@ -3,6 +3,12 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [sessionretitler 1.1.3] - 2026-11-17
+
+### Changed
+
+- **sessionretitler:** the default `interval` is now 10 titleable user messages instead of 20, so a session's name follows a topic change sooner. Both editions ship it. The delta trigger added in 1.1.2 is unchanged, and an explicit `plugins.entries.sessionretitler.settings.interval` still wins over the default.
+
 ## [sessionretitler 1.1.2] - 2026-11-17
 
 ### Fixed

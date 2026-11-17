@@ -4,7 +4,7 @@
   <strong>Keep the session list readable as the topic drifts.</strong>
   <p>Every N titleable user messages, retitles the session from the latest exchanges. A title you set yourself is never touched.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.2-2ea44f" alt="Version 1.1.2" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.3-2ea44f" alt="Version 1.1.3" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -16,7 +16,7 @@
 ## What You Can Do
 
 - Counts titleable user messages (not completed turns), so break- and steer-heavy chats still advance the counter.
-- Every `interval` messages, builds a digest of the latest exchanges and asks the plugin's own `sessionretitler_title` auxiliary slot for a fresh 3-6 word title. The slot inherits the host `title_generation` route until you pin a different model under Settings, Models, Auxiliary.
+- Every `interval` messages (10 by default), builds a digest of the latest exchanges and asks the plugin's own `sessionretitler_title` auxiliary slot for a fresh 3-6 word title. The slot inherits the host `title_generation` route until you pin a different model under Settings, Models, Auxiliary.
 - Rewrites at `llm` rank only. A title you set yourself is never overwritten.
 - Untitled sessions upgrade straight to the new `llm` title; an earlier `llm` title is rewritten in place.
 
