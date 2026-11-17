@@ -1,3 +1,33 @@
+## [delegation-nudge 1.3.0] - 2026-11-17
+
+First listing. The public edition (`public/hermes-delegation-nudge`, catalog name
+`hermes-delegation-nudge`) carries the same middleware as the personal build, with no feature cut: it
+uses one `llm_request` middleware, three hooks and one read of `config.yaml`, touches no app DOM,
+writes nothing and makes no network calls. Both editions gain the hero and a written record here, and
+both are 1.3.0.
+
+## [delegation-nudge 1.2.1] - 2026-11-17
+
+The route purposes no longer repeat the price label. Config descriptions read `Free and quick: file
+sweeps and lookups`, so the note used to say `free ... for Free and quick: file sweeps`; the purpose
+now starts after the colon and the free/cheap label carries the price alone. The test fixture also
+captures the trap that hid it: a plain YAML scalar containing a colon and a space makes the config
+unreadable, and the plugin then falls back to static route labels.
+
+## [delegation-nudge 1.2.0] - 2026-11-17
+
+Four changes to the reminder, each from watching it run. The count now keys on tool results in the
+current turn instead of API rounds, so a turn batching three tools no longer reaches the threshold
+with three times the context. The note reads the routes from `delegation.backends.model_map` and
+labels each free or cheap. It asks the turn to dispatch or say in one sentence why not, which turns a
+silent decline into something a weekly audit can classify. A second note at twenty-five results names
+the bill, capped at two per turn.
+
+## [delegation-nudge 1.1.1] - 2026-11-17
+
+First published build: one note per over-long inline turn, threshold ten tool results, silent inside
+a subagent and after a dispatch, with a dependency-free suite covering both provider payload shapes.
+
 # Changelog
 
 The pack and its plugins have separate version numbers. Entries below name

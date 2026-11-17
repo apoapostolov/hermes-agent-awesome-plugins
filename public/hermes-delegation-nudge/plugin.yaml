@@ -1,0 +1,46 @@
+name: hermes-delegation-nudge
+label: Delegation Nudge
+version: 1.3.0
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/public/hermes-delegation-nudge
+description: >
+  A live reminder that a turn is spending its own context on work a subagent
+  should carry. An llm_request middleware counts the tool results in the current
+  turn and, past ten with no delegate_task, appends one note to that turn's user
+  message naming the routes read from the configured model map, with each route's
+  provider, model and price. The note asks the model to dispatch or say why it
+  cannot, so a decline is recorded rather than silently taken. A second note at
+  twenty-five results names the bill in results carried. Two notes per turn, never
+  inside a subagent, silenced by a dispatch, and it never edits a tool result.
+  This edition stays inside the plugin SDK: one llm_request middleware, three
+  hooks, and one read of config.yaml cached for a minute. No app DOM, no
+  filesystem writes, no network calls.
+provides_hooks:
+  - subagent_start
+  - subagent_stop
+  - on_session_delete
+provides_middleware:
+  - llm_request
+config_schema:
+  enabled:
+    type: bool
+    default: true
+    label: Enable the reminder
+  threshold:
+    type: int
+    default: 10
+    label: Tool results before a reminder
+    description: A turn carrying this many tool results with no delegate_task gets the first note.
+  escalate_at:
+    type: int
+    default: 25
+    label: Second note at
+    description: A turn that ignores the first note and reaches this many results gets one more. At or below the threshold, only one note is sent.
+  repeat_after:
+    type: int
+    default: 0
+    label: Remind again every N further results
+    description: 0 uses the two-note ladder. A positive number replaces it with a fixed repeat interval.

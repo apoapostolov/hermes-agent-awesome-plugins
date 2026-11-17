@@ -1,0 +1,7 @@
+{
+  "name": "hermes-delegation-nudge",
+  "label": "Delegation Nudge",
+  "description": "One live reminder per over-long inline turn, naming the routes",
+  "version": "1.3.0",
+  "tab": { "path": "/hermes-delegation-nudge", "position": "end", "hidden": true }
+}

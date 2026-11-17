@@ -2,11 +2,16 @@
   <a href="https://github.com/NousResearch/hermes-agent"><img src="https://github.com/user-attachments/assets/ac2f5702-c842-4b2e-9340-737481fa0ece" width="96" height="96" alt="Nous Research Hermes mark" /></a>
   <h1>Delegation Nudge</h1>
   <strong>A live reminder that a turn is spending its own context on work a subagent should carry.</strong>
-  <p>Counts the tool results a turn is carrying, names the configured routes, and asks for a reason when the turn declines.</p>
+  </div>
+
+<div align="center">
+  <img src="docs/hero.png" width="100%" alt="Delegation Nudge: an ornate herald's bell on a gothic post, three crows carrying scrolls away into a moonlit ruin" />
 </div>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.2.1-blue" alt="Version 1.2.1" />
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.3.0-blue" alt="Version 1.3.0" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT" />
 </p>
 
@@ -98,6 +103,10 @@ python -m unittest discover -s tests -t .
 ```
 
 Sixteen tests drive the middleware with a fake context: both payload shapes, the results-based count, routes read from a temporary `config.yaml`, the fallback label, the escalation, the two-note cap, dispatch silence, subagent silence, the disabled switch, `repeat_after`, and the guarantee that no tool result is ever edited.
+
+## Changelog
+
+[CHANGELOG.md](../../CHANGELOG.md) carries the entries for both editions under this plugin's name.
 
 ## License
 

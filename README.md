@@ -10,7 +10,7 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, the Windows desktop itself, and the agent's own habit of doing everything in one thread. Twenty-four plugins, twenty-two of them with a public edition.</p>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, the Windows desktop itself, and the agent's own habit of doing everything in one thread. Twenty-four plugins, twenty-three of them with a public edition.</p>
 
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
@@ -27,6 +27,8 @@
 </div>
 
 ## Latest plugin update
+**Delegation Nudge 1.3.0** is listed for the first time, as `hermes-delegation-nudge` in the Hermes plugin catalog, from a public edition that carries the same middleware as the personal build with nothing cut: one `llm_request` middleware, three hooks and a single read of `config.yaml`, with no app DOM, no writes and no network calls. It is the first plugin in this pack whose whole job is the agent's own habits rather than a surface. Past ten tool results in a turn with no dispatch it appends one note to the turn's user message naming the routes from your model map, with provider, model and free or cheap on each; at twenty-five results a second note names the bill in context carried. The note also asks the turn to dispatch or say in one sentence why not, which is what makes a decline readable later. Both editions gain the engraving above and a written record in the changelog.
+
 **Session Retitler 1.1.3** retitles a session after 10 titleable user messages by default, down from 20, so the name catches up with a topic change sooner. Nothing else moves: the delta trigger, the user-title wall, the digest and the `sessionretitler_title` auxiliary slot are the same as in 1.1.2, and a per-profile `interval` setting still overrides the default. Both editions ship it; update and restart the backend once for the new default to load.
 
 **Session Retitler 1.1.2** no longer depends on the session count landing exactly on a multiple of its interval. The count is read from the live history each turn, and compaction, an interrupted turn or a long tool loop can move it by more than one message, so a boundary missed once used to be lost for good. The trigger is now a delta from the last rename, and a count that compaction pulls backwards is rebased. A rename that came back from the model but could not be written restores the previous name instead of leaving the session untitled, and tries again on the next turn; a session whose title has no recorded provenance is treated as one you set and left alone. The interval, the digest size and the auxiliary slot are unchanged. Update both editions and restart the backend when convenient.
@@ -112,7 +114,7 @@ Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.22). **bett
 | [Vercel Agent Desktop Support](personal/vercel-agent-desktop-support/README.md) · [public](public/vercel-agent-desktop-support/README.md) | Operate Windows apps through the accessibility tree: click, fill, select, toggle, scroll, key combos, windows, clipboard. Headless by default, so it never takes focus or the cursor. **Windows only.** |
 | [Memory Review](personal/memory-review/README.md) · [public](public/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
 | [CDP Manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar, with a profile per port and one port a backend supervisor keeps alive. The `cdp` tool does the same from chat and repairs a Chrome profile-picker launch. |
-| [Delegation Nudge](personal/delegation-nudge/README.md) | A live reminder when a turn keeps working inline: past ten tool results with no dispatch, the model gets one note naming the routes it would use, read from the configured model map with provider, model and price, and a second note at twenty-five results naming the bill. It asks the turn to dispatch or say why not, so a decline is recorded instead of silently taken. Silent in subagents, silent after a dispatch, two notes per turn at most. |
+| [Delegation Nudge](personal/delegation-nudge/README.md) · [public](public/hermes-delegation-nudge/README.md) | A live reminder when a turn keeps working inline: past ten tool results with no dispatch, the model gets one note naming the routes it would use, read from the configured model map with provider, model and price, and a second note at twenty-five results naming the bill. It asks the turn to dispatch or say why not, so a decline is recorded instead of silently taken. Silent in subagents, silent after a dispatch, two notes per turn at most. |
 | [Jev Routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. The listed edition rewrites the model and the reasoning level on the request the turn is already bound to, and reports a pick on another provider rather than sending it; the personal edition moves the live session and also reads the provider catalogue, Codex quota and private pricing. |
 
 ### Capabilities and catalog
@@ -212,7 +214,7 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [RSS Reader](personal/rss-reader/README.md)
 - [Session Retitler](personal/sessionretitler/README.md)
 - [Radio Plus](personal/radio-plus/README.md)
-- [Delegation Nudge](personal/delegation-nudge/README.md)
+- [Delegation Nudge](personal/delegation-nudge/README.md) · [public edition](public/hermes-delegation-nudge/README.md)
 
 ## Support
 
