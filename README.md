@@ -10,7 +10,7 @@
 
   <h1>Hermes Agent Awesome Plugins</h1>
 
-  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, and the Windows desktop itself. Twenty-three plugins, twenty-two of them with a public edition.</p>
+  <p>Give Hermes Desktop useful tools for provider limits, long sessions, feeds, memory, the Windows desktop itself, and the agent's own habit of doing everything in one thread. Twenty-four plugins, twenty-two of them with a public edition.</p>
 
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
@@ -112,6 +112,7 @@ Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.22). **bett
 | [Vercel Agent Desktop Support](personal/vercel-agent-desktop-support/README.md) · [public](public/vercel-agent-desktop-support/README.md) | Operate Windows apps through the accessibility tree: click, fill, select, toggle, scroll, key combos, windows, clipboard. Headless by default, so it never takes focus or the cursor. **Windows only.** |
 | [Memory Review](personal/memory-review/README.md) · [public](public/memory-review/README.md) | Checkbox staged memory writes. Approve or reject from a dialog. |
 | [CDP Manager](personal/cdp-manager/README.md) · [public](public/cdp-manager/README.md) | Launch, stop, and recheck local Chrome CDP ports from the status bar, with a profile per port and one port a backend supervisor keeps alive. The `cdp` tool does the same from chat and repairs a Chrome profile-picker launch. |
+| [Delegation Nudge](personal/delegation-nudge/README.md) | A live reminder when a turn keeps working inline: past ten loop iterations with no dispatch, the model gets one note naming the routes. Silent in subagents, silent after a dispatch, once per turn. |
 | [Jev Routing](personal/hermes-jev-routing/README.md) · [public](public/hermes-jev-routing/README.md) | Per-turn model routing from TypeSafe Jev. The listed edition rewrites the model and the reasoning level on the request the turn is already bound to, and reports a pick on another provider rather than sending it; the personal edition moves the live session and also reads the provider catalogue, Codex quota and private pricing. |
 
 ### Capabilities and catalog
@@ -211,6 +212,7 @@ This is an independent community project. It does not change Hermes Agent core, 
 - [RSS Reader](personal/rss-reader/README.md)
 - [Session Retitler](personal/sessionretitler/README.md)
 - [Radio Plus](personal/radio-plus/README.md)
+- [Delegation Nudge](personal/delegation-nudge/README.md)
 
 ## Support
 

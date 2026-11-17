@@ -1,0 +1,38 @@
+name: delegation-nudge
+label: Delegation Nudge
+version: 1.1.1
+author: Apostol Apostolov
+license: MIT
+manifest_version: 2
+api_version: 1
+description: >
+  A live reminder that a turn is spending its own context on work a subagent
+  should carry. An llm_request middleware inspects each outbound provider request,
+  counts the turn's own loop iterations, and once past a threshold with no
+  delegate_task in that turn appends one short note to that turn's user message
+  naming the routes. Nine loop iterations in, the model is told to dispatch or to
+  say why this work belongs in the thread. It stays silent inside a subagent, goes
+  quiet for the rest of the turn after a dispatch, never edits a tool result, and
+  a middleware that raises is skipped by the runtime, so it cannot break a
+  request.
+provides_hooks:
+  - subagent_start
+  - subagent_stop
+  - on_session_delete
+provides_middleware:
+  - llm_request
+config_schema:
+  enabled:
+    type: bool
+    default: true
+    label: Enable the reminder
+  threshold:
+    type: int
+    default: 10
+    label: Loop iterations before a reminder
+    description: A turn that reaches this many loop iterations with no delegate_task gets one reminder.
+  repeat_after:
+    type: int
+    default: 0
+    label: Remind again every N further iterations
+    description: 0 means once per turn. A positive number re-arms the reminder after that many more iterations.
