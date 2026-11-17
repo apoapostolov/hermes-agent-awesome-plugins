@@ -93,7 +93,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.21). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
+Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.22). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
 
 ### Status Bar
 
