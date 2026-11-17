@@ -1,0 +1,35 @@
+name: latest plugin update
+
+# The root README's "Latest plugin update" section is a 7-day rolling record,
+# one entry per plugin. This is the mechanical half of that rule: it runs the
+# same checker a release pass runs before tagging, so a duplicate plugin, an
+# entry with no tag, or an entry past its window fails the push instead of
+# piling up on the repository front page.
+#
+# Tag creation dates come from git and the checker reads them in UTC, so the
+# checkout needs full history and tags rather than the default shallow fetch.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test the checker
+        shell: bash
+        run: python3 -m unittest discover -s scripts/tests -t scripts -v
+
+      - name: Check the Latest plugin update block
+        shell: bash
+        run: python3 scripts/check_latest_plugin_update.py

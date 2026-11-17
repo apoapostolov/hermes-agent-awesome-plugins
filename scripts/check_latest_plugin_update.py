@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,7 +27,7 @@ def tag_dates() -> dict[str, date]:
         [
             "git",
             "for-each-ref",
-            "--format=%(refname:short) %(creatordate:short)",
+            "--format=%(refname:short) %(creatordate:unix)",
             "refs/tags",
         ],
         cwd=ROOT,
@@ -37,10 +37,10 @@ def tag_dates() -> dict[str, date]:
     ).stdout.splitlines()
     tags = {}
     for line in lines:
-        name, _, day = line.rpartition(" ")
+        name, _, epoch = line.rpartition(" ")
         try:
-            tags[name] = datetime.strptime(day, "%Y-%m-%d").date()
-        except ValueError:
+            tags[name] = datetime.fromtimestamp(int(epoch), timezone.utc).date()
+        except (ValueError, OSError, OverflowError):
             continue
     return tags
 
@@ -52,7 +52,7 @@ def key(name: str) -> str:
 def main() -> int:
     body = section((ROOT / "README.md").read_text(encoding="utf-8"))
     tags = tag_dates()
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     problems: list[str] = []
     seen: dict[str, str] = {}
 
