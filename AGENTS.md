@@ -40,11 +40,17 @@ Do not lower personal to match a public cut. Never ship personal behind public.
 
 ## Latest plugin update
 
-`README.md` carries exactly one "Latest plugin update" block, and it names the most recent tagged plugin release.
+`README.md` carries one "Latest plugin update" section. It is a rolling record of the plugins tagged in this repo in the last 7 days, with one entry per plugin.
 
-Rewrite it in the same commit that creates the tag. The block opens with the plugin and its version, says what the release adds for someone who already has the plugin, and ends with the restart or reinstall it needs. It names a version that exists as a tag, and it names the newest one.
+Edit it in the same commit as every tagged release in this repo:
 
-A tag that does not move this block leaves the front page advertising the previous plugin, and a block naming a version with no tag promises something nobody can install. Both are release defects, not copy edits.
+- If the released plugin has no entry, add one at the top of the section.
+- If it already has an entry, replace that entry with the new version. Never leave the old version beside the new one.
+- After that, drop every entry whose release is older than 7 days. Age comes from the release tag's date (`git for-each-ref --format='%(creatordate:short)' refs/tags/<plugin>-v<version>`). A plugin tagged more than once inside the window keeps only its newest entry.
+
+Each entry opens with the plugin and its version, says what the release adds for someone who already has it installed, and ends with the restart or reinstall it needs. Name a version that exists as a tag. Keep the closing restart sentence even when no entry survives the 7-day cut.
+
+Run `python3 scripts/check_latest_plugin_update.py` before tagging. It fails on a duplicate plugin, an entry with no tag, or an entry older than 7 days. A release that stacks a second entry for the same plugin, leaves a stale version in place, or keeps an entry past its 7th day is a release defect, not a copy edit.
 
 ## Catalog work
 
