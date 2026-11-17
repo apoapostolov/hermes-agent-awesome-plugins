@@ -1,0 +1,25 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "byparr-mcp",
+  "version": "0.2.0",
+  "description": "Expose a FlareSolverr-compatible solver (Byparr/FlareSolverr) as MCP tools for Codex, mcporter and other MCP clients. Configure the solver address in Settings.",
+  "author": {
+    "name": "Hermes Agent",
+    "url": "https://github.com/NousResearch/hermes-agent"
+  },
+  "repository": "https://github.com/apoapostolov/hermes-agent-awesome-plugins",
+  "license": "MIT",
+  "keywords": ["byparr", "flaresolverr", "solver", "cloudflare", "mcp"],
+  "extensions": {
+    "com.nousresearch.hermes": {
+      "config_schema": {
+        "solver_url": {
+          "type": "secret",
+          "env": "BYPAAR_BASE_URL",
+          "label": "Solver URL",
+          "description": "Base URL of your Byparr or FlareSolverr instance. Stored as a forwarded variable and passed to the MCP server. Defaults to http://127.0.0.1:8191 when unset."
+        }
+      }
+    }
+  }
+}

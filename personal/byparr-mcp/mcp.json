@@ -1,0 +1,14 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "byparr": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["${PLUGIN_ROOT}/server.py"],
+      "env": {
+        "BYPAAR_BASE_URL": "${BYPAAR_BASE_URL}"
+      },
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}

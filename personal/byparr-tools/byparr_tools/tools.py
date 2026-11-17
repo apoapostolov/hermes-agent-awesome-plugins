@@ -1,28 +1,58 @@
-"""Read-only tools over the Bedroom Byparr solver. Stdlib only."""
+"""Portable, read-only tools over a FlareSolverr-compatible solver.
+
+The solver address, timeouts, browser endpoint and fallback behaviour all come
+from plugin Settings or environment variables. No host-specific value is baked
+into this module. Works with Byparr, FlareSolverr or any compatible API.
+"""
 from __future__ import annotations
 
 import json
-import os
+import urllib.error
 import urllib.request
 from typing import Any, Dict, List
 
-DEFAULT_BASE = "http://192.168.1.217:8191"
+from .cdp import inject_cookies
+from .config import Settings
+from .extract import extract as extract_structured
+from .jar import CookieJar
+from .queue import SolverQueue
+
 WALL_MARKERS = ("just a moment", "sec-if-cpt", "checking security", "access denied")
 
+_settings = Settings()
+_queue = SolverQueue()
+_jar = CookieJar()
 
-def _base() -> str:
-    return os.environ.get("FLARESOLVERR_URL", DEFAULT_BASE).rstrip("/")
+
+def configure(ctx: Any = None) -> None:
+    """Called from register(ctx) so a settings save takes effect on reload."""
+    global _settings, _queue, _jar
+    _settings = Settings(ctx)
+    _queue = SolverQueue(
+        spacing=float(_settings.get("request_spacing_seconds")),
+        retries=_settings.int_key("max_retries"),
+    )
+    _jar = CookieJar(
+        ttl=_settings.int_key("cookie_jar_ttl_seconds"),
+        persist=_settings.bool_key("persist_cookie_jar"),
+        data_dir=str(_settings.get("cookie_jar_dir") or ""),
+    )
 
 
 def _post(path: str, payload: Dict[str, Any], timeout: int,
           headers: Dict[str, str] | None = None) -> Any:
-    req = urllib.request.Request(
-        _base() + path,
+    request = urllib.request.Request(
+        _settings.solver_url() + path,
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json", **(headers or {})},
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8", "replace"))
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8", "replace"))
+
+
+def _get_json(path: str, timeout: int = 10) -> Any:
+    with urllib.request.urlopen(_settings.solver_url() + path, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8", "replace"))
 
 
 def _ok(**payload: Any) -> str:
@@ -37,99 +67,107 @@ def _fail(message: str, **extra: Any) -> str:
 
 
 def _proxy_headers(args: Dict[str, Any]) -> Dict[str, str]:
-    h: Dict[str, str] = {}
-    if args.get("proxyServer"):
-        h["X-Proxy-Server"] = str(args["proxyServer"])
-    if args.get("proxyUsername"):
-        h["X-Proxy-Username"] = str(args["proxyUsername"])
-    if args.get("proxyPassword"):
-        h["X-Proxy-Password"] = str(args["proxyPassword"])
-    return h
+    headers: Dict[str, str] = {}
+    secrets = _settings.secrets()
+    pairs = (
+        ("proxyServer", "X-Proxy-Server", str(_settings.get("proxy_server") or "")),
+        ("proxyUsername", "X-Proxy-Username", secrets.get("proxy_username", "")),
+        ("proxyPassword", "X-Proxy-Password", secrets.get("proxy_password", "")),
+    )
+    for key, header, fallback in pairs:
+        value = args.get(key) or fallback
+        if value:
+            headers[header] = str(value)
+    return headers
 
 
-def _timeout(args: Dict[str, Any]) -> int:
-    try:
-        return max(1, int(args.get("maxTimeout", 60)))
-    except (TypeError, ValueError):
-        return 60
+def _walled(body: str) -> bool:
+    low = body.lower()
+    return any(marker in low for marker in WALL_MARKERS)
+
+
+def _valid_url(args: Dict[str, Any]) -> str | None:
+    url = str(args.get("url") or "")
+    return url if url.startswith(("http://", "https://")) else None
 
 
 def solver_get(args: Dict[str, Any], **kwargs: Any) -> str:
-    url = str(args.get("url") or "")
-    if not url.startswith(("http://", "https://")):
+    url = _valid_url(args)
+    if not url:
         return _fail("url must start with http:// or https://")
-    timeout = _timeout(args)
+    timeout = _settings.timeout(args.get("maxTimeout"))
     payload = {
         "cmd": "request.get", "url": url, "maxTimeout": timeout,
-        "blockMedia": bool(args.get("blockMedia", True)),
+        "blockMedia": bool(args.get("blockMedia", _settings.get("block_media"))),
     }
     try:
-        data = _post("/v1", payload, timeout + 30, _proxy_headers(args))
+        data = _queue.run(lambda: _post("/v1", payload, timeout + 30, _proxy_headers(args)))
     except Exception as exc:  # noqa: BLE001
         return _fail(f"solver request failed: {type(exc).__name__}: {exc}")
     sol = data.get("solution") or {}
     body = sol.get("response") or ""
-    wall = any(w in body.lower() for w in WALL_MARKERS)
+    wall = _walled(body)
     result: Dict[str, Any] = {
-        "status": data.get("status"),
-        "message": data.get("message"),
-        "http_status": sol.get("status"),
-        "final_url": sol.get("url"),
-        "bytes": len(body),
-        "wall": wall,
+        "status": data.get("status"), "message": data.get("message"),
+        "http_status": sol.get("status"), "final_url": sol.get("url"),
+        "bytes": len(body), "wall": wall,
         "solved": data.get("status") == "ok" and not wall and len(body) >= 2000,
     }
-    if args.get("returnHtml"):
-        cap = max(1, int(args.get("maxChars", 6000)))
+    if args.get("returnHtml", _settings.get("return_html_default")):
+        cap = max(1, int(args.get("maxChars", _settings.get("max_html_chars"))))
         result["html"] = body[:cap]
         result["html_truncated"] = len(body) > cap
     return _ok(**result)
 
 
 def solver_cookies(args: Dict[str, Any], **kwargs: Any) -> str:
-    url = str(args.get("url") or "")
-    if not url.startswith(("http://", "https://")):
+    url = _valid_url(args)
+    if not url:
         return _fail("url must start with http:// or https://")
-    timeout = _timeout(args)
+    timeout = _settings.timeout(args.get("maxTimeout"))
     payload = {
         "cmd": "request.get", "url": url, "maxTimeout": timeout,
         "blockMedia": True, "returnOnlyCookies": True,
     }
     try:
-        data = _post("/v1", payload, timeout + 30, _proxy_headers(args))
+        data = _queue.run(lambda: _post("/v1", payload, timeout + 30, _proxy_headers(args)))
     except Exception as exc:  # noqa: BLE001
         return _fail(f"solver request failed: {type(exc).__name__}: {exc}")
     sol = data.get("solution") or {}
     cookies: List[Dict[str, Any]] = sol.get("cookies") or []
     cdp: List[Dict[str, Any]] = []
-    for c in cookies:
+    for cookie in cookies:
         item: Dict[str, Any] = {
-            "name": c.get("name"), "value": c.get("value"),
-            "domain": c.get("domain"), "path": c.get("path") or "/",
-            "secure": bool(c.get("secure")), "httpOnly": bool(c.get("httpOnly")),
+            "name": cookie.get("name"), "value": cookie.get("value"),
+            "domain": cookie.get("domain"), "path": cookie.get("path") or "/",
+            "secure": bool(cookie.get("secure")), "httpOnly": bool(cookie.get("httpOnly")),
         }
-        exp = c.get("expires")
+        exp = cookie.get("expires")
         if exp is not None:
             try:
                 item["expires"] = -1 if exp < 0 else int(float(exp))
             except (TypeError, ValueError):
                 pass
-        same = str(c.get("sameSite") or "").lower()
+        same = str(cookie.get("sameSite") or "").lower()
         if same in ("lax", "strict", "none"):
             item["sameSite"] = same.capitalize()
-        if c.get("partitionKey"):
-            item["partitionKey"] = c["partitionKey"]
+        if cookie.get("partitionKey"):
+            item["partitionKey"] = cookie["partitionKey"]
         cdp.append(item)
     show = bool(args.get("showValues", False))
-    names = [c.get("name") for c in cookies]
-    return _ok(
-        count=len(cookies), names=names,
-        values={c.get("name"): c.get("value") for c in cookies} if show else None,
-        cdp={"cookies": cdp},
-        user_agent=sol.get("userAgent", ""),
-        note=("Set the target browser UA to user_agent and use a browser on Bedroom "
-              "(same egress IP); cf_clearance is UA- and IP-bound."),
-    )
+    result: Dict[str, Any] = {
+        "count": len(cookies),
+        "names": [c.get("name") for c in cookies],
+        "values": {c.get("name"): c.get("value") for c in cookies} if show else None,
+        "cdp": {"cookies": cdp},
+        "user_agent": sol.get("userAgent", ""),
+        "note": ("Match the reported user agent in the browser and use a browser "
+                 "sharing the solver's egress IP when a cookie is IP-bound."),
+    }
+    session = str(args.get("session") or "")
+    if session:
+        result["jar"] = _jar.put(session, cdp, result["user_agent"])
+    return _ok(**result)
 
 
 def solver_load(args: Dict[str, Any], **kwargs: Any) -> str:
@@ -137,17 +175,106 @@ def solver_load(args: Dict[str, Any], **kwargs: Any) -> str:
     if not isinstance(urls, list) or not urls:
         return _fail("urls must be a non-empty array")
     try:
-        results = _post("/load", {"urls": urls}, timeout=240)
+        results = _queue.run(lambda: _post("/load", {"urls": urls}, timeout=240))
     except Exception as exc:  # noqa: BLE001
         return _fail(f"solver load failed: {type(exc).__name__}: {exc}")
-    cap = max(1, int(args.get("maxChars", 3000)))
-    out = []
-    for r in results or []:
-        text = r.get("page_content") or ""
-        out.append({
-            "source": (r.get("metadata") or {}).get("source", ""),
-            "chars": len(text),
-            "truncated": len(text) > cap,
-            "text": text[:cap],
+    cap = max(1, int(args.get("maxChars", _settings.get("max_text_chars"))))
+    pages = []
+    for record in results or []:
+        text = record.get("page_content") or ""
+        pages.append({
+            "source": (record.get("metadata") or {}).get("source", ""),
+            "chars": len(text), "truncated": len(text) > cap, "text": text[:cap],
         })
-    return _ok(pages=out, count=len(out))
+    return _ok(pages=pages, count=len(pages))
+
+
+def solver_status(args: Dict[str, Any], **kwargs: Any) -> str:
+    import time
+
+    started = time.monotonic()
+    try:
+        health = _get_json("/health", timeout=10)
+    except Exception as exc:  # noqa: BLE001
+        return _fail(f"solver unreachable: {type(exc).__name__}: {exc}",
+                     solver_url=_settings.solver_url())
+    latency_ms = int((time.monotonic() - started) * 1000)
+    version = ""
+    if isinstance(health, dict):
+        version = str(health.get("version") or health.get("msg") or "")[:120]
+    return _ok(
+        solver_url=_settings.solver_url(),
+        health=health, version=version, latency_ms=latency_ms,
+        queue=_queue.stats(),
+        settings_summary={
+            "default_timeout_seconds": _settings.get("default_timeout_seconds"),
+            "auto_fallback": _settings.bool_key("auto_fallback"),
+            "block_media": _settings.get("block_media"),
+            "cdp_url_configured": bool(_settings.cdp_url()),
+            "proxy_configured": bool(_settings.secrets()),
+        },
+    )
+
+
+def solver_bridge(args: Dict[str, Any], **kwargs: Any) -> str:
+    session = str(args.get("session") or "")
+    entry = _jar.get(session) if session else None
+    cookies = args.get("cookies")
+    if not isinstance(cookies, list) and entry:
+        cookies = entry.get("cookies") or []
+    if not isinstance(cookies, list) or not cookies:
+        return _fail("provide a stored session or a cookies array")
+    user_agent = str(args.get("user_agent") or (entry or {}).get("user_agent", ""))
+    result = inject_cookies(cookies, _settings.cdp_url(), user_agent)
+    return _ok(**result) if result.get("ok") else _fail(
+        str(result.get("error", "bridge failed")), **result
+    )
+
+
+def solver_extract(args: Dict[str, Any], **kwargs: Any) -> str:
+    html = str(args.get("html") or "")
+    url = _valid_url(args)
+    if not html and url:
+        single = json.loads(solver_get({"url": url, "returnHtml": True,
+                                        "maxChars": 400000}))
+        if not single.get("ok"):
+            return _fail(str(single.get("error", "fetch failed")))
+        html = single.get("html", "")
+    if not html:
+        return _fail("provide html or url")
+    return _ok(**extract_structured(html))
+
+
+def solver_fetch(args: Dict[str, Any], **kwargs: Any) -> str:
+    """Plain fetch first, solver fallback on a walled or failed response."""
+    url = _valid_url(args)
+    if not url:
+        return _fail("url must start with http:// or https://")
+    timeout = _settings.timeout(args.get("maxTimeout"))
+    body = ""
+    via = "direct"
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(request, timeout=min(timeout, 20)) as response:
+            body = response.read().decode("utf-8", "replace")
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError):
+        body = ""
+    walled = _walled(body)
+    fallback_enabled = _settings.bool_key("auto_fallback")
+    if (walled or len(body) < 2000) and fallback_enabled:
+        solved = json.loads(solver_get({"url": url, "returnHtml": True,
+                                        "maxChars": 400000}))
+        if solved.get("ok") and solved.get("bytes", 0) > len(body):
+            body = solved.get("html", "")
+            via = "solver"
+    cap = max(1, int(args.get("maxChars", _settings.get("max_text_chars"))))
+    return _ok(url=url, via=via, bytes=len(body), wall=_walled(body), text=body[:cap])
+
+
+def jar_list(args: Dict[str, Any], **kwargs: Any) -> str:
+    return _ok(sessions=_jar.list())
+
+
+def jar_clear(args: Dict[str, Any], **kwargs: Any) -> str:
+    session = str(args.get("session") or "")
+    return _ok(cleared=_jar.clear(session), session=session)

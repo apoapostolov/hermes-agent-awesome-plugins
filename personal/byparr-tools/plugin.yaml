@@ -1,17 +1,108 @@
 name: byparr-tools
-version: 0.1.0
+version: 0.2.0
 manifest_version: 2
-description: "First-class tools for the Bedroom Byparr challenge solver: fetch solved HTML, harvest challenge cookies for a browser CDP jar, and batch-fetch clean text. Byparr runs under the compatibility name 'flaresolverr' on 192.168.1.217:8191. GET-only, no inbound cookies, no login."
+description: "First-class tools for any FlareSolverr-compatible challenge solver (Byparr, FlareSolverr): solved HTML, challenge cookies bridged into a browser, batch clean text, structured extraction, health and status. Configure the solver address and browser endpoint in Settings."
 author: Hermes Agent
 kind: general
 license: MIT
-tags: [byparr, flaresolverr, solver, cloudflare, web-access, scraping]
+tags: [byparr, flaresolverr, solver, cloudflare, web-access, scraping, mcp]
 provides_tools:
   - solver_get
   - solver_cookies
   - solver_load
+  - solver_status
+  - solver_bridge
+  - solver_extract
+  - solver_fetch
+  - jar_list
+  - jar_clear
 provides_hooks: []
-provides_middleware: []
+provides_middleware:
+  - tool_execution
 requires_env: []
 requires_hermes: ">=0.21.4"
 pip_dependencies: []
+config_schema:
+  solver_url:
+    type: str
+    default: "http://127.0.0.1:8191"
+    label: Solver URL
+    description: "Base URL of your Byparr or FlareSolverr instance. FLARESOLVERR_URL overrides this for one host."
+  default_timeout_seconds:
+    type: int
+    default: 60
+    label: Default solve timeout
+    description: "Seconds allowed for a challenge solve. Values at or above 1000 are sent as milliseconds."
+  block_media:
+    type: bool
+    default: true
+    label: Block media during solves
+    description: "Skip images, media and fonts to make solves faster. Turn off only when a page needs them."
+  auto_fallback:
+    type: bool
+    default: true
+    label: Solver fallback in solver_fetch
+    description: "When a direct fetch is walled, short or fails, retry through the solver."
+  fallback_tool_names:
+    type: list
+    default: [web_extract, browser_exec]
+    label: Tools that get solver fallback
+    description: "Tool names whose walled results are retried through the solver. Keep this short; our own solver tools are never wrapped."
+  return_html_default:
+    type: bool
+    default: false
+    label: Include HTML by default
+    description: "Return HTML in solver_get without asking per call. Off keeps tool results small."
+  max_html_chars:
+    type: int
+    default: 6000
+    label: HTML result cap
+    description: "Maximum HTML characters returned by one solver_get call."
+  max_text_chars:
+    type: int
+    default: 3000
+    label: Text result cap
+    description: "Maximum characters per page returned by solver_load and solver_fetch."
+  cdp_url:
+    type: str
+    default: "http://127.0.0.1:9222"
+    label: Browser CDP URL
+    description: "DevTools endpoint used by solver_bridge to inject cookies. BYPARR_CDP_URL overrides this."
+  request_spacing_seconds:
+    type: float
+    default: 0.2
+    label: Spacing between solves
+    description: "Delay between requests. Solvers serialize solves, so small spacing avoids timeouts."
+  max_retries:
+    type: int
+    default: 2
+    label: Retries per request
+    description: "Retries on transient solver errors with short backoff."
+  cookie_jar_ttl_seconds:
+    type: int
+    default: 1800
+    label: Cookie jar lifetime
+    description: "Seconds a stored cookie session stays usable before it is discarded."
+  persist_cookie_jar:
+    type: bool
+    default: false
+    label: Persist cookie jar to disk
+    description: "Off keeps challenge cookies in memory only. On writes them to the plugin data dir; enable only when you accept session cookies on disk."
+  cookie_jar_dir:
+    type: str
+    default: ""
+    label: Cookie jar directory
+    description: "Optional data directory for the persisted jar. Empty uses the plugin's own data folder."
+  proxy_server:
+    type: str
+    default: ""
+    label: Proxy server
+    description: "Optional protocol://host:port used for solves that need a different egress region."
+  proxy_username:
+    type: secret
+    env: BYPARR_PROXY_USERNAME
+    description: "Optional proxy username. Stored in the host credential store, never in config.yaml."
+  proxy_password:
+    type: secret
+    env: BYPARR_PROXY_PASSWORD
+    description: "Optional proxy password. Stored in the host credential store, never in config.yaml."
