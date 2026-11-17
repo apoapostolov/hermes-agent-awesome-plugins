@@ -3,6 +3,16 @@
 The pack and its plugins have separate version numbers. Entries below name
 the component that changed; a plugin patch does not imply a new pack release.
 
+## [sessionretitler 1.1.2] - 2026-11-17
+
+### Fixed
+
+- **sessionretitler:** the retitle trigger is a delta (`n - last_retitle_n >= interval`) instead of a modulo on the raw count. The count is re-derived from the live history every turn, core compaction shrinks that history, and one turn can move the count by more than one message, so a boundary missed once never fired again and a compacted session kept its old title. A count that falls below the last retitle is rebased, so the next interval still triggers.
+- **sessionretitler:** an `llm` to `llm` rewrite clears the row before writing it, and a write that then failed left the session with no name at all. The previous title goes back at the same rank, so a refused or colliding rename costs nothing.
+- **sessionretitler:** a session that carries a name with no `title_source` is left alone. Core ranks a NULL source as `user`, so the plugin was retrying a rename the store refuses, every interval and silently.
+- **sessionretitler:** a rename whose title could not be persisted gives the claimed boundary back and retries on the next turn instead of waiting out another interval, while a model that returns no title keeps the boundary so a broken auxiliary route is not called every turn.
+- **sessionretitler:** the minimum-exchange gate counts `USER:` at line start, so a prompt that mentions the marker mid-sentence no longer inflates the count.
+
 ## [radio-plus 1.5.4] - 2026-11-17
 
 ### Fixed

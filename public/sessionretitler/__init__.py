@@ -16,7 +16,16 @@ Title authority is ``llm`` rank, never ``user``:
 - ``derived``/untitled sessions upgrade straight to the new ``llm`` title.
 - ``llm`` -> ``llm`` rewrites clear the row first, because the core's
   ``set_auto_title`` only writes on a strictly-higher rank and would
-  otherwise no-op every rename after the first.
+  otherwise no-op every rename after the first. The previous name goes back
+  if the rewrite does not land, so a failed write never leaves the session
+  untitled.
+- A row that carries a name but no ``title_source`` ranks as ``user`` in
+  core, so it is left alone like any other name the user owns.
+
+The trigger is a delta (``n - last_retitle_n >= interval``), not a modulo on
+the raw count: the count is re-derived from the live history every turn, core
+compaction can pull it backwards, and a modulo boundary missed once would
+never fire again.
 
 State (per-session counters) lives in ``ctx.state`` — the host's
 file-locked, cross-process JSON store — so a session that hops between
@@ -149,28 +158,67 @@ def _count_user_messages(history: List[Any], extra_text: Optional[str] = None) -
     return n
 
 
-def _record_count(ctx: Any, session_id: str, n: int, claim: bool = False) -> bool:
+def _last_retitle_n(entry: Any) -> int:
+    """Stored boundary high-water mark, tolerant of a corrupt state entry."""
+    try:
+        if isinstance(entry, dict):
+            return max(0, int(entry.get("last_retitle_n", 0) or 0))
+    except (TypeError, ValueError):
+        pass
+    return 0
+
+
+def _record_count(
+    ctx: Any, session_id: str, n: int, claim: bool = False, interval: int = 1,
+) -> Tuple[Optional[int], bool]:
     """Persist count n in one state round trip; claim the boundary when asked.
 
-    Returns True only when a fresh boundary was claimed (and the session
-    marked in flight). Plain syncs never touch last_retitle_n.
+    Returns ``(previous_last_retitle_n, claimed)``. The claim fires on a delta
+    (``n - last_retitle_n >= interval``), not on ``n % interval == 0``: the
+    count is re-derived from the live history every turn, core compaction can
+    pull it backwards, and one turn can move it by more than one message, so a
+    modulo boundary missed once never fires again. A count that fell below the
+    last retitle is rebased, so the next interval still triggers instead of
+    waiting for the count to climb back over a stale high-water mark. Plain
+    syncs never claim and never touch a boundary that is still ahead.
     """
     with _counter_lock:
         if claim and session_id in _inflight:
-            return False
+            return None, False
         counts = _load_counts(ctx)
         entry = counts.get(session_id) or {}
-        last = int(entry.get("last_retitle_n", 0))
-        if claim:
-            if n == last:
-                return False
-            counts[session_id] = {"n": n, "ts": time.time(), "last_retitle_n": n}
-            _save_counts(ctx, counts)
-            _inflight.add(session_id)
-            return True
-        counts[session_id] = {"n": n, "ts": time.time(), "last_retitle_n": last}
+        last = _last_retitle_n(entry)
+        if n < last:
+            last = n  # history shrank under compaction: rebase, never block forever
+        due = bool(claim) and n - last >= max(1, int(interval or 1))
+        counts[session_id] = {"n": n, "ts": time.time(), "last_retitle_n": n if due else last}
         _save_counts(ctx, counts)
-        return False
+        if not due:
+            return None, False
+        _inflight.add(session_id)
+        return last, True
+
+
+def _release_claim(ctx: Any, session_id: str, previous: Optional[int]) -> None:
+    """Give a claimed boundary back so the next turn retries the rename.
+
+    Used only when the model produced a title that could not be persisted: the
+    name the session would have got is gone, and waiting a whole further
+    interval for the next attempt is the worse outcome.
+    """
+    if previous is None:
+        return
+    with _counter_lock:
+        counts = _load_counts(ctx)
+        entry = counts.get(session_id)
+        if not isinstance(entry, dict):
+            return
+        try:
+            n = int(entry.get("n", 0) or 0)
+        except (TypeError, ValueError):
+            n = 0
+        entry["last_retitle_n"] = max(0, min(int(previous), n))
+        _save_counts(ctx, counts)
 
 
 def _reset(ctx: Any, session_id: str) -> None:
@@ -288,33 +336,13 @@ def _clean_title(raw: Any) -> Optional[str]:
     return title[:_MAX_TITLE_CHARS].rstrip(" .,-")
 
 
-def _write_llm_title(db: Any, session_id: str, title: str) -> bool:
-    """Persist *title* at llm rank, honoring the precedence ladder.
-
-    user > llm > derived. A user-set name is untouchable. llm->llm needs a
-    clear first because set_auto_title requires a strictly higher rank.
-    """
-    try:
-        source = db.get_session_title_source(session_id)
-    except Exception:
-        source = None
-    if source == "user":
-        logger.debug("sessionretitler: %s holds a user title; not rewriting", session_id)
-        return False
-
-    if source == "llm":
-        try:
-            db.set_session_title(session_id, "")  # normalize to None/untitled
-        except Exception:
-            logger.debug("sessionretitler: pre-rewrite clear failed", exc_info=True)
-            return False
-
+def _persist_llm_title(db: Any, session_id: str, title: str) -> bool:
+    """Write *title* at llm rank: core helper first, then the store's own call."""
     try:
         # Reuses the core's proven write: set_auto_title + "#N" collision recovery.
         from agent.title_generator import _persist_session_title
 
-        persisted = _persist_session_title(db, session_id, title, source="llm")
-        return persisted is not None
+        return _persist_session_title(db, session_id, title, source="llm") is not None
     except Exception:
         logger.debug("sessionretitler: core persist helper unavailable", exc_info=True)
     try:
@@ -327,12 +355,70 @@ def _write_llm_title(db: Any, session_id: str, title: str) -> bool:
         return False
 
 
+def _restore_title(db: Any, session_id: str, previous: Optional[str]) -> None:
+    """Put the pre-rewrite name back when the new one could not be persisted.
+
+    The llm->llm path clears the row before writing, so a failed write would
+    otherwise leave the session with no name at all.
+    """
+    if not previous:
+        return
+    try:
+        if db.get_session_title(session_id):
+            return  # something else already named it; never fight that
+        if db.set_auto_title(session_id, previous, source="llm"):
+            logger.warning(
+                "sessionretitler: rename failed for %s; restored %r", session_id, previous,
+            )
+    except Exception:
+        logger.warning("sessionretitler: could not restore %r on %s", previous, session_id, exc_info=True)
+
+
+def _write_llm_title(db: Any, session_id: str, title: str) -> bool:
+    """Persist *title* at llm rank, honoring the precedence ladder.
+
+    user > llm > derived. A user-set name is untouchable, and so is a row that
+    carries a name with no provenance: core ranks a NULL ``title_source`` as
+    ``user``, so such a row would silently refuse every write. llm->llm needs a
+    clear first because set_auto_title requires a strictly higher rank.
+    """
+    try:
+        source = db.get_session_title_source(session_id)
+    except Exception:
+        source = None
+    try:
+        previous = db.get_session_title(session_id)
+    except Exception:
+        previous = None
+    if source == "user" or (source is None and previous):
+        logger.debug("sessionretitler: %s holds a user title; not rewriting", session_id)
+        return False
+
+    if source == "llm":
+        try:
+            db.set_session_title(session_id, "")  # normalize to None/untitled
+        except Exception:
+            logger.debug("sessionretitler: pre-rewrite clear failed", exc_info=True)
+            return False
+
+    if _persist_llm_title(db, session_id, title):
+        return True
+    _restore_title(db, session_id, previous)
+    return False
+
+
 # ---------------------------------------------------------------------------
 # The retitle job
 # ---------------------------------------------------------------------------
 
-def _retitle(ctx: Any, session_id: str, digest: str) -> None:
-    """Ask the aux tier for a title from a prebuilt digest; persist at llm rank."""
+def _retitle(ctx: Any, session_id: str, digest: str) -> str:
+    """Ask the aux tier for a title from a prebuilt digest; persist at llm rank.
+
+    Returns ``"ok"``, ``"no_title"``, ``"write_failed"`` or ``"error"``. Only
+    ``write_failed`` gives the claimed boundary back: the title existed and was
+    lost, so the next turn should try again, while a model that returns nothing
+    must not be hammered every turn.
+    """
     try:
         from agent.plugin_llm import PluginLlmTextInput
 
@@ -351,7 +437,7 @@ def _retitle(ctx: Any, session_id: str, digest: str) -> None:
         title = _clean_title((parsed or {}).get("title") if isinstance(parsed, dict) else None)
         if not title:
             logger.debug("sessionretitler: model gave no usable title")
-            return
+            return "no_title"
 
         from hermes_state import SessionDB
 
@@ -360,6 +446,8 @@ def _retitle(ctx: Any, session_id: str, digest: str) -> None:
             ok = _write_llm_title(db, session_id, title)
             if ok:
                 logger.info("sessionretitler: renamed %s -> %r", session_id, title)
+                return "ok"
+            return "write_failed"
         finally:
             close = getattr(db, "close", None)
             if callable(close):
@@ -367,6 +455,7 @@ def _retitle(ctx: Any, session_id: str, digest: str) -> None:
     except Exception:
         # Never let a background rename disturb the host process.
         logger.debug("sessionretitler: retitle failed", exc_info=True)
+        return "error"
 
 
 # ---------------------------------------------------------------------------
@@ -384,27 +473,32 @@ def _maybe_retitle(
     interval = _cfg(ctx, "interval")
     history = conversation_history or []
     n = _count_user_messages(history, extra_user)
-    if n < interval or n % interval != 0:
-        _record_count(ctx, session_id, n)
+    entry = (_load_counts(ctx).get(session_id) or {})
+    last = _last_retitle_n(entry)
+    if n < last:
+        last = n  # compaction shrank the history; _record_count rebases the same way
+    if n - last < interval:
+        _record_count(ctx, session_id, n, interval=interval)
         return
     # Boundary reached: snapshot first (the triggering prompt counts, so the
     # digest must see it), then gate on usable pairs BEFORE claiming, so a
     # thin digest never burns the boundary.
     snapshot = build_snapshot(history, extra_user)
     digest = build_digest(snapshot, _cfg(ctx, "max_pairs"))
-    pairs = digest.count("USER: ")
+    pairs = len(re.findall(r"(?m)^USER: ", digest))
     if pairs < _cfg(ctx, "min_pairs"):
         logger.debug("sessionretitler: only %d pairs; skipping", pairs)
-        _record_count(ctx, session_id, n)
+        _record_count(ctx, session_id, n, interval=interval)
         return
-    if not _record_count(ctx, session_id, n, claim=True):
+    previous, claimed = _record_count(ctx, session_id, n, claim=True, interval=interval)
+    if not claimed:
         return
     try:
         # Off-thread by design: hook callbacks must not block a turn. A
         # failure here only logs; the turn is never disturbed.
         thread = threading.Thread(
             target=_retitle_and_release,
-            args=(ctx, session_id, digest),
+            args=(ctx, session_id, digest, previous),
             daemon=True,
             name=f"session-retitle-{session_id[:12]}",
         )
@@ -428,12 +522,16 @@ def _on_post_llm_call(ctx: Any, session_id: str, conversation_history: List[Any]
     _maybe_retitle(ctx, session_id, conversation_history)
 
 
-def _retitle_and_release(ctx: Any, session_id: str, digest: str) -> None:
+def _retitle_and_release(
+    ctx: Any, session_id: str, digest: str, previous: Optional[int] = None,
+) -> None:
     try:
-        _retitle(ctx, session_id, digest)
+        status = _retitle(ctx, session_id, digest)
     finally:
         with _counter_lock:
             _inflight.discard(session_id)
+    if status == "write_failed":
+        _release_claim(ctx, session_id, previous)
 
 
 def _on_session_reset(ctx: Any, session_id: str) -> None:

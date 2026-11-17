@@ -4,7 +4,7 @@
   <strong>Keep the session list readable as the topic drifts.</strong>
   <p>Every N titleable user messages, retitles the session from the latest exchanges. A title you set yourself is never touched.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.1-2ea44f" alt="Version 1.1.1" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.2-2ea44f" alt="Version 1.1.2" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
