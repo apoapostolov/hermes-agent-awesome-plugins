@@ -1,0 +1,20 @@
+# Prepared for submission to NousResearch/hermes-agent as plugin-catalog/hermes-delegation-nudge.yaml
+name: hermes-delegation-nudge
+title: "Delegation Nudge"
+repo: https://github.com/apoapostolov/hermes-agent-awesome-plugins
+sha: c3189d71e1198eeaf6d94f91c0774701fc949059
+subdir: public/hermes-delegation-nudge
+description: "A live reminder that a turn is spending its own context on work a subagent should carry. The plugin counts the tool results in the current turn and, past ten with no delegate_task, appends one short note to that turn's user message naming the routes it would use, read from delegation.backends.model_map with each route's provider, model and price, and asking the turn to dispatch or say in one sentence why it cannot. At twenty-five results a second note names the bill in results carried. Two notes per turn at most, silent inside a subagent, and silenced by a dispatch. It never edits a tool result and never touches the system prompt. Disclosure: it reads config.yaml at most once a minute to render route labels, makes no network calls, and never dispatches on its own."
+maintainer: apoapostolov
+tier: community
+category: tools
+docs_url: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/public/hermes-delegation-nudge
+version: "1.3.0"
+image: https://raw.githubusercontent.com/apoapostolov/hermes-agent-awesome-plugins/c3189d71e1198eeaf6d94f91c0774701fc949059/public/hermes-delegation-nudge/docs/hero.png
+platforms: []
+capabilities:
+  provides_tools: []
+  provides_hooks: [subagent_start, subagent_stop, on_session_delete]
+  provides_middleware: [llm_request]
+  requires_env: []
+requires_hermes: ">=0.22.0"
