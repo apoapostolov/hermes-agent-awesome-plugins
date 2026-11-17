@@ -1,0 +1,17 @@
+name: byparr-tools
+version: 0.1.0
+manifest_version: 2
+description: "First-class tools for the Bedroom Byparr challenge solver: fetch solved HTML, harvest challenge cookies for a browser CDP jar, and batch-fetch clean text. Byparr runs under the compatibility name 'flaresolverr' on 192.168.1.217:8191. GET-only, no inbound cookies, no login."
+author: Hermes Agent
+kind: general
+license: MIT
+tags: [byparr, flaresolverr, solver, cloudflare, web-access, scraping]
+provides_tools:
+  - solver_get
+  - solver_cookies
+  - solver_load
+provides_hooks: []
+provides_middleware: []
+requires_env: []
+requires_hermes: ">=0.21.4"
+pip_dependencies: []
