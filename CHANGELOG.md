@@ -1,3 +1,9 @@
+## [hermes-jev-routing 1.1.2] - 2026-11-18
+
+### Fixed
+
+- hermes-jev-routing. Every classification call now sends an explicit `User-Agent`, because Cloudflare's Browser Integrity Check in front of the TypeSafe zones answers urllib's default client signature (`Python-urllib/3.x`) with `HTTP 403` and the body `error code: 1010`. The endpoint rejected every request, the plugin failed open on every turn, and in shadow mode the only symptom was a missing tier line with no savings. The header lives in the transport, so it covers the `/jev-routing` route and the `jev_route` tool too, and a caller that supplies its own agent keeps it. Both editions ship the same change.
+
 ## [byparr-tools 0.2.0] - 2026-11-17
 
 First public release. Nine read-only tools over any FlareSolverr-compatible solver: solved HTML, challenge cookies as a CDP payload, batch clean text, health status, structured extraction, a fetch with solver fallback, and a session-scoped cookie jar with list and clear. The solver address, browser CDP endpoint and proxy credentials all come from Settings or environment variables, so no machine-specific value is baked into either edition.

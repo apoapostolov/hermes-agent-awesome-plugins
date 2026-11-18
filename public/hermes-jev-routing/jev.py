@@ -148,11 +148,21 @@ def parse_analysis(payload: Mapping[str, object], task_kinds: Mapping[str, str])
     )
 
 
+# Cloudflare's Browser Integrity Check on the TypeSafe zones rejects urllib's
+# default client signature (Python-urllib/3.x) with HTTP 403 error 1010, so this
+# header is what makes the endpoint answer at all, not decoration.
+_CLIENT_USER_AGENT = (
+    "hermes-jev-routing (+https://github.com/apoapostolov/hermes-agent-awesome-plugins)"
+)
+
+
 def urllib_transport(url: str, headers: Mapping[str, str], body: dict, timeout_s: float) -> dict:
+    request_headers = dict(headers)
+    request_headers.setdefault("User-Agent", _CLIENT_USER_AGENT)
     request = urllib.request.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
-        headers=dict(headers),
+        headers=request_headers,
         method="POST",
     )
     try:
