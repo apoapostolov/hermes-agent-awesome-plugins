@@ -229,9 +229,13 @@ def main() -> int:
     args = parser.parse_args()
 
     root = Path(args.path).resolve()
-    if not (root / "plugin.yaml").is_file():
-        print(f"no plugin.yaml in {root}")
-        return 2
+    manifest_path = root / "plugin.yaml"
+    portable = not manifest_path.is_file()
+    if portable:
+        manifest_path = root / "plugin.json"
+        if not manifest_path.is_file():
+            print(f"no plugin.yaml or plugin.json in {root}")
+            return 2
 
     found = Findings()
     js = files(root, {".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx"})
@@ -241,8 +245,24 @@ def main() -> int:
     for path in py:
         scan(path, root, found, path.read_text(encoding="utf-8", errors="replace"), False)
 
-    manifest = flat(root / "plugin.yaml")
-    version = key(manifest, "version")
+    if portable:
+        # A portable Agent Plugins v1 package has no plugin.yaml, so the rules that
+        # read one (declared requires_env, pre_tool_call, max_chars) have nothing to
+        # read. Its server declaration lives in mcp.json; the rest of the floor still
+        # applies: source scan, sha and version cross-check, image pin, platforms,
+        # disclosure.
+        try:
+            data = json.loads(manifest_path.read_text(encoding="utf-8", errors="replace"))
+        except ValueError as exc:
+            print(f"{manifest_path.name} is not valid JSON: {exc}")
+            return 1
+        manifest = ""
+        version = str(data.get("version") or "")
+        found.add("INFO", "portable", manifest_path.name, 0,
+                  "portable package: the plugin.yaml-only checks (requires_env, pre_tool_call, prompt cap) do not apply")
+    else:
+        manifest = flat(manifest_path)
+        version = key(manifest, "version")
     prod_py = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in py if not is_test(p))
     all_js = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in js if not is_test(p))
 
@@ -255,13 +275,14 @@ def main() -> int:
                             for p in py if "schema" in p.name.lower())
     if re.search(r"https?://[^\"'\s]*\{version\}", prod_py) and re.search(r'''["']version["']\s*:''', schema_text):
         found.add("FAIL", "rule-17", Path("."), 0, "a tool-supplied version reaches a download URL; pin digests and refuse unpinned versions")
-    if "get_secret(" in prod_py and "requires_env" not in manifest:
+    if not portable and "get_secret(" in prod_py and "requires_env" not in manifest:
         found.add("FAIL", "rule-11", Path("plugin.yaml"), 1, "get_secret() used but requires_env is not declared")
-    if re.search(r"subprocess\.(run|Popen|call|check_output)", prod_py):
+    if not portable and re.search(r"subprocess\.(run|Popen|call|check_output)", prod_py):
         if "pre_tool_call" not in manifest:
             found.add("WARN", "rule-12", Path("plugin.yaml"), 1, "starts a program and declares no pre_tool_call; fine only if no tool argument reaches it")
 
-    prompt_findings(root, found, manifest, prod_py)
+    if not portable:
+        prompt_findings(root, found, manifest, prod_py)
 
     if args.entry:
         entry_path = Path(args.entry)
@@ -271,7 +292,7 @@ def main() -> int:
         if sha and not re.fullmatch(r"[0-9a-f]{40}", sha):
             found.add("FAIL", "rule-2", entry_path.name, 1, f"sha {sha!r} is not 40 lowercase hex")
         if version and entry_version and entry_version != version:
-            found.add("FAIL", "rule-14", entry_path.name, 1, f"entry version {entry_version} != plugin.yaml {version}")
+            found.add("FAIL", "rule-14", entry_path.name, 1, f"entry version {entry_version} != {manifest_path.name} {version}")
         for url in set(re.findall(r"https://raw\.githubusercontent\.com/[^/]+/[^/]+/([0-9a-f]{40})/", entry)):
             if sha and url != sha:
                 found.add("FAIL", "rule-2", entry_path.name, 1, f"an image is pinned to {url[:8]} but the entry sha is {sha[:8]}")
