@@ -2,7 +2,9 @@
 
 ### Fixed
 
-- hermes-jev-routing. Every classification call now sends an explicit `User-Agent`, because Cloudflare's Browser Integrity Check in front of the TypeSafe zones answers urllib's default client signature (`Python-urllib/3.x`) with `HTTP 403` and the body `error code: 1010`. The endpoint rejected every request, the plugin failed open on every turn, and in shadow mode the only symptom was a missing tier line with no savings. The header lives in the transport, so it covers the `/jev-routing` route and the `jev_route` tool too, and a caller that supplies its own agent keeps it. Both editions ship the same change.
+- hermes-jev-routing. Every classification call now sends an explicit `User-Agent`, because Cloudflare's Browser Integrity Check in front of the TypeSafe zones answers urllib's default client signature (`Python-urllib/3.x`) with `HTTP 403` and the body `error code: 1010`. The endpoint rejected every request, the plugin failed open on every turn, and in shadow mode the only symptom was a missing tier line with no savings. The header lives in the transport, so it covers the `/jev-routing` route and the `jev_route` tool too, and a caller that supplies its own agent keeps it.
+
+- hermes-jev-routing. A cron turn is never held. A scheduled job has no one to approve a held send, so the hold interrupted the job before it could do any work; the pre-call hook now leaves a cron turn unrouted instead of holding it. The commit landed on `main` after the 1.1.1 tag, so this is the first tagged build that carries it.
 
 ## [byparr-tools 0.2.0] - 2026-11-17
 
