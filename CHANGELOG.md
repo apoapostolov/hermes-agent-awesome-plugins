@@ -1,3 +1,9 @@
+## [prompt-enhance 1.2.1] - 2026-11-19
+
+### Fixed
+
+- prompt-enhance. The Prompt Library dialog closed on any synthesized pointer-down inside its own bounds, so an accessibility driver could never reach Import Prompt and a Tab escaped to the composer. Both dialogs now cancel Radix's outside-interaction dismissal when the pointer coordinates fall inside the dialog root, and keep it open when focus escapes the modal trap; a real click outside still closes it. Both editions ship the same fix.
+
 ## [hermes-jev-routing 1.1.2] - 2026-11-18
 
 ### Fixed

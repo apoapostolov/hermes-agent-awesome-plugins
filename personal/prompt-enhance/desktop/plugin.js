@@ -86,6 +86,32 @@ function uid() {
   return Math.random().toString(36).slice(2, 10)
 }
 
+/**
+ * Radix dismisses a Dialog on any pointer-down it treats as outside. An
+ * accessibility driver can synthesize a click whose target resolves outside the
+ * content while its coordinates land inside it, which closed the dialog before
+ * the button under the pointer received the click. Judge by geometry, not target.
+ */
+function guardDialogOutside(ref) {
+  const pointer = event => {
+    const detail = event && event.detail
+    const original = detail && (detail.originalEvent || detail)
+    const x = original && original.clientX
+    const y = original && original.clientY
+    if (typeof x !== 'number' || typeof y !== 'number') return
+    const node = ref && ref.current
+    if (!node || typeof node.getBoundingClientRect !== 'function') return
+    const rect = node.getBoundingClientRect()
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+      event.preventDefault()
+    }
+  }
+  // A synthesized Tab can escape the modal focus trap; keep the dialog up so the
+  // driver can still reach its controls.
+  const focus = event => { event.preventDefault() }
+  return { pointer, focus }
+}
+
 function seed() {
   return {
     folders: [{ id: ENHANCERS, name: 'Enhancers', locked: true }],
@@ -510,6 +536,8 @@ function LibraryDialog({ open, folderId, onFolder, onClose, onEdit }) {
   const [catalog, setCatalog] = useState(null)
   const [drop, setDrop] = useState(null)
   const dragId = useRef(null)
+  const dialogRef = useRef(null)
+  const keepOpen = guardDialogOutside(dialogRef)
   const folder = data.folders.find(item => item.id === folderId) || data.folders[0]
   const cards = promptsIn(data, folder.id)
 
@@ -556,11 +584,15 @@ function LibraryDialog({ open, folderId, onFolder, onClose, onEdit }) {
     open,
     onOpenChange: next => { if (!next) onClose() },
     children: jsx(DialogContent, {
+      onPointerDownOutside: keepOpen.pointer,
+      onInteractOutside: keepOpen.pointer,
+      onFocusOutside: keepOpen.focus,
       fitContent: true,
       className: 'min-w-[560px] max-w-[46rem]',
       bodyClassName: 'flex min-h-0 flex-col gap-0 overflow-hidden p-0',
       children: jsxs('div', {
         className: 'min-h-0',
+        ref: dialogRef,
         'data-pe-library': '',
         style: LIBRARY,
         children: [
@@ -981,6 +1013,8 @@ function EditDialog({ prompt, onClose }) {
   const [sel, setSel] = useState({ start: 0, end: 0 })
   const areaRef = useRef(null)
   const pendingSel = useRef(null)
+  const dialogRef = useRef(null)
+  const keepOpen = guardDialogOutside(dialogRef)
   useEffect(() => {
     setName(prompt ? prompt.name : '')
     setBody(prompt ? prompt.body : '')
@@ -1018,10 +1052,14 @@ function EditDialog({ prompt, onClose }) {
     open: Boolean(prompt),
     onOpenChange: next => { if (!next) onClose() },
     children: jsx(DialogContent, {
+      onPointerDownOutside: keepOpen.pointer,
+      onInteractOutside: keepOpen.pointer,
+      onFocusOutside: keepOpen.focus,
       fitContent: true,
       className: 'max-w-[92vw]',
       bodyClassName: 'block min-w-0 p-4',
       children: jsxs('div', {
+        ref: dialogRef,
         'data-pe-edit': '',
         style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' },
         children: [
