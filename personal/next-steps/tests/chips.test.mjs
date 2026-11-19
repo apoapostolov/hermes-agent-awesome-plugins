@@ -135,7 +135,12 @@ function send(el) {
   return roots(el).find((c) => c.props.className.indexOf('fu-send') !== -1)
 }
 
+function steer(el) {
+  return roots(el).find((c) => c && c.props.className && c.props.className.indexOf('fu-steer') !== -1)
+}
+
 function label(el) {
+  if (typeof el.props.children === 'string') return el.props.children
   const first = el.props.children[0]
   if (first == null || typeof first !== 'object') return first
   let inner = first.props.children
@@ -217,13 +222,13 @@ assert.equal(directive.area, 'transcript.directives', 'registers into the transc
 const register = directive.data.render
 
 const results = []
+const cases = []
 function test(name, fn) {
-  try {
-    fn()
-    results.push(['ok', name])
-  } catch (error) {
-    results.push(['fail', name, error.message])
-  }
+  /* Run every case in registration order below. Firing them all at load time used
+     to mark an async case ok before its post-await assertions ran, and concurrent
+     async cases also shared the host stubs, so one case's await let the next case
+     change the arrays under it. */
+  cases.push([name, fn])
 }
 
 /* ---- single select: unchanged behaviour --------------------------------- */
@@ -607,10 +612,10 @@ test('carry: the send button sits below the carried chips, not above them', () =
   const footer = (el.props.children || []).find((c) => c.props.className === 'fu-footer')
   assert.deepEqual(
     footer.props.children.map((c) => c.props.className),
-    ['fu-chip fu-send', 'fu-clean'],
-    'the cleanup sits after the send button, pushed to the end of the row'
+    ['fu-chip fu-send', 'fu-chip fu-send fu-steer', 'fu-clean'],
+    'the cleanup sits after the finalisation buttons, pushed to the end of the row'
   )
-  assert.equal(footer.props.children[1].props.style.marginLeft, 'auto', 'right-aligned in that row')
+  assert.equal(footer.props.children[2].props.style.marginLeft, 'auto', 'right-aligned in that row')
 })
 
 test('carry: proposals never cross chats when the render prop is empty', () => {
@@ -795,7 +800,8 @@ test('steer="1": the click steers the live turn and submits nothing', async () =
     lines.push([sessionId, text])
     return true
   }
-  const el = render(register({ attrs: { steer: '1', q1: 'Tighten the rule', q2: 'Leave it' }, sessionId: 'st1', source: 'st-a' }))
+  busyIn('st1', true)
+  const el = render(register({ attrs: { steer: '1', multi: '0', q1: 'Tighten the rule', q2: 'Leave it' }, sessionId: 'st1', source: 'st-a' }))
   chips(el)[0].props.onClick()
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.equal(calls.length, 1)
@@ -803,7 +809,7 @@ test('steer="1": the click steers the live turn and submits nothing', async () =
   assert.deepEqual(calls[0][1], { session_id: 'st1', text: 'Tighten the rule' })
   assert.equal(lines.length, 0, 'a steered click is not also a new message')
 
-  const after = render(register({ attrs: { steer: '1', q1: 'Tighten the rule', q2: 'Leave it' }, sessionId: 'st1', source: 'st-a' }))
+  const after = render(register({ attrs: { steer: '1', multi: '0', q1: 'Tighten the rule', q2: 'Leave it' }, sessionId: 'st1', source: 'st-a' }))
   assert.match(chips(after)[0].props.className, /fu-chosen/, 'the click still reads as answered')
   sdk.host.request = null
   resetHost()
@@ -933,6 +939,77 @@ test('idle with steer="1": plain submit, no steer and no queue entry', async () 
   assert.equal(asked, 0)
   assert.deepEqual(lines, [['q5', 'Just do it']])
   resetHost()
+})
+
+
+/* ---- the Steer button ---------------------------------------------------- */
+test('multi shows a small Steer button right after Send', () => {
+  const el = render(register({ attrs: { multi: '1', q1: 'A', q2: 'B' }, sessionId: 'sb1', source: 'src-sb1' }))
+  const row = footerRow(el)
+  const buttons = row.props.children.filter((c) => c && c.props.className && c.props.className.indexOf('fu-send') !== -1)
+  assert.equal(buttons.length, 2, 'two finalisation buttons')
+  assert.equal(label(buttons[0]), 'Send')
+  assert.equal(label(buttons[1]), 'Steer')
+  assert.ok(buttons[1].props.className.indexOf('fu-steer') !== -1)
+  assert.ok(parseFloat(buttons[1].props.style.fontSize) < parseFloat(buttons[0].props.style.fontSize), 'Steer is the small button')
+  assert.equal(steer(el), buttons[1], 'the helper finds the same button')
+})
+
+test('busy: Steer reaches the live turn and never becomes a queue entry', async () => {
+  const calls = []
+  sdk.host.request = (method, params) => { calls.push([method, params]); return Promise.resolve({ status: 'queued' }) }
+  busyIn('sb2', true)
+  let el = render(register({ attrs: { multi: '1', q1: 'A', q2: 'B' }, sessionId: 'sb2', source: 'src-sb2' }))
+  chips(el)[0].props.onClick()
+  el = render(register({ attrs: { multi: '1', q1: 'A', q2: 'B' }, sessionId: 'sb2', source: 'src-sb2' }))
+  steer(el).props.onClick()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.deepEqual(calls.map((c) => c[0]), ['session.steer'])
+  assert.deepEqual(calls[0][1], { session_id: 'sb2', text: 'A' })
+  const after = render(register({ attrs: { multi: '1', q1: 'A', q2: 'B' }, sessionId: 'sb2', source: 'src-sb2' }))
+  assert.equal(label(steer(after)), 'Steer', 'the sent block keeps its buttons marked')
+  resetHost()
+})
+
+test('busy: a refused Steer warns and leaves the block unsent', async () => {
+  const calls = []
+  sdk.host.request = (method, params) => { calls.push([method, params]); return Promise.resolve({ status: 'rejected', delivered: false }) }
+  const lines = []
+  sdk.host.composer.submit = (sid, text) => { lines.push([sid, text]); return true }
+  submits.length = 0
+  busyIn('sb3', true)
+  let el = render(register({ attrs: { multi: '1', q1: 'A', q2: 'B' }, sessionId: 'sb3', source: 'src-sb3' }))
+  chips(el)[0].props.onClick()
+  el = render(register({ attrs: { multi: '1', q1: 'A', q2: 'B' }, sessionId: 'sb3', source: 'src-sb3' }))
+  steer(el).props.onClick()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.deepEqual(calls.map((c) => c[0]), ['session.steer'], 'no queue fallback')
+  assert.deepEqual(lines, [], 'no new turn was admitted')
+  assert.deepEqual(submits[0], ['notify', { kind: 'warning', message: 'That turn would not take a steer; use Send to queue it' }])
+  const after = render(register({ attrs: { multi: '1', q1: 'A', q2: 'B' }, sessionId: 'sb3', source: 'src-sb3' }))
+  assert.equal(label(send(after)), 'Send 1', 'the block can still be sent with Send')
+  resetHost()
+})
+
+test('idle: Steer starts a normal turn', async () => {
+  const calls = []
+  sdk.host.request = (method) => { calls.push(method); return Promise.resolve({ status: 'queued' }) }
+  submits.length = 0
+  busyIn('sb4', false)
+  let el = render(register({ attrs: { multi: '1', q1: 'A', q2: 'B' }, sessionId: 'sb4', source: 'src-sb4' }))
+  chips(el)[1].props.onClick()
+  el = render(register({ attrs: { multi: '1', q1: 'A', q2: 'B' }, sessionId: 'sb4', source: 'src-sb4' }))
+  steer(el).props.onClick()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.deepEqual(calls, [], 'nothing is running, so there is nothing to steer')
+  assert.deepEqual(submits, [['sb4', 'B']])
+  resetHost()
+})
+
+test('answer mode draws Steer beside Send', () => {
+  const nodes = answerNodes(render(register({ attrs: { answer: '1', q1: 'One?', q2: 'Two?' }, sessionId: 'sb5', source: 'src-sb5' })))
+  assert.equal(label(answerSend(nodes)), 'Send')
+  assert.equal(label(answerSteer(nodes)), 'Steer')
 })
 
 /* ---- cleaning the carried chips ------------------------------------------ */
@@ -1243,7 +1320,14 @@ function answerNodes(el) {
 function answerSend(nodes) {
   const wrap = nodes.find((n) => n && n.type === 'div' && n.props.style && n.props.style.gridColumn === '2')
   assert.ok(wrap, 'the send button sits in the input column')
-  return wrap.props.children
+  return Array.isArray(wrap.props.children) ? wrap.props.children[0] : wrap.props.children
+}
+
+function answerSteer(nodes) {
+  const wrap = nodes.find((n) => n && n.type === 'div' && n.props.style && n.props.style.gridColumn === '2')
+  const second = wrap && wrap.props.children && wrap.props.children[1]
+  assert.ok(second, 'Steer sits beside Send in the input column')
+  return second
 }
 
 test('answer=true sends labelled item: answer lines as one turn', () => {
@@ -1314,6 +1398,14 @@ test('the answer form caps its width so it cannot grow to the window edge', () =
   assert.equal(form.props.style.gridTemplateColumns, 'auto minmax(0, 1fr)')
 })
 
+for (const [name, fn] of cases) {
+  try {
+    await fn()
+    results.push(['ok', name])
+  } catch (error) {
+    results.push(['fail', name, error.message])
+  }
+}
 rmSync(dir, { recursive: true, force: true })
 const failed = results.filter((r) => r[0] === 'fail')
 for (const [state, name, detail] of results) {

@@ -933,6 +933,46 @@ function Send(props) {
   )
 }
 
+/* The second finalisation button. Send admits a turn; Steer insists the picked
+   steps go into the turn already running, so a busy chat is never quietly turned
+   into a queued follow-up. It is opt-in per click and needs no directive flag. */
+function SteerButton(props) {
+  const count = props.count
+  const sent = props.sent
+  const onSteer = props.onSteer
+  const disabled = count === 0 || sent
+  const primary = 'var(--dt-primary, var(--accent, var(--foreground)))'
+  return jsx(
+    'button',
+    {
+      type: 'button',
+      className: 'fu-chip fu-send fu-steer',
+      disabled: disabled,
+      onClick: function () {
+        if (!disabled) onSteer()
+      },
+      title: sent ? 'Sent' : count === 0 ? 'Pick one or more' : 'Send the picked steps into the running turn instead of queueing them',
+      style: {
+        cursor: disabled ? 'default' : 'pointer',
+        justifySelf: 'start',
+        border: '1px solid color-mix(in srgb, ' + primary + ' ' + (disabled ? '24%' : '42%') + ', transparent)',
+        borderRadius: '12px',
+        background: 'transparent',
+        color: disabled ? 'var(--ui-text-secondary, var(--foreground))' : primary,
+        opacity: disabled ? 0.5 : 0.9,
+        padding: '5px 10px',
+        marginTop: '2px',
+        fontSize: '0.78em',
+        fontWeight: 500,
+        lineHeight: 1.35,
+        transition: 'border-color 160ms ease, background 160ms ease, color 160ms ease, opacity 160ms ease',
+      },
+      children: 'Steer',
+    },
+    'steer'
+  )
+}
+
 /* Re-render hook: subscribes the component to its session's chip state. */
 function useGroupState(key) {
   const [, force] = useState(0)
@@ -1003,13 +1043,20 @@ function AnswerRows(props) {
       'div',
       {
         key: 'send',
-        style: { gridColumn: '2' },
-        children: jsx(Send, {
-          sessionKey: props.sessionKey,
-          count: picked.length,
-          sent: sent,
-          onSend: props.onSend,
-        }),
+        style: { gridColumn: '2', display: 'flex', alignItems: 'center', gap: '8px' },
+        children: [
+          jsx(Send, {
+            sessionKey: props.sessionKey,
+            count: picked.length,
+            sent: sent,
+            onSend: props.onSend,
+          }),
+          jsx(SteerButton, {
+            count: picked.length,
+            sent: sent,
+            onSteer: props.onSteer,
+          }),
+        ],
       },
       'send'
     )
@@ -1160,12 +1207,17 @@ function normalizeSubtitle(text) {
      corrected, queue it as the next prompt", and every other refusal or error
      means the same thing, so the queue admission is the floor: a click is never
      left as text that triggers nothing. */
-  function deliver(text, done) {
+  function deliver(text, done, forceSteer) {
     var submit = host && host.composer && host.composer.submit
     function ordinary() {
       var ok = typeof submit === 'function' ? submit(sessionId != null ? sessionId : null, text) : false
       if (ok) done()
       else if (host && host.notify) host.notify({ kind: 'warning', message: 'Open that chat to continue' })
+    }
+    function warnSteer() {
+      if (host && host.notify) {
+        host.notify({ kind: 'warning', message: 'That turn would not take a steer; use Send to queue it' })
+      }
     }
     var request = host && host.request
     var sid = sessionId != null && sessionId !== '' ? sessionId : null
@@ -1182,6 +1234,27 @@ function normalizeSubtitle(text) {
     }
     if (!busy) {
       ordinary()
+      return
+    }
+    /* The Steer button is explicit: it never degrades into a queue admission.
+       A refused steer leaves the block unsent so the click can be retried. */
+    if (forceSteer) {
+      if (typeof request !== 'function') {
+        warnSteer()
+        return
+      }
+      try {
+        Promise.resolve(request('session.steer', { session_id: sid, text: text }))
+          .then(function (res) {
+            if (res && res.status === 'queued' && res.delivered !== false) done()
+            else warnSteer()
+          })
+          .catch(function () {
+            warnSteer()
+          })
+      } catch (e) {
+        warnSteer()
+      }
       return
     }
     var settled = false
@@ -1246,7 +1319,7 @@ function normalizeSubtitle(text) {
 
   /* One turn carries either the picked chips or the typed answers, in q order.
      Both shapes share the delivery path, so the busy/steer rules cannot drift. */
-  function sendTurn(text) {
+  function sendTurn(text, forceSteer) {
     if (!text) return
     deliver(text, function () {
       const g = group(groupKey)
@@ -1259,21 +1332,21 @@ function normalizeSubtitle(text) {
       groups.forEach(function (_, k) {
         if (k !== groupKey) emit(k)
       })
-    })
+    }, forceSteer)
   }
 
-  function sendPicked() {
+  function sendPicked(forceSteer) {
     sendTurn(
       qs
         .filter(function (q, i) {
           return picked.indexOf(i) !== -1
         })
         .join('\n')
-    )
+    , forceSteer)
   }
 
-  function sendAnswers() {
-    sendTurn(composeAnswers(qs, picked, texts))
+  function sendAnswers(forceSteer) {
+    sendTurn(composeAnswers(qs, picked, texts), forceSteer)
   }
 
   function pick(idx) {
@@ -1341,6 +1414,7 @@ function normalizeSubtitle(text) {
         onToggle: toggle,
         onChange: setAnswer,
         onSend: sendAnswers,
+        onSteer: function () { sendAnswers(true) },
       }),
     ]
   } else {
@@ -1386,7 +1460,7 @@ function normalizeSubtitle(text) {
     )
   })
 
-  /* The send button closes the block, after every row it would send: a carried
+  /* Send and Steer close the block, after every row they would send: a carried
      chip sits between this reply's own options and the button that answers them,
      so the action never appears above entries it does not send.
 
@@ -1402,6 +1476,15 @@ function normalizeSubtitle(text) {
         count: picked.length,
         sent: sent,
         onSend: sendPicked,
+      })
+    )
+    footer.push(
+      jsx(SteerButton, {
+        key: 'steer',
+        sessionKey: groupKey,
+        count: picked.length,
+        sent: sent,
+        onSteer: function () { sendPicked(true) },
       })
     )
   }
