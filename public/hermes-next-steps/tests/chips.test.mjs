@@ -31,6 +31,8 @@ pkg('@hermes/plugin-sdk', {
     "export const TRANSCRIPT_DIRECTIVE_AREA = 'transcript.directives'",
     '// The test mutates this object the way the app would provide it.',
     'export const host = { composer: { submit: () => false }, notify: () => {}, request: null, state: null }',
+    "export const Checkbox = 'Checkbox'",
+    "export const Input = 'Input'",
   ].join('\n'),
 })
 
@@ -1189,6 +1191,87 @@ test('root plugin.js is byte-identical to desktop/plugin.js', () => {
   const root = readFileSync(resolve(here, '..', 'plugin.js'), 'utf8')
   const desktop = readFileSync(pluginSource, 'utf8')
   assert.equal(root === desktop, true, 'run: cp desktop/plugin.js plugin.js')
+})
+
+/* ---- answer mode: the reply fields learned from followup-chips 1.2.0 ------ */
+function answerNodes(el) {
+  const block = el.props.children[0]
+  assert.equal(block && block.props.className, 'fu-answers', 'answer mode draws a form, not chips')
+  return block.props.children
+}
+
+function answerSend(nodes) {
+  const wrap = nodes.find((n) => n && n.type === 'div' && n.props.style && n.props.style.gridColumn === '2')
+  assert.ok(wrap, 'the send button sits in the input column')
+  return wrap.props.children
+}
+
+test('answer=true sends labelled item: answer lines as one turn', () => {
+  submits.length = 0
+  const attrs = { answer: '1', q1: 'Deploy at 16:00?', q2: 'Tag v1.3.0?' }
+  let el = render(register({ attrs, sessionId: 'a1', source: 'src-a1' }))
+  let nodes = answerNodes(el)
+  const fields = nodes.filter((n) => n && n.type === 'Input')
+  assert.equal(fields.length, 2)
+  assert.equal(fields[0].props.placeholder, 'Deploy at 16:00?')
+  assert.equal(answerSend(nodes).props.disabled, true, 'nothing picked yet')
+  fields[0].props.onChange({ target: { value: 'yes, at 16:00' } })
+  el = render(register({ attrs, sessionId: 'a1', source: 'src-a1' }))
+  nodes = answerNodes(el)
+  const button = answerSend(nodes)
+  assert.equal(button.props.disabled, false)
+  assert.equal(label(button), 'Send 1', 'typing auto-picks the row')
+  button.props.onClick()
+  assert.deepEqual(submits, [['a1', '1. Deploy at 16:00?: yes, at 16:00']])
+})
+
+test('a checked answer row with no text sends its numbered question', () => {
+  submits.length = 0
+  const attrs = { answer: '1', q1: 'Deploy?', q2: 'Tag?' }
+  let el = render(register({ attrs, sessionId: 'a2', source: 'src-a2' }))
+  answerNodes(el).filter((n) => n && n.type === 'Checkbox')[1].props.onCheckedChange()
+  el = render(register({ attrs, sessionId: 'a2', source: 'src-a2' }))
+  answerSend(answerNodes(el)).props.onClick()
+  assert.deepEqual(submits, [['a2', '2. Tag?']])
+})
+
+test('kind=answer is accepted and plain chips ignore the answer attr', () => {
+  const attrs = { kind: 'answer', q1: 'One?', q2: 'Two?' }
+  assert.equal(answerNodes(render(register({ attrs, sessionId: 'a3', source: 'src-a3' }))).length > 0, true)
+  const plain = render(register({ attrs: { q1: 'One?', q2: 'Two?' }, sessionId: 'a4', source: 'src-a4' }))
+  assert.equal(chips(plain).length, 2, 'a plain block still draws chips')
+})
+
+test('answers persist, and a corrupt stored value cannot load a form', () => {
+  const attrs = { answer: '1', q1: 'One?', q2: 'Two?' }
+  let el = render(register({ attrs, sessionId: 'a5', source: 'src-a5' }))
+  answerNodes(el).filter((n) => n && n.type === 'Input')[0].props.onChange({ target: { value: 'first' } })
+  el = render(register({ attrs, sessionId: 'a5', source: 'src-a5' }))
+  assert.equal(answerNodes(el).filter((n) => n && n.type === 'Input')[0].props.value, 'first')
+  const saved = store.get('choices')
+  const key = Object.keys(saved).find((k) => k.indexOf('src-a5') !== -1)
+  assert.equal(saved[key].texts[0], 'first')
+  saved[key].texts = [null, 7]
+  store.set('choices', saved)
+  /* A restart re-hydrates; corrupt values must load as blanks, not as text. */
+  plugin.register({
+    storage: {
+      get: (key, fallback) => (store.has(key) ? structuredClone(store.get(key)) : fallback),
+      set: (key, value) => store.set(key, structuredClone(value)),
+    },
+    register: () => {},
+  })
+  el = render(register({ attrs, sessionId: 'a5', source: 'src-a5' }))
+  const fields = answerNodes(el).filter((n) => n && n.type === 'Input')
+  assert.equal(fields[0].props.value, '', 'a bad stored entry loads as blank')
+  assert.equal(fields[1].props.value, '')
+})
+
+test('the answer form caps its width so it cannot grow to the window edge', () => {
+  const el = render(register({ attrs: { answer: '1', q1: 'One?', q2: 'Two?' }, sessionId: 'a6', source: 'src-a6' }))
+  const form = el.props.children[0]
+  assert.equal(form.props.style.maxWidth, '520px')
+  assert.equal(form.props.style.gridTemplateColumns, 'auto minmax(0, 1fr)')
 })
 
 rmSync(dir, { recursive: true, force: true })

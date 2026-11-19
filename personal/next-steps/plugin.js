@@ -6,7 +6,7 @@
 //   ::nextsteps{multi="1" q1="..." q2="..." q3="..."}
 // Add rec="1,3" (1-based q numbers) to mark the options a ranker put first:
 // those chips carry a Recommended tag and start out picked.
-import { TRANSCRIPT_DIRECTIVE_AREA, host } from '@hermes/plugin-sdk'
+import { TRANSCRIPT_DIRECTIVE_AREA, Checkbox, Input, host } from '@hermes/plugin-sdk'
 import { useState, useEffect } from 'react'
 import { jsx } from 'react/jsx-runtime'
 
@@ -70,7 +70,7 @@ function persistChoice(key, g) {
   if (!storage) return
   try {
     const all = storage.get('choices', {}) || {}
-    all[key] = { chosen: g.chosen, picked: g.picked, sent: g.sent, touched: g.touched }
+    all[key] = { chosen: g.chosen, picked: g.picked, texts: g.texts, sent: g.sent, touched: g.touched }
     storage.set('choices', all)
   } catch (e) {
     /* persistence is best-effort */
@@ -95,6 +95,12 @@ function hydrate() {
               return typeof n === 'number' && n >= 0
             })
           }
+          /* Stored text is untrusted: cap both the array and each string. */
+          if (Array.isArray(v.texts)) {
+            g.texts = v.texts.slice(0, 64).map(function (t) {
+              return typeof t === 'string' ? normalizeAnswer(t) : ''
+            })
+          }
           if (v.sent === true) g.sent = true
         }
       })
@@ -108,7 +114,7 @@ function group(key) {
   pruneGroups()
   let g = groups.get(key)
   if (!g) {
-    g = { chosen: null, picked: [], sent: false, touched: false, running: false, listeners: new Set() }
+    g = { chosen: null, picked: [], texts: [], sent: false, touched: false, running: false, listeners: new Set() }
     groups.set(key, g)
   }
   return g
@@ -459,6 +465,11 @@ function pickedOf(key) {
   return g ? g.picked : []
 }
 
+function answersOf(key) {
+  const g = groups.get(key)
+  return g ? g.texts : []
+}
+
 function sentOf(key) {
   const g = groups.get(key)
   return g ? g.sent : false
@@ -497,6 +508,27 @@ function accentOn(value) {
   if (value == null) return true
   if (value === false) return false
   return !/^(0|false|no|off)$/i.test(String(value).trim())
+}
+
+/* answer=true: the block is a small form, one row per question. The text is
+   capped so a stored value or a pasted paragraph cannot turn a row into a page. */
+const ANSWER_MAX_CHARS = 600
+
+function normalizeAnswer(value) {
+  const flat = String(value == null ? '' : value).replace(/\s+/g, ' ').trim()
+  return flat.length > ANSWER_MAX_CHARS ? flat.slice(0, ANSWER_MAX_CHARS) : flat
+}
+
+/* "1. <question>: <answer>", one line per checked row. A checked row with no text
+   still sends its number and question, the way upstream's answer mode does. */
+function composeAnswers(qs, picked, texts) {
+  const lines = []
+  for (let i = 0; i < qs.length; i += 1) {
+    if (picked.indexOf(i) === -1) continue
+    const answer = texts[i] || ''
+    lines.push((i + 1) + '. ' + qs[i] + (answer ? ': ' + answer : ''))
+  }
+  return lines.join('\n')
 }
 
 /* rec="1,3" → [0, 2]. 1-based so it lines up with the qN an agent writes; junk,
@@ -1002,6 +1034,79 @@ function runningState(key) {
   return running(key)
 }
 
+/* A reply field per question, using the app's own controls: the SDKCheckbox and
+   Input carry the app's focus, theme and keyboard behaviour. The send button sits
+   in the input column (`gridColumn: '2'`), not out at the window edge. */
+function AnswerRows(props) {
+  const qs = props.qs
+  const picked = props.picked
+  const texts = props.texts
+  const sent = props.sent
+  const children = []
+  qs.forEach(function (q, i) {
+    children.push(
+      jsx(
+        Checkbox,
+        {
+          key: 'box' + i,
+          checked: picked.indexOf(i) !== -1,
+          disabled: sent,
+          onCheckedChange: function () { props.onToggle(i) },
+          'aria-label': 'Answer ' + (i + 1) + ': ' + q,
+        },
+        'box' + i
+      )
+    )
+    children.push(
+      jsx(
+        Input,
+        {
+          key: 'field' + i,
+          value: texts[i] || '',
+          disabled: sent,
+          placeholder: q,
+          onChange: function (event) {
+            props.onChange(i, event && event.target ? event.target.value : '')
+          },
+          'aria-label': q,
+        },
+        'field' + i
+      )
+    )
+  })
+  children.push(
+    jsx(
+      'div',
+      {
+        key: 'send',
+        style: { gridColumn: '2' },
+        children: jsx(Send, {
+          sessionKey: props.sessionKey,
+          count: picked.length,
+          sent: sent,
+          onSend: props.onSend,
+        }),
+      },
+      'send'
+    )
+  )
+  return jsx(
+    'div',
+    {
+      className: 'fu-answers',
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'auto minmax(0, 1fr)',
+        gap: '8px',
+        maxWidth: '520px',
+        margin: '6px 0 2px 0',
+      },
+      children: children,
+    },
+    'answers'
+  )
+}
+
 function Chips(props) {
   const attrs = (props && props.attrs) || {}
   const sessionId = props && props.sessionId
@@ -1023,10 +1128,14 @@ function Chips(props) {
     .filter(function (q) {
       return typeof q === 'string' && q.length > 0
     })
+  /* answer="1" (also the upstream spelling kind="answer") draws a reply field
+     per option. It replaces pickable chips: a form and a chip row sharing one
+     footer would send two different shapes of turn from the same block. */
+  const answerOn = isOn(attrs.answer) || attrs.kind === 'answer'
   /* Two or more chips are pickable unless the directive says otherwise. A block
      that defaulted to one-click-sends made picking two next steps send two turns
      and queue them; multi="0" is the opt-out for genuinely exclusive options. */
-  const multi = isMulti(attrs.multi) !== false && qs.length > 1
+  const multi = !answerOn && isMulti(attrs.multi) !== false && qs.length > 1
   /* carry="1", stamped by the agent half when Carry Over Old Proposals is on:
      the next reply buries the earlier chips, so this block also draws every
      proposal still unanswered from the replies above it. */
@@ -1039,7 +1148,7 @@ function Chips(props) {
   const carrySession =
     (typeof attrs.sid === 'string' && attrs.sid ? attrs.sid : '') ||
     (typeof sessionId === 'string' && sessionId ? sessionId : '')
-  const carryOn = isOn(attrs.carry) && carrySession !== ''
+  const carryOn = isOn(attrs.carry) && carrySession !== '' && !answerOn
   /* steer="1": the setting asks for a chip's text to reach the live turn instead
      of queueing behind it. */
   const steerOn = isOn(attrs.steer)
@@ -1109,6 +1218,7 @@ function normalizeSubtitle(text) {
      chips and nothing to carry, and then no block is drawn. */
   if (qs.length === 0 && stale.length === 0) return null
   const sent = sentOf(groupKey)
+  const texts = answerOn ? answersOf(groupKey) : []
   const active = multi ? !sent : snapshot(groupKey) == null
 
   /* Send the text the way the moment calls for.
@@ -1210,14 +1320,9 @@ function normalizeSubtitle(text) {
     })
   }
 
-  /* One turn carries every picked chip, in q order, one per line: the agent
-     reads it as a person asking for several things at once. */
-  function sendPicked() {
-    const text = qs
-      .filter(function (q, i) {
-        return picked.indexOf(i) !== -1
-      })
-      .join('\n')
+  /* One turn carries either the picked chips or the typed answers, in q order.
+     Both shapes share the delivery path, so the busy/steer rules cannot drift. */
+  function sendTurn(text) {
     if (!text) return
     deliver(text, function () {
       const g = group(groupKey)
@@ -1231,6 +1336,43 @@ function normalizeSubtitle(text) {
         if (k !== groupKey) emit(k)
       })
     })
+  }
+
+  function sendPicked() {
+    sendTurn(
+      qs
+        .filter(function (q, i) {
+          return picked.indexOf(i) !== -1
+        })
+        .join('\n')
+    )
+  }
+
+  function sendAnswers() {
+    sendTurn(composeAnswers(qs, picked, texts))
+  }
+
+  function pick(idx) {
+    const g = group(groupKey)
+    if (g.sent || g.picked.indexOf(idx) !== -1) return
+    const conflict = alternatesOf(alt, idx)
+    g.picked = g.picked
+      .filter(function (n) { return conflict.indexOf(n) === -1 })
+      .concat([idx])
+      .sort(function (a, b) { return a - b })
+    persistChoice(groupKey, g)
+    emit(groupKey)
+  }
+
+  function setAnswer(idx, value) {
+    const g = group(groupKey)
+    if (g.sent) return
+    g.texts[idx] = normalizeAnswer(value)
+    persistChoice(groupKey, g)
+    /* Typing is already an answer to that point, so select its row; otherwise the
+       user has to tick a box they just filled in. */
+    if (g.texts[idx]) pick(idx)
+    emit(groupKey)
   }
 
   function toggle(idx) {
@@ -1263,7 +1405,22 @@ function normalizeSubtitle(text) {
     retireEntry(carrySession, id)
   }
 
-  const rows = qs.map(function (q, i) {
+  let rows
+  if (answerOn) {
+    rows = [
+      jsx(AnswerRows, {
+        qs: qs,
+        picked: picked,
+        texts: texts,
+        sent: sent,
+        sessionKey: groupKey,
+        onToggle: toggle,
+        onChange: setAnswer,
+        onSend: sendAnswers,
+      }),
+    ]
+  } else {
+    rows = qs.map(function (q, i) {
     return jsx(Chip, {
       key: String(i) + ':' + q,
       q: q,
@@ -1282,7 +1439,8 @@ function normalizeSubtitle(text) {
       onSend: send,
       onToggle: toggle,
     })
-  })
+    })
+  }
 
   /* Older replies first, in the order they were offered: the newest reply shows
      its own proposals, then everything still unanswered above it. Each carried

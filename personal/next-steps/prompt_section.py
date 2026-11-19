@@ -8,7 +8,9 @@ because a raw ::nextsteps line would arrive as text there.
 On the Desktop the rule prefers the `next_steps` tool: the options travel as
 arguments, so nothing has to be escaped and an invalid option is caught before it
 reaches the reply. The directive form stays documented as the fallback, because a
-model without tool calling still has to be able to produce chips.
+model without tool calling still has to be able to produce chips. A reply that asks
+several points separately can set answer=true: its options become labelled reply
+fields instead of chips.
 
 When a decision classifier is available the rule also says to ask it which options
 are worth taking now, so the reply arrives with the likely steps already picked
@@ -30,12 +32,17 @@ DRAWS = frozenset({"local", "desktop"})
 MAX_CHARS = 2_100
 
 DESKTOP = (
-    ""
-    "This chat draws Next Steps under a reply. When the next step is a choice, never ask for it in prose: no \"say the word\", \"want me to...?\", \"shall I...?\", \"let me know\", or a list of things you could do next.\n"
-    "Call next_steps with 2 to 5 imperative options under 120 characters, most likely first, and write no ::nextsteps line yourself: the chips attach to the reply you are about to write. Chips are picked and sent together by default, so pass multi=false only when the options are exclusive, because one picked row can send two contradicting steps. Where some options exclude each other but the rest combine, pass alternates as 1-based pairs: [[1, 3]] means 1 and 3 cannot both be picked. An option meaning \"leave things as they are\" opposes every action even when you pass nothing, so say it in a label. Never offer an option you would not do as it stands.\n"
-    "Without tool calls, end with this directive alone on its line, one qN per option, multi=\"0\" for an exclusive choice, alt=\"1,3\" for options that cannot combine:\n"
+    "\n"
+    "This chat draws Next Steps under a reply. When the next step is a choice, never ask in prose: no \"say the word\", \"want me to...?\", \"shall I...?\", \"let me know\", or a list of options. Call next_steps with 2 to 5 imperative options under 120 characters, most likely first; write no ::nextsteps line: the chips attach to the reply. Several chips are picked and sent together, so pass multi=false only when options are exclusive. Pass alternates as 1-based pairs ([[1, 3]] means 1 and 3 exclude each other); an option meaning \"leave things as they are\" opposes every action, so say it in a label. Never offer an option you would not do. Without tool calls, end with this line alone, one qN per option, multi=\"0\" when exclusive, alt=\"1,3\" for conflicts:\n"
     "::nextsteps{q1=\"Push the branch and open the PR\" q2=\"Add a CHANGELOG entry\"}\n"
-    "Never put a directive inside a sentence, a list or a code block, and never write it twice. The prose says what you did; the chips carry what can follow."
+    "Never put a directive in a sentence, list or code block, and never write it twice. The prose says what you did; the chips carry what follows."
+)
+
+# A different reply shape: the user has to answer the points, not pick one. It is an
+# opt-in mode, so it sits beside the chip rule rather than replacing it.
+ANSWER = (
+    "\n"
+    "When the reply asks the user to answer several points separately, pass answer=true: each option becomes a labelled reply field, and answers are sent back as numbered item: answer lines. Use it for questions, not choices."
 )
 
 OTHER = (
@@ -45,17 +52,17 @@ OTHER = (
 )
 
 SUBTITLE = (
-    ""
+    "\n"
     " A chip can carry a dimmer second line when its label would misread: pass subtitles (one per option, empty where none is needed) or dN. Say what the step touches that the label hides, never what the label already says, and leave it out when the option is clear: a line under every chip is noise."
 )
 
 RISK = (
-    ""
+    "\n"
     " Mark options that could do damage rather than cost time: deleting or overwriting something, rewriting published history, spending money, a migration, or a change that could break a working setup. Pass risk=true, or risky=\"2\" on the directive, for the RISKY pill."
 )
 
 RECOMMEND = (
-    ""
+    "\n"
     " When the chips are a real choice, pass recommend=true so the classifier marks the options worth taking now: they carry a Recommended tag and start picked, so recommend only what you would be happy to receive as it stands. On the directive path, next_steps_recommend returns rec=\"1,3\"."
 )
 
@@ -80,12 +87,13 @@ def chips_rule(session: dict, recommends: bool = False, risk: bool = False) -> s
     session = session or {}
     if session.get("platform") not in DRAWS:
         return OTHER
-    parts = [DESKTOP, SUBTITLE]
+    parts = [DESKTOP, ANSWER, SUBTITLE]
     if recommends:
         parts.append(RECOMMEND)
     if risk:
         parts.append(RISK)
     return _fit(parts)
+
 
 def prompt_texts() -> list[tuple[str, str]]:
     """Every shape this section can take, for the pack's admission check.

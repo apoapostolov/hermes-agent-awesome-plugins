@@ -1,3 +1,15 @@
+## [hermes-next-steps 1.1.2] - 2026-11-20
+
+### Added
+
+- **hermes-next-steps:** when a reply asks several points instead of offering actions, `answer=true` on the `next_steps` tool or `answer="1"` on the `::nextsteps` directive draws a checkbox and a reply field per option. Typing selects its row, and one send delivers `1. <question>: <answer>` lines; a ticked row left blank sends its numbered question. The fields use the SDK's own Checkbox and Input, keep the answers through a reload, and cap stored text so a pasted paragraph cannot fill the screen. The `kind="answer"` spelling from Follow-up Chips is accepted too. This edition keeps its SDK-only surface.
+
+## [next-steps 1.0.5] - 2026-11-20
+
+### Added
+
+- **next-steps:** the same answer mode, with the send button in the input column rather than out at the window edge, the fix followup-chips 1.2.0 shipped for its own answer block. Unlike that block, the fields are the app's own controls, the answers survive a reload, and the delivery path is shared with the chip row so the busy-chat queue and the steer setting keep working. The bundled prompt rule and tool schema now explain when to use answer mode; a compressed base rule keeps every variant under the host's prompt-section cap. The pack pin moves to this commit.
+
 ## [sessionretitler 1.1.4] - 2026-11-19
 
 ### Fixed

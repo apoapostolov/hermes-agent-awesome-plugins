@@ -348,6 +348,7 @@ def directive(
     alt: str = "",
     risky: str = "",
     subs: object = (),
+    answer: bool = False,
 ) -> str:
     """The paragraph the renderer reads.
 
@@ -360,6 +361,9 @@ def directive(
     pick.
 
     ``rec`` is already-validated digits ("1,3") and rides the same brace as an attribute.
+
+    ``answer=True`` draws labelled reply fields instead of chips and sends the
+    typed answers back as numbered ``item: answer`` lines.
 
     ["Push it", "Open the PR"] -> '::nextsteps{multi="1" q1="Push it" q2="Open the PR"}'
     """
@@ -374,6 +378,9 @@ def directive(
         head = 'multi="1" '
     else:
         head = 'multi="0" '
+    # Answer mode replaces pickability: each row is a reply field, not a chip.
+    if answer:
+        head = 'answer="1" '
     if rec:
         head += 'rec="{}" '.format(rec)
     if alt:
@@ -703,7 +710,9 @@ def stamp_multi(text: str) -> str:
 
     def one(match: "re.Match[str]") -> str:
         body = match.group(2)
-        if re.search(r"\bmulti\s*=", body):
+        # An answer block is a form, not a chip row. Adding multi to it would
+        # make an older renderer draw chips while this one draws reply fields.
+        if re.search(r"\b(multi|answer)\s*=", body) or re.search(r'\bkind\s*=\s*"answer"', body):
             return match.group(0)
         if len(re.findall(r"\bq\d+\s*=", body)) < 2:
             return match.group(0)

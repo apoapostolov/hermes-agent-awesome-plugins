@@ -74,7 +74,7 @@ class PendingTest(unittest.TestCase):
     def test_take_consumes_once(self):
         store = Pending()
         store.put("s1", ["A", "B"], False, "1")
-        self.assertEqual(store.take("s1"), (['A', 'B'], False, '1', '', '', ['', '']))
+        self.assertEqual(store.take("s1"), (['A', 'B'], False, '1', '', '', ['', ''], False))
         self.assertIsNone(store.take("s1"))
 
     def test_sessions_do_not_leak_into_each_other(self):
@@ -162,7 +162,7 @@ class HandlerTest(unittest.TestCase):
         reply = tool({"options": ["Push it", "Tag it"], "multi": False}, session_id="s1")
         self.assertIn("Chips registered", reply)
         self.assertIn("do not also write a ::nextsteps line", reply)
-        self.assertEqual(store.take("s1"), (['Push it', 'Tag it'], False, '', '', '', ['', '']))
+        self.assertEqual(store.take("s1"), (['Push it', 'Tag it'], False, '', '', '', ['', ''], False))
 
     def test_a_bad_call_registers_nothing(self):
         store, tool, _ = self.make()
@@ -174,14 +174,14 @@ class HandlerTest(unittest.TestCase):
         store, tool, calls = self.make(picks=[1])
         reply = tool({"options": ["A", "B"], "recommend": False}, session_id="s1")
         self.assertEqual(calls, [])
-        self.assertEqual(store.take("s1"), (['A', 'B'], None, '', '', '', ['', '']))
+        self.assertEqual(store.take("s1"), (['A', 'B'], None, '', '', '', ['', ''], False))
         self.assertNotIn("recommended", reply)
 
     def test_recommend_marks_the_numbers_the_classifier_returned(self):
         store, tool, calls = self.make(picks=[2])
         reply = tool({"options": ["A", "B"], "recommend": True, "context": "a review"}, session_id="s1")
         self.assertEqual(calls, [(["A", "B"], "a review")])
-        self.assertEqual(store.take("s1"), (['A', 'B'], None, '2', '', '', ['', '']))
+        self.assertEqual(store.take("s1"), (['A', 'B'], None, '2', '', '', ['', ''], False))
         self.assertIn("recommended 2", reply)
 
     def test_the_setting_decides_when_the_argument_is_absent(self):
@@ -198,13 +198,13 @@ class HandlerTest(unittest.TestCase):
         tool = handler(store, None, boom, lambda: True)
         reply = tool({"options": ["A", "B"]}, session_id="s1")
         self.assertIn("Chips registered", reply)
-        self.assertEqual(store.take("s1"), (['A', 'B'], None, '', '', '', ['', '']))
+        self.assertEqual(store.take("s1"), (['A', 'B'], None, '', '', '', ['', ''], False))
 
     def test_nothing_cleared_is_reported_without_a_rec_attribute(self):
         store, tool, _ = self.make(picks=[])
         reply = tool({"options": ["A", "B"]}, session_id="s1")
         self.assertIn("nothing cleared the bar", reply)
-        self.assertEqual(store.take("s1"), (['A', 'B'], None, '', '', '', ['', '']))
+        self.assertEqual(store.take("s1"), (['A', 'B'], None, '', '', '', ['', ''], False))
 
 
 class RegistrationTest(unittest.TestCase):

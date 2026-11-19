@@ -4,7 +4,7 @@
   <strong>End a reply with options instead of a promise.</strong>
   <p>Clickable next steps under every reply. Tick several and one send delivers them together.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.1-2ea44f" alt="Version 1.1.1" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.2-2ea44f" alt="Version 1.1.2" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -23,6 +23,7 @@
 
 - End a reply with up to six steps instead of "say the word and I'll push it". A click sends that step back as a normal user turn, so the next message is already written.
 - Tick several and send once. With two or more options the row is multi-select and the send button carries a count, so three picks become one message with three lines rather than three queued turns. A block registered with `multi="0"` sends on the first click.
+- Answer several points in one turn. When the reply asks questions rather than offers actions, `answer=true` draws a checkbox and a reply field for each option; typing selects that row, and one send delivers `1. <question>: <answer>` lines. A ticked row left blank sends just its numbered question.
 - See which options are worth taking now. A decision classifier tags them **Recommended** in the accent tint and they start ticked; several can carry the tag when they belong together, never all of them, and never beside "leave it as it is".
 - See which options could cost you something. An option the classifier reads as able to damage files, a build or money carries an amber **RISKY** pill. Off by default.
 - Read a label that would otherwise mislead. The agent can attach a dim second line to any chip, clipped at two wrapped lines with the full text on hover.
@@ -49,13 +50,19 @@ Recommendations and the RISKY pill need a decision classifier plugin loaded, ner
 
 ## What the agent writes
 
-The tool takes `options`, `multi`, `recommend`, `alternates`, `risky` and `subtitles`. Without tool calling the same row is a directive:
+The tool takes `options`, `multi`, `answer`, `recommend`, `alternates`, `risky` and `subtitles`. Without tool calling the same row is a directive:
 
 ```
 ::nextsteps{multi="1" rec="1" risky="2" q1="Push the branch and open the PR" q2="Force-push over the review commit" q3="Write the release note first" d2="Rewrites origin, discarding the commit already there"}
 ```
 
-`q` attributes are the labels, `dN` a subtitle for option N, `rec` the recommended indexes, `alt` pairs that exclude each other, `risky` the indexes that carry the pill, `carry="1"` records the reply's options for later ones, and `steer="1"` asks a click to steer the live turn. `next_steps_recommend` returns the classifier's pick without drawing anything.
+`q` attributes are the labels, `dN` a subtitle for option N, `rec` the recommended indexes, `alt` pairs that exclude each other, `risky` the indexes that carry the pill, `carry="1"` records the reply's options for later ones, and `steer="1"` asks a click to steer the live turn. `answer="1"` replaces the chip row with a checkbox and reply field per option; `kind="answer"`, the spelling used by Follow-up Chips, works too. `next_steps_recommend` returns the classifier's pick without drawing anything.
+
+Answer mode is for a reply that asks several questions, not for choosing between actions:
+
+```
+::nextsteps{answer="1" q1="Deploy at 16:00?" q2="Tag v1.3.0?"}
+```
 
 ## Install
 

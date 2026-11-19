@@ -1,6 +1,6 @@
 name: hermes-next-steps
 label: Next Steps
-version: 1.1.1
+version: 1.1.2
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2
@@ -12,7 +12,10 @@ description: >
   next_steps, or ends the reply with a ::nextsteps directive, and each option
   renders as a chip that sends its text as the next user turn. Two or more chips
   are ticked and sent as one message by default; multi="0" sends on a single
-  click. The bundled prompt rule makes the agent end a choice that way instead of
+  click.
+  With answer="1", a reply that asks several questions draws a checkbox and a
+  reply field per option instead of chips; one send returns numbered item: answer
+  lines, and a blank ticked row returns its numbered question. The bundled prompt rule makes the agent end a choice that way instead of
   asking "say the word and I'll...". A chip can carry a dim second line when the
   label alone would misread. With rec="1,3" the options a decision classifier
   prefers arrive tagged, accented and picked, and its next_steps_recommend tool

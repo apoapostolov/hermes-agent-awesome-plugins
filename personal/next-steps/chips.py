@@ -131,6 +131,7 @@ class Pending:
         alt: str = "",
         risky: str = "",
         subs: object = (),
+        answer: bool = False,
     ) -> None:
         key = str(session_id or "")
         with self._lock:
@@ -143,28 +144,29 @@ class Pending:
                 alt,
                 risky,
                 parse_subtitles(subs, len(options)),
+                answer,
             )
 
     def has(self, session_id: str) -> bool:
         return self._fresh(session_id) is not None
 
-    def take(self, session_id: str) -> tuple[list[str], bool | None, str, str, str, list[str]] | None:
+    def take(self, session_id: str) -> tuple[list[str], bool | None, str, str, str, list[str], bool] | None:
         """Pop the registration, or None when there is none or it has expired."""
         key = str(session_id or "")
         with self._lock:
             entry = self._entries.pop(key, None)
         if entry is None:
             return None
-        created, options, multi, rec, alt, risky, subs = entry
+        created, options, multi, rec, alt, risky, subs, answer = entry
         if self._clock() - created > self._ttl:
             return None
-        return options, multi, rec, alt, risky, subs
+        return options, multi, rec, alt, risky, subs, answer
 
     def forget(self, session_id: str) -> None:
         with self._lock:
             self._entries.pop(str(session_id or ""), None)
 
-    def _fresh(self, session_id: str) -> tuple[float, list[str], bool | None, str, str, str, list[str]] | None:
+    def _fresh(self, session_id: str) -> tuple[float, list[str], bool | None, str, str, str, list[str], bool] | None:
         key = str(session_id or "")
         with self._lock:
             entry = self._entries.get(key)
@@ -196,9 +198,9 @@ def attach(text: str, session_id: str, platform: str = "", pending: Pending | No
     entry = store.take(session_id)
     if entry is None:
         return None
-    options, multi, rec, alt, risky, subs = entry
+    options, multi, rec, alt, risky, subs, answer = entry
     return text.rstrip() + "\n\n" + directive(
-        options, multi=multi, rec=rec, alt=alt, risky=risky, subs=subs
+        options, multi=multi, rec=rec, alt=alt, risky=risky, subs=subs, answer=answer
     )
 
 
@@ -243,6 +245,15 @@ NEXT_STEPS_SCHEMA = {
                 "description": (
                     "True when more than one option can be done together, false when they "
                     "are exclusive. Defaults to true for two or more options."
+                ),
+            },
+            "answer": {
+                "type": "boolean",
+                "description": (
+                    "Set when the reply asks the user to answer several points separately. "
+                    "Each option becomes a labelled reply field; the user can tick the rows "
+                    "to answer and one turn sends numbered item: answer lines. Never set "
+                    "this for choosing between actions, where plain chips are used."
                 ),
             },
             "alternates": {
@@ -305,6 +316,7 @@ def handler(
         multi = params.get("multi")
         if not isinstance(multi, bool):
             multi = None
+        answer = params.get("answer") is True
         rec = ""
         wanted = params.get("recommend")
         if not isinstance(wanted, bool):
@@ -334,8 +346,8 @@ def handler(
                 numbers = []
             risky = rec_attribute(numbers, len(options))
         subs = parse_subtitles(params.get("subtitles"), len(options))
-        store.put(session_id, options, multi, rec, alt, risky, subs)
-        shape = "multi" if multi is not False else "one choice"
+        store.put(session_id, options, multi, rec, alt, risky, subs, answer)
+        shape = "answer fields" if answer else ("multi" if multi is not False else "one choice")
         detail = "%d options (%s)" % (len(options), shape)
         if alt:
             detail += ", alternates %s" % alt
