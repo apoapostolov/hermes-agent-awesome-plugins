@@ -9,11 +9,11 @@ Listed edition of **Session Retitler** (`sessionretitler`).
 
 ## Disclosed surfaces
 
-### 1. Direct core-adjacent imports for the title write
+### 1. Title write through the published storage interface
 
-- **Listed behavior:** imports `agent.title_generator` and `hermes_state.SessionDB`, and calls `_persist_session_title` so an `llm`-rank rewrite can replace an earlier `llm` title. A user-set name is still a hard wall.
-- **Why it is disclosed:** no plugin SDK method writes an `llm`-rank session title. Without that write the plugin has no product, so the listed edition keeps the guarded imports rather than shipping a no-op.
-- **Needed hook:** a public `ctx` method to write an `llm`-rank session title (including llm-to-llm rewrite). Until that exists, catalog CI reports these as private-core-import warnings.
+- **Listed behavior:** opens the active profile's store with `persistence_assembly.open_persistence(persistence_assembly.profile_scope())` and writes at `llm` rank through `store.sessions.set_auto_title`. An `llm` to `llm` rewrite lowers the row to `derived` first, and a failed write puts the previous title and its provenance back. A user-set name is a hard wall, and a title source that cannot be read skips the write entirely.
+- **Why it is disclosed:** no plugin SDK method writes an `llm`-rank session title. The plugin uses the storage interface the core exposes rather than private title helpers; it imports no `agent.title_generator` or `hermes_state.SessionDB`.
+- **Needed hook:** a public `ctx` method to write an `llm`-rank session title (including llm-to-llm rewrite). Until that exists, this disclosure stays.
 
 ### 2. Auxiliary task (cleared)
 

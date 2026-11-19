@@ -1,3 +1,10 @@
+## [sessionretitler 1.1.4] - 2026-11-19
+
+### Fixed
+
+- sessionretitler. The title write now goes through the published persistence interface (`persistence_assembly` and `store.sessions.set_auto_title`) instead of `agent.title_generator._persist_session_title` and `hermes_state.SessionDB`. On current main the deprecated `SessionDB` has no title-provenance methods, so both reads failed, the user-title guard passed, and an automatic rename was written with *user* provenance, leaving later renames unable to touch it. An `llm` to `llm` rewrite now lowers the row to `derived` before writing and restores the original rank if the write fails.
+- sessionretitler. A failed title-source read skips the write entirely instead of treating the row as untitled. The background rename thread now runs under a copied context so it carries the active profile into the auxiliary model call and the store handle. Both editions ship the fix.
+
 ## [prompt-enhance 1.2.1] - 2026-11-19
 
 ### Fixed

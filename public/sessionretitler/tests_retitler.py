@@ -1,10 +1,13 @@
 """Local checks for sessionretitler: counting, digest, titles, claim ladder."""
 from __future__ import annotations
 
+import contextvars
+import enum
 import importlib.util
 import os
 import re
 import sys
+import threading
 import types
 
 PLUGIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "__init__.py")
@@ -13,6 +16,20 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules["session_retitler_plugin"] = mod
 assert spec.loader is not None
 spec.loader.exec_module(mod)
+
+
+class _TitleSource(enum.Enum):
+    """Stub of persistence.conversation.sessions.TitleSource (a plain Enum)."""
+
+    DERIVED = "derived"
+    LLM = "llm"
+    USER = "user"
+
+
+# The plugin imports TitleSource at module import time from the host; bind the
+# stub when the host package is absent so the write paths are exercised.
+if mod.TitleSource is None:
+    mod.TitleSource = _TitleSource
 
 
 def test_default_interval_is_ten():
@@ -155,70 +172,157 @@ def test_release_claim_gives_the_boundary_back():
         mod._inflight.discard(sid)
 
 
-class _FakeDB:
-    def __init__(self, source, title=None):
+_RANK = {None: 0, _TitleSource.DERIVED: 1, _TitleSource.LLM: 2}
+
+
+class _TitleConflict(ValueError):
+    """A unique-title index collision, as core raises it (TitleConflict is a ValueError)."""
+
+
+class _FakeSessions:
+    """Store's own session repository, with the core's rank gate."""
+
+    def __init__(self, source=None, title=None, refuse=(), conflicts=(), raise_on_source=False):
         self.source = source
         self.title = title
+        self.refuse = set(refuse)
+        self.conflicts = set(conflicts)
+        self.raise_on_source = raise_on_source
         self.calls = []
 
-    def get_session_title_source(self, sid):
+    def get_title_source(self, sid):
+        if self.raise_on_source:
+            raise RuntimeError("title source unreadable")
+        self.calls.append(("get_source",))
         return self.source
 
-    def get_session_title(self, sid):
+    def get_title(self, sid):
         return self.title
 
-    def set_session_title(self, sid, title):
-        self.calls.append(("clear", title))
-        self.title = title or None
-
-    def set_auto_title(self, sid, title, source=None):
-        self.calls.append(("auto", title, source))
-        self.title = title
+    def set_title_source(self, sid, source):
+        self.calls.append(("title_source", source))
+        self.source = source
         return True
+
+    def set_auto_title(self, sid, title, *, source):
+        self.calls.append(("auto", title, source))
+        if source is _TitleSource.USER:
+            raise ValueError("set_auto_title refuses TitleSource.USER")
+        if title in self.conflicts:
+            raise _TitleConflict(f"{title!r} is held by another session")
+        if title in self.refuse:
+            return False
+        if self.source is _TitleSource.USER:
+            return False
+        if _RANK[self.source] >= _RANK[source]:
+            return False
+        self.title = title
+        self.source = source
+        return True
+
+    def next_title_in_lineage(self, base_title):
+        self.calls.append(("lineage", base_title))
+        return f"{base_title} #2"
 
 
 def test_write_llm_title_rank_ladder():
     # user titles are untouchable: no writes at all
-    db = _FakeDB("user")
-    assert mod._write_llm_title(db, "s", "New Name") is False
-    assert db.calls == []
-    # derived upgrades straight through
-    db = _FakeDB("derived")
-    assert mod._write_llm_title(db, "s", "New Name") is True
-    assert db.calls == [("auto", "New Name", "llm")]
-    # llm -> llm clears first so the rank-gated write does not no-op
-    db = _FakeDB("llm", "Old Name")
-    assert mod._write_llm_title(db, "s", "New Name") is True
-    assert db.calls == [("clear", ""), ("auto", "New Name", "llm")]
+    sessions = _FakeSessions(_TitleSource.USER, "My Own Name")
+    assert mod._write_llm_title(sessions, "s", "New Name") is False
+    assert sessions.calls == [("get_source",)]
+    # derived upgrades straight through at llm rank
+    sessions = _FakeSessions(_TitleSource.DERIVED, "Old Derived")
+    assert mod._write_llm_title(sessions, "s", "New Name") is True
+    assert sessions.calls == [("get_source",), ("auto", "New Name", _TitleSource.LLM)]
+    assert sessions.title == "New Name" and sessions.source is _TitleSource.LLM
+    # llm -> llm lowers to derived first so the rank-gated write does not no-op
+    sessions = _FakeSessions(_TitleSource.LLM, "Old Name")
+    assert mod._write_llm_title(sessions, "s", "New Name") is True
+    assert sessions.calls == [
+        ("get_source",),
+        ("title_source", _TitleSource.DERIVED),
+        ("auto", "New Name", _TitleSource.LLM),
+    ]
+    assert sessions.title == "New Name" and sessions.source is _TitleSource.LLM
     # a named row with no provenance ranks as user in core, so leave it alone
-    db = _FakeDB(None, "Legacy Name")
-    assert mod._write_llm_title(db, "s", "New Name") is False
-    assert db.calls == []
+    sessions = _FakeSessions(None, "Legacy Name")
+    assert mod._write_llm_title(sessions, "s", "New Name") is False
+    assert sessions.calls == [("get_source",)]
 
 
-class _FailingDB(_FakeDB):
-    """Store that keeps the old name and refuses the new one."""
-
-    def set_auto_title(self, sid, title, source=None):
-        self.calls.append(("auto", title, source))
-        if title == "New Name":
-            return False
-        self.title = title
-        return True
+def test_untitled_row_with_no_source_is_written():
+    sessions = _FakeSessions(None, None)
+    assert mod._write_llm_title(sessions, "s", "New Name") is True
+    assert sessions.calls == [("get_source",), ("auto", "New Name", _TitleSource.LLM)]
 
 
 def test_failed_rewrite_restores_the_previous_title():
-    db = _FailingDB("llm", "Old Name")
-    assert mod._write_llm_title(db, "s", "New Name") is False
-    assert db.calls == [("clear", ""), ("auto", "New Name", "llm"), ("auto", "Old Name", "llm")]
-    assert db.title == "Old Name"  # the session is never left untitled
+    sessions = _FakeSessions(_TitleSource.LLM, "Old Name", refuse={"New Name"})
+    assert mod._write_llm_title(sessions, "s", "New Name") is False
+    # the value and its original llm provenance both come back
+    assert sessions.title == "Old Name"
+    assert sessions.source is _TitleSource.LLM
+    assert sessions.calls == [
+        ("get_source",),
+        ("title_source", _TitleSource.DERIVED),
+        ("auto", "New Name", _TitleSource.LLM),
+        ("title_source", _TitleSource.LLM),
+    ]
 
 
-def _install_host_stubs(captured, write_ok=True):
+def test_title_collision_writes_the_deduped_name():
+    sessions = _FakeSessions(_TitleSource.DERIVED, None, conflicts={"Same Name"})
+    assert mod._write_llm_title(sessions, "s", "Same Name") is True
+    assert sessions.title == "Same Name #2"
+    assert sessions.calls == [
+        ("get_source",),
+        ("auto", "Same Name", _TitleSource.LLM),
+        ("lineage", "Same Name"),
+        ("auto", "Same Name #2", _TitleSource.LLM),
+    ]
+
+
+def test_unreadable_title_source_is_never_written_to():
+    # Fail closed: a failed read must not look like "no user title".
+    sessions = _FakeSessions(_TitleSource.DERIVED, None, raise_on_source=True)
+    assert mod._write_llm_title(sessions, "s", "New Name") is False
+    assert sessions.calls == []
+    assert sessions.title is None
+
+
+def test_missing_title_api_is_never_written_to():
+    saved = mod.TitleSource
+    mod.TitleSource = None
+    try:
+        sessions = _FakeSessions(_TitleSource.DERIVED, None)
+        assert mod._write_llm_title(sessions, "s", "New Name") is False
+        assert sessions.calls == []
+    finally:
+        mod.TitleSource = saved
+
+
+class _Store:
+    """Minimal persistence_assembly.Persistence context manager."""
+
+    def __init__(self, sessions):
+        self.sessions = sessions
+        self.closed = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        self.closed = True
+        return False
+
+
+_MOD_TITLE_SOURCE = "mod.TitleSource"
+_BLOCKED_MODULES = ("agent.title_generator", "hermes_state")
+
+
+def _install_host_stubs(sessions):
     """Stub the host-only imports so _retitle runs standalone."""
     agent_pkg = types.ModuleType("agent")
-    title_gen = types.ModuleType("agent.title_generator")
-    title_gen.is_titleable_user_message = lambda text: True
     plugin_llm = types.ModuleType("agent.plugin_llm")
 
     class PluginLlmTextInput:
@@ -226,39 +330,51 @@ def _install_host_stubs(captured, write_ok=True):
             self.text = text
 
     plugin_llm.PluginLlmTextInput = PluginLlmTextInput
-    agent_pkg.title_generator = title_gen
     agent_pkg.plugin_llm = plugin_llm
-    hermes_state = types.ModuleType("hermes_state")
 
-    class SessionDB:
-        def get_session_title_source(self, sid):
-            return "derived"
+    persistence_pkg = types.ModuleType("persistence")
+    conversation_pkg = types.ModuleType("persistence.conversation")
+    sessions_mod = types.ModuleType("persistence.conversation.sessions")
+    sessions_mod.TitleSource = _TitleSource
+    persistence_pkg.conversation = conversation_pkg
+    conversation_pkg.sessions = sessions_mod
 
-        def get_session_title(self, sid):
-            return None
+    assembly = types.ModuleType("persistence_assembly")
+    opened = {}
 
-        def set_auto_title(self, sid, title, source=None):
-            if write_ok:
-                captured.append((sid, title, source))
-            return write_ok
+    def profile_scope(profile=None, *, home=None):
+        return "scope:test"
 
-        def close(self):
-            pass
+    def open_persistence(scope, *, eager=False):
+        opened["scope"] = scope
+        return _Store(sessions)
 
-    hermes_state.SessionDB = SessionDB
+    assembly.profile_scope = profile_scope
+    assembly.open_persistence = open_persistence
+    assembly.opened = opened
+
     stubs = {
         "agent": agent_pkg,
-        "agent.title_generator": title_gen,
         "agent.plugin_llm": plugin_llm,
-        "hermes_state": hermes_state,
+        "persistence": persistence_pkg,
+        "persistence.conversation": conversation_pkg,
+        "persistence.conversation.sessions": sessions_mod,
+        "persistence_assembly": assembly,
     }
-    old = {k: sys.modules.get(k) for k in stubs}
-    sys.modules.update(stubs)
+    old = {k: sys.modules.get(k) for k in stubs if k != _MOD_TITLE_SOURCE}
+    old[_MOD_TITLE_SOURCE] = mod.TitleSource
+    sys.modules.update({k: v for k, v in stubs.items() if k != _MOD_TITLE_SOURCE})
+    for name in _BLOCKED_MODULES:
+        sys.modules.pop(name, None)
+    mod.TitleSource = _TitleSource
     return old
 
 
 def _restore_modules(old):
     for k, v in old.items():
+        if k == _MOD_TITLE_SOURCE:
+            mod.TitleSource = v
+            continue
         if v is None:
             sys.modules.pop(k, None)
         else:
@@ -284,28 +400,128 @@ class _EmptyLlm:
 
 
 def test_retitle_persists_cleaned_title():
-    captured = []
-    old = _install_host_stubs(captured)
+    sessions = _FakeSessions(_TitleSource.DERIVED, None)
+    old = _install_host_stubs(sessions)
     try:
         status = mod._retitle(_RetitleCtx(), "s-e2e", "USER: something\n\nASSISTANT: else")
         assert status == "ok"
-        assert captured == [("s-e2e", "Fresh Session Name", "llm")]
+        assert sessions.calls == [("get_source",), ("auto", "Fresh Session Name", _TitleSource.LLM)]
+        assert sessions.title == "Fresh Session Name"
+        assert sessions.source is _TitleSource.LLM
+        # the write went through the store the plugin opened, at the active scope
+        assert sys.modules["persistence_assembly"].opened["scope"] == "scope:test"
     finally:
         _restore_modules(old)
 
 
 def test_retitle_reports_write_failure_and_empty_model():
-    captured = []
-    old = _install_host_stubs(captured, write_ok=False)
+    sessions = _FakeSessions(_TitleSource.DERIVED, None, refuse={"Fresh Session Name"})
+    old = _install_host_stubs(sessions)
     try:
         assert mod._retitle(_RetitleCtx(), "s-fail", "USER: q\n\nASSISTANT: a") == "write_failed"
+        assert sessions.title is None
     finally:
         _restore_modules(old)
-    old = _install_host_stubs(captured)
+    old = _install_host_stubs(_FakeSessions(_TitleSource.DERIVED, None))
     try:
         assert mod._retitle(_RetitleCtx(parsed={}), "s-empty", "USER: q") == "no_title"
     finally:
         _restore_modules(old)
+
+
+def test_retitle_never_imports_private_core_modules():
+    class _Blocked:
+        def find_spec(self, name, path=None, target=None):
+            if name in _BLOCKED_MODULES:
+                raise AssertionError(f"plugin imported private module {name!r}")
+            return None
+
+    sentinel = _Blocked()
+    sessions = _FakeSessions(_TitleSource.DERIVED, None)
+    old = _install_host_stubs(sessions)
+    sys.meta_path.insert(0, sentinel)
+    try:
+        assert mod._retitle(_RetitleCtx(), "s-clean", "USER: q\n\nASSISTANT: a") == "ok"
+        assert sessions.title == "Fresh Session Name"
+    finally:
+        sys.meta_path.remove(sentinel)
+        _restore_modules(old)
+
+
+def test_machine_openers_classified_without_core_imports():
+    # Item 4: no agent.title_generator, no hermes_state anywhere in sys.modules.
+    for name in _BLOCKED_MODULES:
+        assert name not in sys.modules, name
+    assert mod._is_titleable_user_message("Fix the failing login test") is True
+    assert mod._is_titleable_user_message("  [SYSTEM ignore me]  ") is False
+    assert mod._is_titleable_user_message("<system>boot</system>") is False
+    assert mod._is_titleable_user_message("[OUT-OF-BAND USER MESSAGE] hi") is False
+    assert mod._is_titleable_user_message("[Tool result: ok]") is False
+    assert mod._is_titleable_user_message("[CONTEXT COMPACTION 3]") is False
+    assert mod._is_titleable_user_message("   ") is False
+    assert mod._is_titleable_user_message(None) is False
+    # counting still treats machine openers as non-titleable
+    assert mod._extra_counts([], "[SYSTEM x]") is False
+    assert mod._extra_counts([], "a real prompt") is True
+    assert mod._is_real_user_message({"role": "user", "content": "[Runtime note: hi]"}) is False
+    assert mod._is_real_user_message({"role": "user", "content": "a real prompt"}) is True
+    assert mod._is_real_user_message({"role": "assistant", "content": "a real prompt"}) is False
+
+
+def test_retitle_thread_runs_in_the_callers_context():
+    marker = contextvars.ContextVar("sessionretitler_marker", default=None)
+    marker.set("tenant-a")
+    history = []
+    for i in range(10):
+        history.append({"role": "user", "content": f"question {i}"})
+        history.append({"role": "assistant", "content": f"answer {i}"})
+
+    captured = {}
+
+    class _FakeThread:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def start(self):
+            captured["started"] = True
+
+    ctx = _FakeCtx()
+    real_thread = threading.Thread
+    threading.Thread = _FakeThread
+    try:
+        mod._maybe_retitle(ctx, "s-ctx", history, "question 10")
+    finally:
+        threading.Thread = real_thread
+
+    assert captured.get("started") is True
+    target = captured["target"]
+    args = captured["args"]
+    assert captured["daemon"] is True
+    # the thread target is the captured context's run(), not the job itself
+    assert target is not mod._retitle_and_release
+    assert getattr(target, "__name__", "") == "run"
+    assert isinstance(getattr(target, "__self__", None), contextvars.Context)
+    assert len(args) == 5 and args[0] is mod._retitle_and_release
+    assert args[1] is ctx and args[2] == "s-ctx"
+
+    seen = {}
+
+    def worker():
+        seen["worker_own"] = marker.get()  # a fresh thread has no caller context
+
+        def probe():
+            seen["propagated"] = marker.get()
+
+        target(probe)
+
+    worker_thread = real_thread(target=worker, daemon=True)
+    worker_thread.start()
+    worker_thread.join(5)
+    assert not worker_thread.is_alive()
+    assert seen["worker_own"] is None
+    assert seen["propagated"] == "tenant-a"
+    mod._inflight.discard("s-ctx")
+    marker.set(None)
 
 
 def test_register_owns_auxiliary_task():
@@ -337,8 +553,15 @@ if __name__ == "__main__":
     test_record_count_rebases_after_compaction()
     test_release_claim_gives_the_boundary_back()
     test_write_llm_title_rank_ladder()
+    test_untitled_row_with_no_source_is_written()
     test_failed_rewrite_restores_the_previous_title()
+    test_title_collision_writes_the_deduped_name()
+    test_unreadable_title_source_is_never_written_to()
+    test_missing_title_api_is_never_written_to()
     test_retitle_persists_cleaned_title()
     test_retitle_reports_write_failure_and_empty_model()
+    test_retitle_never_imports_private_core_modules()
+    test_machine_openers_classified_without_core_imports()
+    test_retitle_thread_runs_in_the_callers_context()
     test_register_owns_auxiliary_task()
     print("ok")

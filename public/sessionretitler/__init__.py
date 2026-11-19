@@ -14,11 +14,11 @@ Title authority is ``llm`` rank, never ``user``:
 - If the user renamed the session manually (title_source == "user"), the
   plugin never touches the name again.
 - ``derived``/untitled sessions upgrade straight to the new ``llm`` title.
-- ``llm`` -> ``llm`` rewrites clear the row first, because the core's
-  ``set_auto_title`` only writes on a strictly-higher rank and would
+- ``llm`` -> ``llm`` rewrites lower the row to ``derived`` first, because the
+  core's ``set_auto_title`` only writes on a strictly-higher rank and would
   otherwise no-op every rename after the first. The previous name goes back
-  if the rewrite does not land, so a failed write never leaves the session
-  untitled.
+  at its original rank if the rewrite does not land, so a failed write never
+  leaves the session untitled.
 - A row that carries a name but no ``title_source`` ranks as ``user`` in
   core, so it is left alone like any other name the user owns.
 
@@ -34,12 +34,18 @@ the TUI, CLI, and gateway keeps one counter.
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import re
 import threading
 import time
 
 from typing import Any, Dict, List, Optional, Tuple
+
+try:
+    from persistence.conversation.sessions import TitleSource
+except Exception:  # host older than the storage interface
+    TitleSource = None
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +137,7 @@ def _save_counts(ctx: Any, counts: Dict[str, Dict[str, float]]) -> None:
 def _extra_counts(history: List[Any], extra_text: Optional[str]) -> bool:
     """True when the incoming prompt adds one titleable user message."""
     extra = (extra_text or "").strip()
-    if not extra or _is_machine_user_message(extra):
+    if not _is_titleable_user_message(extra):
         return False
     last = ""
     for msg in history or []:
@@ -139,12 +145,7 @@ def _extra_counts(history: List[Any], extra_text: Optional[str]) -> bool:
             last = _text_of(msg).strip()
     if extra == last:
         return False
-    try:
-        from agent.title_generator import is_titleable_user_message
-
-        return bool(is_titleable_user_message(extra))
-    except Exception:
-        return True
+    return True
 
 
 def _count_user_messages(history: List[Any], extra_text: Optional[str] = None) -> int:
@@ -249,26 +250,27 @@ def _text_of(message: Any) -> str:
     return ""
 
 
-def _is_machine_user_message(text: str) -> bool:
-    """Best-effort machinery detector when the core helper is unavailable."""
-    stripped = text.lstrip()
-    return bool(
-        stripped.startswith(("[SYSTEM", "<system", "[OUT-OF-BAND", "[Tool result"))
-    )
+_MACHINE_TITLE_PREFIXES = (
+    "[SYSTEM", "<system", "[OUT-OF-BAND", "[Tool result",
+    "[CONTEXT COMPACTION", "[System note:", "[Runtime note:",
+    "[System: The active model for this chat has changed to ",
+)
+
+
+def _is_titleable_user_message(text: Any) -> bool:
+    """Local stand-in for core's private titleability check."""
+    if not isinstance(text, str) or not text.strip():
+        return False
+    return not text.lstrip().startswith(_MACHINE_TITLE_PREFIXES)
 
 
 def _is_real_user_message(message: Any) -> bool:
     if not isinstance(message, dict) or message.get("role") != "user":
         return False
     text = _text_of(message).strip()
-    if not text or _is_machine_user_message(text):
+    if not _is_titleable_user_message(text):
         return False
-    try:
-        from agent.title_generator import is_titleable_user_message
-
-        return bool(is_titleable_user_message(text))
-    except Exception:
-        return True
+    return True
 
 
 def _assistant_text(message: Any) -> str:
@@ -336,74 +338,88 @@ def _clean_title(raw: Any) -> Optional[str]:
     return title[:_MAX_TITLE_CHARS].rstrip(" .,-")
 
 
-def _persist_llm_title(db: Any, session_id: str, title: str) -> bool:
-    """Write *title* at llm rank: core helper first, then the store's own call."""
-    try:
-        # Reuses the core's proven write: set_auto_title + "#N" collision recovery.
-        from agent.title_generator import _persist_session_title
+def _persist_llm_title(
+    sessions: Any, session_id: str, title: str, title_source: Any,
+) -> Optional[str]:
+    """Write *title* at llm rank through the store's own repository.
 
-        return _persist_session_title(db, session_id, title, source="llm") is not None
-    except Exception:
-        logger.debug("sessionretitler: core persist helper unavailable", exc_info=True)
+    Returns the title actually written, or None when a higher authority held
+    the row. A unique-title collision gets a "#N" suffix from the store.
+    """
+    def _set(candidate: str) -> Optional[str]:
+        if sessions.set_auto_title(session_id, candidate, source=title_source.LLM):
+            return candidate
+        return None
+
     try:
-        return bool(db.set_auto_title(session_id, title, source="llm"))
+        return _set(title)
     except ValueError:
-        logger.debug("sessionretitler: title collision on %r", title)
-        return False
-    except Exception:
-        logger.debug("sessionretitler: title write failed", exc_info=True)
-        return False
+        deduped = sessions.next_title_in_lineage(title)
+        if not deduped or deduped == title:
+            return None
+        return _set(deduped)
 
 
-def _restore_title(db: Any, session_id: str, previous: Optional[str]) -> None:
-    """Put the pre-rewrite name back when the new one could not be persisted.
+def _restore_title(
+    sessions: Any, session_id: str, previous: Optional[str], was_llm: bool,
+) -> None:
+    """Undo the rank-lowering step when a rewrite did not land.
 
-    The llm->llm path clears the row before writing, so a failed write would
-    otherwise leave the session with no name at all.
+    An llm->llm rewrite first lowers the row to derived, so a failed rewrite
+    must put the original provenance back or the next rename silently starts
+    from the wrong rank.
     """
     if not previous:
         return
     try:
-        if db.get_session_title(session_id):
-            return  # something else already named it; never fight that
-        if db.set_auto_title(session_id, previous, source="llm"):
-            logger.warning(
-                "sessionretitler: rename failed for %s; restored %r", session_id, previous,
-            )
+        current = sessions.get_title(session_id)
+        if current and current != previous:
+            return  # another writer named it; never fight that
+        if current == previous:
+            if was_llm:
+                sessions.set_title_source(session_id, TitleSource.LLM)
+            return
+        sessions.set_auto_title(session_id, previous, source=TitleSource.LLM)
+        logger.warning(
+            "sessionretitler: rename failed for %s; restored %r", session_id, previous,
+        )
     except Exception:
-        logger.warning("sessionretitler: could not restore %r on %s", previous, session_id, exc_info=True)
+        logger.warning(
+            "sessionretitler: could not restore %r on %s", previous, session_id, exc_info=True,
+        )
 
 
-def _write_llm_title(db: Any, session_id: str, title: str) -> bool:
+def _write_llm_title(sessions: Any, session_id: str, title: str) -> bool:
     """Persist *title* at llm rank, honoring the precedence ladder.
 
-    user > llm > derived. A user-set name is untouchable, and so is a row that
-    carries a name with no provenance: core ranks a NULL ``title_source`` as
-    ``user``, so such a row would silently refuse every write. llm->llm needs a
-    clear first because set_auto_title requires a strictly higher rank.
+    user > llm > derived. If the source cannot be read the write is skipped
+    entirely: a failed read must never be mistaken for "no user title".
     """
+    if TitleSource is None:
+        logger.debug("sessionretitler: storage title API unavailable; not writing")
+        return False
     try:
-        source = db.get_session_title_source(session_id)
+        source = sessions.get_title_source(session_id)
+        previous = sessions.get_title(session_id)
     except Exception:
-        source = None
-    try:
-        previous = db.get_session_title(session_id)
-    except Exception:
-        previous = None
-    if source == "user" or (source is None and previous):
+        logger.debug(
+            "sessionretitler: cannot read title source for %s; not writing",
+            session_id, exc_info=True,
+        )
+        return False
+    if source == TitleSource.USER or (source is None and previous):
         logger.debug("sessionretitler: %s holds a user title; not rewriting", session_id)
         return False
 
-    if source == "llm":
-        try:
-            db.set_session_title(session_id, "")  # normalize to None/untitled
-        except Exception:
-            logger.debug("sessionretitler: pre-rewrite clear failed", exc_info=True)
-            return False
+    # set_auto_title only writes over a strictly lower rank. Lower an llm row
+    # to derived first, keeping the old title until the rewrite lands.
+    was_llm = source == TitleSource.LLM
+    if was_llm and not sessions.set_title_source(session_id, TitleSource.DERIVED):
+        return False
 
-    if _persist_llm_title(db, session_id, title):
+    if _persist_llm_title(sessions, session_id, title, TitleSource):
         return True
-    _restore_title(db, session_id, previous)
+    _restore_title(sessions, session_id, previous, was_llm)
     return False
 
 
@@ -439,19 +455,16 @@ def _retitle(ctx: Any, session_id: str, digest: str) -> str:
             logger.debug("sessionretitler: model gave no usable title")
             return "no_title"
 
-        from hermes_state import SessionDB
+        import persistence_assembly
 
-        db = SessionDB()
-        try:
-            ok = _write_llm_title(db, session_id, title)
+        with persistence_assembly.open_persistence(
+            persistence_assembly.profile_scope()
+        ) as store:
+            ok = _write_llm_title(store.sessions, session_id, title)
             if ok:
                 logger.info("sessionretitler: renamed %s -> %r", session_id, title)
                 return "ok"
             return "write_failed"
-        finally:
-            close = getattr(db, "close", None)
-            if callable(close):
-                close()
     except Exception:
         # Never let a background rename disturb the host process.
         logger.debug("sessionretitler: retitle failed", exc_info=True)
@@ -496,9 +509,10 @@ def _maybe_retitle(
     try:
         # Off-thread by design: hook callbacks must not block a turn. A
         # failure here only logs; the turn is never disturbed.
+        ctx_copy = contextvars.copy_context()
         thread = threading.Thread(
-            target=_retitle_and_release,
-            args=(ctx, session_id, digest, previous),
+            target=ctx_copy.run,
+            args=(_retitle_and_release, ctx, session_id, digest, previous),
             daemon=True,
             name=f"session-retitle-{session_id[:12]}",
         )
