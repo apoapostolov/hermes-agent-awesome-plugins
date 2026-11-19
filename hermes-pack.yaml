@@ -50,7 +50,7 @@ plugins:
     ref: 185f8465f8c97e0252e85ca07f3655d1bd96cea4
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/sessionretitler
-    ref: bad20c04a7428dbf7f59f386f5e24f621c08dbc9
+    ref: a547a12ff0b4fcf44d614d0ddbd167bc71faa6c8
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/vercel-agent-desktop-support
     ref: ac71ce3260607481d4ccaf19982afd7ae80b065f
