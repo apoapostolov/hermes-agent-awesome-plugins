@@ -1,3 +1,15 @@
+## [hermes-next-steps 1.1.3] - 2026-11-20
+
+### Added
+
+- **hermes-next-steps:** the multi-select row and the answer form now end with Send and a small Steer button. On a busy chat Steer calls `session.steer` with the composed text instead of admitting it to the gateway queue; a refused steer warns and leaves the block unsent so the same picks can be retried. With no turn running it starts a normal turn. The SDK-only surface is unchanged.
+
+## [next-steps 1.0.6] - 2026-11-20
+
+### Added
+
+- **next-steps:** the same Steer button, on the chip row's footer and in the answer form's input column. Send keeps its queue behavior and the `steer="1"` setting; Steer is per click and needs no directive flag. The renderer harness now awaits async cases, which had been marked passed before their assertions ran.
+
 ## [hermes-next-steps 1.1.2] - 2026-11-20
 
 ### Added
