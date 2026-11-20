@@ -889,7 +889,10 @@ function BreakBar() {
     const tick = async () => {
       try {
         const sid = sessionId()
-        const raw = sid ? await runSlash(`/break-status --session-id ${sid}`, true) : ''
+        // Route the slash command with the desktop runtime id, but do not send
+        // it as --session-id: the handler's calling session is the assistant
+        // session, and the two ids differ on Desktop (#23).
+        const raw = sid ? await runSlash('/break-status', true) : ''
         if (!stop) {
           setStatus(parseStatus(raw))
         }

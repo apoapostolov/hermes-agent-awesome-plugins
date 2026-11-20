@@ -27,6 +27,8 @@
 </div>
 
 ## Latest plugin update
+**Intelligent Tool Break 1.3.7** fixes the composer strip staying empty during a tool call when Desktop's runtime session id differs from the assistant session id. The strip used the runtime id as an explicit `/break-status --session-id` filter, which overrode the calling session and matched no tracked tools; it now routes the command with the runtime id and lets the handler scope to the assistant session. Update both editions and restart Hermes Desktop once.
+
 **Prompt Enhance 1.2.1** keeps the Prompt Library and Edit dialogs open when a click lands inside them but its accessibility target resolves to the overlay, which used to close the dialog before Import Prompt received the click. The guard checks pointer coordinates against the dialog's own root instead of the event target, and a Tab that escapes the focus trap no longer closes it either; a normal click outside still closes the dialog. Both editions carry it. Update the plugin and restart Hermes Desktop once.
 
 **Jev Routing 1.1.2** sends an explicit `User-Agent` on every classification call. Cloudflare's Browser Integrity Check in front of `opencode.ai` answers urllib's default client signature with `HTTP 403` and `error code: 1010`, so on an affected host every turn failed open and routing never ran: in shadow mode the only symptom was a missing tier line and no savings. The header lives in the transport, which also carries `/jev-routing` and the `jev_route` tool, and a caller that supplies its own agent keeps it. Both editions carry the change, and this is the first tagged build that also leaves a cron turn unrouted instead of holding it, which had interrupted scheduled jobs; update the plugin and restart the backend once.

@@ -171,6 +171,27 @@ def test_descendants_of_self():
     assert isinstance(kids, list)
 
 
+def test_runtime_id_is_not_the_status_session_filter():
+    """Desktop's runtime id and the assistant session id are different ids (#23).
+
+    The strip used to send the runtime id as an explicit --session-id, which the
+    handler prefers over the calling session, so a tracked call owned by the
+    assistant session reported idle while it ran.
+    """
+    with mod._lock:
+        mod._inflight.clear()
+        mod._broken.clear()
+        mod._again_by_fp.clear()
+    mod._on_pre_tool_call(tool_name="terminal", tool_call_id="rt-1",
+                          session_id="assistant-session", args={"command": "sleep 10"})
+    wrong = json.loads(mod._handle_status("--session-id desktop-runtime-id"))
+    assert wrong["inflight"] is False and wrong["tools"] == []
+    shown = json.loads(mod._handle_status("", session_id="assistant-session"))
+    assert shown["inflight"] is True
+    assert [row["id"] for row in shown["tools"]] == ["rt-1"]
+    mod._on_post_tool_call(tool_call_id="rt-1")
+
+
 if __name__ == "__main__":
     test_fmt()
     test_rewrite_break()
@@ -182,6 +203,7 @@ if __name__ == "__main__":
     test_descendants_of_self()
     test_status_payload()
     test_status_is_scoped_to_session()
+    test_runtime_id_is_not_the_status_session_filter()
     test_newest_is_default()
     test_again_cap()
     print("ok")

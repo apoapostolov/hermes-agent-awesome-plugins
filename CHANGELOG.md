@@ -1,3 +1,9 @@
+## [intelligent-tool-break 1.3.7] - 2026-11-20
+
+### Fixed
+
+- intelligent-tool-break. The composer strip stayed empty while a tool was running when Hermes Desktop's runtime session id differed from the assistant session id. The strip used the runtime id both to route `/break-status` and as its explicit `--session-id` filter; the handler prefers that explicit filter over the calling session, while tracked calls are keyed to the assistant session, so the query returned no tools. The strip now sends no explicit filter and leaves session scoping to the handler, which still receives the calling session through the slash command. The runtime id still routes the RPC. Both editions ship the fix.
+
 ## [hermes-next-steps 1.1.3] - 2026-11-20
 
 ### Added
