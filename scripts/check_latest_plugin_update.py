@@ -49,6 +49,16 @@ def key(name: str) -> str:
     return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
+def same_plugin(tag_key: str, entry_key: str) -> bool:
+    """Whether a tag belongs to the entry, whose name is the plugin's label.
+
+    A catalog edition carries the repo prefix in its id, so `hermes-next-steps`
+    serves the `Next Steps` label. An exact comparison reported that release as
+    untagged once both editions shared one name.
+    """
+    return tag_key == entry_key or tag_key == "hermes" + entry_key
+
+
 def main() -> int:
     body = section((ROOT / "README.md").read_text(encoding="utf-8"))
     tags = tag_dates()
@@ -66,7 +76,7 @@ def main() -> int:
             tag
             for tag in tags
             if tag.endswith(f"-v{version}")
-            and key(tag.rsplit("-v", 1)[0]) == k
+            and same_plugin(key(tag.rsplit("-v", 1)[0]), k)
         ]
         if not matches:
             problems.append(f"no tag for {name} {version}")

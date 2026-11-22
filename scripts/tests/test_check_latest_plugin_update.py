@@ -107,6 +107,22 @@ class CheckerTest(unittest.TestCase):
         code, out = self._run()
         self.assertEqual(code, 0, out)
 
+    def test_a_catalog_edition_tag_matches_the_label(self):
+        # Both editions of a plugin share one id now, and the id carries the repo
+        # prefix, so the tag for `Fresh Plugin` is `hermes-fresh-plugin-v1.0.0`.
+        self._write("**Fresh Plugin 1.0.0** does a thing.")
+        self._fresh_commit_and_tag("hermes-fresh-plugin-v1.0.0")
+        code, out = self._run()
+        self.assertEqual(code, 0, out)
+        self.assertIn("OK (1 entries", out)
+
+    def test_another_plugins_tag_does_not_satisfy_the_entry(self):
+        self._write("**Fresh Plugin 1.0.0** does a thing.")
+        self._fresh_commit_and_tag("hermes-other-plugin-v1.0.0")
+        code, out = self._run()
+        self.assertEqual(code, 1, out)
+        self.assertIn("no tag for Fresh Plugin 1.0.0", out)
+
 
 if __name__ == "__main__":
     unittest.main()
