@@ -1,6 +1,6 @@
 name: hermes-agent-awesome-plugins
 description: Hand-picked Hermes plugins that actually matter. Pack pins catalog-redesign, next-steps, provider-status, hermes-jev-routing, reasoning-switch, intelligent-tool-break, better-session-appearance, drag-to-pin-session, opaque-composer, scroll-on-switch, iteration-budget-meter, memory-review, radio-plus, rss-reader, cdp-manager, sidebar-manager, sessionretitler, vercel-agent-desktop-support, reddit, and delegation-nudge to reproducible SHAs.
-version: 1.27.31
+version: 1.27.32
 author: Apostol Apostolov
 plugins:
   - repo: apoapostolov/hermes-agent-awesome-plugins
@@ -8,7 +8,7 @@ plugins:
     ref: c76655b91c8bb69b68ac3e207dddc81819d59a2f
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/hermes-next-steps
-    ref: 772c500a283129a3d69d9917151bed769cad560b
+    ref: f86eba30779da11cc3bb6750ffa67fa1aa7dcc12
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/provider-status
     ref: bdb74343ea2ae4119b4062414c15b88cf80410a5
