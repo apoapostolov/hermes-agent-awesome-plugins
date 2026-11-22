@@ -15,7 +15,7 @@
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
     <a href="./package.json"><img src="https://img.shields.io/badge/Language-JavaScript-555" alt="Language: JavaScript"></a>
-    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.30-blue" alt="Pack: 1.27.30"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.31-blue" alt="Pack: 1.27.31"></a>
     <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Last%20release-2026--11--16-blue" alt="Last release: 2026-10-31"></a>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a>
   </p>
@@ -39,7 +39,7 @@
 
 **Radio Plus 1.5.4** writes its station log under the active Hermes home's `plugin-data/radio-plus` directory and checks every outbound stream address and redirect with Hermes' URL-safety policy, so a profile-scoped backend cannot log to the wrong home and the probe and track-title routes cannot be used to reach a private network. Nothing in the picker changes. Reinstall or update both editions; the backend restart is still yours.
 
-**Next Steps 1.1.4** is one plugin now: the personal edition takes the catalog edition's name, both sit at 1.1.4, and the install command is `hermes plugins install hermes-next-steps`. The tool names, the `::nextsteps` directive, the toolset name and the settings are unchanged, so nothing written before today stops working. It also stops a chip reply from showing the decision classifier's call: a printed `{"recommend": "2"}` block, or a `recommend="1"` attribute the renderer never read, is removed before the reply is stored. Update from the pack; the pack pin moves to the same commit, and the backend needs a restart before the new hook runs.
+**Next Steps 1.1.5** makes a single choice commit before it sends: the click marks the option and a **Confirm** button appears under the list in the same style as Send, and only that button sends the step. A row that sent on its first click looked the same as a multi-select row waiting for Send, so a single-select click read as a pick and delivered a step nobody had finished choosing. Multi-select, the answer form, carried proposals and the steer setting are unchanged, and both editions ship the change. Update from the pack; toggle the plugin in settings to reload the desktop half.
 
 **Catalog Redesign 1.0.12** turns the Capabilities page into a wide, one-row-per-item list for skills, plugins, connectors and tools. Each row carries a thumbnail, the name with its description, and one column that matters for that kind (tags or the short name). Artwork is real: a published plugin borrows the catalog's hero image, and a plugin outside the catalog uses a logo its own folder ships, so rows stop showing initials where the plugin has a face. Hover a row for a preview, click for a detail panel that slides in from the right with the hero image across its header, a 44px section rail, and the on/off switch beside Close. It adds its own route, sidebar row and palette entry and leaves the native Capabilities page alone. The online catalog now loads reliably, the default view is online, and there's an "Update all" button in the header. See [its README](personal/catalog-redesign/README.md).
 
@@ -95,7 +95,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.30). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
+Nineteen plugins are pinned in `hermes-pack.yaml` (pack version 1.27.31). **better-capabilities**, **prompt-enhance** and **voice-gate** live in this repo but are **not** in the pack, so install any of them separately if you want it. The pack pins the personal tree for all nineteen.
 
 ### Status Bar
 
