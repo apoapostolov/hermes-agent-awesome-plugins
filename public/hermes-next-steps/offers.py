@@ -469,6 +469,35 @@ def _without_risky(match: "re.Match[str]") -> str:
     return match.group(1) + body + match.group(3)
 
 
+# The tool's own argument name, not a directive attribute: the renderer reads `rec`.
+RECOMMEND_ATTR_RE = re.compile(r"\s*recommend\s*=\s*\"[^\"]*\"")
+
+
+def strip_recommend_attribute(text: str) -> str:
+    """Remove `recommend="1"` from a directive, which no renderer reads.
+
+    The model sometimes writes the tool's argument name into the directive instead of
+    `rec`, and an attribute nothing reads looks to the next reader, and to the next
+    model, like a mark that was applied. The numbers are dropped rather than renamed:
+    only the classifier's answer belongs in `rec` (see `recommend.py`), and a model
+    that wants the tag can ask for one.
+    """
+    if not isinstance(text, str) or "recommend" not in text:
+        return text
+    try:
+        return _DIRECTIVE_BODY_RE.sub(_without_recommend, text, count=1)
+    except Exception:  # a hook must never break a reply
+        return text
+
+
+def _without_recommend(match: "re.Match[str]") -> str:
+    body = RECOMMEND_ATTR_RE.sub("", match.group(2))
+    # A mark that opened the directive leaves the space that followed it.
+    if body.startswith(" "):
+        body = body[1:]
+    return match.group(1) + body + match.group(3)
+
+
 ALT_NUMBER_ATTRS = ("rec", "risky")
 Q_ATTR_VALUE_RE = re.compile(r"\bq(\d+)\s*=\s*\"[^\"]*\"")
 

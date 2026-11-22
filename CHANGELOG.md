@@ -1,3 +1,15 @@
+## [hermes-next-steps 1.1.4] - 2026-11-22
+
+### Fixed
+
+- **hermes-next-steps:** a chip reply no longer shows the decision classifier's call. A model that could not reach `next_steps_recommend` printed the call it meant to make as a fenced `{"recommend": "2"}` block under the directive, which arrived as a code block while the chips stayed unmarked, and a model that did reach the classifier sometimes wrote the tool's own argument name as `recommend="1"` inside the directive, where the renderer reads `rec` and ignored it. Both are removed before the reply is stored, and the prompt now names `rec` as the only place the numbers go. The numbers are dropped rather than folded into `rec`, because a recommendation is what the classifier returned.
+
+## [next-steps 1.0.7] - 2026-11-22
+
+### Fixed
+
+- **next-steps:** the same repair, in the edition that also carries the injected chip ring. A trailing fenced classifier call and a `recommend=` attribute are stripped from the reply before it is stored.
+
 ## [intelligent-tool-break 1.3.7] - 2026-11-20
 
 ### Fixed

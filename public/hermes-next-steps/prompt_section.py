@@ -33,9 +33,9 @@ MAX_CHARS = 2_100
 
 DESKTOP = (
     "\n"
-    "This chat draws Next Steps under a reply. When the next step is a choice, never ask in prose: no \"say the word\", \"want me to...?\", \"shall I...?\", \"let me know\", or a list of options. Call next_steps with 2 to 5 imperative options under 120 characters, most likely first; write no ::nextsteps line: the chips attach to the reply. Several chips are picked and sent together, so pass multi=false only when options are exclusive. Pass alternates as 1-based pairs ([[1, 3]] means 1 and 3 exclude each other); an option meaning \"leave things as they are\" opposes every action, so say it in a label. Never offer an option you would not do. Without tool calls, end with this line alone, one qN per option, multi=\"0\" when exclusive, alt=\"1,3\" for conflicts:\n"
+    "This chat draws Next Steps under a reply. When the next step is a choice, never ask in prose: no \"say the word\", \"want me to...?\", \"shall I...?\" or a list of options. Call next_steps with 2 to 5 imperative options under 120 characters, most likely first; write no ::nextsteps line: the chips attach to the reply. Several chips can be picked together, so pass multi=false only when options are exclusive. Pass alternates as 1-based pairs ([[1, 3]] means 1 and 3 exclude each other); an option meaning \"leave things as they are\" opposes every action, so say it in a label. Never offer an option you would not do. Without tool calls, end with this line alone, one qN per option, multi=\"0\" when exclusive, alt=\"1,3\" for conflicts:\n"
     "::nextsteps{q1=\"Push the branch and open the PR\" q2=\"Add a CHANGELOG entry\"}\n"
-    "Never put a directive in a sentence, list or code block, and never write it twice. The prose says what you did; the chips carry what follows."
+    "Never put a directive in a sentence, list or code block, never write it twice, and never follow it with a tool call or JSON. The prose says what you did; the chips carry what follows."
 )
 
 # A different reply shape: the user has to answer the points, not pick one. It is an
@@ -63,7 +63,7 @@ RISK = (
 
 RECOMMEND = (
     "\n"
-    " When the chips are a real choice, pass recommend=true so the classifier marks the options worth taking now: they carry a Recommended tag and start picked, so recommend only what you would be happy to receive as it stands. On the directive path, next_steps_recommend returns rec=\"1,3\"."
+    " When the chips are a real choice, pass recommend=true so the classifier marks the options worth taking now: they start picked, so recommend only what you would send as it stands. On the directive path call next_steps_recommend and write its numbers as rec=\"1,3\"; never a recommend attribute or a JSON block."
 )
 
 

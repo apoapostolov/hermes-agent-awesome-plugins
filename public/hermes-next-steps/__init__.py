@@ -26,9 +26,11 @@ from .offers import (
     stamp_session,
     stamp_steer,
     reorder_alternates,
+    strip_recommend_attribute,
     strip_risky,
 )
 from .prompt_section import MAX_CHARS, chips_rule
+from .stray import strip_call
 from .recommend import (
     NEXT_STEPS_RECOMMEND_SCHEMA,
     alternate_groups,
@@ -147,7 +149,7 @@ def register(ctx) -> None:
     def transform(
         response_text: str = "", platform: str = "", session_id: str = "", **kwargs
     ) -> str | None:
-        """Five jobs, each gated by its own rule, read per call.
+        """Six jobs: five gated by their own rule and read per call, one repair that always runs.
 
         - next_steps: a registration from the tool becomes the reply's directive.
         - auto_offers: a closing offer written in prose becomes a directive.
@@ -157,6 +159,10 @@ def register(ctx) -> None:
           gets one empty block so its message still shows the unanswered ones.
         - always: pickability for two or more chips, and the chat fingerprint, so a
           chat only ever carries its own proposals.
+        - always: a classifier call a model printed as a JSON block, and the tool's
+          argument name written into the directive as `recommend=`, are removed
+          (see stray.py): neither is text to show, and neither is the classifier's
+          answer.
 
         The tool's chips are attached before the stamps run, so the directive they
         produce picks up the accent and carry attributes exactly like a written one.
@@ -183,7 +189,8 @@ def register(ctx) -> None:
             steer = bool(ctx.get_config(STEER_SETTING, False))
         except Exception:
             steer = False
-        changed = response_text
+        # Model noise first, so everything below reads a clean directive.
+        changed = strip_recommend_attribute(strip_call(response_text))
         if auto_offers:
             converted = offer_hook(response_text=changed, platform=platform, auto_offers=True)
             if converted:

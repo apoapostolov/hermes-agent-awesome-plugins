@@ -4,7 +4,7 @@
   <strong>End a reply with options instead of a promise.</strong>
   <p>Clickable next steps under every reply. Tick several and one send delivers them together.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.3-2ea44f" alt="Version 1.1.3" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.4-2ea44f" alt="Version 1.1.4" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -56,7 +56,7 @@ The tool takes `options`, `multi`, `answer`, `recommend`, `alternates`, `risky` 
 ::nextsteps{multi="1" rec="1" risky="2" q1="Push the branch and open the PR" q2="Force-push over the review commit" q3="Write the release note first" d2="Rewrites origin, discarding the commit already there"}
 ```
 
-`q` attributes are the labels, `dN` a subtitle for option N, `rec` the recommended indexes, `alt` pairs that exclude each other, `risky` the indexes that carry the pill, `carry="1"` records the reply's options for later ones, and `steer="1"` changes what **Send** does on a busy chat. The **Steer** button needs no directive flag; it appears beside Send whenever a block has a finalisation row. `answer="1"` replaces the chip row with a checkbox and reply field per option; `kind="answer"`, the spelling used by Follow-up Chips, works too. `next_steps_recommend` returns the classifier's pick without drawing anything.
+`q` attributes are the labels, `dN` a subtitle for option N, `rec` the recommended indexes, `alt` pairs that exclude each other, `risky` the indexes that carry the pill, `carry="1"` records the reply's options for later ones, and `steer="1"` changes what **Send** does on a busy chat. The **Steer** button needs no directive flag; it appears beside Send whenever a block has a finalisation row. `answer="1"` replaces the chip row with a checkbox and reply field per option; `kind="answer"`, the spelling used by Follow-up Chips, works too. `next_steps_recommend` returns the classifier's pick without drawing anything; its numbers go in `rec`, and a call or a `recommend=` attribute printed into the reply instead is removed before the reply is stored.
 
 Answer mode is for a reply that asks several questions, not for choosing between actions:
 

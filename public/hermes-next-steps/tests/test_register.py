@@ -100,6 +100,29 @@ class RegisterTest(unittest.TestCase):
     def test_offer_hook_ignores_non_string_replies(self):
         self.assertIsNone(plugin.offer_hook(response_text=None, platform="local", auto_offers=True))
 
+    def test_the_hook_removes_a_printed_classifier_call(self):
+        ctx = FakeCtx()
+        plugin.register(ctx)
+        hook = ctx.hooks["transform_llm_output"]
+        reply = '::nextsteps{q1="A" q2="B"}\n\n```json\n{"recommend": "2"}\n```'
+        out = hook(response_text=reply, platform="local", session_id="s1")
+        self.assertIsNotNone(out)
+        self.assertNotIn("recommend", out)
+        self.assertIn('::nextsteps{', out)
+        self.assertNotIn("```", out)
+
+    def test_the_hook_removes_a_recommend_attribute_from_the_directive(self):
+        ctx = FakeCtx()
+        plugin.register(ctx)
+        hook = ctx.hooks["transform_llm_output"]
+        out = hook(
+            response_text='::nextsteps{q1="A" q2="B" recommend="2"}',
+            platform="local",
+            session_id="s1",
+        )
+        self.assertNotIn("recommend", out)
+        self.assertIn('q2="B"', out)
+
 
 class RecommendRegistrationTest(unittest.TestCase):
     def test_the_recommend_tool_is_always_registered(self):

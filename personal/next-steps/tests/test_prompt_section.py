@@ -38,7 +38,7 @@ class FitsTheHostCap(unittest.TestCase):
 
     def test_the_rule_names_the_tool_and_the_directive(self):
         text = ps.chips_rule({"platform": "local"}, True, False)
-        for needle in ("next_steps", "::nextsteps", "multi=false", "alternates", "recommend=true"):
+        for needle in ("next_steps", "::nextsteps", "multi=false", "alternates", "recommend=true", 'rec="1,3"'):
             self.assertIn(needle, text)
 
 
