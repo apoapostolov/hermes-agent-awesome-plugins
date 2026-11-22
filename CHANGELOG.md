@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [hermes-next-steps 1.1.6] - 2026-11-22
+
 ### Fixed
 
 - **hermes-next-steps:** a `next_steps` tool call now always draws chips. A model used the retired `answer` argument on an action list, which replaced the chips with reply fields; the tool no longer exposes that argument and the agent prompt no longer teaches it. The `answer="1"` directive still draws the reply-field form when a reply genuinely asks for several typed answers.
