@@ -7,7 +7,7 @@ plugins:
     subdir: personal/radio-plus
     ref: c76655b91c8bb69b68ac3e207dddc81819d59a2f
   - repo: apoapostolov/hermes-agent-awesome-plugins
-    subdir: personal/next-steps
+    subdir: personal/hermes-next-steps
     ref: 4b9236c0b770bc3ed179294799d2ab2aefd84c80
   - repo: apoapostolov/hermes-agent-awesome-plugins
     subdir: personal/provider-status

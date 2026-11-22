@@ -1,4 +1,4 @@
-// next-steps: clickable next-step question chips inside the transcript.
+// hermes-next-steps: clickable next-step question chips inside the transcript.
 // The agent ends a reply with a paragraph alone on its own line:
 //   ::nextsteps{q1="..." q2="..." q3="..."}
 // Each qN renders as a chip; click sends it as the next user turn.
@@ -1629,7 +1629,7 @@ function normalizeSubtitle(text) {
 }
 
 const plugin = {
-  id: 'next-steps',
+  id: 'hermes-next-steps',
   name: 'Next Steps',
   description: 'Clickable next-step question chips after assistant replies',
   register: function register(ctx) {

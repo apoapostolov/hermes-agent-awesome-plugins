@@ -86,7 +86,7 @@ Follow-up Chips and Next Steps draw the same slot under a reply, so disable one 
 
 Desktop plus gateway, and the same per-chat state through `ctx.storage`. A step is a sentence, so a vague option sends a vague request; the plugin does not rewrite what the agent wrote. Ticks are per block, so two blocks open in one reply keep separate picks. The carry queue is stored per chat, and clearing a chat clears its queue. A subtitle is authored by the agent and nothing checks it against the label. The RISKY pill is a classifier's opinion about consequences, not a reading of your repository.
 
-This is the catalog edition and stays inside the plugin SDK. It drops the two surfaces that reach into the app's own DOM: the chip border no longer runs Hermes' arc while a reply works, and a carried label does not jump back to the reply that offered it. The personal edition has both, and `personal/next-steps/LIMITATIONS.md` names the hooks they need before this edition can carry them too.
+This is the catalog edition and stays inside the plugin SDK. It drops the two surfaces that reach into the app's own DOM: the chip border no longer runs Hermes' arc while a reply works, and a carried label does not jump back to the reply that offered it. The personal edition has both, and `personal/hermes-next-steps/LIMITATIONS.md` names the hooks they need before this edition can carry them too.
 
 ## Where this comes from
 

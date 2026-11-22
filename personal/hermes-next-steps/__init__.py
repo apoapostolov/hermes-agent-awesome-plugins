@@ -1,4 +1,4 @@
-"""next-steps: clickable Next Steps, the rule that fills them, and the picker.
+"""hermes-next-steps: clickable Next Steps, the rule that fills them, and the picker.
 
 The desktop half (desktop/plugin.js) draws a `::nextsteps{…}` paragraph as chips
 under a reply. This half gives the model two ways to fill it: `next_steps`
@@ -40,8 +40,11 @@ from .recommend import (
     picks_for,
 )
 
-NAME = "next-steps"
-TOOLSET = NAME.replace("-", "_")
+NAME = "hermes-next-steps"
+# The toolset keeps the old spelling on purpose: platform tool lists and
+# `known_plugin_toolsets` in an existing config already name `next_steps`, and
+# the tools inside it kept their names when the plugin changed its own.
+TOOLSET = "next_steps"
 SETTING = "auto_offers"
 RECOMMEND_SETTING = "auto_recommend"
 ACCENT_SETTING = "accent_recommended"
@@ -90,7 +93,7 @@ def section_text(session: dict, recommends: bool = False, risk: bool = False) ->
 def register(ctx) -> None:
     # The section is rendered when a session starts, not when the plugin loads, so
     # the classifier probe runs there: plugins register in dependency order and
-    # `next-steps` loads before `nerve`, which made an eager probe always False.
+    # `hermes-next-steps` loads before `nerve`, which made an eager probe always False.
     # The setting is read in the same place, so a toggle applies to the next session.
     def section(session):
         recommends = bool(_config(ctx, RECOMMEND_SETTING, True)) and has_ranker(ctx)

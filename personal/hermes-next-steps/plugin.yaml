@@ -1,11 +1,11 @@
-name: next-steps
+name: hermes-next-steps
 label: Next Steps
-version: 1.0.7
+version: 1.1.4
 author: Apostol Apostolov
 license: MIT
 manifest_version: 2
 api_version: 1
-homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/next-steps
+homepage: https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/hermes-next-steps
 description: >
   An extended edition of Follow-up Chips (nuonrg/hermes-plugin-followup-chips),
   the plugin it grew out of. Clickable next-step options under a Hermes Desktop reply. The agent calls

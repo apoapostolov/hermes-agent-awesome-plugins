@@ -1,14 +1,12 @@
 ## [hermes-next-steps 1.1.4] - 2026-11-22
 
-### Fixed
+### Changed
 
-- **hermes-next-steps:** a chip reply no longer shows the decision classifier's call. A model that could not reach `next_steps_recommend` printed the call it meant to make as a fenced `{"recommend": "2"}` block under the directive, which arrived as a code block while the chips stayed unmarked, and a model that did reach the classifier sometimes wrote the tool's own argument name as `recommend="1"` inside the directive, where the renderer reads `rec` and ignored it. Both are removed before the reply is stored, and the prompt now names `rec` as the only place the numbers go. The numbers are dropped rather than folded into `rec`, because a recommendation is what the classifier returned.
-
-## [next-steps 1.0.7] - 2026-11-22
+- **hermes-next-steps:** the personal edition takes the catalog edition's name, and both editions sit at 1.1.4, so one release covers one plugin instead of a `next-steps` line and a `hermes-next-steps` line drifting apart by a version each time. The tool names (`next_steps`, `next_steps_recommend`), the `::nextsteps` directive, the `next_steps` toolset, the plugin settings and the `fu-` CSS prefix are unchanged, because replies and configurations written before the rename have to keep working. Only the plugin id, its folder, its tag family and its install command change.
 
 ### Fixed
 
-- **next-steps:** the same repair, in the edition that also carries the injected chip ring. A trailing fenced classifier call and a `recommend=` attribute are stripped from the reply before it is stored.
+- **hermes-next-steps:** a chip reply no longer shows the decision classifier's call. A model that could not reach `next_steps_recommend` printed the call it meant to make as a fenced `{"recommend": "2"}` block under the directive, which arrived as a code block while the chips stayed unmarked, and a model that did reach the classifier sometimes wrote the tool's own argument name as `recommend="1"` inside the directive, where the renderer reads `rec` and ignored it. Both are removed before the reply is stored, and the prompt now names `rec` as the only place the numbers go. The numbers are dropped rather than folded into `rec`, because a recommendation is what the classifier returned. Both editions ship the fix; the personal edition published it earlier the same day as `next-steps 1.0.7`, which keeps its own tag and release notes.
 
 ## [intelligent-tool-break 1.3.7] - 2026-11-20
 

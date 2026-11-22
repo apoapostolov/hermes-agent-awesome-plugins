@@ -1,6 +1,6 @@
 # LIMITATIONS
 
-Personal edition of **Next Steps** (`next-steps`). This file is why that edition cannot be listed in the Hermes Plugin Catalog as-is.
+Personal edition of **Next Steps** (`hermes-next-steps`). This file is why that edition cannot be listed in the Hermes Plugin Catalog as-is.
 
 Before you pin personal to the catalog, or copy a personal feature into `public/`, walk every blocker below. Either still comply, or confirm the linked Hermes issue or PR is resolved and the SDK hook exists in the Desktop build you target.
 

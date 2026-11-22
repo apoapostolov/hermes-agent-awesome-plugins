@@ -57,7 +57,7 @@ class RegisterTest(unittest.TestCase):
     def test_registers_one_prompt_section_and_the_output_hook(self):
         ctx = FakeCtx()
         plugin.register(ctx)
-        self.assertEqual([s[0] for s in ctx.sections], ["next-steps"])
+        self.assertEqual([s[0] for s in ctx.sections], ["hermes-next-steps"])
         self.assertEqual(ctx.sections[0][2]["max_chars"], plugin.MAX_CHARS)
         self.assertEqual(list(ctx.hooks), ["transform_llm_output"])
 
@@ -135,7 +135,7 @@ class RecommendRegistrationTest(unittest.TestCase):
         self.assertEqual(tool["schema"]["parameters"]["required"], ["options"])
 
     def test_a_classifier_loaded_after_this_plugin_is_still_seen(self):
-        # Plugins register in dependency order and next-steps loads before nerve,
+        # Plugins register in dependency order and hermes-next-steps loads before nerve,
         # so the probe has to run per session, not once at registration.
         ctx = FakeCtx()
         plugin.register(ctx)
