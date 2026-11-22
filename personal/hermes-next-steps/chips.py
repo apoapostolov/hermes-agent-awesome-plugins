@@ -248,15 +248,6 @@ NEXT_STEPS_SCHEMA = {
                     "are exclusive. Defaults to true for two or more options."
                 ),
             },
-            "answer": {
-                "type": "boolean",
-                "description": (
-                    "Set when the reply asks the user to answer several points separately. "
-                    "Each option becomes a labelled reply field; the user can tick the rows "
-                    "to answer and one turn sends numbered item: answer lines. Never set "
-                    "this for choosing between actions, where plain chips are used."
-                ),
-            },
             "alternates": {
                 "type": "array",
                 "description": (
@@ -317,7 +308,9 @@ def handler(
         multi = params.get("multi")
         if not isinstance(multi, bool):
             multi = None
-        answer = params.get("answer") is True
+        # Reply fields are a directive-only fallback. A tool call always draws
+        # chips, even if a model still passes the retired answer argument.
+        answer = False
         rec = ""
         wanted = params.get("recommend")
         if not isinstance(wanted, bool):

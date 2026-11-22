@@ -1,4 +1,4 @@
-"""Answer mode: the tool flag, the directive attribute and the prompt rule."""
+"""Answer mode stays a directive fallback; the tool always draws chips."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import unittest
 
 import offers
 import prompt_section
-from chips import Pending, attach, handler
+from chips import Pending, NEXT_STEPS_SCHEMA, attach, handler
 
 
 class DirectiveTest(unittest.TestCase):
@@ -25,11 +25,15 @@ class DirectiveTest(unittest.TestCase):
 
 
 class ToolTest(unittest.TestCase):
-    def test_answer_call_registers_the_flag(self):
+    def test_the_tool_does_not_expose_answer(self):
+        self.assertNotIn("answer", NEXT_STEPS_SCHEMA["parameters"]["properties"])
+
+    def test_a_stale_answer_call_still_draws_chips(self):
         store = Pending()
-        out = handler(store)({"options": ["Deploy?", "Tag?"], "answer": True}, "s1")
-        self.assertIn("answer fields", out)
-        self.assertIs(store.take("s1")[6], True)
+        out = handler(store)({"options": ["A", "B"], "answer": True}, "s1")
+        self.assertIn("multi", out)
+        self.assertNotIn("answer fields", out)
+        self.assertIs(store.take("s1")[6], False)
 
     def test_a_call_without_the_flag_stays_a_chip_block(self):
         store = Pending()
@@ -38,17 +42,17 @@ class ToolTest(unittest.TestCase):
 
 
 class AttachTest(unittest.TestCase):
-    def test_the_flag_reaches_the_directive(self):
+    def test_a_directive_answer_reaches_the_reply(self):
         store = Pending()
-        handler(store)({"options": ["Deploy?", "Tag?"], "answer": True}, "s3")
+        store.put("s3", ["Deploy?", "Tag?"], None, "", "", "", (), True)
         text = attach("Done.", "s3", platform="local", pending=store)
         self.assertTrue(text.startswith("Done.\n\n::nextsteps{"))
         self.assertIn('answer="1"', text)
 
 
 class PromptTest(unittest.TestCase):
-    def test_the_rule_teaches_answer_mode(self):
-        self.assertIn("answer=true", prompt_section.chips_rule({"platform": "local"}))
+    def test_the_rule_does_not_offer_answer_mode(self):
+        self.assertNotIn("answer=true", prompt_section.chips_rule({"platform": "local"}))
 
     def test_every_variant_fits_the_cap(self):
         for name, text in prompt_section.prompt_texts():

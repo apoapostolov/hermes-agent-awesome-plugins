@@ -8,9 +8,9 @@ because a raw ::nextsteps line would arrive as text there.
 On the Desktop the rule prefers the `next_steps` tool: the options travel as
 arguments, so nothing has to be escaped and an invalid option is caught before it
 reaches the reply. The directive form stays documented as the fallback, because a
-model without tool calling still has to be able to produce chips. A reply that asks
-several points separately can set answer=true: its options become labelled reply
-fields instead of chips.
+model without tool calling still has to be able to produce chips. Reply fields
+are a directive-only fallback and stay out of this prompt: a model offered that
+choice used it for an action list, and the chips disappeared.
 
 When a decision classifier is available the rule also says to ask it which options
 are worth taking now, so the reply arrives with the likely steps already picked
@@ -36,13 +36,6 @@ DESKTOP = (
     "This chat draws Next Steps under a reply. When the next step is a choice, never ask in prose: no \"say the word\", \"want me to...?\", \"shall I...?\" or a list of options. Call next_steps with 2 to 5 imperative options under 120 characters, most likely first; write no ::nextsteps line: the chips attach to the reply. Several chips can be picked together, so pass multi=false only when options are exclusive. Pass alternates as 1-based pairs ([[1, 3]] means 1 and 3 exclude each other); an option meaning \"leave things as they are\" opposes every action, so say it in a label. Never offer an option you would not do. Without tool calls, end with this line alone, one qN per option, multi=\"0\" when exclusive, alt=\"1,3\" for conflicts:\n"
     "::nextsteps{q1=\"Push the branch and open the PR\" q2=\"Add a CHANGELOG entry\"}\n"
     "Never put a directive in a sentence, list or code block, never write it twice, and never follow it with a tool call or JSON. The prose says what you did; the chips carry what follows."
-)
-
-# A different reply shape: the user has to answer the points, not pick one. It is an
-# opt-in mode, so it sits beside the chip rule rather than replacing it.
-ANSWER = (
-    "\n"
-    "When the reply asks the user to answer several points separately, pass answer=true: each option becomes a labelled reply field, and answers are sent back as numbered item: answer lines. Use it for questions, not choices."
 )
 
 OTHER = (
@@ -87,7 +80,7 @@ def chips_rule(session: dict, recommends: bool = False, risk: bool = False) -> s
     session = session or {}
     if session.get("platform") not in DRAWS:
         return OTHER
-    parts = [DESKTOP, ANSWER, SUBTITLE]
+    parts = [DESKTOP, SUBTITLE]
     if recommends:
         parts.append(RECOMMEND)
     if risk:
