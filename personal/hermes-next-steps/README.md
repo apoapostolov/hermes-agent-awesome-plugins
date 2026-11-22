@@ -4,7 +4,7 @@
   <strong>End a reply with options instead of a promise.</strong>
   <p>Clickable next steps under every reply. Tick several and one send delivers them together.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.4-2ea44f" alt="Version 1.1.4" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.1.5-2ea44f" alt="Version 1.1.5" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -21,8 +21,8 @@
 
 ## What You Can Do
 
-- End a reply with up to six steps instead of "say the word and I'll push it". A click sends that step back as a normal user turn, so the next message is already written.
-- Tick several and finish with two buttons. With two or more options the row is multi-select: **Send** carries a count, so three picks become one message with three lines rather than three queued turns, and the small **Steer** button beside it sends the same picks into the turn already running. A block registered with `multi="0"` sends on the first click.
+- End a reply with up to six steps instead of "say the word and I'll push it". A click marks that step, and **Confirm** under the list sends it back as a normal user turn, so the next message is already written and a stray click cannot start one.
+- Tick several and finish with two buttons. With two or more options the row is multi-select: **Send** carries a count, so three picks become one message with three lines rather than three queued turns, and the small **Steer** button beside it sends the same picks into the turn already running. A block registered with `multi="0"` closes with its own **Confirm** button, so both kinds of row read the same way: mark the choice, then send it.
 - Answer several points in one turn. When the reply asks questions rather than offers actions, `answer=true` draws a checkbox and a reply field for each option; typing selects that row, and one send delivers `1. <question>: <answer>` lines. A ticked row left blank sends just its numbered question.
 - See which options are worth taking now. A decision classifier tags them **Recommended** in the accent tint and they start ticked; several can carry the tag when they belong together, never all of them, and never beside "leave it as it is".
 - See which options could cost you something. An option the classifier reads as able to damage files, a build or money carries an amber **RISKY** pill. Off by default.
@@ -90,7 +90,7 @@ The chip border keeps Hermes' arc animating while a reply works, and a carried l
 
 ## Where this comes from
 
-An extended edition of **Follow-up Chips** ([nuonrg/hermes-plugin-followup-chips](https://github.com/nuonrg/hermes-plugin-followup-chips)), which it grew out of and still shares the idea with: a reply ends with clickable options, and a click sends one back as the next turn. Next Steps carries that further with the classifier marks, subtitles, the alternating and deferral ordering, the carry-forward queue, and the steer setting.
+An extended edition of **Follow-up Chips** ([nuonrg/hermes-plugin-followup-chips](https://github.com/nuonrg/hermes-plugin-followup-chips)), which it grew out of and still shares the idea with: a reply ends with clickable options that send a step back as the next turn. Next Steps carries that further with the classifier marks, subtitles, the alternating and deferral ordering, the carry-forward queue, and the steer setting.
 
 ## License
 

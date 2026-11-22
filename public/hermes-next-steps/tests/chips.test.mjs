@@ -139,6 +139,18 @@ function steer(el) {
   return roots(el).find((c) => c && c.props.className && c.props.className.indexOf('fu-steer') !== -1)
 }
 
+/* Single select is two clicks now: a chip marks the choice, and the Confirm
+   button under the list sends it. Delivery cases care about the second click. */
+function markAndConfirm(opts, idx = 0) {
+  let el = render(register(opts))
+  chips(el)[idx].props.onClick()
+  el = render(register(opts))
+  const button = send(el)
+  assert.ok(button, 'a marked single select shows Confirm')
+  button.props.onClick()
+  return el
+}
+
 function label(el) {
   if (typeof el.props.children === 'string') return el.props.children
   const first = el.props.children[0]
@@ -231,29 +243,72 @@ function test(name, fn) {
   cases.push([name, fn])
 }
 
-/* ---- single select: unchanged behaviour --------------------------------- */
-test('multi="0" sends on one click and shows no send button', () => {
+/* ---- single select: the chip marks, Confirm sends ----------------------- */
+test('multi="0" marks one chip and sends only from Confirm', () => {
   submits.length = 0
-  const el = render(
-    register({ attrs: { multi: '0', q1: 'Push it?', q2: 'Tag it?' }, sessionId: 's1', source: 'src-a' })
-  )
+  const attrs = { multi: '0', q1: 'Push it?', q2: 'Tag it?' }
+  let el = render(register({ attrs, sessionId: 's1', source: 'src-a' }))
   assert.equal(chips(el).length, 2)
-  assert.equal(send(el), undefined, 'single select has no send button')
+  assert.equal(send(el), undefined, 'nothing to confirm before a chip is marked')
   chips(el)[1].props.onClick()
+  assert.equal(submits.length, 0, 'a click marks the chip instead of sending')
+  el = render(register({ attrs, sessionId: 's1', source: 'src-a' }))
+  assert.equal(label(send(el)), 'Confirm')
+  assert.equal(send(el).props.disabled, false)
+  send(el).props.onClick()
   assert.deepEqual(submits, [['s1', 'Tag it?']])
 })
 
-test('multi="0" marks the chosen chip and settles on message.complete', () => {
+test('multi="0" marks the chip, runs only after Confirm, and settles on message.complete', () => {
   const attrs = { multi: '0', q1: 'Push it?', q2: 'Tag it?' }
   let el = render(register({ attrs, sessionId: 's2', source: 'src-b' }))
   chips(el)[0].props.onClick()
   el = render(register({ attrs, sessionId: 's2', source: 'src-b' }))
   assert.match(chips(el)[0].props.className, /fu-chosen/)
-  assert.match(chips(el)[0].props.className, /fu-running/)
   assert.equal(label(chips(el)[0]), '✓ Push it?')
+  assert.doesNotMatch(chips(el)[0].props.className, /fu-running/, 'marking is not sending')
+  send(el).props.onClick()
+  el = render(register({ attrs, sessionId: 's2', source: 'src-b' }))
+  assert.match(chips(el)[0].props.className, /fu-running/)
+  assert.equal(send(el), undefined, 'Confirm goes once the turn is sent')
+  chips(el)[1].props.onClick()
+  el = render(register({ attrs, sessionId: 's2', source: 'src-b' }))
+  assert.equal(label(chips(el)[1]), 'Tag it?', 'a sent block cannot be marked again')
   events['message.complete'][0]('s2')
   el = render(register({ attrs, sessionId: 's2', source: 'src-b' }))
   assert.doesNotMatch(chips(el)[0].props.className, /fu-running/)
+})
+
+test('picking another single option moves the mark and keeps one Confirm', () => {
+  submits.length = 0
+  const attrs = { multi: '0', q1: 'A', q2: 'B' }
+  let el = render(register({ attrs, sessionId: 's7', source: 'src-s7' }))
+  chips(el)[0].props.onClick()
+  el = render(register({ attrs, sessionId: 's7', source: 'src-s7' }))
+  chips(el)[1].props.onClick()
+  el = render(register({ attrs, sessionId: 's7', source: 'src-s7' }))
+  assert.equal(label(chips(el)[0]), 'A')
+  assert.equal(label(chips(el)[1]), '✓ B')
+  assert.equal(roots(el).filter((c) => c.props.className.indexOf('fu-send') !== -1).length, 1, 'one Confirm for the block')
+  send(el).props.onClick()
+  assert.deepEqual(submits, [['s7', 'B']])
+})
+
+test('a refused single select keeps its Confirm for a retry', () => {
+  sdk.host.composer.submit = () => false
+  submits.length = 0
+  const attrs = { multi: '0', q1: 'A', q2: 'B' }
+  let el = render(register({ attrs, sessionId: 's8', source: 'src-s8' }))
+  chips(el)[0].props.onClick()
+  el = render(register({ attrs, sessionId: 's8', source: 'src-s8' }))
+  send(el).props.onClick()
+  assert.equal(submits[0][0], 'notify')
+  el = render(register({ attrs, sessionId: 's8', source: 'src-s8' }))
+  assert.equal(label(send(el)), 'Confirm', 'the button stays so the click can be retried')
+  sdk.host.composer.submit = (sessionId, text) => {
+    submits.push([sessionId, text])
+    return true
+  }
 })
 
 /* ---- multi select ------------------------------------------------------- */
@@ -362,11 +417,15 @@ test('two chips are pickable when the directive says nothing', () => {
   assert.equal(label(send(el)), 'Send 1')
 })
 
-test('one chip has nothing to pick, so it sends on one click', () => {
+test('one chip waits for Confirm instead of sending on one click', () => {
   submits.length = 0
-  const el = render(register({ attrs: { q1: 'Only option' }, sessionId: 'd2', source: 'src-d2' }))
-  assert.equal(send(el), undefined, 'no send button for a single chip')
+  const attrs = { q1: 'Only option' }
+  let el = render(register({ attrs, sessionId: 'd2', source: 'src-d2' }))
+  assert.equal(send(el), undefined, 'no Confirm until the chip is marked')
   chips(el)[0].props.onClick()
+  assert.equal(submits.length, 0)
+  el = render(register({ attrs, sessionId: 'd2', source: 'src-d2' }))
+  send(el).props.onClick()
   assert.deepEqual(submits, [['d2', 'Only option']])
 })
 
@@ -761,8 +820,7 @@ test('steer="1": the click steers the live turn and submits nothing', async () =
     return true
   }
   busyIn('st1', true)
-  const el = render(register({ attrs: { steer: '1', multi: '0', q1: 'Tighten the rule', q2: 'Leave it' }, sessionId: 'st1', source: 'st-a' }))
-  chips(el)[0].props.onClick()
+  markAndConfirm({ attrs: { steer: '1', multi: '0', q1: 'Tighten the rule', q2: 'Leave it' }, sessionId: 'st1', source: 'st-a' })
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.equal(calls.length, 1)
   assert.equal(calls[0][0], 'session.steer')
@@ -782,8 +840,7 @@ test('steer="1": a rejected steer still reaches the agent as a normal message', 
     lines.push([sessionId, text])
     return true
   }
-  const el = render(register({ attrs: { steer: '1', q1: 'Only step' }, sessionId: 'st2', source: 'st-b' }))
-  chips(el)[0].props.onClick()
+  markAndConfirm({ attrs: { steer: '1', q1: 'Only step' }, sessionId: 'st2', source: 'st-b' })
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.deepEqual(lines, [['st2', 'Only step']], 'nothing live took it, so it queues as before')
   sdk.host.request = null
@@ -815,8 +872,7 @@ test('without steer="1" the request door is never used', async () => {
   let asked = 0
   sdk.host.request = () => { asked += 1; return Promise.resolve({ status: 'queued' }) }
   submits.length = 0
-  const el = render(register({ attrs: { q1: 'Normal' }, sessionId: 'st4', source: 'st-d' }))
-  chips(el)[0].props.onClick()
+  markAndConfirm({ attrs: { q1: 'Normal' }, sessionId: 'st4', source: 'st-d' })
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.equal(asked, 0)
   assert.deepEqual(submits, [['st4', 'Normal']])
@@ -839,8 +895,7 @@ test('busy: the click is admitted to the queue, not steered or interrupted', asy
   sdk.host.request = (method, params) => { calls.push([method, params]); return Promise.resolve({ status: 'queued' }) }
   sdk.host.composer.submit = (sid, text) => { lines.push([sid, text]); return true }
   busyIn('q1', true)
-  const el = render(register({ attrs: { q1: 'Do the next thing' }, sessionId: 'q1', source: 'q-a' }))
-  chips(el)[0].props.onClick()
+  markAndConfirm({ attrs: { q1: 'Do the next thing' }, sessionId: 'q1', source: 'q-a' })
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.equal(calls.length, 1)
   assert.equal(calls[0][0], 'prompt.submit')
@@ -857,8 +912,7 @@ test('busy with steer="1": the live turn is steered and nothing is queued', asyn
   const calls = []
   sdk.host.request = (method, params) => { calls.push([method, params]); return Promise.resolve({ status: 'queued' }) }
   busyIn('q2', true)
-  const el = render(register({ attrs: { steer: '1', q1: 'Tighten it' }, sessionId: 'q2', source: 'q-b' }))
-  chips(el)[0].props.onClick()
+  markAndConfirm({ attrs: { steer: '1', q1: 'Tighten it' }, sessionId: 'q2', source: 'q-b' })
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.deepEqual(calls.map((c) => c[0]), ['session.steer'])
   resetHost()
@@ -868,8 +922,7 @@ test('busy with steer="1": a rejected steer still reaches the queue', async () =
   const calls = []
   sdk.host.request = (method, params) => { calls.push([method, params]); return Promise.resolve({ status: 'rejected', delivered: false }) }
   busyIn('q3', true)
-  const el = render(register({ attrs: { steer: '1', q1: 'Tighten it' }, sessionId: 'q3', source: 'q-c' }))
-  chips(el)[0].props.onClick()
+  markAndConfirm({ attrs: { steer: '1', q1: 'Tighten it' }, sessionId: 'q3', source: 'q-c' })
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.deepEqual(calls.map((c) => c[0]), ['session.steer', 'prompt.submit'], 'the queue is the floor')
   resetHost()
@@ -880,8 +933,7 @@ test('busy: a refused admission falls back to submit instead of losing the click
   sdk.host.request = () => Promise.reject(new Error('no subscription'))
   sdk.host.composer.submit = (sid, text) => { lines.push([sid, text]); return true }
   busyIn('q4', true)
-  const el = render(register({ attrs: { q1: 'Still here' }, sessionId: 'q4', source: 'q-d' }))
-  chips(el)[0].props.onClick()
+  markAndConfirm({ attrs: { q1: 'Still here' }, sessionId: 'q4', source: 'q-d' })
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.deepEqual(lines, [['q4', 'Still here']])
   resetHost()
@@ -893,8 +945,7 @@ test('idle with steer="1": plain submit, no steer and no queue entry', async () 
   sdk.host.request = () => { asked += 1; return Promise.resolve({ status: 'queued' }) }
   sdk.host.composer.submit = (sid, text) => { lines.push([sid, text]); return true }
   busyIn('q5', false)
-  const el = render(register({ attrs: { steer: '1', q1: 'Just do it' }, sessionId: 'q5', source: 'q-e' }))
-  chips(el)[0].props.onClick()
+  markAndConfirm({ attrs: { steer: '1', q1: 'Just do it' }, sessionId: 'q5', source: 'q-e' })
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.equal(asked, 0)
   assert.deepEqual(lines, [['q5', 'Just do it']])
@@ -1190,8 +1241,7 @@ test('subtitle: a described chip still sends its label alone', () => {
   resetHost()
   submits.length = 0
   const attrs = { multi: '0', q1: 'Push it', d1: 'Rewrites origin', q2: 'Tag it' }
-  const el = render(register({ attrs, sessionId: 'sub-6', source: 'sub-f' }))
-  chips(el)[0].props.onClick()
+  markAndConfirm({ attrs, sessionId: 'sub-6', source: 'sub-f' })
   assert.deepEqual(submits, [['sub-6', 'Push it']], 'the message is the label, never the subtitle')
 })
 
@@ -1253,8 +1303,7 @@ test('risky: the mark does not stop a click', () => {
   resetHost()
   submits.length = 0
   const attrs = { multi: '0', risky: '1', q1: 'Force-push it', q2: 'Leave as it is' }
-  const el = render(register({ attrs, sessionId: 'risk-4', source: 'risk-d' }))
-  chips(el)[0].props.onClick()
+  markAndConfirm({ attrs, sessionId: 'risk-4', source: 'risk-d' })
   assert.deepEqual(submits, [['risk-4', 'Force-push it']], 'a marked chip still sends')
 })
 

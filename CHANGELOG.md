@@ -1,3 +1,9 @@
+## [hermes-next-steps 1.1.5] - 2026-11-22
+
+### Changed
+
+- **hermes-next-steps:** a single-select row no longer sends on the click. The click marks the option, and a **Confirm** button appears under the list in the same style as Send; only that button sends the step, and it goes once the turn is sent. A row that sent on one click and a multi-select row that wanted marks looked alike apart from a missing button, so the difference is now visible before anything leaves the chat. Multi-select, the answer form, carried proposals and the steer setting are unchanged. Both editions ship the change.
+
 ## [hermes-next-steps 1.1.4] - 2026-11-22
 
 ### Changed

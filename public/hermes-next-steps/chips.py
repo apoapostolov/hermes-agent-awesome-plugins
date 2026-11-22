@@ -210,7 +210,8 @@ NEXT_STEPS_SCHEMA = {
         "Register the Next Steps for the reply you are about to write. The chips "
         "attach to that reply automatically, so write the prose and do not also write a "
         "::nextsteps directive. Pass 2 to 6 imperative options under 120 characters each, "
-        "most likely first: the user clicks one and it becomes their next message. Set "
+        "most likely first: the user picks one, confirms it, and it becomes their next "
+        "message. Set "
         "multi=true when several can be done together; leave it false when choosing one "
         "rules out the others, and pass alternates for the pairs that exclude each other "
         "while the rest can still be combined. With recommend=true the decision classifier marks the "
@@ -260,7 +261,7 @@ NEXT_STEPS_SCHEMA = {
                 "type": "array",
                 "description": (
                     "Groups of options that exclude each other, as 1-based numbers: [[1, 3]] "
-                    "means chips 1 and 3 cannot both be picked, and one click clears the "
+                    "means chips 1 and 3 cannot both be picked, and picking one clears the "
                     "other. Use one group per conflict, so [[1, 3], [2, 3]] says 3 is "
                     "opposed to both. An option that means 'leave it as it is' or 'do "
                     "nothing' is opposed to every action; that pairing is applied even "

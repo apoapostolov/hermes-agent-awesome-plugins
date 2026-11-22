@@ -812,7 +812,7 @@ function Chip(props) {
   const sessionKey = props.sessionKey
   const multi = props.multi
   const active = props.active
-  const onSend = props.onSend
+  const onChoose = props.onChoose
   const onToggle = props.onToggle
   ensureArcStyle()
   const chosen = useGroupState(sessionKey)
@@ -846,7 +846,7 @@ function Chip(props) {
       'aria-pressed': multi ? isPicked : undefined,
       onClick: function () {
         if (multi) onToggle(idx)
-        else onSend(q, idx)
+        else onChoose(idx)
       },
       onMouseEnter: function () {
         setHover(true)
@@ -958,6 +958,10 @@ function Send(props) {
   const count = props.count
   const sent = props.sent
   const onSend = props.onSend
+  /* A caller-supplied word and tooltip: the single-select block closes with
+     Confirm, every other block with Send. */
+  const verb = props.label || ''
+  const hint = props.title || ''
   ensureArcStyle()
   const isRunning = sent && runningState(sessionKey)
   const [hover, setHover] = useState(false)
@@ -979,7 +983,7 @@ function Send(props) {
       onMouseLeave: function () {
         setHover(false)
       },
-      title: sent ? 'Sent' : count === 0 ? 'Pick one or more' : 'Send the picked steps as one message',
+      title: sent ? 'Sent' : count === 0 ? 'Pick one or more' : hint || 'Send the picked steps as one message',
       style: {
         cursor: disabled ? 'default' : 'pointer',
         /* Its own width: the row's common width belongs to the pills. */
@@ -1001,7 +1005,7 @@ function Send(props) {
         transition: 'border-color 160ms ease, background 160ms ease, color 160ms ease, opacity 160ms ease',
       },
       children: [
-        sent ? '✓ Sent' : count === 0 ? 'Send' : 'Send ' + count,
+        sent ? '✓ Sent' : verb || (count === 0 ? 'Send' : 'Send ' + count),
         jsx('span', { key: 'arc', className: 'fu-arc', 'aria-hidden': 'true' }),
       ],
     },
@@ -1259,6 +1263,9 @@ function normalizeSubtitle(text) {
   }
 
   const picked = usePickedState(groupKey)
+  /* The single-select mark, read from the store the chips render from, so the
+     Confirm button and the ticked chip can never disagree. */
+  const chosen = multi ? null : snapshot(groupKey)
   const stale = carryOn ? staleFor(carrySession, groupKey) : []
   /* A reply that proposes nothing still has a block when carry is on, because
      that is the only slot the stale chips can draw in. Nothing at all means no
@@ -1377,10 +1384,24 @@ function normalizeSubtitle(text) {
     }
   }
 
-  function send(q, idx) {
-    deliver(q, function () {
+  /* A single-select chip only marks itself. Nothing leaves the chat until the
+     Confirm button under the list is pressed, so a glance cannot become a turn. */
+  function choose(idx) {
+    const g = group(groupKey)
+    if (g.sent) return
+    g.chosen = idx
+    persistChoice(groupKey, g)
+    emit(groupKey)
+  }
+
+  function sendChosen() {
+    const idx = snapshot(groupKey)
+    if (idx == null || !qs[idx]) return
+    deliver(qs[idx], function () {
       const g = group(groupKey)
       g.chosen = idx
+      /* Sent, not merely marked: the button goes and the chips lock. */
+      g.sent = true
       g.running = true
       setActive(groupKey)
       persistChoice(groupKey, g)
@@ -1510,7 +1531,7 @@ function normalizeSubtitle(text) {
       }),
       accent: accent,
       sessionKey: groupKey,
-      onSend: send,
+      onChoose: choose,
       onToggle: toggle,
     })
     })
@@ -1567,6 +1588,22 @@ function normalizeSubtitle(text) {
         count: picked.length,
         sent: sent,
         onSteer: function () { sendPicked(true) },
+      })
+    )
+  }
+  /* Single select closes with one button, and only once a chip is marked: the
+     click states the choice, the button commits it. Same component as Send, so
+     both blocks look alike at the foot of a reply. */
+  if (!multi && chosen != null && !sent) {
+    footer.push(
+      jsx(Send, {
+        key: 'confirm',
+        sessionKey: groupKey,
+        count: 1,
+        sent: sent,
+        label: 'Confirm',
+        title: 'Send the chosen step as the next message',
+        onSend: sendChosen,
       })
     )
   }
