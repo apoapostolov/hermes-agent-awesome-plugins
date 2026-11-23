@@ -4,7 +4,7 @@
   <strong>See provider quota without leaving Hermes.</strong>
   <p>Status-bar used/remaining and user-managed provider pools. Polling is read-only for vendor credentials.</p>
   <p>
-    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.6.9-2ea44f" alt="Version 1.6.9" /></a>
+    <a href="plugin.yaml"><img src="https://img.shields.io/badge/version-1.6.10-2ea44f" alt="Version 1.6.10" /></a>
     <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license" /></a>
   </p>
 </div>
@@ -37,7 +37,7 @@
 
 **Disclosure:** quota checks for Codex and Grok use the documented client identity and user-agent expected by their CLI-compatible endpoints. The public edition sends keys only to their own provider endpoints and does not collect telemetry.
 
-Supported providers: Tavily, OpenCode Go, DeepSeek, GLM (z.ai), OpenRouter, Grok (xAI), Codex (OpenAI), OpenAI, Anthropic, Groq, Cerebras, Moonshot Kimi, MiniMax, Google Gemini, Hugging Face, Mistral, and Qwen.
+Supported providers: Tavily, OpenCode Go, DeepSeek, GLM (z.ai), OpenRouter, Grok (xAI), Codex (OpenAI), OpenAI, Anthropic, Groq, Cerebras, Moonshot Kimi (pay-as-you-go balance or Kimi Code membership quota), MiniMax, Google Gemini, Hugging Face, Mistral, and Qwen.
 
 ## Install
 

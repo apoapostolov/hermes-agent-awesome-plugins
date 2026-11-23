@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [provider-status 1.6.10] - 2026-11-24
+
+### Fixed
+
+- **provider-status:** Kimi Code membership keys (`sk-kimi-…`) now read the coding quota endpoint that Hermes core routes them to, instead of the Moonshot pay-as-you-go balance endpoint that answered `HTTP 401`. The chip shows the monthly window with a 5-hour quota row and counts down to its reset; `KIMI_API_KEY` and `KIMI_CODING_API_KEY` are accepted alongside `MOONSHOT_API_KEY`. A network error or an HTTP status outside 400/401/403 now returns an error status instead of raising `UnboundLocalError` into the chip and the settings badge.
+
 ## [hermes-next-steps 1.1.6] - 2026-11-22
 
 ### Fixed

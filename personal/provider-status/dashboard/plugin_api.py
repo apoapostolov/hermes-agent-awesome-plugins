@@ -1746,11 +1746,79 @@ def fetch_cerebras(cfg: dict) -> dict:
     return _header_limit_fetch("https://api.cerebras.ai/v1/models", "RPM", "CEREBRAS_API_KEY", cfg)
 
 
+def _kimi_coding_status(key: str) -> dict:
+    """Kimi Code membership keys (sk-kimi-) read the coding quota endpoint.
+
+    Core routes these keys to api.kimi.com/coding by prefix (auth_zai_kimi.py),
+    so the Moonshot pay-as-you-go balance endpoint rejects them with 401.
+    """
+    last_code = None
+    last_err = None
+    data = None
+    for base in ("https://api.kimi.com/coding", "https://api.kimi.ai/coding"):
+        try:
+            data = api_get(f"{base}/v1/usages",
+                           {"Authorization": f"Bearer {key}", "Accept": "application/json"})
+            break
+        except HTTPError as e:
+            last_code = e.code
+            last_err = f"HTTP {e.code}"
+        except Exception as e:
+            last_err = str(e)[:40]
+    if data is None:
+        out = {"ok": False, "error": last_err or "unreachable"}
+        if last_code in (401, 403):
+            out["needs_auth"] = True
+        return out
+    usages = data.get("usages") if isinstance(data, dict) else None
+    if not isinstance(usages, dict):
+        return {"ok": False, "error": "empty"}
+
+    def _row(name: str):
+        row = usages.get(name)
+        if not isinstance(row, dict):
+            return None
+        try:
+            ratio = float(row.get("used_ratio"))
+        except (TypeError, ValueError):
+            return None
+        return (round(max(0.0, min(100.0, ratio * 100)), 1),
+                _parse_iso_epoch(str(row.get("reset_time") or "")))
+
+    five = _row("limit_5h")
+    week = _row("limit_7d")
+    month = _row("limit_month_total") or _row("limit_month_code")
+    # The chip prints what remains of the headline, so take the longest
+    # window the plan reports. A plan with no total row still has a code row.
+    headline = five
+    if week is not None:
+        headline = week
+    if month is not None:
+        headline = month
+    if headline is None:
+        return {"ok": False, "error": "empty"}
+    headline_pct, headline_reset = headline
+    windows = []
+    if five is not None:
+        windows.append({"label": "5h", "pct": five[0], "direction": "increase"})
+    if week is not None:
+        windows.append({"label": "wk", "pct": week[0], "direction": "exhaust"})
+    if month is not None:
+        windows.append({"label": "mo", "pct": month[0], "direction": "exhaust"})
+    return {"ok": True, "percent": headline_pct, "exhaust_percent": headline_pct,
+            "resets_at": headline_reset, "windows": windows}
+
+
 def fetch_moonshot(cfg: dict) -> dict:
-    key = resolve_key(["MOONSHOT_API_KEY"], cfg.get("pool"), cfg.get("pool_index", 0))
+    # Core reads the Kimi names first; an sk-kimi- key is a membership key.
+    key = resolve_key(["KIMI_API_KEY", "KIMI_CODING_API_KEY", "MOONSHOT_API_KEY"],
+                      cfg.get("pool"), cfg.get("pool_index", 0))
     if not key:
-        return {"ok": False, "error": "no key", "label": "MOONSHOT_API_KEY"}
+        return {"ok": False, "error": "no key", "label": "KIMI_API_KEY"}
+    if key.startswith("sk-kimi-"):
+        return _kimi_coding_status(key)
     last = None
+    last_code = None
     for base in ("https://api.moonshot.ai", "https://api.moonshot.cn"):
         try:
             d = api_get(f"{base}/v1/users/me/balance",
@@ -1759,12 +1827,17 @@ def fetch_moonshot(cfg: dict) -> dict:
         except HTTPError as e:
             last = f"HTTP {e.code}"
             if e.code not in (400, 401, 403):
-                break
+                return {"ok": False, "error": last}
+            last_code = e.code
         except Exception as e:
-            last = str(e)[:40]
-            break
+            # A network error returns here; falling through used to read an
+            # unassigned `d` and raise UnboundLocalError into the chip.
+            return {"ok": False, "error": str(e)[:40]}
     else:
-        return {"ok": False, "error": last or "unreachable"}
+        out = {"ok": False, "error": last or "unreachable"}
+        if last_code in (401, 403):
+            out["needs_auth"] = True
+        return out
     body = d.get("data") if isinstance(d, dict) else {}
     if not isinstance(body, dict):
         body = d if isinstance(d, dict) else {}
@@ -1854,7 +1927,7 @@ PROVIDER_META = {
     "anthropic": {"name": "Anthropic", "short": "AN", "icon": "comment-discussion", "env": ["ANTHROPIC_API_KEY"]},
     "groq": {"name": "Groq", "short": "GQ", "icon": "zap", "env": ["GROQ_API_KEY"]},
     "cerebras": {"name": "Cerebras", "short": "CB", "icon": "chip", "env": ["CEREBRAS_API_KEY"]},
-    "moonshot": {"name": "Moonshot Kimi", "short": "MS", "icon": "moon", "env": ["MOONSHOT_API_KEY"]},
+    "moonshot": {"name": "Moonshot Kimi", "short": "MS", "icon": "moon", "env": ["KIMI_API_KEY", "KIMI_CODING_API_KEY", "MOONSHOT_API_KEY"]},
     "minimax": {"name": "MiniMax", "short": "MX", "icon": "symbol-numeric", "env": ["MINIMAX_API_KEY"]},
     "gemini": {"name": "Google Gemini", "short": "GM", "icon": "sparkle", "env": ["GEMINI_API_KEY"]},
     "huggingface": {"name": "Hugging Face", "short": "HF", "icon": "smiley", "env": ["HUGGINGFACE_API_KEY"]},
