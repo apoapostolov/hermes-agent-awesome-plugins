@@ -1008,7 +1008,7 @@ const FALLBACK_META = {
   anthropic: { name: 'Anthropic', icon: 'comment-discussion', env: ['ANTHROPIC_API_KEY'], has_env: false },
   groq: { name: 'Groq', icon: 'zap', env: ['GROQ_API_KEY'], has_env: false },
   cerebras: { name: 'Cerebras', icon: 'chip', env: ['CEREBRAS_API_KEY'], has_env: false },
-  moonshot: { name: 'Moonshot Kimi', icon: 'moon', env: ['MOONSHOT_API_KEY'], has_env: false },
+  moonshot: { name: 'Moonshot Kimi', icon: 'moon', env: ['KIMI_API_KEY', 'KIMI_CODING_API_KEY', 'MOONSHOT_API_KEY'], has_env: false },
   minimax: { name: 'MiniMax', icon: 'symbol-numeric', env: ['MINIMAX_API_KEY'], has_env: false },
   gemini: { name: 'Google Gemini', icon: 'sparkle', env: ['GEMINI_API_KEY'], has_env: false },
   huggingface: { name: 'Hugging Face', icon: 'smiley', env: ['HUGGINGFACE_API_KEY'], has_env: false },
