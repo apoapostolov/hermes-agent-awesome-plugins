@@ -125,14 +125,6 @@ def _read_response(response) -> bytes:
         raise ValueError("The feed uses more compression layers than this plugin undoes.")
     if len(body) > _MAX_BYTES:
         raise ValueError("Feed exceeds 2 MB.")
-    if "gzip" in (response.headers.get("Content-Encoding") or "").lower():
-        try:
-            inflater = zlib.decompressobj(31)
-            body = inflater.decompress(body, _MAX_BYTES + 1)
-        except zlib.error as exc:
-            raise ValueError("Feed has an invalid gzip body.") from exc
-        if len(body) > _MAX_BYTES:
-            raise ValueError("Feed exceeds 2 MB.")
     return body
 
 
