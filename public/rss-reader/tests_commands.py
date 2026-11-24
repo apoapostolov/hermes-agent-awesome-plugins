@@ -123,5 +123,84 @@ class RssCookieTests(unittest.TestCase):
         self.assertEqual(plugin_api._cookie_header(netscape), "SID=secret")
 
 
+class RssGzipResponseTests(unittest.TestCase):
+    def setUp(self):
+        api_file = Path(__file__).parent / "dashboard" / "plugin_api.py"
+        spec = importlib.util.spec_from_file_location("rss_reader_plugin_api", api_file)
+        self.api = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(self.api)
+
+    @staticmethod
+    def _response(body: bytes, encoding: str | None = None):
+        class _Headers(dict):
+            def get_content_charset(self):
+                return "utf-8"
+
+        class _Response:
+            status = 200
+
+            def __init__(self):
+                self.headers = _Headers({"Content-Encoding": encoding} if encoding else {})
+
+            def read(self, _size=-1):
+                return body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+        return _Response()
+
+    def test_identity_body_is_returned_unchanged(self):
+        payload = b'<?xml version="1.0"?><rss version="2.0"></rss>'
+        self.assertEqual(self.api._read_response(self._response(payload)), payload)
+
+    def test_gzip_body_is_decompressed(self):
+        import gzip
+
+        payload = (
+            b'<?xml version="1.0" encoding="UTF-8"?>\n'
+            b'<rss version="2.0"><channel><item>ok</item></channel></rss>'
+        )
+        self.assertEqual(
+            self.api._read_response(self._response(gzip.compress(payload), "gzip")),
+            payload,
+        )
+
+    def test_gzip_over_limit_is_rejected(self):
+        import gzip
+
+        payload = b"x" * (self.api._MAX_BYTES + 1)
+        with self.assertRaisesRegex(ValueError, "exceeds 2 MB"):
+            self.api._read_response(self._response(gzip.compress(payload), "gzip"))
+
+    def test_invalid_gzip_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "invalid gzip"):
+            self.api._read_response(self._response(b"not gzip data", "gzip"))
+
+    def test_download_decodes_gzip_feed_to_text(self):
+        import gzip
+
+        payload = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<rss version="2.0"><channel><title>Company Blog</title>'
+            '<item><title>One</title></item></channel></rss>'
+        ).encode("utf-8")
+        response = self._response(gzip.compress(payload), "gzip")
+        opener = type("Opener", (), {"open": lambda _self, _req, timeout=None: response})()
+        with patch.object(self.api, "build_opener", return_value=opener), patch.object(
+            self.api, "_public_addresses", return_value=None
+        ):
+            result = self.api._download(
+                "https://example.com/blog/feed.xml", {"Accept-Encoding": "identity"}
+            )
+        self.assertEqual(result["status"], 200)
+        self.assertIn("<title>Company Blog</title>", result["text"])
+        self.assertNotIn("\ufffd", result["text"])
+
+
 if __name__ == "__main__":
     unittest.main()
