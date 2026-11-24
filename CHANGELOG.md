@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [rss-reader 1.2.2] - 2026-11-25
+
+### Fixed
+
+- **rss-reader:** a feed served with `Content-Encoding: gzip` can be subscribed again. The request asks for `Accept-Encoding: identity`, and a site that compresses the response anyway sent bytes that arrived as replacement characters, so the parser found no entries and Subscribe answered that it could not discover an RSS or Atom feed for the site. The body is now decompressed before the charset decode, the 2 MB limit counts the decompressed bytes, and a body that claims gzip without being valid gzip reports that instead of decoding to garbage. Feed, article, Reddit and feedsearch downloads read the body through the same function, so all four are covered. Both editions carry the change.
+
 ## [provider-status 1.6.10] - 2026-11-24
 
 ### Fixed
