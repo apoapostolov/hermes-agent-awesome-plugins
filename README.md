@@ -15,7 +15,7 @@
   <p>
     <a href="#readme"><img src="https://img.shields.io/badge/Type-Plugin%20pack-555" alt="Type: Plugin pack"></a>
     <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins"><img src="https://img.shields.io/badge/Language-Python%20%2B%20JavaScript-555" alt="Language: Python and JavaScript"></a>
-    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.33-blue" alt="Pack: 1.27.33"></a>
+    <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Pack-1.27.34-blue" alt="Pack: 1.27.34"></a>
     <a href="https://github.com/apoapostolov/hermes-agent-awesome-plugins/releases"><img src="https://img.shields.io/badge/Last%20release-2026--11--22-blue" alt="Last release: 2026-11-22"></a>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a>
   </p>
@@ -95,7 +95,7 @@ Agent rules for these trees live in [AGENTS.md](AGENTS.md). Catalog blockers for
 
 Each row links the personal edition you get from the pack, plus the public catalog edition where one exists.
 
-Twenty plugins are pinned in `hermes-pack.yaml` (pack version 1.27.33). Six plugins in the repo are not in the pack: **better-capabilities**, **byparr-mcp**, **byparr-tools**, **prompt-enhance**, **queue-container-fix**, and **voice-gate**. Install any of them separately. The pack pins the personal tree for those twenty.
+Twenty plugins are pinned in `hermes-pack.yaml` (pack version 1.27.34). Six plugins in the repo are not in the pack: **better-capabilities**, **byparr-mcp**, **byparr-tools**, **prompt-enhance**, **queue-container-fix**, and **voice-gate**. Install any of them separately. The pack pins the personal tree for those twenty.
 
 ### Status Bar
 
