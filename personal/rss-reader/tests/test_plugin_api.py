@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import gzip
 import importlib.util
+import random
 from pathlib import Path
 
 import pytest
@@ -78,6 +79,47 @@ def test_gzip_magic_bytes_are_decompressed_without_the_header(plugin_api):
     """Some servers compress while ignoring the identity request header."""
     body = plugin_api._read_response(FakeResponse(gzip.compress(FEED), encoding=None))
     assert body == FEED
+
+
+def test_double_gzip_body_is_decompressed_twice(plugin_api):
+    """A proxy may re-encode an already compressed body as `gzip, gzip`."""
+    payload = gzip.compress(gzip.compress(FEED))
+    body = plugin_api._read_response(FakeResponse(payload, encoding="gzip, gzip"))
+    assert body == FEED
+
+
+def test_one_declared_layer_still_undoes_every_layer_the_body_carries(plugin_api):
+    """A header that names gzip once must not leave a second layer behind."""
+    payload = gzip.compress(gzip.compress(FEED))
+    body = plugin_api._read_response(FakeResponse(payload, encoding="gzip, identity"))
+    assert body == FEED
+
+
+def test_a_compressed_body_over_the_limit_with_a_small_feed_is_accepted(plugin_api):
+    """The 2 MB limit applies to the feed, never to what came over the wire.
+
+    Incompressible bytes make gzip grow the body, so this transfer is larger
+    than the feed limit while the feed itself sits under it.
+    """
+    feed = random.Random(0).randbytes(plugin_api._MAX_BYTES - 10)
+    payload = gzip.compress(feed)
+    assert len(payload) > plugin_api._MAX_BYTES, "gzip must grow incompressible bytes here"
+    assert len(feed) < plugin_api._MAX_BYTES
+    assert plugin_api._read_response(FakeResponse(payload, encoding="gzip")) == feed
+
+
+def test_the_wire_ceiling_still_bounds_the_read(plugin_api):
+    oversized = b"x" * (plugin_api._MAX_COMPRESSED_BYTES + 1)
+    with pytest.raises(ValueError, match="2 MB"):
+        plugin_api._read_response(FakeResponse(oversized))
+
+
+def test_stacked_layers_stop_at_the_layer_ceiling(plugin_api):
+    payload = FEED
+    for _ in range(plugin_api._MAX_LAYERS + 1):
+        payload = gzip.compress(payload)
+    with pytest.raises(ValueError, match="layers"):
+        plugin_api._read_response(FakeResponse(payload, encoding="gzip"))
 
 
 def test_identity_body_is_returned_untouched(plugin_api):

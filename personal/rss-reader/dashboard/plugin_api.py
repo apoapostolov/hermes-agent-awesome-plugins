@@ -22,6 +22,12 @@ from pydantic import BaseModel
 router = APIRouter()
 
 _MAX_BYTES = 2_000_000
+# The 2 MB limit applies to the decoded feed, so the read that happens before
+# decoding gets its own, larger ceiling to bound the transfer instead.
+_MAX_COMPRESSED_BYTES = 8_000_000
+# Each layer costs one more decompression, so a stacked body stops at a count no
+# real proxy produces.
+_MAX_LAYERS = 4
 _TIMEOUT = 25
 _USER_AGENT = "HermesRSS/0.2"
 _ARTICLE_UA = (
@@ -96,17 +102,29 @@ def _unzip(body: bytes) -> bytes:
             raise ValueError("The feed declared gzip but the body is not valid gzip.") from exc
 
 
+def _declares_gzip(response) -> bool:
+    """True when the response names gzip among its content encodings."""
+    header = str(response.headers.get("Content-Encoding") or "")
+    return any(token.strip().lower() == "gzip" for token in header.split(","))
+
+
 def _read_response(response) -> bytes:
-    body = response.read(_MAX_BYTES + 1)
+    body = response.read(_MAX_COMPRESSED_BYTES + 1)
+    if len(body) > _MAX_COMPRESSED_BYTES:
+        raise ValueError("Feed exceeds 2 MB.")
+    # urllib does not negotiate compression itself: a gzip feed arrives as bytes
+    # that decode to mojibake rather than XML, so undo every layer the body
+    # carries. A header that names gzip over a body that is not gzip still has
+    # to be tried, and _unzip reports that as the 400 _download answers with.
+    declared = _declares_gzip(response)
+    layers = 0
+    while layers < _MAX_LAYERS and ((layers == 0 and declared) or body[:2] == b"\x1f\x8b"):
+        body = _unzip(body)
+        layers += 1
+    if body[:2] == b"\x1f\x8b":
+        raise ValueError("The feed uses more compression layers than this plugin undoes.")
     if len(body) > _MAX_BYTES:
         raise ValueError("Feed exceeds 2 MB.")
-    encoding = str(response.headers.get("Content-Encoding") or "")
-    # urllib does not negotiate compression itself: a gzip feed arrives as bytes
-    # that decode to mojibake rather than XML, so unzip it before the size check.
-    if encoding.lower() == "gzip" or body[:2] == b"\x1f\x8b":
-        body = _unzip(body)
-        if len(body) > _MAX_BYTES:
-            raise ValueError("Feed exceeds 2 MB.")
     return body
 
 
