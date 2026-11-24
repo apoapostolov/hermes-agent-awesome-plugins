@@ -1,12 +1,15 @@
 """RSS Reader backend API: fetch public feeds without shell execution."""
 from __future__ import annotations
 
+import gzip
+import io
 import ipaddress
 import json
 import os
 import re
 import socket
 import time
+import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -83,10 +86,27 @@ def _public_addresses(hostname: str) -> None:
         raise ValueError("Feed host must resolve to a public IPv4 address.")
 
 
+def _unzip(body: bytes) -> bytes:
+    # Read a bounded amount of output so a compression bomb cannot balloon past
+    # the feed limit, and turn broken gzip into the 400 that _download reports.
+    with gzip.GzipFile(fileobj=io.BytesIO(body)) as stream:
+        try:
+            return stream.read(_MAX_BYTES + 1)
+        except (OSError, EOFError, zlib.error) as exc:
+            raise ValueError("The feed declared gzip but the body is not valid gzip.") from exc
+
+
 def _read_response(response) -> bytes:
     body = response.read(_MAX_BYTES + 1)
     if len(body) > _MAX_BYTES:
         raise ValueError("Feed exceeds 2 MB.")
+    encoding = str(response.headers.get("Content-Encoding") or "")
+    # urllib does not negotiate compression itself: a gzip feed arrives as bytes
+    # that decode to mojibake rather than XML, so unzip it before the size check.
+    if encoding.lower() == "gzip" or body[:2] == b"\x1f\x8b":
+        body = _unzip(body)
+        if len(body) > _MAX_BYTES:
+            raise ValueError("Feed exceeds 2 MB.")
     return body
 
 
