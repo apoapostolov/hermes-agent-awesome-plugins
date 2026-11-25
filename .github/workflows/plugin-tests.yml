@@ -1,0 +1,189 @@
+name: plugin tests
+
+# A plugin's own test files are the gate no other workflow here runs. The
+# admission workflow checks the catalog bar and the README workflow checks the
+# rolling block; neither imports a plugin, so a pull request can change one and
+# merge with its tests red. It has happened twice: #26 merged with 8 of 22
+# rss-reader tests failing, and #31 repaired one red case while a second stayed
+# red in the same file.
+#
+# The layout is discovered, not assumed. An edition can carry a `tests/`
+# directory, root-level `tests_*.py` files, or both, and `public/` can carry a
+# plugin that `personal/` does not. Every target gets its own pytest invocation,
+# because two files that share a basename in one call is a collection error.
+#
+# Untrusted input: only SHAs are interpolated, and they are hex from GitHub. The
+# plugin list is written to a file and read line by line, never echoed into a
+# shell, because a pull request chooses the names in it.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plugin-tests:
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # The tests this job runs come from the pull request, so the checkout
+          # keeps no token for them to read.
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest, fastapi and the TestClient transport
+        shell: bash
+        run: |
+          # fastapi.testclient needs httpx, which fastapi does not pull in.
+          python -m pip install --quiet --disable-pip-version-check \
+            fastapi httpx pytest
+
+      - name: List the plugins to test
+        shell: bash
+        run: |
+          set -euo pipefail
+          list="$RUNNER_TEMP/plugins.txt"
+          : > "$list"
+          base="${BASE_SHA:-}"
+          reachable=0
+          if [ -n "$base" ]; then
+            git rev-parse -q --verify "$base^{commit}" >/dev/null && reachable=1
+          fi
+          if [ "$reachable" != 1 ]; then
+            # No commit to diff against, as on workflow_dispatch. Say so
+            # loudly, so this is never read as "the plugins passed".
+            echo "::warning::no base commit to compare against" \
+              "(BASE_SHA='$base'), so no plugin test ran"
+            echo "no base commit to compare against; nothing was tested"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$base" HEAD -- personal public)"
+          touched=0
+          if [ -n "$changed" ]; then
+            touched=1
+          fi
+          printf '%s\n' "$changed" \
+            | awk -F/ 'NF>1 {print $2}' | sort -u > "$list"
+          if [ "$touched" = 1 ] && [ ! -s "$list" ]; then
+            echo "::error::personal or public changed," \
+              "but no plugin came out of the diff"
+            exit 1
+          fi
+          if [ ! -s "$list" ]; then
+            echo "no plugin changed in this push; nothing to test"
+          fi
+          echo "plugins under test:"
+          cat "$list"
+
+      - name: Run the tests of each plugin
+        shell: bash
+        run: |
+          set -uo pipefail
+          # GitHub runs a `shell: bash` step as `bash -e`, so a nonzero pytest
+          # exit would abort the step before `status=$?` and the retry and the
+          # collected-nothing fallback below would never run. Failures are
+          # collected into `fail` and returned at the end instead.
+          set +e
+          fail=0
+          log="$RUNNER_TEMP/pytest.log"
+          # Every test surface an edition can carry: a `tests/` directory and
+          # root-level `tests_*.py` files, which include `tests_commands.py`.
+          targets() {
+            local id="$1" edition base path
+            for edition in personal public; do
+              base="$edition/$id"
+              for path in "$base/tests" "$base"/tests_*.py; do
+                if [ -e "$path" ]; then
+                  printf '%s\n' "$path"
+                fi
+              done
+            done
+          }
+          pytest_run() {
+            local path="$1" plugin_dir="${2:-}"
+            # importlib mode, because prepend imports a plugin's __init__.py as
+            # a top level module and its relative imports then fail.
+            if [ -n "$plugin_dir" ]; then
+              PYTHONPATH="$plugin_dir${PYTHONPATH:+:$PYTHONPATH}" \
+                python -m pytest "$path" -q --import-mode=importlib
+            else
+              python -m pytest "$path" -q --import-mode=importlib
+            fi
+          }
+          while IFS= read -r plugin; do
+            [ -n "$plugin" ] || continue
+            # The names come from the pull request, so each one is checked
+            # against a shape before it reaches a command.
+            case "$plugin" in
+              *[!A-Za-z0-9._-]*|.*|*..*)
+                echo "::error::unexpected plugin name $plugin"
+                fail=1
+                continue
+                ;;
+            esac
+            for req in "personal/$plugin"/requirements*.txt \
+              "public/$plugin"/requirements*.txt
+            do
+              if [ -e "$req" ]; then
+                echo "::group::python -m pip install -r $req"
+                python -m pip install --quiet --disable-pip-version-check \
+                  -r "$req" || fail=1
+                echo "::endgroup::"
+              fi
+            done
+            targets "$plugin" | sort -u > "$RUNNER_TEMP/targets.txt"
+            if [ ! -s "$RUNNER_TEMP/targets.txt" ]; then
+              echo "no test target under $plugin"
+            fi
+            while IFS= read -r path; do
+              [ -n "$path" ] || continue
+              edition="${path%%/*}"
+              plugin_dir="$PWD/$edition/$plugin"
+              echo "::group::python -m pytest $path -q"
+              pytest_run "$path" > "$log" 2>&1
+              status=$?
+              if [ "$status" -ne 0 ] \
+                && grep -qE "ModuleNotFoundError|ImportError" "$log"; then
+                # A suite that imports plugin modules by bare name needs the
+                # plugin directory importable. Only retried when the plain run
+                # said so: the directory must not be on the path for a plugin
+                # whose own module shadows a standard library name, as
+                # personal/rss-reader does with `platform.py`.
+                echo "first attempt could not import the suite; its last lines:"
+                tail -n 5 "$log"
+                echo "retrying with the plugin directory importable"
+                pytest_run "$path" "$plugin_dir" > "$log" 2>&1
+                status=$?
+              fi
+              cat "$log"
+              if [ "$status" -eq 5 ]; then
+                # pytest collected nothing. A `tests_*.py` file that checks
+                # itself is run directly; a directory of node tests is not a
+                # Python suite and is reported, not failed.
+                if [ -f "$path" ]; then
+                  echo "no pytest tests in $path; running the file directly"
+                  python "$path"
+                  status=$?
+                else
+                  echo "::warning::no Python tests collected in $path"
+                  status=0
+                fi
+              fi
+              if [ "$status" -ne 0 ]; then
+                fail=1
+              fi
+              echo "::endgroup::"
+            done < "$RUNNER_TEMP/targets.txt"
+          done < "$RUNNER_TEMP/plugins.txt"
+          exit "$fail"
