@@ -178,7 +178,7 @@ class RssGzipResponseTests(unittest.TestCase):
             self.api._read_response(self._response(gzip.compress(payload), "gzip"))
 
     def test_invalid_gzip_is_rejected(self):
-        with self.assertRaisesRegex(ValueError, "invalid gzip"):
+        with self.assertRaisesRegex(ValueError, "declared gzip but the body is not valid gzip"):
             self.api._read_response(self._response(b"not gzip data", "gzip"))
 
     def test_download_decodes_gzip_feed_to_text(self):
