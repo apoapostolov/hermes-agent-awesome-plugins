@@ -1,0 +1,2 @@
+Throwaway marker: exists only so the merged plugin-tests workflow names and runs
+this plugin in a proof pull request. Branch and pull request are deleted after.
