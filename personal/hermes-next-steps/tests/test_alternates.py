@@ -154,3 +154,5 @@ class OrderTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+# exercised by the plugin-tests proof run (throwaway branch)

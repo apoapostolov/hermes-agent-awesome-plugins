@@ -193,3 +193,5 @@ if FAILS:
     print("%d check(s) failed: %s" % (len(FAILS), ", ".join(FAILS)))
     sys.exit(1)
 print("all checks passed")
+
+# exercised by the plugin-tests proof run (throwaway branch)
