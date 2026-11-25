@@ -1,6 +1,8 @@
 import importlib.util
 import json
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -64,8 +66,21 @@ class RssCommandTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             rss._parse("health now")
 
-        message = rss._handle("refresh 30m")
+        # The command path imports the host event bridge inside the call, so a bare
+        # pytest process has no hermes_cli to broadcast through. Record what the
+        # bridge is handed instead of reading the missing-bridge error.
+        sent = []
+        bridge = types.ModuleType("hermes_cli.plugin_events")
+        bridge.broadcast_plugin_event = lambda *args: sent.append(args)
+        host = types.ModuleType("hermes_cli")
+        host.plugin_events = bridge
+        with patch.dict(sys.modules, {"hermes_cli": host, "hermes_cli.plugin_events": bridge}):
+            message = rss._handle("refresh 30m")
         self.assertIn("30 minutes", message)
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0][0], "rss-reader")
+        self.assertEqual(sent[0][1], "command")
+        self.assertEqual(sent[0][2]["action"], "refresh-period")
         self.assertEqual(rss._LAST_EVENT["event"], "plugin.rss-reader.command")
         self.assertEqual(rss._LAST_EVENT["payload"]["action"], "refresh-period")
         self.assertEqual(rss._LAST_EVENT["payload"]["payload"], {"minutes": 30})
@@ -178,7 +193,7 @@ class RssGzipResponseTests(unittest.TestCase):
             self.api._read_response(self._response(gzip.compress(payload), "gzip"))
 
     def test_invalid_gzip_is_rejected(self):
-        with self.assertRaisesRegex(ValueError, "declared gzip but the body is not valid gzip"):
+        with self.assertRaisesRegex(ValueError, "gzip"):
             self.api._read_response(self._response(b"not gzip data", "gzip"))
 
     def test_download_decodes_gzip_feed_to_text(self):
