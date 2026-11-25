@@ -89,6 +89,12 @@ jobs:
       - name: Run the tests of each plugin
         shell: bash
         run: |
+          # GitHub runs a `bash` step as `bash --noprofile --norc -eo pipefail`,
+          # and `set -uo pipefail` below does not clear that -e. A failing
+          # pytest has to reach the handlers in this loop instead of ending the
+          # step, so errexit is cleared here and every invocation captures its
+          # own status.
+          set +e
           set -uo pipefail
           fail=0
           log="$RUNNER_TEMP/pytest.log"
@@ -146,8 +152,8 @@ jobs:
               edition="${path%%/*}"
               plugin_dir="$PWD/$edition/$plugin"
               echo "::group::python -m pytest $path -q"
-              pytest_run "$path" > "$log" 2>&1
-              status=$?
+              status=0
+              pytest_run "$path" > "$log" 2>&1 || status=$?
               if [ "$status" -ne 0 ] \
                 && grep -qE "ModuleNotFoundError|ImportError" "$log"; then
                 # A suite that imports plugin modules by bare name needs the
@@ -158,8 +164,8 @@ jobs:
                 echo "first attempt could not import the suite; its last lines:"
                 tail -n 5 "$log"
                 echo "retrying with the plugin directory importable"
-                pytest_run "$path" "$plugin_dir" > "$log" 2>&1
-                status=$?
+                status=0
+                pytest_run "$path" "$plugin_dir" > "$log" 2>&1 || status=$?
               fi
               cat "$log"
               if [ "$status" -eq 5 ]; then
@@ -168,8 +174,8 @@ jobs:
                 # Python suite and is reported, not failed.
                 if [ -f "$path" ]; then
                   echo "no pytest tests in $path; running the file directly"
-                  python "$path"
-                  status=$?
+                  status=0
+                  python "$path" || status=$?
                 else
                   echo "::warning::no Python tests collected in $path"
                   status=0
