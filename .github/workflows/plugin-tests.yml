@@ -90,6 +90,11 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
+          # GitHub runs a `shell: bash` step as `bash -e`, so a nonzero pytest
+          # exit would abort the step before `status=$?` and the retry and the
+          # collected-nothing fallback below would never run. Failures are
+          # collected into `fail` and returned at the end instead.
+          set +e
           fail=0
           log="$RUNNER_TEMP/pytest.log"
           # Every test surface an edition can carry: a `tests/` directory and
