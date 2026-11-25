@@ -1,0 +1,99 @@
+name: plugin tests
+
+# A plugin's own pytest files are the gate no other workflow here runs. The
+# admission workflow checks the catalog bar and the README workflow checks the
+# rolling block; neither imports a plugin, so a pull request can change one and
+# merge with its tests red. It has happened twice: #26 merged with 8 of 22
+# rss-reader tests failing, and #31 repaired one red case while a second stayed
+# red in the same file.
+#
+# Every changed plugin runs its tests here, one pytest invocation per file.
+# `public/<plugin>` usually ships no `tests/` directory and pytest answers
+# `ERROR: file or directory not found` for a missing path, so each path is
+# checked before it runs.
+#
+# Untrusted input: only SHAs are interpolated, and they are hex from GitHub. The
+# plugin list is written to a file and read line by line, never echoed into a
+# shell, because a pull request chooses the names in it.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plugin-tests:
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest and fastapi
+        shell: bash
+        run: |
+          python -m pip install --quiet --disable-pip-version-check \
+            fastapi pytest
+
+      - name: List the plugins that changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          list="$RUNNER_TEMP/plugins.txt"
+          : > "$list"
+          base="${BASE_SHA:-}"
+          reachable=0
+          if [ -n "$base" ]; then
+            git rev-parse -q --verify "$base^{commit}" >/dev/null && reachable=1
+          fi
+          if [ "$reachable" = 1 ]; then
+            git diff --name-only "$base" HEAD -- personal public \
+              | awk -F/ 'NF>1 {print $2}' | sort -u > "$list"
+          fi
+          if [ ! -s "$list" ]; then
+            echo "no plugin changed in this push; nothing to test"
+          fi
+          echo "plugins under test:"
+          cat "$list"
+
+      - name: Run the tests of each changed plugin
+        shell: bash
+        run: |
+          set -uo pipefail
+          fail=0
+          while IFS= read -r plugin; do
+            [ -n "$plugin" ] || continue
+            # The names come from the pull request, so each one is checked
+            # against a shape before it reaches a command.
+            case "$plugin" in
+              *[!A-Za-z0-9._-]*|.*|*..*)
+                echo "::error::unexpected plugin name $plugin"
+                fail=1
+                continue
+                ;;
+            esac
+            for path in \
+              "personal/$plugin/tests" \
+              "personal/$plugin/tests_commands.py" \
+              "public/$plugin/tests_commands.py"
+            do
+              if [ -d "$path" ] || [ -f "$path" ]; then
+                echo "::group::python -m pytest $path -q"
+                python -m pytest "$path" -q || fail=1
+                echo "::endgroup::"
+              else
+                echo "skipped, not present: $path"
+              fi
+            done
+          done < "$RUNNER_TEMP/plugins.txt"
+          exit "$fail"
