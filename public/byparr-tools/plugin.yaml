@@ -1,7 +1,7 @@
 name: byparr-tools
-version: 0.2.0
+version: 0.2.1
 manifest_version: 2
-description: "First-class tools for any FlareSolverr-compatible challenge solver (Byparr, FlareSolverr): solved HTML, challenge cookies bridged into a browser, batch clean text, structured extraction, health and status. Configure the solver address and browser endpoint in Settings."
+description: "First-class tools for any FlareSolverr-compatible challenge solver (Byparr, FlareSolverr): solved HTML, challenge cookies bridged into a browser, batch clean text, structured extraction, health and status. Loopback, private and cloud-metadata targets are refused unless LAN targets are opted in. Configure the solver address and browser endpoint in Settings."
 author: Hermes Agent
 kind: general
 license: MIT
@@ -45,9 +45,14 @@ config_schema:
     description: "When a direct fetch is walled, short or fails, retry through the solver."
   fallback_tool_names:
     type: list
-    default: [web_extract, browser_exec]
+    default: [web_extract]
     label: Tools that get solver fallback
-    description: "Tool names whose walled results are retried through the solver. Keep this short; our own solver tools are never wrapped."
+    description: "Tool names whose walled results are retried through the solver. Only a tool that takes URLs can be wrapped, so browser_exec (a code argument) is not a default. Our own solver tools are never wrapped."
+  allow_private_targets:
+    type: bool
+    default: false
+    label: Allow LAN and loopback targets
+    description: "Off refuses loopback, private and link-local URLs before any fetch. Turn on only when a page you must reach sits on your own network. Cloud metadata addresses stay blocked."
   return_html_default:
     type: bool
     default: false
@@ -97,12 +102,12 @@ config_schema:
     type: str
     default: ""
     label: Proxy server
-    description: "Optional protocol://host:port used for solves that need a different egress region."
+    description: "Optional protocol://host:port used for every solve. Tool calls cannot override it, so stored credentials only ever reach this host."
   proxy_username:
     type: secret
     env: BYPARR_PROXY_USERNAME
-    description: "Optional proxy username. Stored in the host credential store, never in config.yaml."
+    description: "Optional proxy username, sent only to the proxy server above. Stored in the host credential store, never in config.yaml."
   proxy_password:
     type: secret
     env: BYPARR_PROXY_PASSWORD
-    description: "Optional proxy password. Stored in the host credential store, never in config.yaml."
+    description: "Optional proxy password, sent only to the proxy server above. Stored in the host credential store, never in config.yaml."

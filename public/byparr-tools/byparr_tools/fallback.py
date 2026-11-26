@@ -1,10 +1,10 @@
 """Auto-fallback middleware.
 
-Wraps tool execution so that a walled web_extract/browser_exec result can be
-retried through the configured solver. Fail-open by design: any error returns
-the original result, so this never breaks the tools it observes. The middleware
-is opt-in per tool name through Settings and never touches our own solver_*
-tools, so it cannot recurse into itself.
+Wraps tool execution so that a walled ``web_extract`` result can be retried
+through the configured solver. Fail-open by design: any error returns the
+original result, so this never breaks the tools it observes. The middleware is
+opt-in per tool name through Settings and never touches our own solver_* tools,
+so it cannot recurse into itself.
 """
 from __future__ import annotations
 
@@ -16,7 +16,10 @@ from . import tools as solver_tools
 
 _settings = Settings()
 WALL_MARKERS = ("just a moment", "sec-if-cpt", "checking security", "access denied")
-DEFAULT_TARGETS = ("web_extract", "browser_exec")
+# web_extract takes ``urls``; browser_exec takes ``code``, so a URL never reaches
+# this middleware from that tool and it is not a default target.
+DEFAULT_TARGETS = ("web_extract",)
+URL_ARGUMENTS = ("url", "target_url", "href")
 MAX_RESULT_CHARS = 20000
 
 
@@ -48,11 +51,29 @@ def _walled(text: str) -> bool:
     return any(marker in low for marker in WALL_MARKERS)
 
 
+def _first_http_url(value: Any) -> str:
+    if isinstance(value, str) and value.startswith(("http://", "https://")):
+        return value
+    return ""
+
+
 def _url(args: Dict[str, Any]) -> str:
-    for key in ("url", "target_url", "href"):
-        value = args.get(key)
-        if isinstance(value, str) and value.startswith(("http://", "https://")):
-            return value
+    """The first fetchable URL in a tool's arguments.
+
+    ``web_extract`` names its input ``urls`` (a list), and a single-URL call is
+    the common case, so ``urls[0]`` is read alongside the singular names. Without
+    that read the fallback never fired for the tool it advertises.
+    """
+    for key in URL_ARGUMENTS:
+        found = _first_http_url(args.get(key))
+        if found:
+            return found
+    urls = args.get("urls")
+    if isinstance(urls, list):
+        for value in urls:
+            found = _first_http_url(value)
+            if found:
+                return found
     return ""
 
 

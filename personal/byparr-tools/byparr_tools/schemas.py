@@ -7,8 +7,9 @@ SOLVER_GET = {
         "solver (Byparr or FlareSolverr) and return solved HTML. The solver address "
         "comes from plugin Settings or FLARESOLVERR_URL. GET-only, no inbound cookies. "
         "Use when web_extract/curl returned a challenge or a walled/short body. "
-        "Returns status, byte count, wall markers and optionally HTML. For login or "
-        "clicks, use solver_cookies to bridge into a browser instead."
+        "Loopback, private and cloud-metadata targets are refused. Returns status, "
+        "byte count, wall markers and optionally HTML. For login or clicks, use "
+        "solver_cookies to bridge into a browser instead."
     ),
     "parameters": {
         "type": "object",
@@ -18,9 +19,6 @@ SOLVER_GET = {
             "blockMedia": {"type": "boolean", "description": "Block images/media/fonts for speed."},
             "returnHtml": {"type": "boolean", "description": "Include HTML in the result."},
             "maxChars": {"type": "integer", "description": "HTML cap when returnHtml is true."},
-            "proxyServer": {"type": "string", "description": "Optional protocol://host:port for one request."},
-            "proxyUsername": {"type": "string"},
-            "proxyPassword": {"type": "string"},
         },
         "required": ["url"],
     },
@@ -31,10 +29,11 @@ SOLVER_COOKIES = {
     "description": (
         "Harvest challenge cookies such as cf_clearance through returnOnlyCookies. "
         "Returns a CDP Network.setCookies payload and the exact user_agent to set. "
+        "Cookie values are omitted from that payload unless showValues is true. "
         "Challenge cookies are commonly bound to User-Agent and IP: match the UA and "
-        "use a browser sharing the solver's egress IP. Cookie values stay hidden "
-        "unless showValues is true. An optional session stores the payload in a "
-        "session-scoped in-memory jar for solver_bridge."
+        "use a browser sharing the solver's egress IP. An optional session stores the "
+        "full cookies in a session-scoped jar for solver_bridge. Loopback, private and "
+        "cloud-metadata targets are refused."
     ),
     "parameters": {
         "type": "object",
@@ -43,9 +42,6 @@ SOLVER_COOKIES = {
             "maxTimeout": {"type": "integer"},
             "showValues": {"type": "boolean", "description": "Include cookie values (sensitive)."},
             "session": {"type": "string", "description": "Optional jar key for a later solver_bridge call."},
-            "proxyServer": {"type": "string"},
-            "proxyUsername": {"type": "string"},
-            "proxyPassword": {"type": "string"},
         },
         "required": ["url"],
     },
@@ -55,9 +51,11 @@ SOLVER_LOAD = {
     "name": "solver_load",
     "description": (
         "Batch-fetch public URLs through the solver's Open WebUI /load endpoint and "
-        "return clean text with source metadata for RAG/document capture. Failing "
-        "URLs yield empty text so a pipeline degrades gracefully. Text-only: use "
-        "solver_get when HTML, status codes or cookies are needed."
+        "return clean text with source metadata for RAG/document capture. Every URL is "
+        "checked first: the call is refused when one targets a loopback, private or "
+        "cloud-metadata address. A failing page yields empty text so a pipeline "
+        "degrades gracefully. Text-only: use solver_get when HTML, status codes or "
+        "cookies are needed."
     ),
     "parameters": {
         "type": "object",
@@ -121,7 +119,9 @@ SOLVER_FETCH = {
     "description": (
         "Fetch a public URL directly first, then fall back to the solver when the "
         "body is walled, short or the direct request fails. Reports which route "
-        "was used. The fallback is controlled by the auto_fallback setting."
+        "was used. The fallback is controlled by the auto_fallback setting. Every "
+        "redirect hop is checked, so a public URL cannot bounce to a loopback, "
+        "private or cloud-metadata address."
     ),
     "parameters": {
         "type": "object",

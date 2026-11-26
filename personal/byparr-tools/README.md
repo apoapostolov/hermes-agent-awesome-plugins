@@ -3,19 +3,20 @@
   <h1>byparr-tools</h1>
   <p><strong>First-class solver tools for Hermes, on any machine.</strong></p>
   <p>Hand a Cloudflare-walled page to a FlareSolverr-compatible solver, bridge the cleared cookies into your browser, and pull clean text for RAG, all from tools the agent can call directly.</p>
-  <p><a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" /></a> <img src="https://img.shields.io/badge/version-0.2.0-green" alt="0.2.0" /></p>
+  <p><a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" /></a> <img src="https://img.shields.io/badge/version-0.2.1-green" alt="0.2.1" /></p>
 </div>
 
 <div align="center">
   <img src="docs/hero.png" width="100%" alt="byparr-tools" />
 </div>
 
-## What's New in 0.2.0
+## What's New in 0.2.1
 
-- Nine tools now ship instead of three: `solver_status` reports health and latency, `solver_bridge` injects challenge cookies into a browser over CDP, `solver_extract` parses JSON-LD and metadata, `solver_fetch` falls back from a direct request to the solver, and `jar_list` / `jar_clear` manage the session-scoped cookie jar.
-- `tool_execution` middleware retries a walled `web_extract` or `browser_exec` result through the solver. It is fail-open and configurable by tool name.
-- Every machine-specific value moved into Settings or an environment variable. `FLARESOLVERR_URL`, `BYPARR_CDP_URL` and the proxy secret keys override the stored settings for one host.
-- A single-flight queue with bounded retries prevents the timeouts that parallel solver calls produced.
+- Every URL a tool fetches passes the host's URL policy first, through the same `tools.url_safety` check the built-in fetch tools use. Loopback, private, link-local and cloud-metadata targets are refused, `solver_fetch` re-checks each redirect hop, and `solver_load` refuses a batch that contains one instead of fetching the rest.
+- The proxy is a setting only. Tool calls no longer carry proxy fields, so a URL chosen inside a prompt cannot route your stored proxy credentials to a host it named.
+- Proxy secrets come from the host secret scope. A scope error now stops the call instead of falling back to the process environment, which under a multi-profile gateway read the launch profile's value.
+- `solver_cookies` omits cookie values from the CDP payload it returns unless `showValues` is true. The jar keeps the full cookies for `solver_bridge`, which injects them without printing them.
+- The auto-fallback middleware reads `web_extract`'s `urls` argument and wraps `web_extract` by default. `browser_exec` takes code rather than a URL, so it is no longer a default target.
 
 ## What You Can Do
 
@@ -52,7 +53,7 @@ Check the solver with `curl http://127.0.0.1:8191/health`. A Byparr answer usual
 Then install and enable the plugin:
 
 ```bash
-hermes plugins install https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/personal/byparr-tools
+hermes plugins install https://github.com/apoapostolov/hermes-agent-awesome-plugins/tree/main/public/byparr-tools
 hermes plugins enable byparr-tools
 ```
 
@@ -68,6 +69,8 @@ For cookie bridging, set **Browser CDP URL** to a Chrome/Chromium DevTools endpo
 | Default solve timeout | `60` | Seconds for a solve; values `1000+` are milliseconds. |
 | Block media during solves | on | Skip images, media and fonts for faster solves. |
 | Solver fallback in solver_fetch | on | Retry through the solver when a direct fetch is walled, short or fails. |
+| Tools that get solver fallback | `web_extract` | Tool names whose walled results are retried through the solver. Only a tool that takes URLs can be wrapped. |
+| Allow LAN and loopback targets | off | Off refuses loopback, private and link-local addresses before any fetch. On allows pages on your own network; cloud metadata addresses stay blocked either way. |
 | Include HTML by default | off | Return HTML from `solver_get` without asking per call. |
 | HTML result cap | `6000` | Maximum HTML characters returned by one call. |
 | Text result cap | `3000` | Maximum characters per page for `solver_load` and `solver_fetch`. |
@@ -77,17 +80,17 @@ For cookie bridging, set **Browser CDP URL** to a Chrome/Chromium DevTools endpo
 | Cookie jar lifetime | `1800` | Seconds a stored cookie session stays usable. |
 | Persist cookie jar to disk | off | Off keeps cookies in memory only; on writes them to the plugin data dir. |
 | Cookie jar directory | empty | Optional directory for the persisted jar. |
-| Proxy server | empty | Optional `protocol://host:port` for solves that need a different egress region. |
-| Proxy username / password | unset | Optional proxy credentials stored in the host credential store. |
+| Proxy server | empty | Optional `protocol://host:port` used for every solve. Tool calls cannot override it. |
+| Proxy username / password | unset | Optional credentials, sent only to the configured proxy server. |
 
-`FLARESOLVERR_URL`, `BYPARR_CDP_URL`, `BYPARR_PROXY_USERNAME` and `BYPARR_PROXY_PASSWORD` override their settings for one host. Proxy credentials use the host's secret scope, never `config.yaml`.
+`FLARESOLVERR_URL`, `BYPARR_CDP_URL`, `BYPARR_PROXY_USERNAME` and `BYPARR_PROXY_PASSWORD` override their settings for one host. Proxy credentials use the host's secret scope, never `config.yaml`, and are attached only to the proxy configured above.
 
 ## What the agent writes
 
 | Tool | Result |
 | --- | --- |
 | `solver_get` | Status, byte count, wall flag, `solved` flag and optional truncated HTML for one URL. |
-| `solver_cookies` | Cookie names, an optional jar session, a CDP `Network.setCookies` payload and the exact User-Agent. Values stay hidden unless `showValues` is true. |
+| `solver_cookies` | Cookie names, an optional jar session, a CDP `Network.setCookies` payload and the exact User-Agent. Values are left out of the payload and the result unless `showValues` is true. |
 | `solver_load` | Clean text with source metadata for a list of URLs. |
 | `solver_status` | Health body, version, latency, queue counters and a redacted settings summary. |
 | `solver_bridge` | Injects a jar session or explicit cookies into the configured CDP target, including the UA. |
@@ -105,6 +108,7 @@ The tools are transport and extraction primitives. Site-specific interpretation 
 - The solver is GET-only in this plugin. There is no inbound cookies field, no session parameter and no login flow. Use `solver_cookies` plus `solver_bridge` for an interactive page.
 - `solver_load` needs the solver's Open WebUI `/load` endpoint. FlareSolverr builds without it will not answer; `solver_get` still works.
 - Cookies are live session state. The jar is in memory unless disk persistence is explicitly enabled, and values are never written to chat output, logs or commits by the tools.
+- Each fetched URL is checked with the host's `tools.url_safety`, the same policy the built-in fetch tools follow. Outside a Hermes process that module is absent and only the floor is enforced (scheme, address literals, cloud-metadata hosts), because the resolver policy lives in the host.
 - A cloud-hosted solver is likely to stay blocked by Cloudflare. Run the solver on a machine whose traffic looks like real user traffic.
 
 ## License

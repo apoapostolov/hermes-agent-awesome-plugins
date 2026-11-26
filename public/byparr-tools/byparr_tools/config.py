@@ -23,11 +23,29 @@ DEFAULTS: Dict[str, Any] = {
     "cookie_jar_ttl_seconds": 1800,
     "persist_cookie_jar": False,
     "cookie_jar_dir": "",
+    "proxy_server": "",
+    "allow_private_targets": False,
 }
 
 # Sensitive proxy credentials travel through the host's secret scope. These
-# names are the declared env fallbacks; get_secret is used when available.
+# names are the env-var names the host resolves; get_secret is used whenever the
+# plugin runs inside Hermes.
 SECRET_KEYS = ("proxy_username", "proxy_password")
+
+
+def host_secret_scope() -> Any:
+    """The host's profile-aware secret helper, or None outside a Hermes process.
+
+    Only a failed import counts as "outside the host". Every other error is left
+    to propagate, and ``UnscopedSecretError`` matters most: it means the read has
+    no profile scope while a multiplexing gateway is active, so falling back to
+    ``os.environ`` would hand this profile another profile's credential.
+    """
+    try:
+        from agent import secret_scope  # type: ignore
+    except ImportError:
+        return None
+    return secret_scope
 
 
 class Settings:
@@ -82,16 +100,17 @@ class Settings:
         return bool(value)
 
     def secrets(self) -> Dict[str, str]:
+        """Proxy credentials from the host scope, or from the env outside Hermes.
+
+        The env read is gated on the host module being absent, not on an error
+        from it: a host that raises is telling us the scope is missing, and that
+        answer must reach the caller instead of becoming a silent env read.
+        """
+        scope = host_secret_scope()
         out: Dict[str, str] = {}
         for key in SECRET_KEYS:
-            value = ""
-            # Prefer the profile-aware host helper when running inside Hermes.
-            try:
-                from agent.secret_scope import get_secret  # type: ignore
-
-                value = get_secret("BYPARR_" + key.upper(), "")
-            except Exception:  # noqa: BLE001 - outside the host, fall back to env
-                value = os.environ.get("BYPARR_" + key.upper(), "")
+            name = "BYPARR_" + key.upper()
+            value = os.environ.get(name, "") if scope is None else scope.get_secret(name, "")
             if value:
-                out[key] = value
+                out[key] = str(value)
         return out
