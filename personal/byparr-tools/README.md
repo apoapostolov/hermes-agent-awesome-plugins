@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/NousResearch/hermes-agent/main/docs/assets/hermes-mark.png" width="96" alt="Hermes" />
   <h1>byparr-tools</h1>
-  <p><strong>First-class solver tools for Hermes, on any machine.</strong></p>
+  <p><strong>Solver tools for Hermes, on any machine.</strong></p>
   <p>Hand a Cloudflare-walled page to a FlareSolverr-compatible solver, bridge the cleared cookies into your browser, and pull clean text for RAG, all from tools the agent can call directly.</p>
   <p><a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" /></a> <img src="https://img.shields.io/badge/version-0.2.1-green" alt="0.2.1" /></p>
 </div>

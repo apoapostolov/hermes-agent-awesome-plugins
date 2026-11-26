@@ -1,7 +1,7 @@
 name: byparr-tools
 version: 0.2.1
 manifest_version: 2
-description: "First-class tools for any FlareSolverr-compatible challenge solver (Byparr, FlareSolverr): solved HTML, challenge cookies bridged into a browser, batch clean text, structured extraction, health and status. Loopback, private and cloud-metadata targets are refused unless LAN targets are opted in. Configure the solver address and browser endpoint in Settings."
+description: "Solver tools for any FlareSolverr-compatible challenge solver (Byparr, FlareSolverr): solved HTML, challenge cookies bridged into a browser, batch clean text, structured extraction, health and status. Loopback, private and cloud-metadata targets are refused unless LAN targets are opted in. Configure the solver address and browser endpoint in Settings."
 author: Hermes Agent
 kind: general
 license: MIT
